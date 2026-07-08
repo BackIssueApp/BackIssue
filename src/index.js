@@ -463,10 +463,19 @@ scheduler.register({ key: 'recent-search', label: 'Search new releases', ...sche
 scheduler.register({ key: 'rss-watch', label: 'Watch indexer RSS for releases', ...schedGetters('rss-watch'), run: () => runRssWatch() });
 // Plugin-contributed schedulable jobs (e.g. a catalog crawl). Plugins still
 // declare their legacy '<x>Hours' key; the '<x>Cron'/'<x>Enabled' twins drive it.
+// Each run receives a context so a plugin job can queue work without importing
+// core internals: db is the live core connection; startDownloads kicks the
+// download queue if idle (the same guard the built-in jobs use).
+const pluginJobCtx = () => ({
+  db,
+  startDownloads: () => {
+    if (!state.queue.running) Promise.resolve(runDownloads()).catch((e) => { state.queue.error = String(e); });
+  },
+});
 for (const job of registeredJobs()) {
   const base = String(job.scheduleKey).replace(/Hours$/, ''); // 'crawlHours' → 'crawl'
   SCHEDULE_KEYS[job.id] = { cron: base + 'Cron', enabled: base + 'Enabled' };
-  scheduler.register({ key: job.id, label: job.label, ...schedGetters(job.id), run: () => job.run() });
+  scheduler.register({ key: job.id, label: job.label, ...schedGetters(job.id), run: () => job.run(pluginJobCtx()) });
 }
 
 function setScheduleCron(key, { cron, enabled } = {}) {

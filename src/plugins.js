@@ -85,8 +85,11 @@ export const pluginApi = {
       bump('routes');
     }
   },
-  // A schedulable background job. `run` is async; `scheduleKey` is the config key
-  // (in hours) that drives it on the scheduler, `defaultHours` its default.
+  // A schedulable background job. `run(ctx)` is async and receives
+  // { db, startDownloads } — the live core DB connection and a kick for the
+  // download queue — so a job can queue issues without importing core
+  // internals. `scheduleKey` is the legacy '<x>Hours' config key whose
+  // '<x>Cron'/'<x>Enabled' twins drive it on the Jobs page.
   registerJob(job) {
     if (job?.id && typeof job.run === 'function') { jobs.push(job); bump('jobs'); }
   },
