@@ -184,6 +184,14 @@ export function loadSettings() {
 
 export function saveSettings(input) {
   applySettings(input);
-  fs.writeFileSync(FILE, JSON.stringify(currentSettings(), null, 2));
+  // Preserve keys we don't currently recognize. A plugin's setting keys are only
+  // "known" (registered) while that plugin is loaded; if it is disabled, mid-
+  // update via the catalog, or failed to load, its keys are absent from
+  // currentSettings(). Writing just currentSettings() would then drop them —
+  // permanently wiping that plugin's saved config from disk. Merge over whatever
+  // is already on disk so an unloaded plugin's settings survive until it's back.
+  let onDisk = {};
+  try { onDisk = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { /* first run: nothing to preserve */ }
+  fs.writeFileSync(FILE, JSON.stringify({ ...onDisk, ...currentSettings() }, null, 2));
   return currentSettings();
 }
