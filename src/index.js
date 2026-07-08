@@ -617,7 +617,13 @@ async function runRecentSearch() {
   const { items, total } = listWantedIssues(db, { followedOnly: true, releasedWithinDays: days, limit: 200 });
   const fresh = [], failed = [];
   for (const it of items) {
-    const bucket = it.queue_status === 'failed' ? failed : it.queue_status ? null : fresh;
+    // 'pending' is PARKED (a cancelled or interrupted queue entry), not
+    // in-flight — inside the new-releases window it gets picked back up:
+    // followed means "keep this complete". Only genuinely moving statuses
+    // (queued/downloading/grabbed/saving/done) are left alone.
+    const bucket = it.queue_status === 'failed' ? failed
+      : (!it.queue_status || it.queue_status === 'pending') ? fresh
+      : null;
     if (bucket) bucket.push(ensureCvIssueRow(db, { seriesId: it.series_id, cvIssueId: it.cv_issue_id, number: it.issue_number, title: it.issue_name }));
   }
   // Failed rows keep no files (they never downloaded) — just reset them to
