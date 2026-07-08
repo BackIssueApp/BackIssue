@@ -122,6 +122,10 @@ const config = {
   // matches a missing issue of a followed series, within one poll of upload.
   rssWatchCron: '*/15 * * * *',
   rssWatchEnabled: false,
+  // Scheduled database backups (the backup-db tool: snapshots into backups/,
+  // keeps the newest 5). ON by default — cheap insurance for every install.
+  backupCron: '0 5 * * 1',         // weekly, Monday 05:00
+  backupEnabled: true,
   // Legacy hour-cadence keys — migrated to Cron+Enabled on load (see settings.js).
   releaseCheckHours: 0,
   updatesCheckHours: 0,

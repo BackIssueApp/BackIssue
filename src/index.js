@@ -452,6 +452,7 @@ const SCHEDULE_KEYS = {
   'wanted-search': { cron: 'wantedSearchCron', enabled: 'wantedSearchEnabled' },
   'recent-search': { cron: 'recentSearchCron', enabled: 'recentSearchEnabled' },
   'rss-watch': { cron: 'rssWatchCron', enabled: 'rssWatchEnabled' },
+  'db-backup': { cron: 'backupCron', enabled: 'backupEnabled' },
 };
 const scheduler = createScheduler({ db });
 const schedGetters = (key) => ({ cron: () => config[SCHEDULE_KEYS[key].cron], enabled: () => !!config[SCHEDULE_KEYS[key].enabled] });
@@ -461,6 +462,10 @@ scheduler.register({ key: 'zero-day', label: 'Grab weekly 0-Day pack (torrent)',
 scheduler.register({ key: 'wanted-search', label: 'Search wanted issues (backfill)', ...schedGetters('wanted-search'), run: () => runWantedSearch() });
 scheduler.register({ key: 'recent-search', label: 'Search new releases', ...schedGetters('recent-search'), run: () => runRecentSearch() });
 scheduler.register({ key: 'rss-watch', label: 'Watch indexer RSS for releases', ...schedGetters('rss-watch'), run: () => runRssWatch() });
+// Scheduled backups reuse the backup-db tool (same job tracking + keep-newest-5
+// rotation). If another tool happens to be running, this tick is skipped and
+// the next scheduled run catches up.
+scheduler.register({ key: 'db-backup', label: 'Back up database', ...schedGetters('db-backup'), run: () => runTool('backup-db') });
 // Plugin-contributed schedulable jobs (e.g. a catalog crawl). Plugins still
 // declare their legacy '<x>Hours' key; the '<x>Cron'/'<x>Enabled' twins drive it.
 // Each run receives a context so a plugin job can queue work without importing

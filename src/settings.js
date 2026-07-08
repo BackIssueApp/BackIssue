@@ -51,6 +51,8 @@ export const SETTING_FIELDS = {
   recentSearchDays:    { type: 'int', min: 1, max: 90 },
   rssWatchCron:        { type: 'string', allowEmpty: true },
   rssWatchEnabled:     { type: 'bool' },
+  backupCron:          { type: 'string', allowEmpty: true },
+  backupEnabled:       { type: 'bool' },
   autoDownloadOnAdd:   { type: 'bool' }, // adding a volume queues its issues immediately
   zeroDayCron:         { type: 'string', allowEmpty: true },
   zeroDayEnabled:      { type: 'bool' },
