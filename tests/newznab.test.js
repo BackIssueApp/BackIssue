@@ -136,3 +136,11 @@ test('parseNewznab: dispatches XML (servers that ignore o=json) and JSON alike',
   // An XML <error> surfaces as a thrown, human-readable error.
   assert.throws(() => parseNewznab('<error code="100" description="Incorrect user credentials"/>', 'NZ'), /Incorrect user credentials/);
 });
+
+test('buildSearchUrl: an empty query omits q entirely (RSS/latest mode)', () => {
+  const url = buildSearchUrl({ url: 'https://nz', apiKey: 'k' }, '');
+  assert.ok(!/[?&]q=/.test(url), 'no empty q param');
+  assert.match(url, /t=search/);
+  // a real query still includes it
+  assert.match(buildSearchUrl({ url: 'https://nz', apiKey: 'k' }, 'saga'), /q=saga/);
+});

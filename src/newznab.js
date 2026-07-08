@@ -26,7 +26,10 @@ export function parseIndexers(str) {
 const apiRoot = (url) => String(url || '').replace(/\/+$/, '').replace(/\/api$/i, '');
 
 export function buildSearchUrl(indexer, query, { cat = '7030', limit = 50 } = {}) {
-  const p = new URLSearchParams({ t: 'search', q: query, o: 'json', apikey: indexer.apiKey, limit: String(limit) });
+  const p = new URLSearchParams({ t: 'search', o: 'json', apikey: indexer.apiKey, limit: String(limit) });
+  // A present-but-EMPTY q trips "Missing parameter" on some servers (althub),
+  // while omitting it entirely is the standard "latest uploads" (RSS) request.
+  if (String(query || '').trim()) p.set('q', query);
   if (cat) p.set('cat', cat);
   return `${apiRoot(indexer.url)}/api?${p.toString()}`;
 }
