@@ -22,6 +22,7 @@ const routes = [];     // { method, path, handler } express routes
 const jobs = [];       // { id, label, run, scheduleKey, defaultHours } schedulable jobs
 const clientAssets = []; // { name, js?, css? } — front-end files served + injected
 const permissions = []; // { key, label, description, tier, plugin } — role-assignable perms
+const authProviders = []; // { id, label, loginPath } — external login (SSO/OIDC) buttons
 
 // Per-plugin catalog for the management page: everything discovered on disk,
 // loaded or not. name → { name, version, description, enabled, loaded, error, counts }.
@@ -97,6 +98,21 @@ export const pluginApi = {
       bump('assets');
     }
   },
+  // An external login method (SSO/OIDC). The login page shows a "Sign in with
+  // <label>" button that sends the browser to loginPath (a public plugin route
+  // that starts the provider's flow). After the provider verifies the user, the
+  // plugin's callback route calls req.app.locals.issueSession(...) to sign them
+  // in. { id, label, loginPath }.
+  registerAuthProvider(provider) {
+    if (!provider?.id || !provider?.loginPath) return;
+    if (authProviders.some((p) => p.id === provider.id)) return;
+    authProviders.push({
+      id: String(provider.id),
+      label: provider.label || String(provider.id),
+      loginPath: String(provider.loginPath),
+      plugin: currentLoadingPlugin,
+    });
+  },
 };
 
 // The plugin currently running its register() — so registerClientAsset can stamp
@@ -104,6 +120,7 @@ export const pluginApi = {
 let currentLoadingPlugin = null;
 
 // Live views of what plugins (and built-ins) have registered.
+export function registeredAuthProviders() { return authProviders; }
 export function registeredSources() { return sources; }
 export function registeredSettings() { return Object.assign({}, ...settings); }
 export function registeredStartups() { return startups; }

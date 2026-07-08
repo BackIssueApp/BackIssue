@@ -26,6 +26,7 @@ export const SETTING_FIELDS = {
   cvEnrich:            { type: 'bool' },
   disabledPlugins:     { type: 'string', allowEmpty: true }, // comma-separated plugin names skipped at boot
   allowRegistration:   { type: 'bool' }, // self-service signups (new accounts start as viewers)
+  passwordLoginDisabled: { type: 'bool' }, // SSO-only: hide the password form (admins keep an escape hatch)
   // Legacy single-account basic auth — replaced by the user system. Tolerated
   // so old settings.json files load; the boot migration converts them to the
   // first admin user and then blanks them.

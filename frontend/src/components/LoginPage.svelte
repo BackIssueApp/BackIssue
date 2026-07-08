@@ -1,8 +1,9 @@
 <script>
-  // Full-screen auth gate: sign in, or register when self-service signups are
-  // enabled. Also reused (via `mode="secure"`) from open mode to create the
-  // first admin account.
+  // Full-screen auth gate: sign in (password and/or SSO), or register when
+  // self-service signups are enabled. Also reused (via `mode="secure"`) from
+  // open mode to create the first admin account.
   import { auth, login, register } from '../lib/auth.svelte.js';
+  import { apiGet } from '../lib/api.js';
 
   let { mode = 'login', oncancel = null } = $props(); // 'login' | 'secure'
   let tab = $state(mode === 'secure' ? 'register' : 'login');
@@ -13,6 +14,18 @@
   let busy = $state(false);
 
   const securing = $derived(mode === 'secure');
+
+  // External login providers (SSO/OIDC) + whether the password form is enabled.
+  let providers = $state([]);
+  let passwordLogin = $state(true);
+  $effect(() => {
+    if (securing) return; // first-admin creation always uses the password form
+    apiGet('/api/auth/providers')
+      .then((r) => { providers = r.providers || []; passwordLogin = r.passwordLogin !== false; })
+      .catch(() => { /* offline — leave defaults */ });
+  });
+
+  const showPasswordForm = $derived(securing || passwordLogin);
   const canRegister = $derived(securing || auth.registration);
 
   async function submit() {
@@ -38,34 +51,47 @@
     <div class="brand"><span class="brand__logo">BACKISSUE</span></div>
     {#if securing}
       <p class="authgate__intro">Welcome to BackIssue. Create your account to get started — it becomes the <b>admin</b>, and signing in will be required from then on.</p>
-    {:else if canRegister}
+    {:else if canRegister && showPasswordForm}
       <div class="authgate__tabs">
         <button class="authgate__tab" class:is-active={tab === 'login'} onclick={() => { tab = 'login'; error = ''; }}>Sign in</button>
         <button class="authgate__tab" class:is-active={tab === 'register'} onclick={() => { tab = 'register'; error = ''; }}>Create account</button>
       </div>
     {/if}
 
-    <form class="authgate__form" onsubmit={(e) => { e.preventDefault(); submit(); }}>
-      <label>Username
-        <input type="text" autocomplete="username" bind:value={username} required minlength="2" maxlength="32" />
-      </label>
-      <label>Password
-        <input type="password" autocomplete={tab === 'register' ? 'new-password' : 'current-password'} bind:value={password} required minlength={tab === 'register' ? 8 : 1} />
-      </label>
-      {#if tab === 'register'}
-        <label>Confirm password
-          <input type="password" autocomplete="new-password" bind:value={confirm} required />
+    {#if showPasswordForm}
+      <form class="authgate__form" onsubmit={(e) => { e.preventDefault(); submit(); }}>
+        <label>Username
+          <input type="text" autocomplete="username" bind:value={username} required minlength="2" maxlength="32" />
         </label>
-      {/if}
-      {#if error}<div class="authgate__error">{error}</div>{/if}
-      <button class="btn btn--primary authgate__submit" disabled={busy}>
-        {busy ? '…' : securing ? 'Create admin account' : tab === 'register' ? 'Create account' : 'Sign in'}</button>
-      {#if securing && oncancel}
-        <button type="button" class="btn btn--ghost" onclick={oncancel}>Cancel</button>
-      {/if}
-    </form>
+        <label>Password
+          <input type="password" autocomplete={tab === 'register' ? 'new-password' : 'current-password'} bind:value={password} required minlength={tab === 'register' ? 8 : 1} />
+        </label>
+        {#if tab === 'register'}
+          <label>Confirm password
+            <input type="password" autocomplete="new-password" bind:value={confirm} required />
+          </label>
+        {/if}
+        {#if error}<div class="authgate__error">{error}</div>{/if}
+        <button class="btn btn--primary authgate__submit" disabled={busy}>
+          {busy ? '…' : securing ? 'Create admin account' : tab === 'register' ? 'Create account' : 'Sign in'}</button>
+        {#if securing && oncancel}
+          <button type="button" class="btn btn--ghost" onclick={oncancel}>Cancel</button>
+        {/if}
+      </form>
+    {/if}
 
-    {#if !securing && !canRegister}
+    {#if !securing && providers.length}
+      {#if showPasswordForm}<div class="authgate__or"><span>or</span></div>{/if}
+      <div class="authgate__sso">
+        {#each providers as p (p.id)}
+          <a class="btn btn--ghost authgate__sso-btn" href={p.loginPath}>Sign in with {p.label}</a>
+        {/each}
+      </div>
+    {/if}
+
+    {#if !securing && !passwordLogin && !providers.length}
+      <p class="authgate__note">No sign-in method is available — an admin must configure SSO or re-enable password login.</p>
+    {:else if !securing && !canRegister && showPasswordForm}
       <p class="authgate__note">Registration is disabled — ask an admin for an account.</p>
     {/if}
   </div>

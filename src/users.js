@@ -95,7 +95,79 @@ export function initUserTables(db) {
     ('viewer', 'Viewer', 'viewer', 1),
     ('trusted', 'Trusted', 'trusted', 1),
     ('admin', 'Admin', 'admin', 1)`).run();
+  // External identities (OIDC/SSO): map a verified (provider, subject) to a
+  // local user so external logins land on a stable account. email is added to
+  // users for linking-by-email and display. ALTER is idempotent-guarded since
+  // CREATE TABLE IF NOT EXISTS can't add a column to an existing table.
+  const userCols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+  if (!userCols.includes('email')) db.exec('ALTER TABLE users ADD COLUMN email TEXT');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS external_identities (
+      provider TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      user_id INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      PRIMARY KEY (provider, subject)
+    );
+    CREATE INDEX IF NOT EXISTS idx_extid_user ON external_identities(user_id);
+  `);
   clearRoleCache();
+}
+
+// ---- external identities (SSO/OIDC) ----------------------------------------
+// Sanitize an arbitrary display name/email-local-part into a valid username.
+function sanitizeUsername(raw) {
+  let s = String(raw || '').replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 32);
+  while (s.length < 2) s += '0';
+  return s;
+}
+
+export function findUserByEmail(db, email) {
+  if (!email) return null;
+  return db.prepare('SELECT * FROM users WHERE email = ? COLLATE NOCASE LIMIT 1').get(String(email)) || null;
+}
+
+export function findUserByExternalIdentity(db, provider, subject) {
+  const row = db.prepare('SELECT user_id FROM external_identities WHERE provider = ? AND subject = ?')
+    .get(String(provider), String(subject));
+  return row ? getUser(db, row.user_id) : null;
+}
+
+export function linkExternalIdentity(db, provider, subject, userId) {
+  db.prepare('INSERT OR IGNORE INTO external_identities (provider, subject, user_id) VALUES (?, ?, ?)')
+    .run(String(provider), String(subject), userId);
+}
+
+// Create a user with no usable password — they authenticate via their external
+// provider. A unique username is derived from the requested one.
+export function createExternalUser(db, { username, email, role = 'viewer' }) {
+  if (!roleExists(db, role)) role = 'viewer';
+  const pw = hashPassword(crypto.randomBytes(24).toString('hex')); // random → unusable for password login
+  const base = sanitizeUsername(username) || 'user';
+  let final = base;
+  for (let n = 1; db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE').get(final); n += 1) {
+    final = `${base}${n}`.slice(0, 32);
+  }
+  const r = db.prepare('INSERT INTO users (username, password_hash, role, email) VALUES (?, ?, ?, ?)')
+    .run(final, pw, role, email ? String(email) : null);
+  return getUser(db, r.lastInsertRowid);
+}
+
+// Resolve an ALREADY-VERIFIED external identity to a local user: by prior link,
+// else by matching email, else auto-provision. Links the identity for next
+// time. Callers MUST have verified the identity (e.g. a valid OIDC id_token).
+export function resolveExternalUser(db, { provider, subject, email, name, defaultRole = 'viewer' }) {
+  if (!provider || !subject) throw new Error('external identity requires provider and subject');
+  let user = findUserByExternalIdentity(db, provider, subject);
+  if (user) return user;
+  if (email) {
+    user = findUserByEmail(db, email);
+    if (user) { linkExternalIdentity(db, provider, subject, user.id); return user; }
+  }
+  const uname = name || (email ? String(email).split('@')[0] : '') || `${provider}-user`;
+  user = createExternalUser(db, { username: uname, email, role: defaultRole });
+  linkExternalIdentity(db, provider, subject, user.id);
+  return user;
 }
 
 // ---- roles ------------------------------------------------------------------
@@ -205,7 +277,7 @@ export function createUser(db, { username, password, role = 'viewer' }) {
 }
 
 export function getUser(db, id) {
-  return db.prepare('SELECT id, username, role, disabled, created_at FROM users WHERE id=?').get(id) || null;
+  return db.prepare('SELECT id, username, email, role, disabled, created_at FROM users WHERE id=?').get(id) || null;
 }
 
 export function listUsers(db) {

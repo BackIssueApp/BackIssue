@@ -31,6 +31,10 @@ const config = {
   // Optional HTTP Basic auth for the web UI + API (both must be set to enable).
   authUser: '',
   authPass: '',
+  // Force SSO: disable the username/password login form (an SSO/OIDC auth
+  // provider must be configured). Admins keep a password escape hatch so a
+  // broken identity provider can't lock everyone out.
+  passwordLoginDisabled: false,
   // Webhook POSTed on imports/failures (Discord-compatible JSON: { content }).
   // Blank = off. Also usable as a post-import hook (e.g. trigger a reader scan).
   notifyWebhookUrl: '',

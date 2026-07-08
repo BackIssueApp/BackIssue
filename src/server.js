@@ -12,7 +12,7 @@ import { testIndexer } from './newznab.js';
 import { testClient } from './nzbclients.js';
 import { testTorznabIndexer } from './torznab.js';
 import { testTorrentClient } from './torrentclients.js';
-import { pluginsDir, pluginCatalog, setPluginEnabled, registeredRoutes, registeredPermissions } from './plugins.js';
+import { pluginsDir, pluginCatalog, setPluginEnabled, registeredRoutes, registeredPermissions, registeredAuthProviders } from './plugins.js';
 import { fetchCatalog, installPlugin, uninstallPlugin } from './plugincatalog.js';
 import * as users from './users.js';
 import * as lists from './lists.js';
@@ -253,7 +253,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     // The SPA shell, its assets, and auth endpoints are public — everything
     // under /api and /plugins requires an authenticated user.
     if (!req.path.startsWith('/api') && !req.path.startsWith('/plugins')) return next();
-    if (/^\/api\/auth\/(login|register|me)$/.test(req.path)) return next();
+    if (/^\/api\/auth\/(login|register|me|providers)$/.test(req.path)) return next();
     if (basicCsrfBlocked(req)) return res.status(403).json({ error: 'cross-origin request refused' });
     // Zero accounts = open single-user mode (the appliance default, same as
     // the old unset-basic-auth state). Creating the first account — which
@@ -296,6 +296,24 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       user: publicUser(u),
     });
   });
+  // Public: what the sign-in page should offer — external SSO buttons (from
+  // auth-provider plugins) and whether the password form is enabled.
+  app.get('/api/auth/providers', (req, res) => {
+    res.json({
+      providers: registeredAuthProviders().map((p) => ({ id: p.id, label: p.label, loginPath: p.loginPath })),
+      passwordLogin: !config.passwordLoginDisabled,
+    });
+  });
+  // Sign in a user from an ALREADY-VERIFIED external identity. SSO/OIDC plugins
+  // call this from their callback route AFTER validating the provider's token.
+  // Returns the public user; throws { status } on a disabled account.
+  app.locals.issueSession = (req, res, identity) => {
+    const user = users.resolveExternalUser(db, identity);
+    if (user.disabled) { const e = new Error('this account is disabled'); e.status = 403; throw e; }
+    const token = users.createSession(db, user.id);
+    setSessionCookie(req, res, token);
+    return publicUser(user);
+  };
   app.post('/api/auth/register', (req, res) => {
     const { username, password } = req.body || {};
     const first = users.userCount(db) === 0;
@@ -326,6 +344,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     if (!u) {
       users.authFailed(key);
       return res.status(401).json({ error: 'wrong username or password' });
+    }
+    // Password login can be disabled (SSO-only), but admins keep a password
+    // escape hatch so a broken IdP can't lock everyone out.
+    if (config.passwordLoginDisabled && u.role !== 'admin') {
+      return res.status(403).json({ error: 'password login is disabled — sign in with SSO' });
     }
     users.authSucceeded(key);
     const token = users.createSession(db, u.id);
