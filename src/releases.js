@@ -54,7 +54,12 @@ export function matchReleases(db, releases) {
       hits++;
       if (issueId) {
         isNew = !getCvIssue(db, issueId);
-        upsertCvIssue(db, { id: issueId, cv_series_id: cvId, number: r.issue, name: r.title });
+        // Carry the provider's ship date into the cache as the store date —
+        // it's what makes this issue visible to the new-releases search lane
+        // (which filters by release date). upsertCvIssue only backfills a
+        // missing date, never overwrites one ComicVine already supplied.
+        const ship = /^\d{4}-\d{2}-\d{2}/.test(String(r.shipdate || '')) ? String(r.shipdate).slice(0, 10) : null;
+        upsertCvIssue(db, { id: issueId, cv_series_id: cvId, number: r.issue, name: r.title, store_date: ship });
         if (isNew) added++;
       }
       owned = issueId ? !!ownedStmt.get(issueId) : false;

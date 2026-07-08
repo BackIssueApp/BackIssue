@@ -726,7 +726,9 @@ export function upsertCvIssue(db, i) {
     `INSERT INTO cv_issues (comicvine_id, cv_series_id, issue_number, name, cover_date, store_date, has_detail, cached_at)
      VALUES (@id, @cv_series_id, @issue_number, @name, @cover_date, @store_date, @has_detail, datetime('now'))
      ON CONFLICT(comicvine_id) DO UPDATE SET
-       cv_series_id=excluded.cv_series_id, issue_number=excluded.issue_number, name=excluded.name`
+       cv_series_id=excluded.cv_series_id, issue_number=excluded.issue_number, name=excluded.name,
+       cover_date=COALESCE(cv_issues.cover_date, excluded.cover_date),
+       store_date=COALESCE(cv_issues.store_date, excluded.store_date)`
   ).run({
     id: i.id, cv_series_id: i.cv_series_id,
     issue_number: locked.has('issue_number') ? prev.issue_number : (i.issue_number ?? i.number ?? null),

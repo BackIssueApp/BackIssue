@@ -63,3 +63,26 @@ test('matchReleases cross-references tracked comics by ComicVine id', () => {
   // tracked comics sort to the top
   assert.ok(r.releases[0].tracked && r.releases[r.releases.length - 1].tracked === false);
 });
+
+test('matchReleases seeds the ship date as store_date (feeds the new-releases lane)', () => {
+  const db = openDb(':memory:');
+  const sid = upsertSeries(db, { title: 'Invincible (2003)', url: '/c/inv2' });
+  upsertCvSeries(db, { id: 17993, name: 'Invincible' });
+  setSeriesCv(db, sid, 17993, { locked: 0 });
+  // An existing DATE-LESS stub (how release-seeded issues used to look) and an
+  // issue ComicVine already dated.
+  upsertCvIssue(db, { id: 5001, cv_series_id: 17993, number: '5', name: 'Five' });
+  upsertCvIssue(db, { id: 5002, cv_series_id: 17993, number: '6', name: 'Six', store_date: '2026-01-01' });
+
+  matchReleases(db, [
+    { comicid: '17993', issueid: '5001', issue: '5', shipdate: '2026-07-08', series: 'Invincible' },
+    { comicid: '17993', issueid: '5002', issue: '6', shipdate: '2026-07-08', series: 'Invincible' },
+    { comicid: '17993', issueid: '5003', issue: '7', shipdate: '2026-07-08', series: 'Invincible' }, // brand new
+    { comicid: '17993', issueid: '5004', issue: '8', shipdate: 'garbage', series: 'Invincible' },    // bad date → null
+  ]);
+  const d = (id) => db.prepare('SELECT store_date FROM cv_issues WHERE comicvine_id=?').get(id).store_date;
+  assert.equal(d(5001), '2026-07-08', 'date-less stub backfilled from shipdate');
+  assert.equal(d(5002), '2026-01-01', 'a real ComicVine date is never overwritten');
+  assert.equal(d(5003), '2026-07-08', 'newly seeded issue carries the ship date');
+  assert.equal(d(5004), null, 'malformed shipdate stays null');
+});
