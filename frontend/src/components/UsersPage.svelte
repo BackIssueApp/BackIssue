@@ -79,6 +79,11 @@
     allowRegistration = !!r.allowRegistration;
   }
 
+  // A friendly label for an external-login source. Known providers get a nice
+  // name; anything else shows its id uppercased so new plugins still surface.
+  const PROVIDER_LABELS = { whmcs: 'WHMCS', oidc: 'SSO' };
+  const providerLabel = (id) => PROVIDER_LABELS[id] || String(id || '').toUpperCase();
+
   // ---- roles ----
   const roleLabel = (name) => roles.find((r) => r.name === name)?.label || name;
   const permLabel = (key) => perms.find((p) => p.key === key)?.label || key;
@@ -129,7 +134,7 @@
   <div class="users-scroll">
     {#each users as u (u.id)}
       <div class="user-row" class:is-off={u.disabled}>
-        <span class="user-row__name">{u.username}{#if u.id === auth.user?.id}<span class="user-row__you">you</span>{/if}</span>
+        <span class="user-row__name">{u.username}{#if u.id === auth.user?.id}<span class="user-row__you">you</span>{/if}{#each u.providers || [] as p}<span class="user-row__src" title="Account linked to {providerLabel(p)}">{providerLabel(p)}</span>{/each}</span>
         <span class="user-row__seen muted">{u.last_seen ? 'seen ' + new Date(u.last_seen).toLocaleDateString() : 'never signed in'}</span>
         <select class="user-row__role" value={u.role} onchange={(e) => setRole(u, e.currentTarget.value)} disabled={u.id === auth.user?.id}>
           {#each roles as r (r.name)}

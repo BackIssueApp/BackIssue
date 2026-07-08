@@ -587,6 +587,7 @@ body.userspage .users-page { display: flex; flex-direction: column; height: calc
 .user-row.is-off { opacity: .55; }
 .user-row__name { font-size: 14px; font-weight: 600; min-width: 140px; }
 .user-row__you { margin-left: 8px; font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); border: 1px solid rgba(255,45,111,.4); border-radius: 4px; padding: 1px 6px; }
+.user-row__src { margin-left: 6px; font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; }
 .user-row__seen { flex: 1; font-size: 12px; }
 .user-row__role { padding: 5px 8px; background: var(--ink); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font: 12.5px var(--font-body); }
 .user-new { border: 1px dashed var(--line); border-radius: 10px; padding: 14px 16px; margin-top: 8px; }

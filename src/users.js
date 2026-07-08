@@ -283,8 +283,12 @@ export function getUser(db, id) {
 export function listUsers(db) {
   return db.prepare(`
     SELECT u.id, u.username, u.role, u.disabled, u.created_at,
-           (SELECT MAX(last_seen) FROM sessions s WHERE s.user_id = u.id) AS last_seen
-      FROM users u ORDER BY u.id`).all();
+           (SELECT MAX(last_seen) FROM sessions s WHERE s.user_id = u.id) AS last_seen,
+           (SELECT GROUP_CONCAT(DISTINCT provider) FROM external_identities e WHERE e.user_id = u.id) AS providers
+      FROM users u ORDER BY u.id`).all()
+    // A user linked to an external login (SSO/OIDC, WHMCS, …) carries its
+    // provider id(s); a plain local account has none.
+    .map((u) => ({ ...u, providers: u.providers ? u.providers.split(',') : [] }));
 }
 
 /** Credentials → user row (with hash timing regardless of user existence). */
@@ -323,8 +327,12 @@ export function deleteUser(db, id) {
 
 export function createSession(db, userId) {
   const token = crypto.randomBytes(32).toString('hex');
-  db.prepare(`INSERT INTO sessions (token_hash, user_id, expires_at)
-              VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%SZ','now','+${SESSION_DAYS} days'))`)
+  // Stamp last_seen at creation so a brand-new sign-in reads as "seen just now"
+  // immediately — otherwise a user who logs in (especially via SSO/WHMCS and
+  // lands on a single page) shows as "never signed in" until their next request.
+  db.prepare(`INSERT INTO sessions (token_hash, user_id, expires_at, last_seen)
+              VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%SZ','now','+${SESSION_DAYS} days'),
+                      strftime('%Y-%m-%dT%H:%M:%SZ','now'))`)
     .run(tokenHash(token), userId);
   return token;
 }

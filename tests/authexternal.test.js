@@ -43,3 +43,21 @@ test('defaultRole is honored for auto-provisioned users, and subject is required
   assert.equal(u.role, 'admin');
   assert.throws(() => users.resolveExternalUser(d, { provider: 'oidc', subject: '' }), /provider and subject/);
 });
+
+test('listUsers reports external-login providers and a plain account has none', () => {
+  const d = freshDb();
+  const local = users.createUser(d, { username: 'localguy', password: 'password1', role: 'viewer' });
+  const ext = users.resolveExternalUser(d, { provider: 'whmcs', subject: '42', email: 'w@x.com', name: 'W', defaultRole: 'viewer' });
+  const rows = users.listUsers(d);
+  const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
+  assert.deepEqual(byId[local.id].providers, [], 'local account has no providers');
+  assert.deepEqual(byId[ext.id].providers, ['whmcs'], 'external account reports its provider');
+});
+
+test('createSession stamps last_seen so a fresh login is not "never signed in"', () => {
+  const d = freshDb();
+  const u = users.createUser(d, { username: 'seenme', password: 'password1', role: 'viewer' });
+  users.createSession(d, u.id);
+  const row = users.listUsers(d).find((r) => r.id === u.id);
+  assert.ok(row.last_seen, 'last_seen is set at session creation');
+});
