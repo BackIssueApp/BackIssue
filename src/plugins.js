@@ -16,21 +16,27 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PLUGINS_DIR = process.env.PLUGINS_DIR || path.join(root, 'plugins');
 
-// Make the app's dependencies resolvable from plugins that live OUTSIDE the app
-// tree (e.g. Docker's PLUGINS_DIR=/data/plugins). Node walks up node_modules
-// dirs from the importing file, so a symlink at <pluginsDir>/node_modules → the
-// app's node_modules lets a plugin `import 'better-sqlite3'` (a shared core dep)
-// resolve. No-op when pluginsDir already sits under the app root (dev, where the
-// walk-up reaches the app's node_modules on its own).
+// Let plugins that live OUTSIDE the app tree (e.g. Docker's
+// PLUGINS_DIR=/data/plugins) reach core. Plugins reach it two ways, both of
+// which assume the plugin sits at <appRoot>/plugins/<name> — so `../..` is the
+// app root:
+//   • relative imports:   import config from '../../src/config.js'
+//   • bare shared deps:    import Database from 'better-sqlite3'
+// When PLUGINS_DIR is elsewhere, `../..` points at the plugins dir's parent
+// (/data), not /app. Recreate the app root there by symlinking the app's src/
+// and node_modules/ beside the plugins dir. No-op in dev, where the plugins dir
+// already sits under the app root and both are present.
 function linkCoreModules(dir) {
-  try {
-    const appModules = path.join(root, 'node_modules');
-    const link = path.join(dir, 'node_modules');
-    const underRoot = path.resolve(dir + path.sep).startsWith(path.resolve(root) + path.sep);
-    if (underRoot || !fs.existsSync(appModules) || fs.existsSync(link)) return;
-    fs.symlinkSync(appModules, link, 'junction'); // junction on Windows; plain symlink on posix
-    console.log(`Linked core node_modules into ${dir} for plugin dependency resolution`);
-  } catch (e) { console.warn('plugin core-module link failed:', e?.message || e); }
+  const parent = path.dirname(dir); // '../..' from a plugin resolves here
+  for (const item of ['src', 'node_modules']) {
+    try {
+      const target = path.join(root, item);
+      const link = path.join(parent, item);
+      if (!fs.existsSync(target) || fs.existsSync(link)) continue;
+      fs.symlinkSync(target, link, 'junction'); // junction on Windows; plain symlink on posix
+      console.log(`Linked ${item} beside ${dir} for plugin resolution`);
+    } catch (e) { console.warn(`plugin resolution link (${item}) failed:`, e?.message || e); }
+  }
 }
 
 // A plugin's OWN dependencies (its package.json "dependencies") aren't in the
