@@ -399,3 +399,38 @@ test('safeUrl blocks javascript:/data: incl. control-char-split schemes', async 
     assert.equal(safeUrl(bad), '', `drops ${JSON.stringify(bad)}`);
   }
 });
+
+test('login falls back to a plugin credential provider and provisions the user', async () => {
+  // Simulates a remote password backend (e.g. WHMCS): verifies a specific
+  // credential pair and hands core a verified external identity.
+  pluginApi.registerCredentialProvider(async (username, password) =>
+    username === 'client@x.com' && password === 'good'
+      ? { provider: 'mock-billing', subject: 'client-1', email: 'client@x.com', name: 'Client', defaultRole: 'viewer' }
+      : null);
+  const { app } = makeApp();
+  const s = await listen(app);
+  const base = `http://localhost:${s.address().port}`;
+  const post = (path, body) => fetch(`${base}${path}`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+  });
+  try {
+    // Close open mode with a real admin so login is enforced.
+    await post('/api/auth/register', { username: 'admin', password: 'adminpass1' });
+
+    // Wrong remote password → local fails, provider returns null → 401.
+    const bad = await post('/api/auth/login', { username: 'client@x.com', password: 'nope' });
+    assert.equal(bad.status, 401);
+
+    // Valid remote creds → provider verifies → core provisions + issues a session.
+    const ok = await post('/api/auth/login', { username: 'client@x.com', password: 'good' });
+    assert.equal(ok.status, 200);
+    const body = await ok.json();
+    assert.equal(body.user.username, 'Client'); // provisioned from the verified identity's name
+    assert.equal(body.user.role, 'viewer');
+    assert.ok(cookieOf(ok), 'issues a session cookie');
+
+    // The provider is not consulted for the local admin (local auth wins first).
+    const admin = await post('/api/auth/login', { username: 'admin', password: 'adminpass1' });
+    assert.equal(admin.status, 200);
+  } finally { s.close(); }
+});

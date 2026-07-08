@@ -23,6 +23,7 @@ const jobs = [];       // { id, label, run, scheduleKey, defaultHours } schedula
 const clientAssets = []; // { name, js?, css? } — front-end files served + injected
 const permissions = []; // { key, label, description, tier, plugin } — role-assignable perms
 const authProviders = []; // { id, label, loginPath } — external login (SSO/OIDC) buttons
+const credentialProviders = []; // async (username, password) => identity | null — external password backends
 
 // Per-plugin catalog for the management page: everything discovered on disk,
 // loaded or not. name → { name, version, description, enabled, loaded, error, counts }.
@@ -113,6 +114,14 @@ export const pluginApi = {
       plugin: currentLoadingPlugin,
     });
   },
+  // A password backend for the standard login form. `fn(username, password)`
+  // resolves to a VERIFIED identity ({ provider, subject, email?, name?,
+  // defaultRole? }) or null (not this backend's user / bad credentials). Core
+  // tries these only after local password auth fails, then issues the session.
+  // Used for e.g. WHMCS or LDAP where the password is checked against a remote.
+  registerCredentialProvider(fn) {
+    if (typeof fn === 'function') credentialProviders.push(fn);
+  },
 };
 
 // The plugin currently running its register() — so registerClientAsset can stamp
@@ -121,6 +130,7 @@ let currentLoadingPlugin = null;
 
 // Live views of what plugins (and built-ins) have registered.
 export function registeredAuthProviders() { return authProviders; }
+export function registeredCredentialProviders() { return credentialProviders; }
 export function registeredSources() { return sources; }
 export function registeredSettings() { return Object.assign({}, ...settings); }
 export function registeredStartups() { return startups; }

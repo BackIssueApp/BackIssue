@@ -12,7 +12,7 @@ import { testIndexer } from './newznab.js';
 import { testClient } from './nzbclients.js';
 import { testTorznabIndexer } from './torznab.js';
 import { testTorrentClient } from './torrentclients.js';
-import { pluginsDir, pluginCatalog, setPluginEnabled, registeredRoutes, registeredPermissions, registeredAuthProviders } from './plugins.js';
+import { pluginsDir, pluginCatalog, setPluginEnabled, registeredRoutes, registeredPermissions, registeredAuthProviders, registeredCredentialProviders } from './plugins.js';
 import { fetchCatalog, installPlugin, uninstallPlugin } from './plugincatalog.js';
 import * as users from './users.js';
 import * as lists from './lists.js';
@@ -305,7 +305,9 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   app.get('/api/auth/providers', (req, res) => {
     res.json({
       providers: registeredAuthProviders().map((p) => ({ id: p.id, label: p.label, loginPath: p.loginPath })),
-      passwordLogin: !config.passwordLoginDisabled,
+      // The password form is also needed by credential backends (e.g. WHMCS),
+      // so keep it visible whenever one is registered.
+      passwordLogin: !config.passwordLoginDisabled || registeredCredentialProviders().length > 0,
     });
   });
   // Sign in a user from an ALREADY-VERIFIED external identity. SSO/OIDC plugins
@@ -339,25 +341,42 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       res.status(400).json({ error: String(e?.message || e) });
     }
   });
-  app.post('/api/auth/login', (req, res) => {
+  app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body || {};
     const key = authKey(req, username);
     const wait = users.authBlockedFor(key);
     if (wait) return res.status(429).json({ error: `too many attempts — try again in ${wait}s` });
     const u = users.verifyCredentials(db, username, password);
-    if (!u) {
-      users.authFailed(key);
-      return res.status(401).json({ error: 'wrong username or password' });
+    if (u) {
+      // Password login can be disabled (SSO-only), but admins keep a password
+      // escape hatch so a broken IdP can't lock everyone out.
+      if (config.passwordLoginDisabled && u.role !== 'admin') {
+        return res.status(403).json({ error: 'password login is disabled — sign in with SSO' });
+      }
+      users.authSucceeded(key);
+      const token = users.createSession(db, u.id);
+      setSessionCookie(req, res, token);
+      return res.json({ user: publicUser(u) });
     }
-    // Password login can be disabled (SSO-only), but admins keep a password
-    // escape hatch so a broken IdP can't lock everyone out.
-    if (config.passwordLoginDisabled && u.role !== 'admin') {
-      return res.status(403).json({ error: 'password login is disabled — sign in with SSO' });
+    // Local password failed — try external credential backends (e.g. WHMCS,
+    // LDAP). Each verifies the password against its own system; the first to
+    // return a VERIFIED identity signs the user in via the external-identity
+    // link/provision path.
+    for (const provider of registeredCredentialProviders()) {
+      let identity = null;
+      try { identity = await provider(String(username || ''), String(password || '')); }
+      catch { /* the provider logs its own errors; treat as no-match */ }
+      if (identity && identity.subject) {
+        users.authSucceeded(key);
+        try {
+          return res.json({ user: app.locals.issueSession(req, res, { defaultRole: 'viewer', ...identity }) });
+        } catch (e) {
+          return res.status(e?.status || 403).json({ error: String(e?.message || e) });
+        }
+      }
     }
-    users.authSucceeded(key);
-    const token = users.createSession(db, u.id);
-    setSessionCookie(req, res, token);
-    res.json({ user: publicUser(u) });
+    users.authFailed(key);
+    return res.status(401).json({ error: 'wrong username or password' });
   });
   app.post('/api/auth/logout', (req, res) => {
     users.destroySession(db, readCookie(req));
