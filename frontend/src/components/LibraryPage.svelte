@@ -119,12 +119,13 @@
   let viewH = $state(800);
   let stride = $state(260);      // row height incl. gap, measured
   let cols = $state(1);          // posters per row (1 in list view), measured
+  let listTop = $state(0);       // px from scroll-top to the grid (home rail height)
 
   const virtual = $derived(rail.rows.length > VIRTUAL_MIN);
   const range = $derived.by(() => {
     const n = rail.rows.length;
     if (!virtual) return { start: 0, end: n, padTop: 0, padBottom: 0 };
-    return windowRange({ n, cols: view === 'grid' ? cols : 1, stride, viewH, scrollTop, listTop: 0, overscan: 6 });
+    return windowRange({ n, cols: view === 'grid' ? cols : 1, stride, viewH, scrollTop, listTop, overscan: 6 });
   });
 
   let raf = 0;
@@ -145,8 +146,22 @@
       const d = next.offsetTop - top0;
       if (d > 10) stride = d;
     }
+    // Offset of the grid/list from the scroll top — i.e. the home rail's height.
+    // (scroller is position:relative, so offsetTop is measured against it.)
+    const listEl = scroller.querySelector('.poster-grid, .series-list');
+    listTop = listEl ? listEl.offsetTop : 0;
   }
   $effect(() => { void rail.rows; void view; measure(); });
+  // The home rail is filled by a plugin (plain DOM), so Svelte can't see it
+  // change height — watch it and re-measure listTop when shelves appear/hide.
+  $effect(() => {
+    if (typeof ResizeObserver === 'undefined' || !scroller) return;
+    const railEl = scroller.querySelector('#home-plugin-rail');
+    if (!railEl) return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(railEl);
+    return () => ro.disconnect();
+  });
   $effect(() => {
     if (typeof window === 'undefined') return;
     const onResize = () => measure();
@@ -197,12 +212,12 @@
     </div>
   {/if}
 
-  <!-- Plugin home rail (reading shelves etc.) injects here — plain DOM, must
-       stay mounted. Sits above the virtualized list so it can't perturb its
-       scroll-offset math; empty (0-height) until a plugin fills it. -->
-  <div id="home-plugin-rail" class="home-rail"></div>
-
   <div class="librarypage__scroll" id="series-list" bind:this={scroller} onscroll={onScroll}>
+    <!-- Plugin home rail (reading shelves etc.) injects here — plain DOM, must
+         stay mounted. Inside the scroll so it scrolls away as you browse down;
+         its measured height feeds the virtual list's listTop so the windowing
+         stays aligned. Empty (0-height) until a plugin fills it. -->
+    <div id="home-plugin-rail" class="home-rail"></div>
     {#if rail.loaded && !rail.rows.length}
       <div class="empty">
         <div class="empty__art"><Icon name="star" /></div>

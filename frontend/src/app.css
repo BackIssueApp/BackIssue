@@ -309,7 +309,7 @@ body {
 .librarypage__actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 .librarypage__bar .coll-filters { padding: 0; border-bottom: none; }
 .librarypage__bar .coll-sort { margin-left: 0; }
-.librarypage__scroll { flex: 1; overflow-y: auto; min-height: 0; }
+.librarypage__scroll { flex: 1; overflow-y: auto; min-height: 0; position: relative; }
 #coll-select-btn.is-active { color: var(--accent); border-color: var(--accent); }
 
 /* View toggle (grid ⊞ / list ≣) */
