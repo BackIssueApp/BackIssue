@@ -30,7 +30,6 @@
     "yauzl": "^3.4.0"
   },
   "optionalDependencies": {
-    "//": "patchright drives a real browser for browser-based source plugins (src/browser.js). Optional so the lean image (npm install --omit=optional) skips it; the browser image and local dev still install it.",
     "patchright": "^1.61.1"
   }
 }
