@@ -68,7 +68,7 @@ test('zero users = open mode; first registration becomes admin and closes it', a
   } finally { s.close(); }
 });
 
-test('roles gate routes: viewer can download but not mutate; admin routes locked down', async () => {
+test('roles gate routes: viewer is read-only (no download or mutate); admin routes locked down', async () => {
   const { app } = makeApp();
   const s = await listen(app);
   const base = `http://localhost:${s.address().port}`;
@@ -93,15 +93,19 @@ test('roles gate routes: viewer can download but not mutate; admin routes locked
 
     // viewer: reads OK
     assert.equal((await fetch(`${base}/api/series`, { headers: V })).status, 200);
-    // viewer: downloads allowed by policy (route exists; 4xx would be 403 if gated)
+    // viewer: downloads → 403 (viewer is read-only; downloads.grab is trusted-tier)
     const dl = await fetch(`${base}/api/redownload`, { method: 'POST', headers: V, body: '{"issueIds":[]}' });
-    assert.notEqual(dl.status, 403, 'viewer may queue downloads');
+    assert.equal(dl.status, 403, 'viewer may not queue downloads');
     // viewer: library mutation → 403
     const mut = await fetch(`${base}/api/collection/bulk`, { method: 'POST', headers: V, body: '{"ids":[],"action":"follow"}' });
     assert.equal(mut.status, 403);
     // viewer: admin surface → 403
     assert.equal((await fetch(`${base}/api/settings`, { headers: V })).status, 403);
     assert.equal((await fetch(`${base}/api/users`, { headers: V })).status, 403);
+    // the built-in viewer role grants only browsing — not search/download
+    const vme = await (await fetch(`${base}/api/auth/me`, { headers: V })).json();
+    assert.ok(vme.user.permissions.includes('library.view'), 'viewer can browse');
+    assert.ok(!vme.user.permissions.includes('downloads.grab'), 'viewer cannot download');
 
     // guard rails: the only admin cannot demote or delete themselves
     const meList = await (await fetch(`${base}/api/users`, { headers: { cookie: adminCookie } })).json();

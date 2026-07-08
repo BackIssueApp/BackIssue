@@ -285,7 +285,9 @@
               <span class="series-row__dim series-col--wide" title="Newest known issue's cover date">{s.latest || '—'}</span>
               <span class="series-row__dim series-col--wide">{s.size ? humanBytes(s.size) : '—'}</span>
             {/if}
-            <button class="coll-mon" class:is-on={s.followed} title={s.followed ? 'Followed — click to unfollow' : 'Not followed — click to follow'} aria-label={s.followed ? 'Unfollow' : 'Follow'} onclick={(e) => { e.stopPropagation(); toggleMon(s); }}><Icon name="star" fill={!!s.followed} /></button>
+            {#if isTrusted()}
+              <button class="coll-mon" class:is-on={s.followed} title={s.followed ? 'Followed — click to unfollow' : 'Not followed — click to follow'} aria-label={s.followed ? 'Unfollow' : 'Follow'} onclick={(e) => { e.stopPropagation(); toggleMon(s); }}><Icon name="star" fill={!!s.followed} /></button>
+            {/if}
           </div>
         {/each}
         {#if range.padBottom > 0}<div style="height:{range.padBottom}px"></div>{/if}

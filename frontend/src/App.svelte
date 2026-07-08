@@ -25,7 +25,7 @@
   import LoginPage from './components/LoginPage.svelte';
   import AccountModal from './components/AccountModal.svelte';
   import HelpModal from './components/HelpModal.svelte';
-  import { auth, loadMe } from './lib/auth.svelte.js';
+  import { auth, loadMe, can } from './lib/auth.svelte.js';
   import QueueDrawer from './components/QueueDrawer.svelte';
   import ReleasesDrawer from './components/ReleasesDrawer.svelte';
   import AddModal from './components/AddModal.svelte';
@@ -46,6 +46,23 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
     '/queue': 'queuepage', '/releases': 'releasespage', '/plugins': 'pluginspage',
     '/users': 'userspage', '/lists': 'listspage',
   };
+
+  // Route-level permission guard. Section pages are always mounted, so a user
+  // could otherwise reach a page by typing its URL even with the nav link
+  // hidden. The server still enforces every action; this keeps the UI honest by
+  // bouncing anyone who lacks the page's permission back to the library.
+  const PAGE_PERMS = {
+    '/settings': 'settings.manage', '/users': 'users.manage', '/plugins': 'plugins.manage',
+    '/jobs': 'system.jobs', '/tools': 'system.jobs', '/logs': 'system.logs',
+    '/import': 'library.manage',
+    '/wanted': 'downloads.grab', '/queue': 'downloads.grab',
+    '/releases': 'downloads.grab', '/history': 'downloads.grab',
+  };
+  $effect(() => {
+    if (!authed) return;
+    const need = PAGE_PERMS[route.path];
+    if (need && !can(need)) navigate('/', { replace: true });
+  });
 
   const overlay = $derived(OVERLAY_PATHS.includes(route.path));
   const volumeId = $derived.by(() => {

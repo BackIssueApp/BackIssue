@@ -1,9 +1,10 @@
 // User accounts, sessions, and roles.
 //
 // Roles (strictly ordered): viewer < trusted < admin.
-//   viewer  — browse, search, read, queue downloads (the default for signups)
-//   trusted — everything viewer has + library mutations (add/remove volumes,
-//             scan, tag, import, matching…)
+//   viewer  — browse and read only (the default for signups): no searching,
+//             downloading, or queue actions
+//   trusted — everything viewer has + search & download + library mutations
+//             (add/remove volumes, scan, tag, import, matching…)
 //   admin   — everything + settings, users, plugins, jobs/tools/logs
 //
 // Passwords are scrypt (node:crypto, no dependency); sessions are opaque
@@ -25,7 +26,7 @@ const tierRank = (t) => TIERS.indexOf(t);
 
 export const CORE_PERMISSIONS = [
   { key: 'library.view', label: 'Browse the library', description: 'See series, issues, releases, and the queue', tier: 'viewer', category: 'Library' },
-  { key: 'downloads.grab', label: 'Search & download', description: 'Search sources, queue downloads, cancel queued items', tier: 'viewer', category: 'Library' },
+  { key: 'downloads.grab', label: 'Search & download', description: 'Search sources, queue downloads, cancel queued items', tier: 'trusted', category: 'Library' },
   { key: 'library.manage', label: 'Manage the library', description: 'Add/remove volumes and issues, scan, tag, import, fix matches', tier: 'trusted', category: 'Library' },
   { key: 'library.restricted', label: 'View mature content', description: 'See and read series flagged as mature/restricted (hidden from roles without this)', tier: 'trusted', category: 'Library' },
   { key: 'settings.manage', label: 'Settings & indexers', description: 'Change app settings, indexers, and run connection tests', tier: 'admin', category: 'System' },

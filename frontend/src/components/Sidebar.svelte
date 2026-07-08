@@ -43,17 +43,19 @@
     <button id="stats-btn" class="sidenav__item" class:is-active={isActive('/stats')} onclick={() => go('/stats')}>
       <span class="sidenav__icon"><Icon name="bar-chart" /></span> Stats</button>
 
-    <div class="sidenav__head">Downloads</div>
-    <button id="wanted-btn" class="sidenav__item" class:is-active={isActive('/wanted')} onclick={() => go('/wanted')}>
-      <span class="sidenav__icon"><Icon name="target" /></span> Wanted</button>
-    <button id="queue-btn" class="sidenav__item" class:is-active={isActive('/queue')} onclick={() => go('/queue')}>
-      <span class="sidenav__icon"><Icon name="queue" /></span> Queue
-      {#if queueActive}<span class="sidenav__count">{fmt(queueActive)}</span>{/if}
-      {#if failed}<span class="sidenav__count sidenav__count--bad">{fmt(failed)}</span>{/if}</button>
-    <button id="releases-btn" class="sidenav__item" class:is-active={isActive('/releases')} onclick={() => go('/releases')}>
-      <span class="sidenav__icon"><Icon name="calendar" /></span> Releases</button>
-    <button id="history-btn" class="sidenav__item" class:is-active={isActive('/history')} onclick={() => go('/history')}>
-      <span class="sidenav__icon"><Icon name="history" /></span> History</button>
+    {#if can('downloads.grab')}
+      <div class="sidenav__head">Downloads</div>
+      <button id="wanted-btn" class="sidenav__item" class:is-active={isActive('/wanted')} onclick={() => go('/wanted')}>
+        <span class="sidenav__icon"><Icon name="target" /></span> Wanted</button>
+      <button id="queue-btn" class="sidenav__item" class:is-active={isActive('/queue')} onclick={() => go('/queue')}>
+        <span class="sidenav__icon"><Icon name="queue" /></span> Queue
+        {#if queueActive}<span class="sidenav__count">{fmt(queueActive)}</span>{/if}
+        {#if failed}<span class="sidenav__count sidenav__count--bad">{fmt(failed)}</span>{/if}</button>
+      <button id="releases-btn" class="sidenav__item" class:is-active={isActive('/releases')} onclick={() => go('/releases')}>
+        <span class="sidenav__icon"><Icon name="calendar" /></span> Releases</button>
+      <button id="history-btn" class="sidenav__item" class:is-active={isActive('/history')} onclick={() => go('/history')}>
+        <span class="sidenav__icon"><Icon name="history" /></span> History</button>
+    {/if}
 
     <!-- Plugin menu actions inject here (plain DOM — must stay mounted). -->
     <div id="menu-plugin-actions" class="sidenav__plugins" onclick={() => { ui.sidebarOpen = false; }}></div>
