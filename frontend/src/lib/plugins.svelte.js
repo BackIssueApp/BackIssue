@@ -65,6 +65,10 @@ const bi = {
     // spares plugin clients an /api/auth/me roundtrip on boot. May be
     // pre-resolution (user null, openMode false): fall back to fetching.
     me: () => ({ openMode: auth.openMode, user: auth.user }),
+    // Does the signed-in user hold a permission? Mirrors core's can(): true in
+    // open mode or for a '*'/exact grant. Lets a plugin hide affordances the
+    // server would 403 anyway (e.g. a "Discover" button that adds to the library).
+    can: (perm) => auth.openMode || (auth.user?.permissions || []).some((p) => p === '*' || p === perm),
     // Add a per-issue action button (rendered on matching issue rows).
     registerIssueAction(action) {
       if (action && typeof action.run === 'function') issueActions.push(action);

@@ -6,6 +6,7 @@
   import { navigate, route } from '../lib/router.svelte.js';
   import { rail, ui } from '../lib/store.svelte.js';
   import { status } from '../lib/status.svelte.js';
+  import { can } from '../lib/auth.svelte.js';
   import { live } from '../lib/events.svelte.js';
   import { fmt } from '../lib/util.js';
   import { openHelp } from './HelpModal.svelte';
@@ -71,15 +72,19 @@
     <div id="header-plugin-slot"></div>
     <NotificationBell />
     <button class="topbar__help" title="Help for this page" aria-label="Help for this page" onclick={openHelp}>?</button>
-    <div class="pills" id="pills">
-      <span class="pill pill--done"><span class="dot"></span>saved <b>{fmt(status.counts.done || 0)}</b></span>
-      <span class="pill pill--queued"><span class="dot"></span>queued <b>{fmt(status.counts.queued || 0)}</b></span>
-      {#if status.counts.failed}
-        <span class="pill pill--failed"><span class="dot"></span>failed <b>{fmt(status.counts.failed)}</b></span>
-      {/if}
-      {#if status.downloading}
-        <span class="pill pill--busy"><span class="dot"></span>downloading <b>{fmt(status.counts.downloading || 0)}</b></span>
-      {/if}
-    </div>
+    {#if can('downloads.grab')}
+      <!-- Download-pipeline stats: meaningless to a read-only viewer, so hidden
+           unless the user can actually queue downloads. -->
+      <div class="pills" id="pills">
+        <span class="pill pill--done"><span class="dot"></span>saved <b>{fmt(status.counts.done || 0)}</b></span>
+        <span class="pill pill--queued"><span class="dot"></span>queued <b>{fmt(status.counts.queued || 0)}</b></span>
+        {#if status.counts.failed}
+          <span class="pill pill--failed"><span class="dot"></span>failed <b>{fmt(status.counts.failed)}</b></span>
+        {/if}
+        {#if status.downloading}
+          <span class="pill pill--busy"><span class="dot"></span>downloading <b>{fmt(status.counts.downloading || 0)}</b></span>
+        {/if}
+      </div>
+    {/if}
   </div>
 </header>
