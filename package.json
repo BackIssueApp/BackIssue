@@ -1,0 +1,33 @@
+{
+  "name": "backissue",
+  "version": "0.1.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "author": "DrBoon45",
+  "description": "A self-hosted comic library manager — ComicVine-first, with pluggable download sources.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "test:ui": "npm --prefix frontend test",
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "build": "cd frontend && npm install && npm run build",
+    "dev:ui": "npm --prefix frontend run dev",
+    "up": "npm run build && npm start"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "cheerio": "^1.0.0",
+    "compression": "^1.8.1",
+    "express": "^5.2.1",
+    "jszip": "^3.10.1",
+    "node-unrar-js": "^2.0.2",
+    "patchright": "^1.61.1",
+    "pdf-lib": "^1.17.1",
+    "undici": "^8.5.0",
+    "yauzl": "^3.4.0"
+  }
+}

@@ -1,0 +1,19 @@
+# Keep the build context small and secrets/data out of the image.
+node_modules
+frontend/node_modules
+frontend/dist
+.git
+.profile
+catalog.db
+catalog.db-shm
+catalog.db-wal
+settings.json
+downloads
+.staging
+*.png
+# …but the web UI's PWA/favicon icons must ship in the image.
+!frontend/public/*.png
+docs
+scratchpad
+plugins
+reports

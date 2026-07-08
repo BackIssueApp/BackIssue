@@ -1,0 +1,111 @@
+<script>
+  // App navigation: sections on the left, content on the right. On phones the
+  // sidebar is an off-canvas overlay opened by the header's ☰.
+  import { navigate, route } from '../lib/router.svelte.js';
+  import { ui } from '../lib/store.svelte.js';
+  import { status } from '../lib/status.svelte.js';
+  import { fmt } from '../lib/util.js';
+  import { auth, logout, can, isTrusted } from '../lib/auth.svelte.js';
+  import { openAccountModal } from './AccountModal.svelte';
+  import Icon from '../lib/Icon.svelte';
+
+  let userMenuOpen = $state(false);
+
+  const queueActive = $derived((status.counts.queued || 0) + (status.counts.downloading || 0));
+  const failed = $derived(status.counts.failed || 0);
+
+  // Library owns '/' and every /volume/* page.
+  const isActive = (path) => path === '/'
+    ? route.path === '/' || route.path.startsWith('/volume/')
+    : route.path === path;
+
+  function go(path) {
+    ui.sidebarOpen = false;
+    navigate(path);
+  }
+</script>
+
+<aside class="sidebar" class:is-open={ui.sidebarOpen} aria-label="App sections">
+  <div class="brand" onclick={() => go('/')} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter') go('/'); }}>
+    <span class="brand__logo">BACKISSUE</span>
+  </div>
+
+  <nav class="sidenav">
+    <div class="sidenav__head">Library</div>
+    <button class="sidenav__item" class:is-active={isActive('/')} onclick={() => go('/')}>
+      <span class="sidenav__icon"><Icon name="library" /></span> Library</button>
+    <button id="lists-btn" class="sidenav__item" class:is-active={isActive('/lists')} onclick={() => go('/lists')}>
+      <span class="sidenav__icon"><Icon name="list" /></span> Lists</button>
+    {#if isTrusted()}
+      <button id="import-btn" class="sidenav__item" class:is-active={isActive('/import')} onclick={() => go('/import')}>
+        <span class="sidenav__icon"><Icon name="import" /></span> Import</button>
+    {/if}
+    <button id="stats-btn" class="sidenav__item" class:is-active={isActive('/stats')} onclick={() => go('/stats')}>
+      <span class="sidenav__icon"><Icon name="bar-chart" /></span> Stats</button>
+
+    <div class="sidenav__head">Downloads</div>
+    <button id="wanted-btn" class="sidenav__item" class:is-active={isActive('/wanted')} onclick={() => go('/wanted')}>
+      <span class="sidenav__icon"><Icon name="target" /></span> Wanted</button>
+    <button id="queue-btn" class="sidenav__item" class:is-active={isActive('/queue')} onclick={() => go('/queue')}>
+      <span class="sidenav__icon"><Icon name="queue" /></span> Queue
+      {#if queueActive}<span class="sidenav__count">{fmt(queueActive)}</span>{/if}
+      {#if failed}<span class="sidenav__count sidenav__count--bad">{fmt(failed)}</span>{/if}</button>
+    <button id="releases-btn" class="sidenav__item" class:is-active={isActive('/releases')} onclick={() => go('/releases')}>
+      <span class="sidenav__icon"><Icon name="calendar" /></span> Releases</button>
+    <button id="history-btn" class="sidenav__item" class:is-active={isActive('/history')} onclick={() => go('/history')}>
+      <span class="sidenav__icon"><Icon name="history" /></span> History</button>
+
+    <!-- Plugin menu actions inject here (plain DOM — must stay mounted). -->
+    <div id="menu-plugin-actions" class="sidenav__plugins" onclick={() => { ui.sidebarOpen = false; }}></div>
+
+    {#if can('users.manage') || can('plugins.manage') || can('system.jobs') || can('system.logs') || can('settings.manage')}
+      <div class="sidenav__head">System</div>
+      {#if can('users.manage')}
+        <button id="users-btn" class="sidenav__item" class:is-active={isActive('/users')} onclick={() => go('/users')}>
+          <span class="sidenav__icon"><Icon name="users" /></span> Users</button>
+      {/if}
+      {#if can('plugins.manage')}
+        <button id="plugins-btn" class="sidenav__item" class:is-active={isActive('/plugins')} onclick={() => go('/plugins')}>
+          <span class="sidenav__icon"><Icon name="puzzle" /></span> Plugins</button>
+      {/if}
+      {#if can('system.jobs')}
+        <button id="jobs-btn" class="sidenav__item" class:is-active={isActive('/jobs')} onclick={() => go('/jobs')}>
+          <span class="sidenav__icon"><Icon name="clock" /></span> Jobs</button>
+        <button id="tools-btn" class="sidenav__item" class:is-active={isActive('/tools')} onclick={() => go('/tools')}>
+          <span class="sidenav__icon"><Icon name="tools" /></span> Tools</button>
+      {/if}
+      {#if can('system.logs')}
+        <button id="logs-btn" class="sidenav__item" class:is-active={isActive('/logs')} onclick={() => go('/logs')}>
+          <span class="sidenav__icon"><Icon name="file-text" /></span> Logs</button>
+      {/if}
+      {#if can('settings.manage')}
+        <button id="settings-btn" class="sidenav__item" class:is-active={isActive('/settings')} onclick={() => go('/settings')}>
+          <span class="sidenav__icon"><Icon name="settings" /></span> Settings</button>
+      {/if}
+    {/if}
+  </nav>
+
+  <!-- Account chip: who you are + account menu. (A fresh install can't reach
+       the sidebar in open mode — first run forces admin creation instead.) -->
+  <div class="sideuser">
+    {#if auth.user}
+      <button class="sideuser__chip" onclick={() => { userMenuOpen = !userMenuOpen; }}>
+        <span class="sideuser__avatar">{auth.user.username.slice(0, 1).toUpperCase()}</span>
+        <span class="sideuser__name">{auth.user.username}</span>
+        <span class="sideuser__role sideuser__role--{auth.user.role}">{auth.user.role}</span>
+      </button>
+      {#if userMenuOpen}
+        <div class="sideuser__menu">
+          <button class="menu__item" onclick={() => { userMenuOpen = false; openAccountModal(); }}>Change password</button>
+          <button class="menu__item" onclick={() => { userMenuOpen = false; logout(); }}>Sign out</button>
+        </div>
+      {/if}
+    {/if}
+  </div>
+
+  <div class="sidenav__version" id="app-version">{status.version ? `BackIssue v${status.version}` : ''}</div>
+</aside>
+
+{#if ui.sidebarOpen}
+  <div class="sidebar__scrim" onclick={() => { ui.sidebarOpen = false; }} aria-hidden="true"></div>
+{/if}

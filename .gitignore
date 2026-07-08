@@ -1,0 +1,21 @@
+node_modules/
+# Built UI (npm run build → frontend/dist)
+frontend/dist/
+.profile/
+downloads/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+fixtures/
+.superpowers/
+.staging/
+settings.json
+# External plugins (private download sources) live here, each its own repo.
+plugins/
+
+# Docs (internal)
+docs/
+
+# Node fatal-error diagnostic reports
+reports/
