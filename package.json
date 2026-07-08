@@ -25,9 +25,12 @@
     "express": "^5.2.1",
     "jszip": "^3.10.1",
     "node-unrar-js": "^2.0.2",
-    "patchright": "^1.61.1",
     "pdf-lib": "^1.17.1",
     "undici": "^8.5.0",
     "yauzl": "^3.4.0"
+  },
+  "optionalDependencies": {
+    "//": "patchright drives a real browser for browser-based source plugins (src/browser.js). Optional so the lean image (npm install --omit=optional) skips it; the browser image and local dev still install it.",
+    "patchright": "^1.61.1"
   }
 }
