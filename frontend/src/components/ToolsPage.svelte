@@ -3,6 +3,7 @@
   import { apiGet, apiPost } from '../lib/api.js';
   import { subscribe } from '../lib/events.svelte.js';
   import { notify } from '../lib/toasts.svelte.js';
+  import { confirmDialog } from './DialogModal.svelte';
   import { fmt } from '../lib/util.js';
   import Icon from '../lib/Icon.svelte';
 
@@ -19,6 +20,13 @@
   $effect(() => {
     if (!active) return;
     renderTools();
+    // A reorganize may be running from before we navigated here — pick it up.
+    (async () => {
+      try {
+        const st = await apiGet('/api/library/refile-status');
+        if (st?.running) { refileStatus = st; refileBusy = true; startRefilePoll(); }
+      } catch { /* fine */ }
+    })();
     return subscribe('tools', renderTools, 1200);
   });
 
@@ -34,6 +42,64 @@
     if (busy) return `Running: ${(st.catalog?.find((t) => t.id === runningTool)?.label) || runningTool}${st.total ? ` · ${fmt(st.done || 0)}/${fmt(st.total)}` : ''}`;
     return st.ranAt ? `Last: ${summarizeToolResult(st)}` : '';
   });
+
+  // ---- Reorganize library (dry-run preview, then execute) ----
+  const segs = (p) => String(p || '').split(/[\\/]/);
+  const tail = (p, n) => segs(p).slice(-n).join('/');
+  let refilePlan = $state(null);
+  // The sample moves grouped by destination folder, so the preview reads as
+  // "this folder gets these files" instead of a wall of raw paths.
+  const refileGroups = $derived.by(() => {
+    const map = new Map();
+    for (const m of refilePlan?.moves || []) {
+      const dir = segs(m.to).slice(0, -1).join('/');
+      if (!map.has(dir)) map.set(dir, { dir, label: tail(dir, 2), items: [] });
+      map.get(dir).items.push({ from: segs(m.from).at(-1), to: segs(m.to).at(-1), fullFrom: m.from, fullTo: m.to });
+    }
+    return [...map.values()];
+  });
+  let refileBusy = $state(false);
+  async function previewRefile() {
+    refileBusy = true;
+    try { refilePlan = await apiGet('/api/library/refile-plan'); }
+    catch (e) { notify('Preview failed: ' + (e?.message || e), 'error'); }
+    refileBusy = false;
+  }
+  // The execute runs as a background job — poll its status while it works.
+  let refileStatus = $state(null);
+  let refilePoll = null;
+  function stopRefilePoll() { clearInterval(refilePoll); refilePoll = null; }
+  function startRefilePoll() {
+    stopRefilePoll();
+    refilePoll = setInterval(async () => {
+      try { refileStatus = await apiGet('/api/library/refile-status'); } catch { return; }
+      if (!refileStatus?.running) {
+        stopRefilePoll();
+        refileBusy = false;
+        if (refileStatus?.result) {
+          const r = refileStatus.result;
+          notify(`Reorganized ${fmt(r.moved)} file${r.moved === 1 ? '' : 's'}${r.skipped ? `, ${fmt(r.skipped)} skipped` : ''}.`, 'ok');
+          refilePlan = null;
+        } else if (refileStatus?.error) notify('Reorganize failed: ' + refileStatus.error, 'error');
+      }
+    }, 1200);
+  }
+  $effect(() => () => stopRefilePoll()); // page teardown stops the poll
+  async function runRefile() {
+    const n = refilePlan?.counts?.move || 0;
+    if (!n) return;
+    if (!(await confirmDialog({
+      title: `Reorganize ${fmt(n)} file${n === 1 ? '' : 's'}?`,
+      message: 'Every ComicVine-matched series is moved/renamed to match your folder and file patterns. This changes files on disk and runs in the background — progress shows here and on the Jobs page.',
+      confirmLabel: 'Reorganize',
+    }))) return;
+    refileBusy = true;
+    let r;
+    try { r = await apiPost('/api/library/refile', {}); } catch (e) { r = { error: String(e?.message || e) }; }
+    if (r.error) { refileBusy = false; return notify(r.error, 'error'); }
+    refileStatus = { running: true, done: 0, total: 0 };
+    startRefilePoll();
+  }
 
   let startingId = $state(null);
   async function run(t) {
@@ -54,6 +120,55 @@
   </div>
   <div class="tools-scroll">
     <p class="modal__note">Library-wide maintenance. Each runs in the background — you can leave this page and watch progress on the Jobs page.</p>
+
+    <div class="tool-card tool-card--refile">
+      <div class="tool-info">
+        <div class="tool-name">Reorganize library</div>
+        <div class="tool-desc">Move &amp; rename every matched series' files to match your folder and file patterns (Settings → Library → File organization). Preview first — nothing changes until you reorganize.</div>
+        {#if refileStatus?.running}
+          <div class="tool-prog"><div class="tool-prog__fill" style="width:{refileStatus.total ? Math.round(((refileStatus.done || 0) / refileStatus.total) * 100) : 0}%"></div></div>
+          <div class="tool-prog__meta">{refileStatus.message || 'Starting…'} · {fmt(refileStatus.done || 0)}/{fmt(refileStatus.total || 0)} series{refileStatus.moved != null ? ` · ${fmt(refileStatus.moved)} moved` : ''}</div>
+        {/if}
+        {#if refilePlan}
+          <div class="refile-stats">
+            <span class="refile-stat"><b>{fmt(refilePlan.counts.move)}</b> to move</span>
+            <span class="refile-stat"><b>{fmt(refilePlan.counts.unchanged)}</b> already match</span>
+            {#if refilePlan.counts.skip}<span class="refile-stat"><b>{fmt(refilePlan.counts.skip)}</b> skipped</span>{/if}
+            {#if refilePlan.counts.collision}<span class="refile-stat refile-stat--warn"><b>{fmt(refilePlan.counts.collision)}</b> name collisions (left in place)</span>{/if}
+          </div>
+          {#if refileGroups.length}
+            <div class="refile-preview">
+              {#each refileGroups as g (g.dir)}
+                <div class="refile-group">
+                  <div class="refile-group__dir" title={g.dir}>
+                    {g.label}
+                    <span class="refile-group__count">{g.items.length} file{g.items.length === 1 ? '' : 's'}</span>
+                  </div>
+                  {#each g.items as it (it.fullFrom)}
+                    <div class="refile-item" title={it.fullFrom + '\n→ ' + it.fullTo}>
+                      <div class="refile-item__from">{it.from}</div>
+                      <div class="refile-item__to">{it.to}</div>
+                    </div>
+                  {/each}
+                </div>
+              {/each}
+              {#if refilePlan.truncated}
+                <div class="refile-more">Showing the first {fmt(refilePlan.moves.length)} of {fmt(refilePlan.counts.move)} moves — the rest follow the same patterns.</div>
+              {/if}
+            </div>
+          {:else}
+            <div class="modal__note">Nothing to move — files already match your patterns.</div>
+          {/if}
+        {/if}
+      </div>
+      <div class="tool-refile-actions">
+        <button class="btn btn--ghost btn--sm" disabled={refileBusy} onclick={previewRefile}>{refileBusy && !refilePlan ? 'Previewing…' : refilePlan ? 'Re-preview' : 'Preview'}</button>
+        {#if refilePlan && refilePlan.counts.move}
+          <button class="btn btn--primary btn--sm" disabled={refileBusy} onclick={runRefile}>{refileBusy ? 'Reorganizing…' : `Reorganize ${fmt(refilePlan.counts.move)}`}</button>
+        {/if}
+      </div>
+    </div>
+
     <div id="tools-list" class="tools-list">
       {#each st?.catalog || [] as t (t.id)}
         <div class="tool-card" class:is-running={runningTool === t.id}>

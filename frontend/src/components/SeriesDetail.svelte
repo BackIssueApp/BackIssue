@@ -22,6 +22,33 @@
   const s = $derived(detail.series);
   const det = $derived(detail.det);
   const isCv = $derived(!!det && det.source === 'cv' && Array.isArray(det.issues));
+
+  // Rename this series' files to the configured folder/file pattern. Dry-runs
+  // first to show the count, then executes on confirm.
+  let refileBusy = $state(false);
+  async function refileFiles() {
+    const sid = detail.series?.id, title = detail.series?.title || 'this series';
+    if (!sid) return;
+    let plan;
+    try { plan = (await apiPost(`/api/collection/${sid}/refile`, { dryRun: true })).plan || []; }
+    catch (e) { return notify('Could not plan the rename: ' + (e?.message || e), 'error'); }
+    const moves = plan.filter((p) => p.status === 'move').length;
+    const collisions = plan.filter((p) => p.status === 'skip:collision').length;
+    if (!moves) return notify(collisions ? `Nothing to do — ${collisions} file(s) would collide.` : 'Files already match the pattern.', 'info');
+    if (!(await confirmDialog({
+      title: `Rename ${moves} file${moves === 1 ? '' : 's'}?`,
+      message: `Files for "${title}" are moved/renamed to match your folder and file patterns${collisions ? ` (${collisions} would collide and are skipped)` : ''}.`,
+      confirmLabel: 'Rename files',
+    }))) return;
+    refileBusy = true;
+    let r;
+    try { r = await apiPost(`/api/collection/${sid}/refile`, {}); }
+    catch (e) { r = { error: String(e?.message || e) }; }
+    refileBusy = false;
+    if (r.error) return notify(r.error, 'error');
+    notify(`Renamed ${r.moved} file${r.moved === 1 ? '' : 's'}${r.skipped ? `, ${r.skipped} skipped` : ''}.`, 'ok');
+    reloadDetail();
+  }
   const isUnmatched = $derived(!!det && det.source === 'unmatched');
   const issues = $derived(isCv ? det.issues : []);
   const missingIds = $derived(issues.filter((i) => !i.owned).map((i) => i.cv_issue_id));
@@ -478,6 +505,10 @@
                         onclick={() => { moreOpen = false; openCvPicker(s.id, s.title, null, { files: pickerFileCount }); }}><Icon name="diamond" /> Fix match…</button>
                       <button class="menu__item" role="menuitem" disabled={scanBusy} title="Scan this series' folder for owned issues"
                         onclick={() => { moreOpen = false; notify('Scanning folder…', 'info'); scanFolder(); }}><Icon name="search" /> {scanBusy ? scanText : 'Scan folder'}</button>
+                      {#if isCv}
+                        <button class="menu__item" role="menuitem" disabled={refileBusy} title="Move/rename this series' files to match the configured folder & file patterns"
+                          onclick={() => { moreOpen = false; refileFiles(); }}><Icon name="edit" /> {refileBusy ? 'Renaming…' : 'Rename files'}</button>
+                      {/if}
                       {#if det?.cv}
                         <button class="menu__item" role="menuitem" disabled={tagBusy} title="Write ComicVine metadata into every owned file"
                           onclick={() => { moreOpen = false; notify('Tagging files…', 'info'); tagFiles(); }}><Icon name="tag" /> {tagBusy ? tagText : (untaggedOwned ? `Tag ${fmt(untaggedOwned)} untagged` : 'Tag files')}</button>

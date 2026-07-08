@@ -12,7 +12,7 @@ import { pruneLibraryFiles } from './db.js';
 import { libraryStats } from './db.js';
 import { linkFilesToCv, refreshCvVolume } from './cvmatch.js';
 import { tagFileFromCv } from './metatagger.js';
-import { comicFileName } from './downloader.js';
+import { fileStemFromPattern } from './naming.js';
 import { deleteLibraryFile, getLibraryFile } from './db.js';
 import { logWarn } from './logstore.js';
 
@@ -196,13 +196,13 @@ export async function scanEntireLibrary(db, roots, onProgress = () => {}) {
   return { files: s.total, tagged: s.tagged, untagged: s.untagged, corrupt: s.corrupt, ...(swept ? { tempSwept: swept } : {}), ...(unreachable ? { unreachableRoots: unreachable } : {}) };
 }
 
-// Rename library files to the app's standard name ("Series VYYYY #NNN (Month
-// Year).ext") so imported scene-named files converge with downloaded ones. Uses
-// THE naming core (comicFileName — same as downloads). Only valid, CV-linked
-// files, renamed in place (same folder); a name collision skips the file.
+// Rename library files to the configured file pattern (Settings → Library →
+// File organization) so imported scene-named files converge with downloaded
+// ones. Same naming core as downloads and the reorganize tool. Only valid,
+// CV-linked files, renamed in place (same folder); a name collision skips.
 export async function renameAllFiles(db, onProgress = () => {}) {
   const rows = db.prepare(`SELECT lf.path, ci.issue_number, ci.name issue_name, ci.cover_date,
-      cv.name series_name, cv.start_year
+      cv.name series_name, cv.publisher, cv.start_year
     FROM library_files lf
     JOIN cv_issues ci ON ci.comicvine_id = lf.cv_issue_id
     JOIN cv_series cv ON cv.comicvine_id = ci.cv_series_id
@@ -210,7 +210,11 @@ export async function renameAllFiles(db, onProgress = () => {}) {
   let done = 0, renamed = 0, unchanged = 0, collisions = 0;
   for (const r of rows) {
     const ext = path.extname(r.path).toLowerCase();
-    const stem = comicFileName(r.series_name, r.issue_number, r.cover_date, r.issue_name, r.start_year);
+    const stem = fileStemFromPattern(
+      { title: r.series_name, publisher: r.publisher, year: r.start_year },
+      { issue_number: r.issue_number, title: r.issue_name, cover_date: r.cover_date },
+      config.filePattern,
+    );
     const target = path.join(path.dirname(r.path), stem + ext);
     if (target === r.path) unchanged++;
     else if (existsSync(target)) collisions++;

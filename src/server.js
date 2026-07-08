@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import config from './config.js';
 import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, seriesCollectionDetail, setSeriesPath, getSeriesById, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
 import { resolveSeriesDir, defaultRootedDir } from './paths.js';
+import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
+import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
 import { normalizeNumber } from './matcher.js';
 import { testIndexer } from './newznab.js';
 import { testClient } from './nzbclients.js';
@@ -26,7 +28,7 @@ const publicDir = path.join(repoRoot, 'frontend', 'dist');
 let APP_VERSION = '0.0.0';
 try { APP_VERSION = JSON.parse(fssync.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).version || APP_VERSION; } catch { /* dev */ }
 
-export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, stats, listSources, queueProgress, packProgress, cancelGrab, testCvKeys, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, state }) {
+export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, queueProgress, packProgress, cancelGrab, testCvKeys, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, state }) {
   const startDownloads = (arg) => {
     if (!state.queue.running) {
       state.queue.running = true;
@@ -169,6 +171,10 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     [/^\/api\/logs/, 'system.logs'],
     // Import (candidate file paths, scan dirs) is a library-management feature.
     [/^\/api\/import/, 'library.manage'],
+    // Library-wide reorganize is a maintenance tool (admin); naming preview is
+    // part of settings.
+    [/^\/api\/library\//, 'system.jobs'],
+    [/^\/api\/naming\//, 'settings.manage'],
     // Reading lists are personal curation (no files touched) — any signed-in
     // user manages their own, including non-GET verbs.
     [/^\/api\/lists/, 'library.view'],
@@ -1058,6 +1064,40 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // Scan just this comic's folder to detect owned issues (per-volume index).
   app.post('/api/collection/:id/scan', async (req, res) => {
     res.json(await scanSeriesFolder(Number(req.params.id)));
+  });
+  // Rename/move THIS series' files to the configured folder/file patterns.
+  // { dryRun:true } returns the planned moves; otherwise it performs them.
+  app.post('/api/collection/:id/refile', (req, res) => {
+    const row = getSeriesById(db, Number(req.params.id));
+    if (!row) return res.status(404).json({ error: 'no such series' });
+    if (!canRefile(row)) return res.status(400).json({ error: 'match this series to ComicVine first — its files can’t be organized without publisher/title/year' });
+    try {
+      if ((req.body || {}).dryRun) return res.json({ plan: planSeries(db, row) });
+      res.json(refileSeries(db, row));
+    } catch (e) { res.status(500).json({ error: String(e?.message || e) }); }
+  });
+  // Library-wide reorganize (a manual maintenance tool — never automatic).
+  // Execution is a background job: the POST starts it, the status endpoint
+  // reports progress, and it also appears on the Jobs page.
+  app.get('/api/library/refile-plan', (req, res) => {
+    try { res.json(planLibrary(db)); } catch (e) { res.status(500).json({ error: String(e?.message || e) }); }
+  });
+  app.post('/api/library/refile', (req, res) => {
+    const r = runLibraryRefile();
+    if (r.busy) return res.status(409).json({ error: 'a reorganize is already running' });
+    res.json(r);
+  });
+  app.get('/api/library/refile-status', (req, res) => res.json(refileState()));
+  // Live preview for the settings pattern fields — render a sample path.
+  app.post('/api/naming/preview', (req, res) => {
+    const { folderPattern, filePattern } = req.body || {};
+    const s = { title: 'Batman', publisher: 'DC Comics', year: '2011' };
+    const iss = { issue_number: '1', title: 'The Court of Owls, Part One', cover_date: '2011-11-01' };
+    try {
+      const folder = seriesFolderFromPattern(s, folderPattern);
+      const file = fileStemFromPattern(s, iss, filePattern) + '.cbz';
+      res.json({ folder, file, example: `${folder}/${file}` });
+    } catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
   });
   app.get('/api/scan-folder', (req, res) => res.json(state.scanFolder || { running: false }));
   // Set (or clear, with empty) a comic's folder on disk.

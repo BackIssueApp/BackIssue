@@ -59,6 +59,19 @@
   // Source priority (order enabled sources are tried), from /api/sources.
   let sourceOrder = $state([]);
 
+  // Live example path for the folder/file naming patterns.
+  let namingPreview = $state('');
+  let namingTimer;
+  function previewNaming() {
+    clearTimeout(namingTimer);
+    namingTimer = setTimeout(async () => {
+      const folderPattern = root?.querySelector('#set-folderPattern')?.value || '';
+      const filePattern = root?.querySelector('#set-filePattern')?.value || '';
+      try { namingPreview = (await apiPost('/api/naming/preview', { folderPattern, filePattern })).example || ''; }
+      catch { namingPreview = ''; }
+    }, 250);
+  }
+
   // Webhook notification categories (empty saved value = all enabled).
   const NOTIFY_CATS = [
     ['import', 'Imports & downloads'], ['failure', 'Failures'],
@@ -155,6 +168,7 @@
     try { sourceOrder = (await apiGet('/api/sources')).sources || []; } catch { sourceOrder = []; }
     for (const cb of BackIssue._settingsHooks) { try { cb(s); } catch { /* ignore */ } }
     syncSourceUI();
+    previewNaming();
     // Start each source expanded iff it's enabled — a tidy collapsed row when off.
     for (const b of root.querySelectorAll('.src-block')) {
       b.classList.toggle('is-open', !!b.querySelector('.switch input')?.checked);
@@ -413,6 +427,13 @@
             <p class="modal__note">Comics are filed as <b>root</b>/Publisher/Title (Year). New comics land in the <b>Default</b> folder. Add more folders so BackIssue also scans them for existing comics when you <b>Import</b> or run <b>Scan library</b> — reorder with <b>Make default</b> to change where new comics go. Changing this never moves files already on disk. The <b>downloads folder</b> below is only a fallback when no root folder is set.</p>
             <label class="field"><span>Tool workers</span><input id="set-toolsConcurrency" type="number" min="1" max="16" /></label>
             <p class="modal__note">How many files the library tools (convert / verify / tag) process at once — higher overlaps I/O but uses more memory per in-flight file.</p>
+
+            <p class="modal__subhead modal__subhead--sub">File organization</p>
+            <label class="field"><span>Folder pattern</span><input id="set-folderPattern" type="text" spellcheck="false" placeholder={'{publisher}/{series} ({year})'} oninput={previewNaming} /></label>
+            <label class="field"><span>File pattern</span><input id="set-filePattern" type="text" spellcheck="false" placeholder={'{series} V{year} #{issue}'} oninput={previewNaming} /></label>
+            {#if namingPreview}<p class="modal__note">Example: <code class="mono">{namingPreview}</code></p>{/if}
+            <label class="field field--check"><input id="set-renameDownloads" type="checkbox" /><span>Rename downloaded files to the file pattern (off = keep the source's original filename)</span></label>
+            <p class="modal__note">Tokens: <code>{'{publisher}'}</code> <code>{'{series}'}</code> <code>{'{year}'}</code> <code>{'{issue}'}</code> (<code>{'{issue:2}'}</code> sets the pad width) <code>{'{issueTitle}'}</code> <code>{'{date}'}</code> <code>{'{edition}'}</code>. Blank uses the defaults shown above; empty tokens are dropped and spacing is tidied. Changing these affects <b>new</b> downloads — to apply to existing files, use <b>Reorganize library</b> on the Tools page, or a volume's <b>Rename files</b> action.</p>
           </section>
         </section>
 

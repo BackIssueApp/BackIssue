@@ -120,6 +120,14 @@ const config = {
   // Root folders where comics live on disk (newline/comma separated). The first
   // is the default root for new comics; downloads land in each comic's folder.
   rootFolders: '',
+  // How comics are organized on disk (token patterns; blank = built-in default,
+  // which reproduces "Publisher/Title (Year)" + "Series VYYYY #NNN (Month YYYY)").
+  // See src/naming.js for the tokens.
+  folderPattern: '',
+  filePattern: '',
+  // Rename downloaded files to the file pattern (off = keep the source's
+  // original filename; files still land in the comic's folder).
+  renameDownloads: true,
 
   // First-run onboarding wizard: set true once completed or skipped.
   onboardingDone: false,

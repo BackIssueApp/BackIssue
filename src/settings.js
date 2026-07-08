@@ -62,6 +62,9 @@ export const SETTING_FIELDS = {
   libraryDir:          { type: 'string' }, // legacy: seeds rootFolders (see loadSettings)
   libraryConcurrency:  { type: 'int', min: 1, max: 32 },
   rootFolders:         { type: 'string' },
+  folderPattern:       { type: 'string', allowEmpty: true }, // library org (blank = default)
+  filePattern:         { type: 'string', allowEmpty: true },
+  renameDownloads:     { type: 'bool' }, // off = downloads keep the source's filename
   onboardingDone:      { type: 'bool' },
   // Download sources
   sourcePriority:          { type: 'string' },

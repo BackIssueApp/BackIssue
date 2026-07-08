@@ -7,6 +7,7 @@ import config from './config.js';
 import fsp from 'node:fs/promises';
 import { claimNextQueued, setIssueStatus, getSeriesById, getCvSeries, listIssues, recordGrab, recordImport, seriesSearchNames } from './db.js';
 import { detectEdition } from './editions.js';
+import { fileStemFromPattern } from './naming.js';
 import { resolveSeriesDir } from './paths.js';
 import { indexDownloadedFile } from './library.js';
 import { tagCbzBuffer, taggingEnabled, xmlForIssue } from './metatagger.js';
@@ -57,7 +58,7 @@ export function targetPath(seriesTitle, issue, format = 'cbz', year, baseDir) {
   const hasNum = issue.issue_number != null && /[\d½¼¾⅓⅔⅛]/.test(String(issue.issue_number));
   const ed = detectEdition(issue.title);
   const stem = (hasNum || ed)
-    ? comicFileName(seriesTitle, issue.issue_number, undefined, issue.title, year)
+    ? fileStemFromPattern({ title: seriesTitle, publisher: issue.publisher || '', year }, issue, config.filePattern)
     : `${folder} - ${safeName(issue.title)}`;
   // Save into the comic's own folder when we have one; else legacy downloads/<Series>.
   const dir = baseDir || path.join(config.downloadsDir, folder);
@@ -137,7 +138,18 @@ export async function finalizeComic({ buffer, srcPath, format = 'cbz', issue, se
     throw new Error('downloaded file is not a comic archive (corrupt or bogus source copy)');
   }
 
-  let dest = targetPath(seriesTitle, issue, format, seriesYear, seriesPath);
+  // "Rename downloads" off: keep the source's original filename (usenet/torrent
+  // completed files have one) — still filed into the comic's folder, with the
+  // extension corrected to the sniffed container. Built-from-pages downloads
+  // have no original name, so those always use the pattern.
+  let dest;
+  if (!config.renameDownloads && srcPath) {
+    const stem = safeName(path.basename(srcPath).replace(/\.[^.]+$/, ''));
+    const dir = seriesPath || path.join(config.downloadsDir, safeName(seriesTitle));
+    dest = path.join(dir, `${stem}.${format === 'pdf' ? 'pdf' : 'cbz'}`);
+  } else {
+    dest = targetPath(seriesTitle, issue, format, seriesYear, seriesPath);
+  }
   if (existsSync(dest)) {
     const cid = trailingIdFromUrl(issue.url); // stable source id when present
     dest = cid ? dest.replace(/(\.(?:cbz|pdf))$/i, ` (${cid})$1`) : uniquePath(dest);

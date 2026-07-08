@@ -1,5 +1,6 @@
 import path from 'node:path';
 import config from './config.js';
+import { seriesFolderFromPattern } from './naming.js';
 
 // Root folders where comics live on disk (Radarr-style), newline/comma separated.
 export function parseRootFolders(text) {
@@ -24,20 +25,11 @@ export function safeSegment(s) {
   return String(s || '').replace(/[<>:"/\\|?*\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-// Normalize an ongoing/range year marker to just the start year:
-// "(2022-)" / "(2022 - )" / "(2022-2024)" / "(2022-present)" -> "(2022)".
-function cleanYearMarker(s) {
-  return String(s).replace(/\((\d{4})\s*-\s*(?:\d{4}|present)?\s*\)/gi, '($1)');
-}
-function year4(y) { const m = String(y ?? '').match(/\d{4}/); return m ? m[0] : null; }
-
-// The default folder name for a comic: "Publisher/Title (Year)".
+// The on-disk folder (relative to a root) for a comic, from the admin's folder
+// pattern — blank falls back to the built-in "Publisher/Title (Year)" default.
 export function seriesFolderName(series) {
-  let title = cleanYearMarker(safeSegment(series.title));
-  const y = year4(series.year);
-  if (y && !/\(\d{4}\)\s*$/.test(title)) title = `${title} (${y})`;
-  const pub = series.publisher ? safeSegment(series.publisher) : null;
-  return pub ? path.join(pub, title) : title;
+  // Pattern uses "/" for sub-folders; return OS-native separators.
+  return seriesFolderFromPattern(series, config.folderPattern).split('/').join(path.sep);
 }
 
 // Prefer ComicVine's clean name/publisher/start-year over the (possibly

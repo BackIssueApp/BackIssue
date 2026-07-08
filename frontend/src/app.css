@@ -1113,6 +1113,25 @@ body.tools .tools-page { display: flex; flex-direction: column; height: 100%; }
 .tool-prog__meta { font-size: 11px; color: var(--faint); font-family: var(--font-mono); margin-top: 3px; }
 .tool-result { font-size: 12px; color: var(--green); margin-top: 4px; }
 .tool-result--err { color: var(--red); }
+/* Reorganize-library card: stacked (info over its own actions) with a
+   grouped, scrollable dry-run report of the planned moves. */
+.tool-card--refile { flex-direction: column; align-items: stretch; gap: 12px; margin-bottom: 14px; }
+.tool-refile-actions { display: flex; gap: 8px; }
+.refile-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.refile-stat { font-size: 12px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; }
+.refile-stat b { color: var(--text); font-weight: 600; }
+.refile-stat--warn { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 35%, var(--line)); }
+.refile-stat--warn b { color: var(--amber); }
+.refile-preview { max-height: 340px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--line); border-radius: 10px; margin-top: 10px; background: var(--ink); }
+.refile-group { padding: 12px 14px 6px; }
+.refile-group + .refile-group { border-top: 1px solid var(--line); }
+.refile-group__dir { display: flex; align-items: baseline; gap: 10px; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px; overflow-wrap: anywhere; }
+.refile-group__count { font-size: 11px; font-weight: 400; color: var(--faint); white-space: nowrap; }
+.refile-item { padding: 6px 0 8px 14px; border-left: 2px solid var(--line); margin: 0 0 6px 4px; }
+.refile-item__from { font-size: 12px; color: var(--faint); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--faint) 55%, transparent); overflow-wrap: anywhere; line-height: 1.5; }
+.refile-item__to { font-size: 13px; color: var(--text); overflow-wrap: anywhere; line-height: 1.5; }
+.refile-item__to::before { content: '→ '; color: var(--accent); }
+.refile-more { padding: 10px 14px; font-size: 12px; color: var(--faint); font-style: italic; border-top: 1px solid var(--line); }
 
 /* Logs page */
 .logs-page { display: none; }

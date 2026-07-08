@@ -11,6 +11,7 @@ import fss from 'node:fs';
 import nodePath from 'node:path';
 import { indexFolderForSeries, reconcileLibrary, removeSupersededFiles } from './library.js';
 import { resolveSeriesDir, parseRootFolders } from './paths.js';
+import { refileLibrary } from './refile.js';
 import { findComicFiles, groupSeries } from './scanner.js';
 import { extractYear } from './matcher.js';
 import { poolWithResource } from './pool.js';
@@ -93,7 +94,7 @@ reconcileDownloading(db);
 // matched series, and drop index rows for comics you don't track.
 try { const rec = reconcileLibrary(db); if (rec.attributed || rec.pruned) console.log(`Library reconcile: attributed ${rec.attributed}, pruned ${rec.pruned} untracked file rows.`); } catch (e) { console.warn('reconcile failed', e?.message || e); }
 
-const state = { crawl: { running: false }, queue: { running: false }, follow: { running: false }, updates: { running: false }, cv: { running: false }, scanFolder: { running: false }, tagFiles: { running: false }, releases: { running: false }, import: { running: false }, tools: { running: false } };
+const state = { crawl: { running: false }, queue: { running: false }, follow: { running: false }, updates: { running: false }, cv: { running: false }, scanFolder: { running: false }, tagFiles: { running: false }, releases: { running: false }, import: { running: false }, tools: { running: false }, refile: { running: false } };
 
 // Library-wide maintenance tools (the Tools page). Each runs as a job with progress.
 const TOOLS = {
@@ -103,7 +104,7 @@ const TOOLS = {
   'remove-duplicates': { label: 'Remove duplicate files', desc: 'Delete old/corrupt copies that a good copy of the same issue has already replaced.', run: (op) => removeAllDuplicates(db, op) },
   'verify': { label: 'Verify archives', desc: 'Deep-check every comic file for corruption and prune ones missing from disk.', run: (op, opts) => verifyLibrary(db, op, opts) },
   'relink-cv': { label: 'Re-link to ComicVine', desc: 'Re-map owned files to ComicVine issues for every matched comic (fixes owned/missing counts).', run: (op) => relinkAllCv(db, op) },
-  'rename-files': { label: 'Rename files to standard', desc: 'Rename every CV-linked file to "Series VYYYY #NNN" (same folder) so imported scene-named files match downloaded ones. Collisions are skipped.', run: (op) => renameAllFiles(db, op) },
+  'rename-files': { label: 'Rename files to pattern', desc: 'Rename every CV-linked file to your file pattern (same folder — no moves) so imported scene-named files match downloaded ones. Collisions are skipped.', run: (op) => renameAllFiles(db, op) },
   'backup-db': { label: 'Back up database', desc: 'Snapshot the catalog database into backups/ next to it (keeps the newest 5). Safe while the app is in use. Restore: stop the app and copy a snapshot over catalog.db.', run: (op) => backupDatabase(db, config.dbPath, op) },
 };
 const summarizeTool = (r) => Object.entries(r || {}).map(([k, v]) => `${v} ${k.replace(/([A-Z])/g, ' $1').toLowerCase()}`).join(', ');
@@ -126,6 +127,28 @@ function runTool(tool, opts = {}) {
 }
 const countCorrupt = () => { try { return db.prepare('SELECT COUNT(*) c FROM library_files WHERE valid=0').get().c; } catch { return 0; } };
 const toolsState = () => ({ ...state.tools, corruptCount: countCorrupt(), catalog: Object.entries(TOOLS).map(([id, t]) => ({ id, label: t.label, desc: t.desc })) });
+
+// --- Reorganize library (move+rename to the configured patterns) ---
+// A background job: 40k files on a NAS takes minutes and must not block requests.
+function runLibraryRefile() {
+  if (state.refile.running) return { busy: true };
+  state.refile = { running: true, done: 0, total: 0 };
+  const job = startJob('refile', 'Reorganize library');
+  (async () => {
+    try {
+      const r = await refileLibrary(db, (p) => { state.refile = { running: true, ...p }; job.progress(p); });
+      state.refile = { running: false, result: r, ranAt: new Date().toISOString() };
+      logInfo(`Reorganize library: moved ${r.moved}, ${r.unchanged} already matched, ${r.skipped} skipped${r.errors.length ? `, ${r.errors.length} error(s)` : ''}`, 'tools');
+      job.finish({ moved: r.moved, unchanged: r.unchanged, skipped: r.skipped, errors: r.errors.length });
+    } catch (e) {
+      state.refile = { running: false, error: String(e?.message || e) };
+      logError(`Reorganize library failed: ${e?.message || e}`, 'tools');
+      job.fail(e);
+    }
+  })();
+  return { started: true };
+}
+const refileState = () => ({ ...state.refile });
 
 // --- ComicVine metadata matching ---
 function cvClient() { return makeCvClient(config); }
@@ -942,6 +965,8 @@ const app = createApp({
   importState,
   runTool,
   toolsState,
+  runLibraryRefile,
+  refileState,
   stats: () => collectionStats(db, config),
   listSources: () => orderedSources(config).map((s) => ({ id: s.id, label: s.label || s.id })),
   queueProgress: () => downloadMonitor.getProgress(),
