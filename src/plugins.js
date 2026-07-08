@@ -10,10 +10,48 @@
 // public distribution; the app runs fully without any external plugin.
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PLUGINS_DIR = process.env.PLUGINS_DIR || path.join(root, 'plugins');
+
+// Make the app's dependencies resolvable from plugins that live OUTSIDE the app
+// tree (e.g. Docker's PLUGINS_DIR=/data/plugins). Node walks up node_modules
+// dirs from the importing file, so a symlink at <pluginsDir>/node_modules → the
+// app's node_modules lets a plugin `import 'better-sqlite3'` (a shared core dep)
+// resolve. No-op when pluginsDir already sits under the app root (dev, where the
+// walk-up reaches the app's node_modules on its own).
+function linkCoreModules(dir) {
+  try {
+    const appModules = path.join(root, 'node_modules');
+    const link = path.join(dir, 'node_modules');
+    const underRoot = path.resolve(dir + path.sep).startsWith(path.resolve(root) + path.sep);
+    if (underRoot || !fs.existsSync(appModules) || fs.existsSync(link)) return;
+    fs.symlinkSync(appModules, link, 'junction'); // junction on Windows; plain symlink on posix
+    console.log(`Linked core node_modules into ${dir} for plugin dependency resolution`);
+  } catch (e) { console.warn('plugin core-module link failed:', e?.message || e); }
+}
+
+// A plugin's OWN dependencies (its package.json "dependencies") aren't in the
+// app's node_modules and aren't shipped in the source-only catalog bundle, so
+// install them into the plugin folder once. Prebuilt-binary deps (sharp,
+// better-sqlite3) install without a compiler, so this works on the slim image.
+// Best-effort: a failure is logged and the plugin still loads (a dep it needs
+// will surface its own clear error).
+function ensurePluginDeps(dir, name) {
+  try {
+    const pkgPath = path.join(dir, name, 'package.json');
+    if (!fs.existsSync(pkgPath)) return;
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    if (!pkg.dependencies || !Object.keys(pkg.dependencies).length) return;
+    if (fs.existsSync(path.join(dir, name, 'node_modules'))) return; // already installed
+    console.log(`Installing dependencies for plugin "${name}"…`);
+    const r = spawnSync('npm', ['install', '--omit=dev', '--no-audit', '--no-fund'],
+      { cwd: path.join(dir, name), stdio: 'inherit', shell: process.platform === 'win32' });
+    if (r.status !== 0) console.warn(`plugin "${name}": dependency install exited ${r.status}`);
+  } catch (e) { console.warn(`plugin "${name}" dependency install failed:`, e?.message || e); }
+}
 
 const sources = [];
 const settings = [];   // { key: spec } objects, merged into SETTING_FIELDS
@@ -162,10 +200,12 @@ function readMeta(dir, name) {
 export async function loadPluginsFromDir(dir, api = pluginApi, disabled = []) {
   const loaded = [];
   if (!dir || !fs.existsSync(dir)) return loaded;
+  linkCoreModules(dir); // shared core deps resolvable from plugins outside the app tree
   for (const name of fs.readdirSync(dir).sort()) {
-    if (name.startsWith('.')) continue;
+    if (name.startsWith('.') || name === 'node_modules') continue;
     const entry = path.join(dir, name, 'index.js');
     if (!fs.existsSync(entry)) continue;
+    if (!disabled.includes(name)) ensurePluginDeps(dir, name); // plugin's own deps (once)
     const info = {
       name,
       ...readMeta(dir, name),
