@@ -321,6 +321,13 @@
     </div>
     <div class="settings-col">
     <section class="settings-section">
+      <p class="modal__subhead">Sign-in</p>
+      <p class="modal__note">Password login always works for admins. Add an SSO provider (e.g. OIDC) from the <b>Plugins</b> page to let users sign in with an identity provider.</p>
+      <!-- Auth plugin config (e.g. OIDC/SSO) injects here (plain DOM — stays mounted). -->
+      <div id="settings-plugin-auth"></div>
+      <label class="field field--check"><input id="set-passwordLoginDisabled" type="checkbox" /><span>Disable password login (SSO only — admins keep a password fallback)</span></label>
+    </section>
+    <section class="settings-section">
       <p class="modal__subhead">Download sources</p>
 
       <p class="modal__note">Turn on the sources you want to download from. Enabling one reveals its settings below the toggle.</p>

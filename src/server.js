@@ -255,6 +255,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     if (!req.path.startsWith('/api') && !req.path.startsWith('/plugins')) return next();
     if (/^\/api\/auth\/(login|register|me|providers)$/.test(req.path)) return next();
     if (basicCsrfBlocked(req)) return res.status(403).json({ error: 'cross-origin request refused' });
+    // Resolve the route's required access BEFORE authenticating: a route
+    // explicitly marked public (e.g. an SSO plugin's login/callback) needs no
+    // session — the browser reaches it while signed out.
+    const need = requiredPermission(req);
+    if (need === 'public') return next();
     // Zero accounts = open single-user mode (the appliance default, same as
     // the old unset-basic-auth state). Creating the first account — which
     // becomes the admin — activates authentication for everything.
@@ -268,8 +273,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       return res.status(401).json({ error: 'authentication required' });
     }
     req.user = user;
-    const need = requiredPermission(req);
-    if (need !== 'public' && need !== 'authed' && !users.roleGrants(db, user.role, need, permCatalog)) {
+    if (need !== 'authed' && !users.roleGrants(db, user.role, need, permCatalog)) {
       const label = permCatalog.get(need)?.label || need;
       return res.status(403).json({ error: `your role doesn't include the permission: ${label}` });
     }
