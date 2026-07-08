@@ -87,6 +87,13 @@ To build the image locally: `docker build -t backissue .`. A second image,
 `Dockerfile.browser`, additionally runs a real (headed) Chromium under a
 virtual display (Xvfb) — only needed by browser-based source plugins.
 
+## AI disclosure
+
+AI was used in the creation of this app, managed end-to-end by an experienced
+engineer. Every feature is designed, reviewed, and tested under human
+direction — AI is what lets a single engineer lead the charge and iterate at
+the speed of a full team.
+
 ## License
 
 BackIssue is free software, licensed under the
