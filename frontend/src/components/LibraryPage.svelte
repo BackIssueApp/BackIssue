@@ -197,6 +197,11 @@
     </div>
   {/if}
 
+  <!-- Plugin home rail (reading shelves etc.) injects here — plain DOM, must
+       stay mounted. Sits above the virtualized list so it can't perturb its
+       scroll-offset math; empty (0-height) until a plugin fills it. -->
+  <div id="home-plugin-rail" class="home-rail"></div>
+
   <div class="librarypage__scroll" id="series-list" bind:this={scroller} onscroll={onScroll}>
     {#if rail.loaded && !rail.rows.length}
       <div class="empty">
