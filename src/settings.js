@@ -46,6 +46,9 @@ export const SETTING_FIELDS = {
   wantedSearchCron:    { type: 'string', allowEmpty: true },
   wantedSearchEnabled: { type: 'bool' },
   wantedSearchBatch:   { type: 'int', min: 1, max: 200 },
+  recentSearchCron:    { type: 'string', allowEmpty: true },
+  recentSearchEnabled: { type: 'bool' },
+  recentSearchDays:    { type: 'int', min: 1, max: 90 },
   autoDownloadOnAdd:   { type: 'bool' }, // adding a volume queues its issues immediately
   zeroDayCron:         { type: 'string', allowEmpty: true },
   zeroDayEnabled:      { type: 'bool' },

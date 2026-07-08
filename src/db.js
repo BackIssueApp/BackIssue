@@ -282,7 +282,7 @@ export function recordImport(db, { seriesId = null, seriesTitle = null, issueTit
 // valid file) that has NO valid file yet. `queue_status` carries the in-flight
 // state (queued/grabbed/failed…) when the issue has already been sent for
 // download, so the page can show a badge instead of a Download button.
-export function listWantedIssues(db, { limit = 200, offset = 0, followedOnly = false, hideUnreleased = false, search = '', includeRestricted = true } = {}) {
+export function listWantedIssues(db, { limit = 200, offset = 0, followedOnly = false, hideUnreleased = false, releasedWithinDays = 0, search = '', includeRestricted = true } = {}) {
   const conds = [
     `(s.followed=1 OR EXISTS(SELECT 1 FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1))`,
     `NOT EXISTS (SELECT 1 FROM library_files lf2 WHERE lf2.cv_issue_id = ci.comicvine_id AND lf2.valid=1)`,
@@ -293,6 +293,15 @@ export function listWantedIssues(db, { limit = 200, offset = 0, followedOnly = f
   // Best-effort: most cached issues have no cover date (volume stubs don't carry
   // one), so this only hides issues we KNOW are future-dated — honest, not complete.
   if (hideUnreleased) conds.push(`NOT (ci.cover_date IS NOT NULL AND date(ci.cover_date) > date('now'))`);
+  // Only issues RELEASED within the last N days (store date first — that's the
+  // real shelf date; cover dates run weeks ahead). Requires a known, non-future
+  // date, so this is a strict subset: the "new releases" lane, not the backlog.
+  if (releasedWithinDays > 0) {
+    conds.push(`COALESCE(ci.store_date, ci.cover_date) IS NOT NULL
+      AND date(COALESCE(ci.store_date, ci.cover_date)) >= date('now', @recentSince)
+      AND date(COALESCE(ci.store_date, ci.cover_date)) <= date('now')`);
+    args.recentSince = `-${Math.floor(releasedWithinDays)} days`;
+  }
   if (search) { conds.push('COALESCE(cv.name, s.title) LIKE @q'); args.q = `%${search}%`; }
   const from = `FROM series s
     JOIN cv_series cv ON cv.comicvine_id = s.cv_id

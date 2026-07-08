@@ -448,6 +448,7 @@ const SCHEDULE_KEYS = {
   'cv-match': { cron: 'cvMatchCron', enabled: 'cvMatchEnabled' },
   'zero-day': { cron: 'zeroDayCron', enabled: 'zeroDayEnabled' },
   'wanted-search': { cron: 'wantedSearchCron', enabled: 'wantedSearchEnabled' },
+  'recent-search': { cron: 'recentSearchCron', enabled: 'recentSearchEnabled' },
 };
 const scheduler = createScheduler({ db });
 const schedGetters = (key) => ({ cron: () => config[SCHEDULE_KEYS[key].cron], enabled: () => !!config[SCHEDULE_KEYS[key].enabled] });
@@ -455,6 +456,7 @@ scheduler.register({ key: 'releases', label: "Check this week's releases", ...sc
 scheduler.register({ key: 'cv-match', label: 'Match ComicVine (owned + followed)', ...schedGetters('cv-match'), run: () => runCvMatchSweep() });
 scheduler.register({ key: 'zero-day', label: 'Grab weekly 0-Day pack (torrent)', ...schedGetters('zero-day'), run: () => runZeroDayGrab() });
 scheduler.register({ key: 'wanted-search', label: 'Search wanted issues (backfill)', ...schedGetters('wanted-search'), run: () => runWantedSearch() });
+scheduler.register({ key: 'recent-search', label: 'Search new releases', ...schedGetters('recent-search'), run: () => runRecentSearch() });
 // Plugin-contributed schedulable jobs (e.g. a catalog crawl). Plugins still
 // declare their legacy '<x>Hours' key; the '<x>Cron'/'<x>Enabled' twins drive it.
 for (const job of registeredJobs()) {
@@ -601,6 +603,34 @@ async function runWantedSearch() {
   logInfo(`Wanted search: queued ${ids.length} of ${total} missing issue(s)`, 'download');
   job.finish({ queued: ids.length, wanted: total });
   return { queued: ids.length, wanted: total };
+}
+
+// Scheduled new-releases lane: queue missing issues of FOLLOWED series that hit
+// the shelves in the last recentSearchDays. Unlike the backfill above, FAILED
+// items are retried on every run while they're inside the window — a comic
+// released yesterday often isn't on the indexers yet, and availability changes
+// daily in week one. Once an issue ages out of the window it stops being
+// retried (the nightly backfill's skip-failed rule takes over).
+async function runRecentSearch() {
+  const job = startJob('recent-search', 'Search new releases');
+  const days = Math.max(1, Number(config.recentSearchDays) || 14);
+  const { items, total } = listWantedIssues(db, { followedOnly: true, releasedWithinDays: days, limit: 200 });
+  const fresh = [], failed = [];
+  for (const it of items) {
+    const bucket = it.queue_status === 'failed' ? failed : it.queue_status ? null : fresh;
+    if (bucket) bucket.push(ensureCvIssueRow(db, { seriesId: it.series_id, cvIssueId: it.cv_issue_id, number: it.issue_number, title: it.issue_name }));
+  }
+  // Failed rows keep no files (they never downloaded) — just reset them to
+  // pending so queueIssues picks them up alongside the fresh ones.
+  clearIssuesForRedownload(db, failed);
+  const ids = [...fresh, ...failed];
+  queueIssues(db, ids);
+  if (ids.length && !state.queue.running) {
+    Promise.resolve(runDownloads()).catch((e) => { state.queue.error = String(e); });
+  }
+  logInfo(`New releases: queued ${fresh.length} new, retried ${failed.length} failed (of ${total} recent missing)`, 'download');
+  job.finish({ queued: fresh.length, retried: failed.length, recent: total });
+  return { queued: fresh.length, retried: failed.length, recent: total };
 }
 
 // Try a real search with the given key (or the saved one) — the Settings

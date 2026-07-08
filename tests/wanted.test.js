@@ -76,3 +76,22 @@ test('listWantedIssues: hideUnreleased hides only KNOWN-future cover dates', () 
   assert.equal(filtered.total, 2); // #2 (unknown date) still shown — honest filter
   assert.ok(!filtered.items.some((i) => i.issue_number === '3' && i.series_title === 'Saga'));
 });
+
+test('listWantedIssues: releasedWithinDays = the new-releases lane', () => {
+  const { db } = seed();
+  const daysAgo = (n) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+  // Saga #2 hit shelves 3 days ago; #3 is 60 days old; X-Men #1 has no date.
+  db.prepare('UPDATE cv_issues SET store_date=? WHERE comicvine_id=2').run(daysAgo(3));
+  db.prepare('UPDATE cv_issues SET store_date=? WHERE comicvine_id=3').run(daysAgo(60));
+  const recent = listWantedIssues(db, { releasedWithinDays: 14 });
+  assert.equal(recent.total, 1, 'only the 3-day-old release is "recent"');
+  assert.equal(recent.items[0].issue_number, '2');
+
+  // store_date beats a future cover date (cover dates run weeks ahead).
+  db.prepare("UPDATE cv_issues SET cover_date='2099-01-01' WHERE comicvine_id=2").run();
+  assert.equal(listWantedIssues(db, { releasedWithinDays: 14 }).total, 1, 'still recent via store_date');
+
+  // A future store date is NOT recent (not out yet).
+  db.prepare("UPDATE cv_issues SET store_date='2099-01-01' WHERE comicvine_id=2").run();
+  assert.equal(listWantedIssues(db, { releasedWithinDays: 14 }).total, 0);
+});

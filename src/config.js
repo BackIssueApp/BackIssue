@@ -112,6 +112,12 @@ const config = {
   wantedSearchCron: '0 2 * * *',   // nightly, 2am
   wantedSearchEnabled: false,
   wantedSearchBatch: 25,           // issues per run — be kind to the indexers
+  // New-releases lane: search recently-released issues of followed series.
+  // Unlike the backfill it RETRIES failures while the issue is inside the
+  // window (new releases reach indexers over days), then lets them age out.
+  recentSearchCron: '0 */6 * * *', // every 6 hours
+  recentSearchEnabled: false,
+  recentSearchDays: 14,            // how recent counts as a "new" release
   // Legacy hour-cadence keys — migrated to Cron+Enabled on load (see settings.js).
   releaseCheckHours: 0,
   updatesCheckHours: 0,
