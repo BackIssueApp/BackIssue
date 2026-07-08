@@ -118,6 +118,10 @@ const config = {
   recentSearchCron: '0 */6 * * *', // every 6 hours
   recentSearchEnabled: false,
   recentSearchDays: 14,            // how recent counts as a "new" release
+  // RSS watch: poll the indexers' latest-uploads feed and grab anything that
+  // matches a missing issue of a followed series, within one poll of upload.
+  rssWatchCron: '*/15 * * * *',
+  rssWatchEnabled: false,
   // Legacy hour-cadence keys — migrated to Cron+Enabled on load (see settings.js).
   releaseCheckHours: 0,
   updatesCheckHours: 0,

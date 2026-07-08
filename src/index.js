@@ -12,6 +12,7 @@ import nodePath from 'node:path';
 import { indexFolderForSeries, reconcileLibrary, removeSupersededFiles } from './library.js';
 import { resolveSeriesDir, parseRootFolders } from './paths.js';
 import { refileLibrary } from './refile.js';
+import { initRssTables, unseenItems, markSeen, buildWantedIndex, matchFeedItems } from './rsswatch.js';
 import { findComicFiles, groupSeries } from './scanner.js';
 import { extractYear } from './matcher.js';
 import { poolWithResource } from './pool.js';
@@ -90,6 +91,7 @@ process.on('warning', (w) => { if (/memory|heap/i.test(w?.message || '')) { try 
 // Recover issues left in 'downloading' by a previous crash/force-close so they
 // don't sit stuck on the "saving" badge until the next queue run.
 reconcileDownloading(db);
+initRssTables(db);
 // Per-volume is now the ownership model: attribute any orphaned files, CV-link
 // matched series, and drop index rows for comics you don't track.
 try { const rec = reconcileLibrary(db); if (rec.attributed || rec.pruned) console.log(`Library reconcile: attributed ${rec.attributed}, pruned ${rec.pruned} untracked file rows.`); } catch (e) { console.warn('reconcile failed', e?.message || e); }
@@ -449,6 +451,7 @@ const SCHEDULE_KEYS = {
   'zero-day': { cron: 'zeroDayCron', enabled: 'zeroDayEnabled' },
   'wanted-search': { cron: 'wantedSearchCron', enabled: 'wantedSearchEnabled' },
   'recent-search': { cron: 'recentSearchCron', enabled: 'recentSearchEnabled' },
+  'rss-watch': { cron: 'rssWatchCron', enabled: 'rssWatchEnabled' },
 };
 const scheduler = createScheduler({ db });
 const schedGetters = (key) => ({ cron: () => config[SCHEDULE_KEYS[key].cron], enabled: () => !!config[SCHEDULE_KEYS[key].enabled] });
@@ -457,6 +460,7 @@ scheduler.register({ key: 'cv-match', label: 'Match ComicVine (owned + followed)
 scheduler.register({ key: 'zero-day', label: 'Grab weekly 0-Day pack (torrent)', ...schedGetters('zero-day'), run: () => runZeroDayGrab() });
 scheduler.register({ key: 'wanted-search', label: 'Search wanted issues (backfill)', ...schedGetters('wanted-search'), run: () => runWantedSearch() });
 scheduler.register({ key: 'recent-search', label: 'Search new releases', ...schedGetters('recent-search'), run: () => runRecentSearch() });
+scheduler.register({ key: 'rss-watch', label: 'Watch indexer RSS for releases', ...schedGetters('rss-watch'), run: () => runRssWatch() });
 // Plugin-contributed schedulable jobs (e.g. a catalog crawl). Plugins still
 // declare their legacy '<x>Hours' key; the '<x>Cron'/'<x>Enabled' twins drive it.
 for (const job of registeredJobs()) {
@@ -637,6 +641,47 @@ async function runRecentSearch() {
   logInfo(`New releases: queued ${fresh.length} new, retried ${failed.length} failed (of ${total} recent missing)`, 'download');
   job.finish({ queued: fresh.length, retried: failed.length, recent: total });
   return { queued: fresh.length, retried: failed.length, recent: total };
+}
+
+// RSS watch: poll the indexers' latest-uploads feed (empty-query search) and
+// grab anything matching a missing issue of a followed series. Each item is
+// considered once (rss_seen); a match is PINNED to the issue so the queue
+// downloads exactly that release — no re-search. See src/rsswatch.js.
+async function runRssWatch() {
+  const job = startJob('rss-watch', 'Watch indexer RSS');
+  const feeds = [];
+  if (config.torrentEnabled) {
+    const ixs = parseTorznab(config.torznabIndexers);
+    if (ixs.length) feeds.push(searchTorznab(ixs, '', { limit: 100 })
+      .then((r) => r.map((x) => ({ ...x, source: 'torrent' })))
+      .catch((e) => { logWarn(`RSS watch: torznab feed failed — ${e?.message || e}`, 'download'); return []; }));
+  }
+  if (config.usenetEnabled) {
+    const ixs = parseIndexers(config.newznabIndexers);
+    if (ixs.length) feeds.push(searchNewznab(ixs, '', { limit: 100 })
+      .then((r) => r.map((x) => ({ ...x, source: 'usenet' })))
+      .catch((e) => { logWarn(`RSS watch: newznab feed failed — ${e?.message || e}`, 'download'); return []; }));
+  }
+  if (!feeds.length) { job.finish({ skipped: 'no sources enabled' }); return { skipped: true }; }
+  const items = (await Promise.all(feeds)).flat();
+  const fresh = unseenItems(db, items);
+  const matches = fresh.length ? matchFeedItems(fresh, buildWantedIndex(db)) : [];
+  const ids = [];
+  for (const { item, wanted } of matches) {
+    const id = ensureCvIssueRow(db, { seriesId: wanted.series_id, cvIssueId: wanted.cv_issue_id, number: wanted.issue_number, title: wanted.issue_name });
+    if (manualPins.size >= 500) manualPins.delete(manualPins.keys().next().value);
+    manualPins.set(id, { source: item.source, candidate: item });
+    ids.push(id);
+    logInfo(`RSS match: "${item.title}" → ${wanted.series_title} #${wanted.issue_number} (${item.source})`, 'download');
+  }
+  queueIssues(db, ids);
+  markSeen(db, items); // every fetched item was considered — never re-process
+  if (ids.length && !state.queue.running) {
+    Promise.resolve(runDownloads()).catch((e) => { state.queue.error = String(e); });
+  }
+  if (fresh.length || ids.length) logInfo(`RSS watch: ${items.length} item(s), ${fresh.length} new, matched ${ids.length}`, 'download');
+  job.finish({ items: items.length, fresh: fresh.length, queued: ids.length });
+  return { items: items.length, fresh: fresh.length, queued: ids.length };
 }
 
 // Try a real search with the given key (or the saved one) — the Settings
