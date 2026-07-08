@@ -336,11 +336,11 @@
   }
   const priorityLabel = (s) => (s.label || s.id).replace(/^./, (c) => c.toUpperCase());
 
-  // Dot state for a rail item: Sources reflects enabled sources; others light up
-  // when they hold unsaved edits.
-  function dotClass(id) {
-    if (id === 'sources') return anySourceOn ? 'is-good' : 'is-warn';
-    return dirtySections.has(id) ? 'is-edit' : '';
+  // A chip's attention dot: amber on Sources when no source is enabled, accent
+  // on a section holding unsaved edits, nothing otherwise (quiet by default).
+  function chipDot(id) {
+    if (id === 'sources' && !anySourceOn) return 'is-warn';
+    return dirtySections.has(id) ? 'is-edit' : null;
   }
 </script>
 
@@ -373,26 +373,19 @@
     <button id="settings-save" class="btn btn--primary" onclick={save}>Save</button>
   </div>
 
-  <div class="settings-shell">
-    <!-- Index rail: jump-navigation that also reports each section's state. -->
-    <nav class="settings-rail" aria-label="Settings sections">
-      {#each SECTIONS as s (s.id)}
-        <button type="button" class="settings-rail__item" class:is-active={activeSection === s.id}
-          class:is-dim={!!filterQuery && emptySections.has(s.id)} onclick={() => scrollToSection(s.id)}>
-          <span class="settings-rail__dot {dotClass(s.id)}"></span>
-          <span class="settings-rail__label">{s.label}</span>
-        </button>
-      {/each}
-      <div class="settings-rail__spacer"></div>
-      <div class="settings-rail__status" class:is-warn={!anySourceOn}>
-        {#if anySourceOn}
-          <Icon name="check" /><span>Downloads are set up.</span>
-        {:else}
-          <Icon name="alert-triangle" /><span>No download sources enabled — new comics can’t download until you turn one on.</span>
-        {/if}
-      </div>
-    </nav>
+  <!-- Section chips: the same filter-chip language as the Library page. Click
+       to jump; scroll-spy fills the chip you're in; a dot flags attention
+       (amber = no sources enabled, accent = unsaved edits in that section). -->
+  <nav class="settings-chips" aria-label="Settings sections">
+    {#each SECTIONS as s (s.id)}
+      <button type="button" class="coll-chip settings-chip" class:is-active={activeSection === s.id}
+        class:is-dim={!!filterQuery && emptySections.has(s.id)} onclick={() => scrollToSection(s.id)}>
+        {s.label}{#if chipDot(s.id)}<span class="settings-chip__dot {chipDot(s.id)}"></span>{/if}
+      </button>
+    {/each}
+  </nav>
 
+  <div class="settings-shell">
     <!-- Scrolling content -->
     <div class="settings-content" bind:this={contentEl} onscroll={onSpy}>
       <div class="settings-measure">
@@ -558,6 +551,10 @@
               <p class="modal__note">A scheduled job finds the newest <b>0-Day Week of …</b> pack on your Torznab indexers, downloads it, and post-processes it — importing the <b>missing</b> issues of series already in your collection (the rest still seeds). With <b>Add new series</b> on, it also adds+follows any series it can confidently match to ComicVine, so brand-new series start being tracked. Turn the schedule on and set how often on the <b>Jobs</b> page (“Grab weekly 0-Day pack”), or Run it now from there.</p>
             </div>
           </div>
+
+          {#if !anySourceOn}
+            <p class="modal__note src-warning"><Icon name="alert-triangle" /> No download sources are enabled — new comics can't be downloaded until you turn one on.</p>
+          {/if}
 
           {#if sourceOrder.length >= 2}
             <section class="settings-section" id="source-priority">
