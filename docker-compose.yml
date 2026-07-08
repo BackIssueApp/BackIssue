@@ -1,0 +1,30 @@
+# BackIssue — example Docker Compose deployment.
+#
+#   docker compose up -d
+#
+# Then open http://localhost:8787 — the first run walks you through creating
+# the admin account and picking plugins. In Settings → Library, set the root
+# folder to /comics (the container path of your comics mount below).
+services:
+  backissue:
+    image: ghcr.io/backissueapp/backissue:latest
+    container_name: backissue
+    ports:
+      - "8787:8787"
+    volumes:
+      # Database, settings, and installed plugins — keep this persistent.
+      - ./data:/data
+      # Your comic library root(s). Add more mounts for extra root folders.
+      - /path/to/comics:/comics
+      # If a download client (SABnzbd/NZBGet/qBittorrent) runs in another
+      # container, mount its completed-downloads folder too, e.g.:
+      # - /path/to/downloads/complete:/downloads/complete
+    environment:
+      # File ownership for /data and imported comics. Defaults are Unraid's
+      # nobody:users — set to your host user (run `id`) on other setups.
+      - PUID=99
+      - PGID=100
+      - UMASK=022
+      # Local time for schedules (release checks, wanted/new-release searches).
+      - TZ=Europe/Dublin
+    restart: unless-stopped

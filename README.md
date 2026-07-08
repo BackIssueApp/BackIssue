@@ -61,16 +61,33 @@ Everything also has a default in `src/config.js`. Data lives in `catalog.db`
 
 ## Docker
 
+The published image is `ghcr.io/backissueapp/backissue` — `latest` tracks
+releases and the nightly build of main; version tags (e.g. `0.3.0`) pin a
+release; `nightly` is last night's main. The easiest deployment is Docker
+Compose — see
+[`docker-compose.yml`](docker-compose.yml) for a commented example:
+
 ```bash
-docker build -t backissue .
-docker run -d -p 8787:8787 \
-  -v /path/to/data:/data \
-  -v /path/to/comics:/comics \
-  backissue
+docker compose up -d
 ```
 
-The image runs a real (headed) Chromium under a virtual display (Xvfb) — needed
-by browser-based source plugins, and harmless otherwise.
+Or plain `docker run`:
+
+```bash
+docker run -d -p 8787:8787 \
+  -e PUID=99 -e PGID=100 -e TZ=Europe/Dublin \
+  -v /path/to/data:/data \
+  -v /path/to/comics:/comics \
+  ghcr.io/backissueapp/backissue:latest
+```
+
+`/data` holds the database, settings, and installed plugins; mount your comic
+library at `/comics` (and point Settings → Library → Root folders at it).
+`PUID`/`PGID`/`UMASK` control file ownership (defaults suit Unraid).
+
+To build locally: `docker build -t backissue .`. A second image,
+`Dockerfile.browser`, additionally runs a real (headed) Chromium under a
+virtual display (Xvfb) — only needed by browser-based source plugins.
 
 ## Plugins
 
