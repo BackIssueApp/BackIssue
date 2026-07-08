@@ -9,7 +9,7 @@ year, issue list, covers). Download **sources** are pluggable and
 interchangeable — Usenet and torrents ship built in, and more install with one
 click from the in-app plugin catalog.
 
-**Documentation: [backissue.app](https://backissue.app)**
+**Documentation: [backissue.app](https://backissue.app)** · **Support & community: [Discord](https://discord.gg/T6GTgzz8t2)**
 
 ---
 
