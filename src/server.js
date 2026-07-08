@@ -396,6 +396,22 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       res.json({ ok: true });
     } catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
   });
+  // The signed-in user's own profile (self-service — any authed user).
+  app.get('/api/auth/profile', (req, res) => {
+    if (!req.user || req.user.id === 0) {
+      return res.json({ user: { username: req.user?.username || 'local', role: req.user?.role || 'admin', email: null, created_at: null, last_seen: null, providers: [] } });
+    }
+    res.json({ user: users.userProfile(db, req.user.id) });
+  });
+  app.post('/api/auth/email', (req, res) => {
+    if (!req.user || req.user.id === 0) return res.status(403).json({ error: 'sign in with a real account first' });
+    try { res.json({ email: users.updateEmail(db, req.user.id, (req.body || {}).email) }); }
+    catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
+  });
+  app.post('/api/auth/logout-others', (req, res) => {
+    if (!req.user || req.user.id === 0) return res.status(403).json({ error: 'sign in with a real account first' });
+    res.json({ cleared: users.destroyOtherSessions(db, req.user.id, readCookie(req)) });
+  });
 
   // ---- user administration (needs users.manage via PERM_RULES) ----
   // "Admin" for the can't-lock-yourself-out guards means anyone who can manage

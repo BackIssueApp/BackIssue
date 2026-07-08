@@ -292,6 +292,38 @@ export function listUsers(db) {
     .map((u) => ({ ...u, providers: u.providers ? u.providers.split(',') : [] }));
 }
 
+/** One account's own details for the profile page: identity + when they joined,
+ *  last activity, and any external-login providers. */
+export function userProfile(db, id) {
+  const u = db.prepare(`
+    SELECT u.id, u.username, u.email, u.role, u.created_at,
+           (SELECT MAX(last_seen) FROM sessions s WHERE s.user_id = u.id) AS last_seen,
+           (SELECT GROUP_CONCAT(DISTINCT provider) FROM external_identities e WHERE e.user_id = u.id) AS providers
+      FROM users u WHERE u.id = ?`).get(id);
+  if (!u) return null;
+  return { ...u, providers: u.providers ? u.providers.split(',') : [] };
+}
+
+/** Set a user's email (self-service). Blank clears it. Validates format and
+ *  guards uniqueness so it stays a reliable key for external-login linking. */
+export function updateEmail(db, id, email) {
+  const e = String(email || '').trim() || null;
+  if (e && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error('that doesn’t look like an email address');
+  if (e) {
+    const other = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(e, id);
+    if (other) throw new Error('that email is already linked to another account');
+  }
+  db.prepare('UPDATE users SET email = ? WHERE id = ?').run(e, id);
+  return e;
+}
+
+/** Sign out every OTHER session for a user, keeping the one making the request
+ *  (identified by its raw token). Returns how many were cleared. */
+export function destroyOtherSessions(db, userId, keepToken) {
+  const keep = keepToken ? tokenHash(keepToken) : '';
+  return db.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').run(userId, keep).changes;
+}
+
 /** Credentials → user row (with hash timing regardless of user existence). */
 export function verifyCredentials(db, username, password) {
   const row = db.prepare('SELECT * FROM users WHERE username=?').get(String(username || ''));

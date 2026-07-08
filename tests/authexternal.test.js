@@ -61,3 +61,31 @@ test('createSession stamps last_seen so a fresh login is not "never signed in"',
   const row = users.listUsers(d).find((r) => r.id === u.id);
   assert.ok(row.last_seen, 'last_seen is set at session creation');
 });
+
+test('profile email: set, validate, uniqueness, clear; userProfile shape', () => {
+  const d = freshDb();
+  const a = users.createUser(d, { username: 'alice', password: 'password1', role: 'viewer' });
+  const b = users.createUser(d, { username: 'bob', password: 'password1', role: 'viewer' });
+  assert.equal(users.updateEmail(d, a.id, 'alice@x.com'), 'alice@x.com');
+  assert.equal(users.userProfile(d, a.id).email, 'alice@x.com');
+  assert.throws(() => users.updateEmail(d, a.id, 'not-an-email'), /email address/);
+  assert.throws(() => users.updateEmail(d, b.id, 'alice@x.com'), /already linked/);
+  assert.equal(users.updateEmail(d, a.id, ''), null, 'blank clears');
+  const p = users.userProfile(d, a.id);
+  assert.equal(p.username, 'alice');
+  assert.equal(p.email, null);
+  assert.deepEqual(p.providers, []);
+});
+
+test('sign out other devices keeps the current session, drops the rest', () => {
+  const d = freshDb();
+  const u = users.createUser(d, { username: 'multi', password: 'password1' });
+  const t1 = users.createSession(d, u.id);
+  const t2 = users.createSession(d, u.id);
+  const t3 = users.createSession(d, u.id);
+  assert.ok(users.sessionUser(d, t1) && users.sessionUser(d, t2) && users.sessionUser(d, t3));
+  assert.equal(users.destroyOtherSessions(d, u.id, t2), 2, 'two others cleared');
+  assert.equal(users.sessionUser(d, t2)?.id, u.id, 'current session kept');
+  assert.equal(users.sessionUser(d, t1), null);
+  assert.equal(users.sessionUser(d, t3), null);
+});

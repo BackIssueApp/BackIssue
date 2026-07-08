@@ -22,6 +22,7 @@
   import PluginsPage from './components/PluginsPage.svelte';
   import UsersPage from './components/UsersPage.svelte';
   import ListsPage from './components/ListsPage.svelte';
+  import ProfilePage from './components/ProfilePage.svelte';
   import LoginPage from './components/LoginPage.svelte';
   import AccountModal from './components/AccountModal.svelte';
   import HelpModal from './components/HelpModal.svelte';
@@ -44,7 +45,7 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
     '/settings': 'settings', '/jobs': 'jobs', '/tools': 'tools', '/logs': 'logs',
     '/wanted': 'wanted', '/history': 'history', '/stats': 'stats', '/import': 'import',
     '/queue': 'queuepage', '/releases': 'releasespage', '/plugins': 'pluginspage',
-    '/users': 'userspage', '/lists': 'listspage',
+    '/users': 'userspage', '/lists': 'listspage', '/profile': 'profilepage',
   };
 
   // Route-level permission guard. Section pages are always mounted, so a user
@@ -177,6 +178,7 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
       <ReleasesDrawer active={route.path === '/releases'} />
       <UsersPage active={route.path === '/users'} />
       <ListsPage active={route.path === '/lists'} />
+      <ProfilePage active={route.path === '/profile'} />
     </main>
   </div>
 </div>

@@ -6,7 +6,6 @@
   import { status } from '../lib/status.svelte.js';
   import { fmt } from '../lib/util.js';
   import { auth, logout, can, isTrusted } from '../lib/auth.svelte.js';
-  import { openAccountModal } from './AccountModal.svelte';
   import Icon from '../lib/Icon.svelte';
 
   let userMenuOpen = $state(false);
@@ -98,7 +97,7 @@
       </button>
       {#if userMenuOpen}
         <div class="sideuser__menu">
-          <button class="menu__item" onclick={() => { userMenuOpen = false; openAccountModal(); }}>Change password</button>
+          <button class="menu__item" onclick={() => { userMenuOpen = false; go('/profile'); }}>Profile</button>
           <button class="menu__item" onclick={() => { userMenuOpen = false; logout(); }}>Sign out</button>
         </div>
       {/if}

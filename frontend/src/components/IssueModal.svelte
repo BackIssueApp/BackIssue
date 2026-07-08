@@ -18,6 +18,7 @@
 
 <script>
   import { detail, flags, downloadCvIssues, redownloadCvIssues, reloadDetail } from '../lib/store.svelte.js';
+  import { issueActions, issueActionsTick } from '../lib/plugins.svelte.js';
   import { sanitizeHtml, safeUrl } from '../lib/util.js';
   import { openSourceSearch } from './SourceSearchModal.svelte';
   import { apiPost } from '../lib/api.js';
@@ -146,6 +147,19 @@
               </div>
             </div>
           </div>
+          <!-- Reader (and other plugin) per-issue actions: Read, mark read/unread,
+               read-later. Each action's when() limits it to owned issues; not
+               gated on downloads.grab since reading is a viewer capability. -->
+          {#if info && issueActions.length}
+            <div class="ii-actions ii-actions--read">
+              {#each issueActions as a (a.id + ':' + issueActionsTick.n)}
+                {@const issue = { ...info, cv_issue_id: m.cvIssueId }}
+                {#if !a.when || a.when(issue)}
+                  <button class="btn btn--ghost" onclick={() => { closeModal('issue'); a.run(issue, detail.series); }}>{@html typeof a.icon === 'function' ? a.icon(issue) : a.icon} {typeof a.title === 'function' ? a.title(issue) : a.title}</button>
+                {/if}
+              {/each}
+            </div>
+          {/if}
           {#if can('downloads.grab')}
             <div class="ii-actions">
               <button class="btn btn--primary ii-dl" onclick={download}>

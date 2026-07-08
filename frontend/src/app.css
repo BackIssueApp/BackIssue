@@ -36,7 +36,14 @@
 /* hidden attribute must win over component display rules (.empty, etc.) */
 [hidden] { display: none !important; }
 
-html, body { height: 100%; }
+/* App-shell: the document is pinned to the viewport and never scrolls or
+   rubber-bands. Only the inner containers scroll (they contain their overscroll,
+   below). Pinning body with position:fixed stops iPad Safari from dragging the
+   whole page a few px — which otherwise offsets the fixed reader overlay and
+   clips its controls. Login/onboarding are their own fixed overlays, so they're
+   unaffected. */
+html { height: 100%; overflow: hidden; overscroll-behavior: none; }
+body { position: fixed; inset: 0; width: 100%; height: 100%; overflow: hidden; overscroll-behavior: none; }
 
 body {
   margin: 0;
@@ -577,7 +584,7 @@ button .bi-icon, a .bi-icon { pointer-events: none; }
 /* ---------- Users page ---------- */
 .users-page { display: none; }
 body.userspage .home { display: none; }
-body.userspage .users-page { display: flex; flex-direction: column; height: calc(100vh - var(--topbar-h)); }
+body.userspage .users-page { display: flex; flex-direction: column; height: 100%; }
 .users-scroll { overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 10px; max-width: 760px; width: 100%; margin: 0 auto; }
 .userreg { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text); margin-left: auto; cursor: pointer; }
 .user-row {
@@ -620,7 +627,7 @@ body.userspage .users-page { display: flex; flex-direction: column; height: calc
 /* ---------- Reading lists page ---------- */
 .lists-page { display: none; }
 body.listspage .home { display: none; }
-body.listspage .lists-page { display: flex; flex-direction: column; height: calc(100vh - var(--topbar-h)); }
+body.listspage .lists-page { display: flex; flex-direction: column; height: 100%; }
 .lists-scroll { overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 10px; max-width: 860px; width: 100%; margin: 0 auto; }
 .listcard {
   display: grid; grid-template-columns: 1fr auto auto; grid-template-rows: auto auto; gap: 6px 8px;
@@ -664,7 +671,7 @@ a.listitem__series:hover { color: var(--accent); }
 /* ---------- Plugins page ---------- */
 .plugins-page { display: none; }
 body.pluginspage .home { display: none; }
-body.pluginspage .plugins-page { display: flex; flex-direction: column; height: calc(100vh - var(--topbar-h)); }
+body.pluginspage .plugins-page { display: flex; flex-direction: column; height: 100%; }
 .plugins-scroll { overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; max-width: 760px; width: 100%; margin: 0 auto; }
 .plugins-banner {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -867,7 +874,12 @@ body.queuepage .home, body.releasespage .home { display: none; }
 .ii-cover { width: 96px; flex: none; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-2); }
 .ii-head { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .ii-statusrow { margin-top: 2px; }
-.ii-actions { display: flex; gap: 8px; }
+.ii-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+/* Plugin per-issue action buttons (Read, mark read/unread) render an inline SVG
+   icon followed by their label — align and size the icon to the text. */
+.ii-actions--read { margin-bottom: 8px; }
+.ii-actions--read .btn { display: inline-flex; align-items: center; gap: 6px; }
+.ii-actions--read .btn svg { width: 16px; height: 16px; }
 .ii-flag--ok { color: var(--green); border-color: rgba(95,211,138,.4); }
 .ii-error { font-family: var(--font-sans, inherit); color: var(--red); font-size: 11px; margin-top: 2px; white-space: normal; }
 .ii-name { font-size: 16px; font-weight: 500; }
@@ -1000,7 +1012,7 @@ input[type="checkbox"]:disabled { opacity: .45; cursor: default; }
 
 /* ---------- Settings page ---------- */
 body.settings .home { display: none; }
-body.settings .settings-page { display: flex; flex-direction: column; height: calc(100vh - var(--topbar-h)); }
+body.settings .settings-page { display: flex; flex-direction: column; height: 100%; }
 .settings-spacer { flex: 1; }
 
 /* Top-bar filter box */
@@ -1057,16 +1069,36 @@ body.settings .settings-page { display: flex; flex-direction: column; height: ca
   background: rgba(255,255,255,.015);
 }
 
+/* ---------- Profile page ---------- */
+body.profilepage .home { display: none; }
+body.profilepage .profile-page { display: flex; flex-direction: column; height: 100%; }
+.profile-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 24px 22px max(40px, env(safe-area-inset-bottom)); }
+.profile-measure { max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+.profile-id { display: flex; align-items: center; gap: 14px; }
+.profile-id__avatar { width: 52px; height: 52px; border-radius: 50%; background: var(--panel-2); border: 1px solid var(--line); display: grid; place-items: center; font-family: var(--font-display); font-size: 24px; color: var(--accent); flex-shrink: 0; }
+.profile-id__name { font-size: 18px; font-weight: 600; }
+.profile-id__role { font-size: 12px; color: var(--muted); text-transform: capitalize; }
+.profile-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.profile-email { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.profile-email__row { display: flex; gap: 8px; align-items: center; }
+.profile-email__row input { flex: 1; height: 34px; padding: 0 10px; background: var(--ink); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font: inherit; }
+.profile-email__row input:focus { border-color: var(--accent); outline: none; }
+.profile-email__row .btn { height: 34px; }
+.profile-meta { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 12px; color: var(--faint); }
+.profile-meta b { color: var(--muted); font-weight: 600; margin-right: 4px; }
+#profile-plugin-slot:empty { display: none; } /* no double gap when no plugin fills it */
+#profile-plugin-slot { display: flex; flex-direction: column; gap: 20px; }
+
 /* ---------- Jobs page ---------- */
 .jobs-page { display: none; }
 body.jobs .home { display: none; }
-body.jobs .jobs-page { display: flex; flex-direction: column; height: calc(100vh - var(--topbar-h)); }
+body.jobs .jobs-page { display: flex; flex-direction: column; height: 100%; }
 .jobs-scroll { overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 22px; max-width: 900px; width: 100%; margin: 0 auto; }
 
 /* Tools page */
 .tools-page { display: none; }
 body.tools .home { display: none; }
-body.tools .tools-page { display: flex; flex-direction: column; height: calc(100vh - var(--topbar-h)); }
+body.tools .tools-page { display: flex; flex-direction: column; height: 100%; }
 .tools-scroll { overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; max-width: 760px; width: 100%; margin: 0 auto; }
 .tools-list { display: flex; flex-direction: column; gap: 10px; }
 .tool-card { display: flex; gap: 14px; align-items: center; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
@@ -1085,7 +1117,7 @@ body.tools .tools-page { display: flex; flex-direction: column; height: calc(100
 /* Logs page */
 .logs-page { display: none; }
 body.logs .home { display: none; }
-body.logs .logs-page { display: flex; flex-direction: column; height: calc(100vh - var(--topbar-h)); }
+body.logs .logs-page { display: flex; flex-direction: column; height: 100%; }
 .logs-scroll { overflow-y: auto; padding: 12px 18px; width: 100%; }
 
 /* Rail extras: sort select, multi-select mode, bulk action bar */
@@ -1112,7 +1144,7 @@ body.logs .logs-page { display: flex; flex-direction: column; height: calc(100vh
 /* Wanted page */
 .wanted-page { display: none; }
 body.wanted .home { display: none; }
-body.wanted .wanted-page { display: flex; flex-direction: column; height: calc(100vh - var(--topbar-h)); }
+body.wanted .wanted-page { display: flex; flex-direction: column; height: 100%; }
 .wanted-scroll { overflow-y: auto; padding: 12px 18px 40px; width: 100%; max-width: 900px; margin: 0 auto; }
 .wanted-search { width: 200px; padding: 6px 11px; background: var(--ink); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font: inherit; }
 .wanted-series { font-weight: 600; font-size: 14px; padding: 14px 4px 4px; border-bottom: 1px solid var(--line); }
@@ -1125,7 +1157,7 @@ body.wanted .wanted-page { display: flex; flex-direction: column; height: calc(1
 /* History page */
 .history-page { display: none; }
 body.history .home { display: none; }
-body.history .history-page { display: flex; flex-direction: column; height: calc(100vh - var(--topbar-h)); }
+body.history .history-page { display: flex; flex-direction: column; height: 100%; }
 .history-scroll { overflow-y: auto; padding: 12px 18px 40px; width: 100%; max-width: 900px; margin: 0 auto; }
 .hist-row { display: grid; grid-template-columns: 150px 1fr auto; gap: 12px; align-items: center; padding: 7px 4px; border-bottom: 1px solid rgba(53,47,68,.5); font-size: 13px; }
 .hist-when { color: var(--faint); font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
@@ -1138,7 +1170,7 @@ body.history .history-page { display: flex; flex-direction: column; height: calc
 /* Stats page */
 .stats-page { display: none; }
 body.stats .home { display: none; }
-body.stats .stats-page { display: flex; flex-direction: column; height: calc(100vh - var(--topbar-h)); }
+body.stats .stats-page { display: flex; flex-direction: column; height: 100%; }
 .stats-scroll { overflow-y: auto; padding: 16px 18px 48px; width: 100%; max-width: 1100px; margin: 0 auto; }
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .stat-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
@@ -1186,7 +1218,7 @@ body.stats .stats-page { display: flex; flex-direction: column; height: calc(100
 /* Library import page */
 .import-page { display: none; }
 body.import .home { display: none; }
-body.import .import-page { display: flex; flex-direction: column; height: calc(100vh - var(--topbar-h)); }
+body.import .import-page { display: flex; flex-direction: column; height: 100%; }
 .import-scroll { overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; max-width: 900px; width: 100%; margin: 0 auto; }
 #import-intro { margin: 0; }
 .import-list { display: flex; flex-direction: column; gap: 8px; }
@@ -1321,9 +1353,11 @@ body.import .import-page { display: flex; flex-direction: column; height: calc(1
 }
 
 /* Momentum scrolling for older iPads (inert on modern browsers). */
-.librarypage__scroll, .detail, .tools-scroll, .lists-scroll, .settings-body,
-.add-results, .scan-scroll, .queue-scroll, .drawer__scroll, .modal__panel,
-.notif__list { -webkit-overflow-scrolling: touch; }
+.librarypage__scroll, .detail, .tools-scroll, .lists-scroll, .settings-content,
+.profile-body, .jobs-scroll, .add-results, .scan-scroll, .queue-scroll,
+.drawer__scroll, .modal__panel, .notif__list {
+  -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+}
 
 /* Long-pressing cover art must not pop Safari's save-image sheet mid-browse. */
 .poster__art img, .icard__art img, .cover img {
