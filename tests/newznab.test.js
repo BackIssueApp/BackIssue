@@ -55,7 +55,7 @@ test('testIndexer: requires a url', async () => {
 });
 
 test('testIndexer: ok with results', async () => {
-  const fetchImpl = async () => ({ ok: true, json: async () => ({ channel: { item: [{ title: 'Batman 001', link: 'x', size: '1' }] } }) });
+  const fetchImpl = async () => ({ ok: true, text: async () => JSON.stringify({ channel: { item: [{ title: 'Batman 001', link: 'x', size: '1' }] } }) });
   const r = await testIndexer({ name: 'NZ', url: 'https://nz', apiKey: 'k' }, { fetchImpl });
   assert.equal(r.ok, true);
   assert.equal(r.results, 1);
@@ -63,7 +63,7 @@ test('testIndexer: ok with results', async () => {
 });
 
 test('testIndexer: ok but no comics results', async () => {
-  const fetchImpl = async () => ({ ok: true, json: async () => ({ channel: { item: [] } }) });
+  const fetchImpl = async () => ({ ok: true, text: async () => JSON.stringify({ channel: { item: [] } }) });
   const r = await testIndexer({ url: 'https://nz', apiKey: 'k' }, { fetchImpl });
   assert.equal(r.ok, true);
   assert.equal(r.results, 0);
@@ -71,7 +71,7 @@ test('testIndexer: ok but no comics results', async () => {
 });
 
 test('testIndexer: surfaces a newznab auth error (HTTP 200 + error body)', async () => {
-  const fetchImpl = async () => ({ ok: true, json: async () => ({ error: { code: '100', description: 'Incorrect user credentials' } }) });
+  const fetchImpl = async () => ({ ok: true, text: async () => JSON.stringify({ error: { code: '100', description: 'Incorrect user credentials' } }) });
   const r = await testIndexer({ url: 'https://nz', apiKey: 'bad' }, { fetchImpl });
   assert.equal(r.ok, false);
   assert.match(r.message, /Incorrect user credentials/);
@@ -85,16 +85,17 @@ test('testIndexer: HTTP error → not ok', async () => {
 });
 
 test('testIndexer: non-JSON response → helpful message', async () => {
-  const fetchImpl = async () => ({ ok: true, json: async () => { throw new Error('not json'); } });
+  const fetchImpl = async () => ({ ok: true, text: async () => '<!doctype html><html>a login page</html>' });
   const r = await testIndexer({ url: 'https://nz' }, { fetchImpl });
   assert.equal(r.ok, false);
   assert.match(r.message, /Newznab API/i);
 });
 
 test('searchNewznab: merges indexers, largest first, survives a failure', async () => {
+  const body = (o) => ({ ok: true, text: async () => JSON.stringify(o) });
   const fetchImpl = async (url) => {
-    if (url.includes('good1')) return { ok: true, json: async () => ({ channel: { item: [{ title: 'A', link: 'a', size: '100' }] } }) };
-    if (url.includes('good2')) return { ok: true, json: async () => ({ channel: { item: [{ title: 'B', link: 'b', size: '900' }] } }) };
+    if (url.includes('good1')) return body({ channel: { item: [{ title: 'A', link: 'a', size: '100' }] } });
+    if (url.includes('good2')) return body({ channel: { item: [{ title: 'B', link: 'b', size: '900' }] } });
     return { ok: false, status: 500 }; // 'bad' indexer
   };
   const indexers = [
@@ -104,4 +105,34 @@ test('searchNewznab: merges indexers, largest first, survives a failure', async 
   ];
   const out = await searchNewznab(indexers, 'q', { fetchImpl });
   assert.deepEqual(out.map((r) => r.title), ['B', 'A']); // largest first, bad skipped
+});
+
+test('parseNewznab: dispatches XML (servers that ignore o=json) and JSON alike', async () => {
+  const { parseNewznab } = await import('../src/newznab.js');
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+    <rss version="2.0" xmlns:newznab="http://www.newznab.com/DTD/2010/feeds/attributes/">
+      <channel><item>
+        <title>Saga 002 (2012) (Digital)</title>
+        <guid>https://ix/details/abc</guid>
+        <link>https://ix/getnzb/abc.nzb</link>
+        <enclosure url="https://ix/getnzb/abc.nzb" length="41943040" type="application/x-nzb"/>
+        <newznab:attr name="size" value="41943040"/>
+      </item><item>
+        <title>No Link Item</title>
+      </item></channel></rss>`;
+  const out = parseNewznab(xml, 'althub');
+  assert.equal(out.length, 1, 'link-less items dropped');
+  assert.equal(out[0].title, 'Saga 002 (2012) (Digital)');
+  assert.equal(out[0].nzbUrl, 'https://ix/getnzb/abc.nzb');
+  assert.equal(out[0].size, 41943040);
+  assert.equal(out[0].guid, 'https://ix/details/abc');
+  assert.equal(out[0].indexer, 'althub');
+
+  // JSON payloads still take the JSON path.
+  const j = parseNewznab(JSON.stringify({ channel: { item: [{ title: 'T', link: 'https://n/x.nzb', size: 5e7 }] } }), 'NZ');
+  assert.equal(j.length, 1);
+  assert.equal(j[0].nzbUrl, 'https://n/x.nzb');
+
+  // An XML <error> surfaces as a thrown, human-readable error.
+  assert.throws(() => parseNewznab('<error code="100" description="Incorrect user credentials"/>', 'NZ'), /Incorrect user credentials/);
 });
