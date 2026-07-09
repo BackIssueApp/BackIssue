@@ -4,6 +4,14 @@
    ============================================================ */
 
 :root {
+  /* Declare the page dark so native chrome (scrollbars, form controls,
+     overscroll) renders dark deterministically — without this Chrome guesses
+     per-profile and sometimes lands on wide light-grey scrollbars. */
+  color-scheme: dark;
+  /* Thin, theme-colored scrollbars (Firefox + Chrome 121+). */
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+
   --ink:      #15131c;
   --panel:    #1e1b27;
   --panel-2:  #272231;
