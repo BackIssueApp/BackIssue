@@ -589,6 +589,8 @@
               {#if tests.cv}<span id="cv-test-result" class="client-status {tests.cv.cls}">{#if tests.cv.icon}<Icon name={tests.cv.icon} /> {/if}{tests.cv.text}</span>{/if}</div>
             <label class="field"><span>API base URL (optional)</span><input id="set-cvBaseUrl" type="text" spellcheck="false" placeholder="https://data.backissue.app/api" /></label>
             <p class="modal__note">Point metadata lookups at a ComicVine-compatible server instead of the official API — no rate limits, and politeness delays are skipped automatically. Blank = official ComicVine.</p>
+            <label class="field field--check"><input id="set-cvEnrich" type="checkbox" /><span>Enrich metadata (content ratings, series status, issue extras)</span></label>
+            <p class="modal__note">When the metadata server supports it (a self-hosted CloneVine), adds Metron data — content ratings, series status and end year, and per-issue extras like price, UPC, and story titles. The official ComicVine API ignores the request, so it's safe either way.</p>
             <label class="field"><span>Release provider URL</span><input id="set-releaseProviderUrl" type="text" spellcheck="false" placeholder="https://data.backissue.app" /></label>
             <p class="modal__note">ComicInfo.xml is written straight into the CBZ from the metadata source. The release provider feeds "This week's releases".</p>
           </section>

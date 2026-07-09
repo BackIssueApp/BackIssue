@@ -147,13 +147,6 @@ export function validateSettings(input = {}) {
 
 export function applySettings(input) {
   Object.assign(config, validateSettings(input));
-  // TEMPORARY: metadata enrichment (enrich=metron) is force-disabled while we
-  // sort out reliable access to the enrichment source. This overrides any
-  // saved/incoming value on every load and save, so no request appends
-  // &enrich=metron and no enrichment refetch fires. The Settings checkbox is
-  // hidden to match. To re-enable: delete this line and unhide the checkbox in
-  // SettingsPage.svelte (search "TEMPORARY: enrichment disabled").
-  config.cvEnrich = false;
   return currentSettings();
 }
 
