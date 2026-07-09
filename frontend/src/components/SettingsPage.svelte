@@ -427,6 +427,8 @@
             {#if namingPreview}<p class="modal__note">Example: <code class="mono">{namingPreview}</code></p>{/if}
             <label class="field field--check"><input id="set-renameDownloads" type="checkbox" /><span>Rename downloaded files to the file pattern (off = keep the source's original filename)</span></label>
             <p class="modal__note">Tokens: <code>{'{publisher}'}</code> <code>{'{series}'}</code> <code>{'{year}'}</code> <code>{'{issue}'}</code> (<code>{'{issue:2}'}</code> sets the pad width) <code>{'{issueTitle}'}</code> <code>{'{date}'}</code> <code>{'{edition}'}</code>. Blank uses the defaults shown above; empty tokens are dropped and spacing is tidied. Changing these affects <b>new</b> downloads — to apply to existing files, use <b>Reorganize library</b> on the Tools page, or a volume's <b>Rename files</b> action.</p>
+            <!-- Plugin library-behavior settings inject here (plain DOM — stays mounted). -->
+            <div id="settings-plugin-library"></div>
           </section>
         </section>
 
