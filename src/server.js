@@ -156,6 +156,14 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // May this request see mature/restricted series? Drives content filtering on
   // every surface that lists or opens series/issues.
   const canRestricted = (req) => users.roleGrants(db, req.user.role, 'library.restricted', permCatalog);
+  // The notification categories whose BROADCASTS this user may see: each
+  // category requires one of its mapped permissions (open mode sees all;
+  // targeted rows always reach their user regardless).
+  const notifCategories = (req) => {
+    if (!req.user || req.user.id === 0) return Object.keys(notifications.CATEGORIES); // open mode
+    return Object.keys(notifications.CATEGORIES).filter((c) =>
+      (notifications.CATEGORY_VISIBILITY[c] || []).some((p) => users.roleGrants(db, req.user.role, p, permCatalog)));
+  };
   // Permission required for a request. Specific rules first, then the default:
   // reads are library.view, mutations are library.manage. Downloads are
   // deliberately their own permission (policy: a role may queue downloads
@@ -497,13 +505,16 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     } catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
   });
 
-  // ---- notifications (per-user feed; any signed-in user sees their own) ----
+  // ---- notifications (per-user feed; broadcasts filtered to the categories
+  // this user's permissions allow, targeted rows always their own) ----
   app.get('/api/notifications', (req, res) => {
-    res.json(notifications.listNotifications(db, req.user.id, { limit: Number(req.query.limit) || 30 }));
+    res.json(notifications.listNotifications(db, req.user.id, {
+      limit: Number(req.query.limit) || 30, categories: notifCategories(req),
+    }));
   });
   app.post('/api/notifications/read', (req, res) => {
     const { ids, all } = req.body || {};
-    res.json({ unread: notifications.markRead(db, req.user.id, { ids, all: !!all }) });
+    res.json({ unread: notifications.markRead(db, req.user.id, { ids, all: !!all, categories: notifCategories(req) }) });
   });
 
   // ---- reading lists (personal, per-user) ----

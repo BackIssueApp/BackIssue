@@ -21,6 +21,31 @@ test('feed scoping: broadcast is seen by all; targeted only by its user', () => 
   assert.equal(ann.items[0].title, 'Everyone');
 });
 
+test('broadcasts are filtered to the categories a user may see', () => {
+  const d = db();
+  notify(d, { type: 'a', category: 'import', title: 'Import done' });          // broadcast
+  notify(d, { type: 'b', category: 'request', title: 'New request' });         // broadcast
+  const mine = notify(d, { type: 'c', category: 'request', title: 'Your request', userId: 5 }); // targeted
+
+  // A viewer-ish user: may see release broadcasts only.
+  const viewer = listNotifications(d, 5, { categories: ['release'] });
+  assert.equal(viewer.items.length, 1, 'no import/request broadcasts…');
+  assert.equal(viewer.items[0].id, mine, '…but their own targeted row still arrives');
+  assert.equal(unreadCount(d, 5, { categories: ['release'] }), 1);
+
+  // A downloader: import broadcasts + nothing targeted.
+  const dl = listNotifications(d, 6, { categories: ['import', 'failure'] });
+  assert.deepEqual(dl.items.map((i) => i.title), ['Import done']);
+
+  // mark-all only touches what the user can see.
+  markRead(d, 6, { all: true, categories: ['import', 'failure'] });
+  assert.equal(unreadCount(d, 6, { categories: ['import', 'failure'] }), 0);
+  assert.equal(unreadCount(d, 6, { categories: ['import', 'request'] }), 1, 'the request row was NOT marked read');
+
+  // No filter (back-compat) = everything broadcast.
+  assert.equal(listNotifications(d, 9).items.length, 2);
+});
+
 test('read receipts are per-user', () => {
   const d = db();
   const id = notify(d, { type: 'x', category: 'import', title: 'Hi' }); // broadcast

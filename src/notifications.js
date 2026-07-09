@@ -18,6 +18,18 @@ export const CATEGORIES = {
   system: 'System',
 };
 
+// Who may see BROADCAST rows of each category: a user needs any one of the
+// listed permissions. Targeted rows (user_id set) always reach their user
+// regardless. Keeps download/request/system chatter away from roles that
+// can't see those features anyway.
+export const CATEGORY_VISIBILITY = {
+  import: ['downloads.grab', 'library.manage'],
+  failure: ['downloads.grab', 'library.manage'],
+  release: ['library.view'],
+  request: ['requests.manage'],
+  system: ['settings.manage', 'system.jobs'],
+};
+
 const KEEP = 500; // ring the table: prune the oldest beyond this on insert
 
 export function initNotificationTables(db) {
@@ -81,37 +93,52 @@ export function notify(db, { type, category = 'system', level = 'info', title, b
   return id;
 }
 
-/** A user's feed: broadcast rows + their own targeted rows, newest first,
- *  each flagged read/unread for this user. */
-export function listNotifications(db, userId, { limit = 30 } = {}) {
+// Broadcast-visibility clause: targeted rows always reach their user; broadcast
+// rows only in the caller's visible categories (null = no filtering, back-compat).
+function visClause(categories) {
+  if (!Array.isArray(categories)) return { sql: '(n.user_id IS NULL OR n.user_id = ?)', extra: [] };
+  const ph = categories.map(() => '?').join(',');
+  return {
+    sql: `(n.user_id = ? OR (n.user_id IS NULL AND n.category IN (${ph || "''"})))`,
+    extra: categories,
+  };
+}
+
+/** A user's feed: broadcast rows (in the user's visible categories) + their own
+ *  targeted rows, newest first, each flagged read/unread for this user. */
+export function listNotifications(db, userId, { limit = 30, categories = null } = {}) {
+  const v = visClause(categories);
   const items = db.prepare(`
     SELECT n.id, n.ts, n.type, n.category, n.level, n.title, n.body, n.url,
            EXISTS(SELECT 1 FROM notification_reads r WHERE r.notification_id = n.id AND r.user_id = ?) AS read
       FROM notifications n
-     WHERE n.user_id IS NULL OR n.user_id = ?
-     ORDER BY n.ts DESC LIMIT ?`).all(userId, userId, Math.min(200, Math.max(1, limit)));
-  return { items: items.map((i) => ({ ...i, read: !!i.read })), unread: unreadCount(db, userId) };
+     WHERE ${v.sql}
+     ORDER BY n.ts DESC LIMIT ?`).all(userId, userId, ...v.extra, Math.min(200, Math.max(1, limit)));
+  return { items: items.map((i) => ({ ...i, read: !!i.read })), unread: unreadCount(db, userId, { categories }) };
 }
 
-export function unreadCount(db, userId) {
+export function unreadCount(db, userId, { categories = null } = {}) {
+  const v = visClause(categories);
   return db.prepare(`
-    SELECT COUNT(*) n FROM notifications
-     WHERE (user_id IS NULL OR user_id = ?)
-       AND id NOT IN (SELECT notification_id FROM notification_reads WHERE user_id = ?)`).get(userId, userId).n;
+    SELECT COUNT(*) n FROM notifications n
+     WHERE ${v.sql}
+       AND n.id NOT IN (SELECT notification_id FROM notification_reads WHERE user_id = ?)`)
+    .get(userId, ...v.extra, userId).n;
 }
 
 /** Mark specific ids (or all visible) read for this user. */
-export function markRead(db, userId, { ids = null, all = false } = {}) {
+export function markRead(db, userId, { ids = null, all = false, categories = null } = {}) {
   const ins = db.prepare('INSERT OR IGNORE INTO notification_reads (notification_id, user_id) VALUES (?, ?)');
   if (all) {
-    const rows = db.prepare('SELECT id FROM notifications WHERE user_id IS NULL OR user_id = ?').all(userId);
+    const v = visClause(categories);
+    const rows = db.prepare(`SELECT n.id FROM notifications n WHERE ${v.sql}`).all(userId, ...v.extra);
     const tx = db.transaction(() => { for (const { id } of rows) ins.run(id, userId); });
     tx();
   } else if (Array.isArray(ids)) {
     const tx = db.transaction(() => { for (const id of ids) ins.run(Number(id), userId); });
     tx();
   }
-  return unreadCount(db, userId);
+  return unreadCount(db, userId, { categories });
 }
 
 /** Cheap change signal for the SSE hub — the newest id + total count. */
