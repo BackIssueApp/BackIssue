@@ -46,6 +46,27 @@ test('broadcasts are filtered to the categories a user may see', () => {
   assert.equal(listNotifications(d, 9).items.length, 2);
 });
 
+test('notifications about restricted series are hidden without the permission', () => {
+  const d = db();
+  d.exec("INSERT INTO series (id, title, url, restricted) VALUES (1, 'Safe', 'u1', 0), (2, 'Mature', 'u2', 1)");
+  notify(d, { type: 'a', category: 'import', title: 'Safe series', seriesId: 1 });
+  notify(d, { type: 'b', category: 'import', title: 'Mature series', seriesId: 2 });
+  notify(d, { type: 'c', category: 'import', title: 'No series link' });
+
+  const cats = ['import'];
+  const plain = listNotifications(d, 4, { categories: cats, includeRestricted: false });
+  assert.deepEqual(plain.items.map((i) => i.title).sort(), ['No series link', 'Safe series'],
+    'restricted-series row hidden');
+  assert.equal(unreadCount(d, 4, { categories: cats, includeRestricted: false }), 2);
+
+  const priv = listNotifications(d, 5, { categories: cats, includeRestricted: true });
+  assert.equal(priv.items.length, 3, 'permitted user sees all three');
+
+  // Live check: unflagging the series reveals its old notifications.
+  d.exec('UPDATE series SET restricted=0 WHERE id=2');
+  assert.equal(listNotifications(d, 4, { categories: cats, includeRestricted: false }).items.length, 3);
+});
+
 test('read receipts are per-user', () => {
   const d = db();
   const id = notify(d, { type: 'x', category: 'import', title: 'Hi' }); // broadcast

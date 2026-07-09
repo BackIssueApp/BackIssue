@@ -26,7 +26,7 @@ async function handlePackGrab({ db, grab, item, client, policy, source, cvClient
     if (!item) {
       if (now() - grabbedAtMs(grab.grabbed_at) > policy.timeoutMs) {
         setGrabStatus(db, grab.id, 'failed', { error: 'pack not found on client before timeout' });
-        onProgress({ event: 'pack-failed', source, title: grab.title, error: 'download disappeared' });
+        onProgress({ event: 'pack-failed', source, title: grab.title, seriesId: grab.series_id ?? null, error: 'download disappeared' });
       }
       return;
     }
@@ -37,7 +37,7 @@ async function handlePackGrab({ db, grab, item, client, policy, source, cvClient
     }
     if (item.state === 'failed') {
       setGrabStatus(db, grab.id, 'failed', { error: item.error || 'client reported failure' });
-      onProgress({ event: 'pack-failed', source, title: grab.title, error: item.error || 'download failed' });
+      onProgress({ event: 'pack-failed', source, title: grab.title, seriesId: grab.series_id ?? null, error: item.error || 'download failed' });
       if (policy.removeOnFailed) await client.remove(grab.download_id, { deleteFiles: true }).catch(() => {});
       return;
     }
@@ -57,7 +57,7 @@ async function handlePackGrab({ db, grab, item, client, policy, source, cvClient
       } catch (e) { job.fail(e); throw e; }
       job.finish({ imported: summary.imported, skipped: summary.skipped, unmatched: summary.unmatched, failed: summary.failed });
       setGrabStatus(db, grab.id, 'imported', { importedAt: new Date(now()).toISOString() });
-      onProgress({ event: 'pack-done', source, title: grab.title, summary });
+      onProgress({ event: 'pack-done', source, title: grab.title, seriesId: grab.series_id ?? null, summary });
       if (policy.removeOnDone) await client.remove(grab.download_id, { deleteFiles: true }).catch(() => {});
     }
   } catch (e) {

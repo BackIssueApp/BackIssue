@@ -509,12 +509,12 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // this user's permissions allow, targeted rows always their own) ----
   app.get('/api/notifications', (req, res) => {
     res.json(notifications.listNotifications(db, req.user.id, {
-      limit: Number(req.query.limit) || 30, categories: notifCategories(req),
+      limit: Number(req.query.limit) || 30, categories: notifCategories(req), includeRestricted: canRestricted(req),
     }));
   });
   app.post('/api/notifications/read', (req, res) => {
     const { ids, all } = req.body || {};
-    res.json({ unread: notifications.markRead(db, req.user.id, { ids, all: !!all, categories: notifCategories(req) }) });
+    res.json({ unread: notifications.markRead(db, req.user.id, { ids, all: !!all, categories: notifCategories(req), includeRestricted: canRestricted(req) }) });
   });
 
   // ---- reading lists (personal, per-user) ----

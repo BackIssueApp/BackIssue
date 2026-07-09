@@ -866,12 +866,12 @@ function grabSourcePack({ source, seriesId, result } = {}) {
       job.finish({ imported: summary.imported, skipped: summary.skipped, unmatched: summary.unmatched, failed: summary.failed });
       setGrabStatus(db, grabId, 'imported', { importedAt: new Date().toISOString() });
       logInfo(`${source} pack imported: ${summary.imported} new · ${summary.skipped} already owned · ${summary.unmatched} unmatched · ${summary.failed} failed — ${result.title}`, source);
-      notifyRaw(db, { type: 'pack.done', category: 'import', level: summary.failed ? 'warn' : 'success', title: 'Pack imported', body: `${result.title} — ${summary.imported} new issue(s)` });
+      notifyRaw(db, { type: 'pack.done', category: 'import', level: summary.failed ? 'warn' : 'success', title: 'Pack imported', body: `${result.title} — ${summary.imported} new issue(s)`, seriesId: sid ?? null });
     } catch (e) {
       setGrabStatus(db, grabId, 'failed', { error: String(e?.message || e) });
       job.fail(e);
       logError(`${source} pack failed: ${result.title} — ${String(e?.message || e)}`, source);
-      notifyRaw(db, { type: 'pack.failed', category: 'failure', level: 'error', title: 'Pack failed', body: `${result.title} — ${String(e?.message || e)}` });
+      notifyRaw(db, { type: 'pack.failed', category: 'failure', level: 'error', title: 'Pack failed', body: `${result.title} — ${String(e?.message || e)}`, seriesId: sid ?? null });
     } finally {
       inAppPackProgress.delete(grabId);
       // processPack copies each imported file into the library, so a temp dir the
@@ -1157,8 +1157,8 @@ const downloadMonitor = createDownloadMonitor({
   db,
   onProgress: (p) => {
     if (p.event === 'tag-result') recordProgressTagLog(p);
-    if (p.event === 'done') { logInfo(`Imported from ${p.source || 'download'}: ${p.issue?.title || 'issue ' + p.issue?.id}`, p.source || 'usenet'); notifyRaw(db, { type: 'import.done', category: 'import', level: 'success', title: 'Downloaded', body: `${p.issue?.title || 'issue'}${p.source ? ' · ' + p.source : ''}` }); }
-    if (p.event === 'failed') { logError(`${p.source || 'download'} import failed: ${p.issue?.title || 'issue ' + p.issue?.id} — ${p.error}`, p.source || 'usenet'); notifyRaw(db, { type: 'import.failed', category: 'failure', level: 'error', title: 'Download failed', body: `${p.issue?.title || 'issue'} — ${p.error}` }); }
+    if (p.event === 'done') { logInfo(`Imported from ${p.source || 'download'}: ${p.issue?.title || 'issue ' + p.issue?.id}`, p.source || 'usenet'); notifyRaw(db, { type: 'import.done', category: 'import', level: 'success', title: 'Downloaded', body: `${p.issue?.title || 'issue'}${p.source ? ' · ' + p.source : ''}`, seriesId: p.issue?.series_id ?? null }); }
+    if (p.event === 'failed') { logError(`${p.source || 'download'} import failed: ${p.issue?.title || 'issue ' + p.issue?.id} — ${p.error}`, p.source || 'usenet'); notifyRaw(db, { type: 'import.failed', category: 'failure', level: 'error', title: 'Download failed', body: `${p.issue?.title || 'issue'} — ${p.error}`, seriesId: p.issue?.series_id ?? null }); }
     if (p.event === 'pack-start') logInfo(`Post-processing pack — ${p.title}…`, p.source || 'torrent');
     if (p.event === 'pack-import') {
       if (p.outcome === 'imported') logInfo(`[${p.done}/${p.total}] imported ${p.reason}`, p.source || 'torrent');
@@ -1168,9 +1168,9 @@ const downloadMonitor = createDownloadMonitor({
       const s = p.summary;
       logInfo(`Pack done — ${p.title}: ${s.imported} imported, ${s.skipped} already owned, ${s.unmatched} not in collection, ${s.failed} failed`, p.source || 'torrent');
       if (!s.total) logWarn(`Pack "${p.title}" contained no comic files at all — wrong path mapping, or a bogus release?`, p.source || 'torrent');
-      notifyRaw(db, { type: 'pack.done', category: 'import', level: s.failed ? 'warn' : 'success', title: 'Pack imported', body: `${p.title}: ${s.imported} new issue(s)${s.failed ? ', ' + s.failed + ' failed' : ''}` });
+      notifyRaw(db, { type: 'pack.done', category: 'import', level: s.failed ? 'warn' : 'success', title: 'Pack imported', body: `${p.title}: ${s.imported} new issue(s)${s.failed ? ', ' + s.failed + ' failed' : ''}`, seriesId: p.seriesId ?? null });
     }
-    if (p.event === 'pack-failed') { logError(`Pack failed — ${p.title}: ${p.error}`, p.source || 'torrent'); notifyRaw(db, { type: 'pack.failed', category: 'failure', level: 'error', title: 'Pack failed', body: `${p.title}: ${p.error}` }); }
+    if (p.event === 'pack-failed') { logError(`Pack failed — ${p.title}: ${p.error}`, p.source || 'torrent'); notifyRaw(db, { type: 'pack.failed', category: 'failure', level: 'error', title: 'Pack failed', body: `${p.title}: ${p.error}`, seriesId: p.seriesId ?? null }); }
   },
 });
 downloadMonitor.start();

@@ -43,7 +43,8 @@ export function initNotificationTables(db) {
       title TEXT NOT NULL,
       body TEXT,
       url TEXT,                              -- in-app link to open on click
-      user_id INTEGER                        -- NULL = broadcast to everyone
+      user_id INTEGER,                       -- NULL = broadcast to everyone
+      series_id INTEGER                      -- the library series this concerns (restricted filtering)
     );
     CREATE INDEX IF NOT EXISTS idx_notif_ts ON notifications(ts DESC);
     -- Per-user read receipts (a broadcast row can be read by A but not B).
@@ -53,6 +54,9 @@ export function initNotificationTables(db) {
       PRIMARY KEY (notification_id, user_id)
     );
   `);
+  // series_id arrived after first ship; CREATE TABLE IF NOT EXISTS won't alter
+  // an existing table (errors if the column already exists; ignored).
+  try { db.exec('ALTER TABLE notifications ADD COLUMN series_id INTEGER'); } catch { /* exists */ }
 }
 
 // Webhook categories that are enabled. Empty/unset setting = all categories on.
@@ -64,12 +68,12 @@ function webhookAllows(category) {
 
 /** Record + dispatch a notification. Never throws (a bad webhook or a closed
  *  DB must not break the thing that triggered it). Returns the row id or 0. */
-export function notify(db, { type, category = 'system', level = 'info', title, body = null, url = null, userId = null }, { fetchImpl = fetch } = {}) {
+export function notify(db, { type, category = 'system', level = 'info', title, body = null, url = null, userId = null, seriesId = null }, { fetchImpl = fetch } = {}) {
   let id = 0;
   try {
     const r = db.prepare(
-      'INSERT INTO notifications (ts, type, category, level, title, body, url, user_id) VALUES (?,?,?,?,?,?,?,?)',
-    ).run(Date.now(), String(type || 'event'), category, level, String(title || ''), body, url, userId ?? null);
+      'INSERT INTO notifications (ts, type, category, level, title, body, url, user_id, series_id) VALUES (?,?,?,?,?,?,?,?,?)',
+    ).run(Date.now(), String(type || 'event'), category, level, String(title || ''), body, url, userId ?? null, seriesId ?? null);
     id = r.lastInsertRowid;
     // Prune oldest beyond KEEP (and their read receipts).
     db.prepare(`DELETE FROM notifications WHERE id <= (
@@ -95,30 +99,38 @@ export function notify(db, { type, category = 'system', level = 'info', title, b
 
 // Broadcast-visibility clause: targeted rows always reach their user; broadcast
 // rows only in the caller's visible categories (null = no filtering, back-compat).
-function visClause(categories) {
-  if (!Array.isArray(categories)) return { sql: '(n.user_id IS NULL OR n.user_id = ?)', extra: [] };
+// includeRestricted=false additionally hides rows linked to a series that is
+// CURRENTLY restricted — a live check, so flagging a series retroactively hides
+// its old notifications too.
+function visClause(categories, includeRestricted = true) {
+  const restrict = includeRestricted
+    ? ''
+    : ' AND (n.series_id IS NULL OR NOT EXISTS(SELECT 1 FROM series s WHERE s.id = n.series_id AND s.restricted = 1))';
+  if (!Array.isArray(categories)) {
+    return { sql: `((n.user_id IS NULL OR n.user_id = ?)${restrict})`, extra: [] };
+  }
   const ph = categories.map(() => '?').join(',');
   return {
-    sql: `(n.user_id = ? OR (n.user_id IS NULL AND n.category IN (${ph || "''"})))`,
+    sql: `((n.user_id = ? OR (n.user_id IS NULL AND n.category IN (${ph || "''"})))${restrict})`,
     extra: categories,
   };
 }
 
 /** A user's feed: broadcast rows (in the user's visible categories) + their own
  *  targeted rows, newest first, each flagged read/unread for this user. */
-export function listNotifications(db, userId, { limit = 30, categories = null } = {}) {
-  const v = visClause(categories);
+export function listNotifications(db, userId, { limit = 30, categories = null, includeRestricted = true } = {}) {
+  const v = visClause(categories, includeRestricted);
   const items = db.prepare(`
     SELECT n.id, n.ts, n.type, n.category, n.level, n.title, n.body, n.url,
            EXISTS(SELECT 1 FROM notification_reads r WHERE r.notification_id = n.id AND r.user_id = ?) AS read
       FROM notifications n
      WHERE ${v.sql}
      ORDER BY n.ts DESC LIMIT ?`).all(userId, userId, ...v.extra, Math.min(200, Math.max(1, limit)));
-  return { items: items.map((i) => ({ ...i, read: !!i.read })), unread: unreadCount(db, userId, { categories }) };
+  return { items: items.map((i) => ({ ...i, read: !!i.read })), unread: unreadCount(db, userId, { categories, includeRestricted }) };
 }
 
-export function unreadCount(db, userId, { categories = null } = {}) {
-  const v = visClause(categories);
+export function unreadCount(db, userId, { categories = null, includeRestricted = true } = {}) {
+  const v = visClause(categories, includeRestricted);
   return db.prepare(`
     SELECT COUNT(*) n FROM notifications n
      WHERE ${v.sql}
@@ -127,10 +139,10 @@ export function unreadCount(db, userId, { categories = null } = {}) {
 }
 
 /** Mark specific ids (or all visible) read for this user. */
-export function markRead(db, userId, { ids = null, all = false, categories = null } = {}) {
+export function markRead(db, userId, { ids = null, all = false, categories = null, includeRestricted = true } = {}) {
   const ins = db.prepare('INSERT OR IGNORE INTO notification_reads (notification_id, user_id) VALUES (?, ?)');
   if (all) {
-    const v = visClause(categories);
+    const v = visClause(categories, includeRestricted);
     const rows = db.prepare(`SELECT n.id FROM notifications n WHERE ${v.sql}`).all(userId, ...v.extra);
     const tx = db.transaction(() => { for (const { id } of rows) ins.run(id, userId); });
     tx();
@@ -138,7 +150,7 @@ export function markRead(db, userId, { ids = null, all = false, categories = nul
     const tx = db.transaction(() => { for (const id of ids) ins.run(Number(id), userId); });
     tx();
   }
-  return unreadCount(db, userId, { categories });
+  return unreadCount(db, userId, { categories, includeRestricted });
 }
 
 /** Cheap change signal for the SSE hub — the newest id + total count. */
