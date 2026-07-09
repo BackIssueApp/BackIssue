@@ -207,7 +207,7 @@
                   </span>
                   {#if !m.owned && !queued.has(relKey(m)) && can('downloads.grab')}
                     <!-- Close the loop: download the missing release right here. -->
-                    <button class="btn btn--ghost btn--sm" title="Download this issue" disabled={m._busy}
+                    <button class="btn btn--ghost btn--icon" title="Download this issue" disabled={m._busy}
                       onclick={async (e) => { e.stopPropagation(); m._busy = true; if (!(await downloadRelease(m))) m._busy = false; }}><Icon name="download" /></button>
                   {/if}
                 {:else if m.cvId && isTrusted()}
