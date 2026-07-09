@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import config from './config.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PLUGINS_DIR = process.env.PLUGINS_DIR || path.join(root, 'plugins');
@@ -264,11 +265,14 @@ export function setPluginEnabled(name, enabled) {
   return info || null;
 }
 
-/// The disabled list as persisted in settings.json (read directly — the
-/// settings module imports this one, so we can't import config back).
+/// The disabled list as persisted in settings.json, read directly (the settings
+/// MODULE imports this one so we can't import it back — but config.js is
+/// cycle-free) from the data dir, where settings.json actually lives. This used
+/// to read the app root, which equals the data dir in dev but not in Docker
+/// (DATA_DIR=/data) — so disabling a plugin never survived a container restart.
 export function disabledPluginNames() {
   try {
-    const s = JSON.parse(fs.readFileSync(path.join(root, 'settings.json'), 'utf8'));
+    const s = JSON.parse(fs.readFileSync(path.join(config.dataDir, 'settings.json'), 'utf8'));
     return String(s.disabledPlugins || '').split(',').map((n) => n.trim()).filter(Boolean);
   } catch {
     return [];
