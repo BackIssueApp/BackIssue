@@ -44,6 +44,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV DATA_DIR=/data
 ENV PLUGINS_DIR=/data/plugins
+# Build provenance: release builds leave the defaults; dev/nightly builds pass
+# BUILD_CHANNEL (+ commit sha) so the app reports e.g. "0.5.0-dev.a1b2c3d".
+ARG BUILD_CHANNEL=release
+ARG BUILD_SHA=""
+ENV BUILD_CHANNEL=$BUILD_CHANNEL
+ENV BUILD_SHA=$BUILD_SHA
 
 # Everything the server reads at runtime: prod deps, the server, its version
 # (from package.json), the built UI, and the entrypoint. Plugins live on the

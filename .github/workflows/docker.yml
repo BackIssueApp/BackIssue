@@ -55,5 +55,10 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Stamp non-release builds so the app reports e.g. "0.5.0-dev.a1b2c3d"
+          # (release tags keep the clean version).
+          build-args: |
+            BUILD_CHANNEL=${{ startsWith(github.ref, 'refs/tags/v') && 'release' || (github.event_name == 'schedule' && 'nightly' || 'dev') }}
+            BUILD_SHA=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

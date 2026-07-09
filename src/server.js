@@ -24,9 +24,16 @@ import { createEventHub } from './events.js';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // The UI is a built Svelte app — `npm run build` writes it to frontend/dist.
 const publicDir = path.join(repoRoot, 'frontend', 'dist');
-// App version for the UI (About) — read once from package.json.
+// App version for the UI (About) — read once from package.json. Dev/nightly
+// images stamp BUILD_CHANNEL (+ short BUILD_SHA) at image build, so a rolling
+// build identifies itself ("0.5.0-dev.a1b2c3d") instead of masquerading as the
+// release it was cut from.
 let APP_VERSION = '0.0.0';
 try { APP_VERSION = JSON.parse(fssync.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).version || APP_VERSION; } catch { /* dev */ }
+if (process.env.BUILD_CHANNEL && process.env.BUILD_CHANNEL !== 'release') {
+  const sha = String(process.env.BUILD_SHA || '').slice(0, 7);
+  APP_VERSION += `-${process.env.BUILD_CHANNEL}${sha ? '.' + sha : ''}`;
+}
 
 export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, queueProgress, packProgress, cancelGrab, testCvKeys, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, state }) {
   const startDownloads = (arg) => {

@@ -120,7 +120,9 @@
             <div class="job__head"><span class="job__type">{JOB_LABELS[j.type] || j.type}</span>
               <span class="job__label">{j.label}</span>
               <span class="job__status badge {j.status === 'failed' ? 'badge--failed' : j.status === 'running' ? 'badge--downloading' : 'badge--done'}"><span class="dot"></span>{j.status}</span>
-              <span class="job__time">{j.status === 'running' ? 'running ' : ''}{fmtAgo((j.finishedAt || now) - j.startedAt)}{j.status === 'running' ? '' : ' ago'}</span></div>
+              <span class="job__time">{j.status === 'running'
+                ? `running ${fmtAgo(now - j.startedAt)}`
+                : `${fmtAgo(now - (j.finishedAt || j.startedAt))} ago · took ${fmtAgo((j.finishedAt || now) - j.startedAt)}`}</span></div>
             <div class="job__track">
               {#if pct === null}<div class="job__bar job__bar--indef"></div>
               {:else}<div class="job__bar" style="width:{pct}%"></div>{/if}
