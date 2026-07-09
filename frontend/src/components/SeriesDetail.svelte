@@ -1,6 +1,6 @@
 <script>
   import { goBack, navigate } from '../lib/router.svelte.js';
-  import { detail, detailSelected, flags, ops, loadCollection, reloadDetail, clearDetail, issueState, downloadCvIssues, redownloadCvIssues, redownloadIssues } from '../lib/store.svelte.js';
+  import { detail, detailSelected, flags, ops, loadCollection, reloadDetail, clearDetail, issueState, downloadCvIssues, redownloadCvIssues, redownloadIssues, watchDetailSweep } from '../lib/store.svelte.js';
   import { issueActions, seriesActions, issueActionsTick, issueCoverUrl } from '../lib/plugins.svelte.js';
   import { isTrusted, can } from '../lib/auth.svelte.js';
   import { apiGet, apiPost } from '../lib/api.js';
@@ -234,6 +234,7 @@
       if (r.error) { notify('Refresh failed: ' + r.error, 'error'); return; }
       await loadCollection();
       await reloadDetail(); // re-render with the fresh ComicVine data
+      if (r.detailSweep) watchDetailSweep(); // covers/titles fill in live as the sweep caches them
       notify(`Series metadata refreshed${r.detailSweep ? ' — issue details are updating in the background (see Jobs)' : ''}.`, 'ok');
     } catch {
       notify('Refresh failed — is the app reachable?', 'error');

@@ -122,6 +122,42 @@ export function issueState(i) {
   return i.corrupt ? 'corrupt' : (i.owned && i.untagged) ? 'untagged' : i.owned ? 'done' : (i.status || 'pending');
 }
 
+// Surgical metadata patch: when an issue's full detail lands (the issue modal
+// fetch caches it server-side), update the open series' matching row so the
+// cover and title appear immediately — no page refresh.
+export function patchIssueMeta(cvIssueId, meta) {
+  const i = detail.det?.issues?.find((x) => x.cv_issue_id === cvIssueId);
+  if (!i || !meta || meta.error) return;
+  if (meta.image_url && meta.image_url !== i.image_url) i.image_url = meta.image_url;
+  if (meta.name) i.title = meta.name;
+  i.has_detail = true;
+}
+
+// Watch a background "Refresh issue details" sweep: reload the open series
+// periodically so covers/titles fill in as the sweep caches them, stopping when
+// every issue has detail, progress stalls (sweep halted/failed), the user
+// navigates away, or a safety cap is hit.
+let sweepTimer = null;
+export function watchDetailSweep() {
+  if (sweepTimer) return;
+  const seriesId = detail.series?.id;
+  if (!seriesId) return;
+  let lastMissing = Infinity;
+  let stalls = 0;
+  let ticks = 0;
+  sweepTimer = setInterval(async () => {
+    const stop = () => { clearInterval(sweepTimer); sweepTimer = null; };
+    if (!detail.series || detail.series.id !== seriesId) return stop();
+    if (++ticks > 200) return stop(); // safety cap ≈ 13 min
+    await reloadDetail();
+    const missing = (detail.det?.issues || []).filter((i) => !i.has_detail).length;
+    if (missing === 0) return stop();
+    if (missing >= lastMissing) { if (++stalls >= 5) return stop(); } // no progress → sweep ended
+    else stalls = 0;
+    lastMissing = missing;
+  }, 4000);
+}
+
 // Patch statuses in place during downloads without losing the user's checkboxes.
 export async function refreshIssueStatuses() {
   if (!detail.series || !detail.det?.issues) return;

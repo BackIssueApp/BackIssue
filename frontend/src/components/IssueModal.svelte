@@ -1,5 +1,6 @@
 <script module>
   import { openModal, closeModal, modals } from '../lib/modals.svelte.js';
+  import { patchIssueMeta } from '../lib/store.svelte.js';
 
   const m = $state({ cvIssueId: null, number: null, info: null, loading: false, failed: false });
 
@@ -10,7 +11,12 @@
     m.loading = true;
     m.failed = false;
     openModal('issue');
-    try { m.info = await (await fetch('/api/issue/' + cvIssueId)).json(); }
+    try {
+      m.info = await (await fetch('/api/issue/' + cvIssueId)).json();
+      // The fetch just cached this issue's detail server-side — reflect the
+      // cover/title on the open series grid immediately, no refresh needed.
+      patchIssueMeta(cvIssueId, m.info);
+    }
     catch { m.failed = true; }
     m.loading = false;
   }

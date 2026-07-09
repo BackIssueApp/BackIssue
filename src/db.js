@@ -619,6 +619,7 @@ export function seriesCollectionDetail(db, id) {
         title: ci.name || ('#' + (ci.issue_number ?? '?')),
         image_url: ci.image_url,           // cover art for the issue grid
         cover_date: ci.cover_date,         // list-view date column
+        has_detail: !!ci.has_detail,       // full CV detail cached (drives the sweep-watch poll)
         owned,
         corrupt,
         untagged,
