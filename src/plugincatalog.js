@@ -137,11 +137,22 @@ export async function installPlugin(entry, { fetchImpl = fetch, npmInstall = def
       throw new Error('bundle has no index.js — not a valid plugin');
     }
     // Swap into place last so a failure never leaves a half-written install.
-    fs.rmSync(dest, { recursive: true, force: true });
-    if (src !== staging) {
-      fs.renameSync(src, dest);
-    } else {
-      fs.renameSync(staging, dest);
+    // The old install is RENAMED aside, not deleted: on Windows a loaded
+    // native module (e.g. sharp's libvips DLL in the running process) makes
+    // delete fail with EPERM, but rename succeeds. The .old dir is removed
+    // here when possible, else by the boot sweep once nothing holds it.
+    const old = path.join(dir, `.${id}.old-${Date.now()}`);
+    const hadOld = fs.existsSync(dest);
+    if (hadOld) fs.renameSync(dest, old);
+    try {
+      fs.renameSync(src !== staging ? src : staging, dest);
+    } catch (e) {
+      if (hadOld) { try { fs.renameSync(old, dest); } catch { /* leave .old for the boot sweep */ } }
+      throw e;
+    }
+    if (hadOld) {
+      try { fs.rmSync(old, { recursive: true, force: true }); }
+      catch { /* locked (loaded DLL) — swept at next boot */ }
     }
     // Native/deep deps can't ship portably in the zip — install them for the
     // host platform. A failure here is surfaced but leaves the files in place

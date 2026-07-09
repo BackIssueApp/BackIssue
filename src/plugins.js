@@ -208,6 +208,15 @@ export async function loadPluginsFromDir(dir, api = pluginApi, disabled = []) {
   const loaded = [];
   if (!dir || !fs.existsSync(dir)) return loaded;
   linkCoreModules(dir); // shared core deps resolvable from plugins outside the app tree
+  // Sweep updater leftovers: replaced installs renamed aside (Windows can't
+  // delete a dir whose native DLL the old process had loaded) and dead staging
+  // dirs. At boot nothing holds them, so removal succeeds now.
+  for (const name of fs.readdirSync(dir)) {
+    if (/^\..+\.(old-\d+|installing)$/.test(name)) {
+      try { fs.rmSync(path.join(dir, name), { recursive: true, force: true }); }
+      catch { /* still held? next boot */ }
+    }
+  }
   for (const name of fs.readdirSync(dir).sort()) {
     if (name.startsWith('.') || name === 'node_modules') continue;
     const entry = path.join(dir, name, 'index.js');
