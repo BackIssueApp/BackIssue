@@ -1062,7 +1062,7 @@ const app = createApp({
   toolsState,
   runLibraryRefile,
   refileState,
-  stats: () => collectionStats(db, config),
+  stats: (opts) => collectionStats(db, config, opts),
   listSources: () => orderedSources(config).map((s) => ({ id: s.id, label: s.label || s.id })),
   queueProgress: () => downloadMonitor.getProgress(),
   packProgress: () => ({ ...downloadMonitor.getPackProgress(), ...Object.fromEntries(inAppPackProgress) }),

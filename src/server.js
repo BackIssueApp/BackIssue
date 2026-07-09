@@ -5,7 +5,7 @@ import fsp from 'node:fs/promises';
 import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
-import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, seriesCollectionDetail, setSeriesPath, getSeriesById, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
+import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, seriesCollectionDetail, setSeriesPath, getSeriesById, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, restrictedSeriesIds, isCvIssueRestricted, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
 import { resolveSeriesDir, defaultRootedDir } from './paths.js';
 import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
@@ -828,7 +828,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   });
 
   // ---- Library tools ----
-  app.get('/api/stats', (req, res) => res.json(stats()));
+  app.get('/api/stats', (req, res) => res.json(stats({ includeRestricted: canRestricted(req) })));
   app.get('/api/sources', (req, res) => res.json({ sources: listSources ? listSources() : [] }));
   // Import history — what was added and from where (newest first, paged).
   app.get('/api/history', (req, res) => {
@@ -841,13 +841,23 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     if (!users.roleGrants(db, req.user.role, 'library.manage', permCatalog)) {
       h.items = h.items.map(({ path, ...rest }) => rest);
     }
+    // Restricted series titles stay hidden from roles without the permission.
+    if (!canRestricted(req)) {
+      const rset = restrictedSeriesIds(db);
+      h.items = h.items.filter((i) => !rset.has(i.series_id));
+    }
     res.json(h);
   });
   // Failed downloads (durable — queue rows clear, this record doesn't).
   app.get('/api/history/failed', (req, res) => {
     const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 200));
     const offset = Math.max(0, Number(req.query.offset) || 0);
-    res.json(listFailedGrabs(db, { limit, offset }));
+    const r = listFailedGrabs(db, { limit, offset });
+    if (!canRestricted(req)) {
+      const rset = restrictedSeriesIds(db);
+      r.rows = r.rows.filter((i) => i.series_id == null || !rset.has(i.series_id));
+    }
+    res.json(r);
   });
   // Wanted — every missing issue across the collection (paged, filterable).
   app.get('/api/wanted', (req, res) => {
@@ -879,6 +889,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // Full info for one ComicVine issue (detail fetched on demand) + its file(s).
   app.get('/api/issue/:cvIssueId', async (req, res) => {
     try {
+      // Direct-by-id lookup bypasses the filtered list surfaces — apply the
+      // restricted check here too so ids can't be probed.
+      if (!canRestricted(req) && isCvIssueRestricted(db, Number(req.params.cvIssueId))) {
+        return res.status(404).json({ error: 'unknown issue' });
+      }
       const info = await cvIssueInfo(Number(req.params.cvIssueId));
       if (!info) return res.status(404).json({ error: 'unknown issue' });
       res.json(info);
@@ -902,9 +917,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     // be invisible here while downloading.
     const packLive = (packProgress ? packProgress() : {}) || {};
     const packs = activePackGrabs(db).map((g) => ({ ...g, live: packLive[g.id] || null }));
+    // Restricted series stay invisible to roles without the permission.
+    const rset = canRestricted(req) ? null : restrictedSeriesIds(db);
     res.json({
-      items,
-      packs,
+      items: rset ? items.filter((i) => !rset.has(i.series_id)) : items,
+      packs: rset ? packs.filter((p) => p.series_id == null || !rset.has(p.series_id)) : packs,
       paused: !!state.queue.paused,
       running: !!state.queue.running,
       current: state.queue.current || null,

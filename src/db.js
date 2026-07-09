@@ -219,6 +219,21 @@ export function isSeriesRestricted(db, id) {
   return !!(r && r.restricted);
 }
 
+/** Ids of every restricted series — for filtering joined rows (queue, history)
+ *  on surfaces serving viewers without library.restricted. */
+export function restrictedSeriesIds(db) {
+  return new Set(db.prepare('SELECT id FROM series WHERE restricted=1').all().map((r) => r.id));
+}
+
+/** Does this ComicVine issue belong to a restricted series in the library?
+ *  Guards direct-by-id issue lookups (list surfaces are filtered separately). */
+export function isCvIssueRestricted(db, cvIssueId) {
+  const r = db.prepare(
+    'SELECT 1 x FROM cv_issues ci JOIN series s ON s.cv_id = ci.cv_series_id WHERE ci.comicvine_id=? AND s.restricted=1',
+  ).get(cvIssueId);
+  return !!r;
+}
+
 export function listIssues(db, { seriesId, status } = {}) {
   const clauses = [];
   const params = {};

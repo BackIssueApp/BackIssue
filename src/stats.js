@@ -6,7 +6,11 @@ import { cvKey } from './cv.js';
 // A series counts toward the collection if followed or backed by a valid file.
 const IN_COLLECTION = `(s.followed=1 OR EXISTS(SELECT 1 FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1))`;
 
-export function collectionStats(db, config = {}) {
+export function collectionStats(db, config = {}, { includeRestricted = true } = {}) {
+  // Titles of restricted series must not reach viewers without
+  // library.restricted: the gaps table and recent-imports list are filtered.
+  // Aggregate counts (files, publishers) stay global — numbers, not titles.
+  const noR = includeRestricted ? '' : 'AND s.restricted = 0';
   // ---- Files: totals, health, pages, size ----
   const files = db.prepare(`SELECT
     COUNT(*) total, COALESCE(SUM(size),0) bytes, COALESCE(SUM(page_count),0) pages,
@@ -56,7 +60,7 @@ export function collectionStats(db, config = {}) {
       (SELECT COUNT(DISTINCT lf.cv_issue_id) FROM library_files lf
         WHERE lf.series_id=s.id AND lf.valid=1 AND lf.cv_issue_id IS NOT NULL) owned
     FROM series s LEFT JOIN cv_series cv ON cv.comicvine_id=s.cv_id
-    WHERE s.cv_id IS NOT NULL AND ${IN_COLLECTION}`).all();
+    WHERE s.cv_id IS NOT NULL AND ${IN_COLLECTION} ${noR}`).all();
 
   let complete = 0, incomplete = 0, missingIssues = 0, cvIssuesTotal = 0;
   const gaps = [];
@@ -104,8 +108,15 @@ export function collectionStats(db, config = {}) {
     SELECT d.day day, COUNT(g.id) n FROM d
       LEFT JOIN grabs g ON g.imported_at IS NOT NULL AND date(g.imported_at)=d.day
     GROUP BY d.day ORDER BY d.day`).all();
+  // Recent imports name series in their titles — exclude restricted ones for
+  // viewers without the permission (rows with no series link stay: no way to
+  // tell, and grab titles for them are release names the user initiated).
   const recent = db.prepare(
-    `SELECT title, imported_at FROM grabs WHERE imported_at IS NOT NULL ORDER BY imported_at DESC LIMIT 8`,
+    `SELECT g.title, g.imported_at FROM grabs g
+      LEFT JOIN issues i ON i.id = g.issue_id
+      LEFT JOIN series s ON s.id = COALESCE(i.series_id, g.series_id)
+     WHERE g.imported_at IS NOT NULL ${includeRestricted ? '' : 'AND (s.id IS NULL OR s.restricted = 0)'}
+     ORDER BY g.imported_at DESC LIMIT 8`,
   ).all();
 
   return {
