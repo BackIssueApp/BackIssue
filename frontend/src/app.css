@@ -354,17 +354,20 @@ body {
 .poster.is-selected .poster__art { outline-color: var(--accent); }
 .poster__art .cover { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; }
 .poster__art .cover__ph { font-size: 34px; }
-.poster__bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(0,0,0,.55); }
+/* Poster overlays sit above the cover image (.cover img is z-index:1). */
+.poster__bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(0,0,0,.55); z-index: 2; }
 .poster__fill { height: 100%; background: var(--amber); }
 .poster__fill.is-done { background: var(--green); }
 .poster__star {
   position: absolute; top: 6px; right: 6px;
   color: var(--amber); font-size: 13px;
   text-shadow: 0 1px 4px rgba(0,0,0,.9);
+  z-index: 2;
 }
 .poster__check {
   position: absolute; top: 8px; left: 8px; width: 18px; height: 18px;
   border-radius: 5px; border: 1.5px solid #fff; background: rgba(0,0,0,.45);
+  z-index: 2;
 }
 .poster__check.is-on { background: var(--accent); border-color: var(--accent); }
 .poster__check.is-on::after {
