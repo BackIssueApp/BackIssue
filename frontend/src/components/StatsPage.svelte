@@ -73,6 +73,7 @@
         <div class="stat-prog__meta">{spct(c.ownedIssues, comp.cvIssuesTotal)}% of known issues owned ({fmt(c.ownedIssues)}/{fmt(comp.cvIssuesTotal)})</div>
         <p class="modal__subhead modal__subhead--sub">Biggest gaps</p>
         {#if comp.topGaps.length}
+          <div class="stat-tablewrap">
           <table class="stat-table"><thead><tr><th>Series</th><th>Have</th><th>Missing</th><th class="stat-table__bar"></th></tr></thead><tbody>
             {#each comp.topGaps as g (g.id)}
               <tr><td><a class="stat-link" href={'/volume/' + g.id} onclick={(e) => openVolumeLink(e, g.id)}>{g.title}</a></td>
@@ -80,6 +81,7 @@
                 <td><div class="stat-bar"><div class="stat-bar__fill" style="width:{spct(g.owned, g.total)}%"></div></div></td></tr>
             {/each}
           </tbody></table>
+          </div>
         {:else}
           <div class="list-note">Every matched series is complete. 🎉</div>
         {/if}
@@ -87,12 +89,14 @@
 
       <section class="stat-section">
         <h3 class="stat-section__title">By publisher</h3>
+        <div class="stat-tablewrap">
         <table class="stat-table"><thead><tr><th>Publisher</th><th>Series</th><th>Issues</th><th>Files</th><th>Size</th></tr></thead><tbody>
           {#each c.byPublisher as p (p.publisher)}
             <tr><td><a class="stat-link" onclick={() => pickPublisher(p.publisher)} href={'/?q=' + encodeURIComponent(p.publisher)}>{p.publisher}</a></td>
               <td>{fmt(p.series)}</td><td>{fmt(p.issues)}</td><td>{fmt(p.files)}</td><td>{humanBytes(p.bytes)}</td></tr>
           {/each}
         </tbody></table>
+        </div>
       </section>
 
       <section class="stat-section">

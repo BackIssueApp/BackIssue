@@ -1195,6 +1195,7 @@ body.stats .stats-page { display: flex; flex-direction: column; height: 100%; }
 .stat-card__sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
 .stat-section { margin-top: 26px; }
 .stat-section__title { font-size: 14px; font-weight: 700; margin: 0 0 12px; letter-spacing: .02em; }
+.stat-tablewrap { overflow-x: auto; }
 .stat-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .stat-table th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 6px 10px; border-bottom: 1px solid var(--line); }
 .stat-table td { padding: 7px 10px; border-bottom: 1px solid var(--line); }
@@ -1517,6 +1518,40 @@ body.import .import-page { display: flex; flex-direction: column; height: 100%; 
 .scan-page { display: none; }
 .scan-page__bar { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
 .scan-page__title { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
+/* Narrow screens: the top-bar actions must stay reachable — the body can't
+   scroll sideways, so a non-wrapping bar would push buttons (e.g. Settings'
+   Save) off the right edge. Wrap instead, let the title take the slack so
+   trailing buttons sit at the right, and drop the settings filter to its own
+   full-width row. */
+@media (max-width: 640px) {
+  .scan-page__bar { flex-wrap: wrap; row-gap: 8px; }
+  .scan-page__title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .settings-filter { order: 5; flex: 1 1 100%; margin-left: 0; }
+  .settings-filter input { width: 100%; box-sizing: border-box; }
+
+  /* Users page rows: wrap so the role picker / Disable / Delete stay on-screen
+     (the body can't scroll sideways). */
+  .user-row, .role-row { flex-wrap: wrap; row-gap: 6px; }
+
+  /* Filter pill groups (History/Logs) wrap instead of overflowing. */
+  .filter { flex-wrap: wrap; }
+
+  /* Source config: single-column field rows, and drop the deep left indent. */
+  .fields-row { grid-template-columns: 1fr; }
+  .src-config { padding-left: 16px; }
+
+  /* Role editor permission rows: checkbox + (label over description). */
+  .role-editor__perm { grid-template-columns: auto 1fr; }
+  .role-editor__perm > .muted { grid-column: 2; }
+
+  /* History rows: date on its own line above the description + source. */
+  .hist-row { grid-template-columns: 1fr auto; }
+  .hist-when { grid-column: 1 / -1; }
+}
+/* Comfortable tap targets for the small pill/chip controls on touch devices. */
+@media (hover: none) {
+  .filter__btn, .settings-chip { min-height: 34px; }
+}
 #scan-dir { flex: 1; min-width: 0; padding: 7px 11px; background: var(--ink); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font: 12px var(--font-mono); }
 .scan-page__sub { display: flex; align-items: center; gap: 16px; padding: 8px 18px; color: var(--muted); font-size: 12px; border-bottom: 1px solid var(--line); }
 .scan-summary { flex: 1; }
