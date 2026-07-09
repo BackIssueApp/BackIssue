@@ -43,6 +43,7 @@ export function matchReleases(db, releases) {
     tracked.set(s.cv_id, s);
   }
   const ownedStmt = db.prepare('SELECT 1 FROM library_files WHERE cv_issue_id=? AND valid=1 LIMIT 1');
+  const coverStmt = db.prepare('SELECT image_url FROM cv_issues WHERE comicvine_id=? AND image_url IS NOT NULL');
   const out = [];
   let added = 0, hits = 0;
   for (const r of releases || []) {
@@ -65,8 +66,12 @@ export function matchReleases(db, releases) {
       owned = issueId ? !!ownedStmt.get(issueId) : false;
     }
     const cv = s ? getCvSeries(db, cvId) : null;
+    // Cover for the row: the issue's own art when its detail is cached, else
+    // the series cover for tracked series. Untracked issues without a cached
+    // cover stay null — the UI lazy-loads those via /api/issue/:id on scroll.
+    const cover = (issueId && coverStmt.get(issueId)?.image_url) || (cv && cv.image_url) || null;
     out.push({
-      cvId, issueId,
+      cvId, issueId, cover,
       seriesId: s ? s.id : null,
       tracked: !!s,
       series: (cv && cv.name) || r.series || 'Comic',

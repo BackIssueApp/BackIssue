@@ -82,6 +82,50 @@
   const all = $derived(st.releases || []);
   const mineCount = $derived(all.filter((r) => r.tracked).length);
   const items = $derived(filter === 'mine' ? all.filter((r) => r.tracked) : all);
+
+  // Grouped view: your tracked series first as one section, then the rest
+  // bucketed by publisher (the list arrives tracked-first, publisher-sorted).
+  const groups = $derived.by(() => {
+    const mine = items.filter((r) => r.tracked);
+    const rest = items.filter((r) => !r.tracked);
+    const out = [];
+    if (mine.length) out.push({ name: 'In your collection', mine: true, items: mine });
+    let cur = null;
+    for (const r of rest) {
+      const pub = r.publisher || 'Other';
+      if (!cur || cur.name !== pub) { cur = { name: pub, mine: false, items: [] }; out.push(cur); }
+      cur.items.push(r);
+    }
+    return out;
+  });
+
+  // Lazy cover fill: rows without cached art fetch their issue's cover through
+  // the app (read-through to the metadata server; cached in the DB after the
+  // first view). Small concurrency, one attempt per issue per session.
+  const covers = $state({});       // issueId -> url (fetched this session)
+  const coverTried = new Set();
+  let coverQueue = [];
+  let coverActive = 0;
+  function pumpCovers() {
+    while (coverActive < 4 && coverQueue.length) {
+      const id = coverQueue.shift();
+      coverActive++;
+      apiGet('/api/issue/' + id)
+        .then((info) => { if (info?.image_url) covers[id] = info.image_url; })
+        .catch(() => {})
+        .finally(() => { coverActive--; pumpCovers(); });
+    }
+  }
+  $effect(() => {
+    if (st.running) return;
+    for (const r of items) {
+      if (r.cover || !r.issueId || coverTried.has(r.issueId)) continue;
+      coverTried.add(r.issueId);
+      coverQueue.push(r.issueId);
+    }
+    pumpCovers();
+  });
+  const coverOf = (m) => m.cover || (m.issueId && covers[m.issueId]) || null;
   const statusText = $derived.by(() => {
     if (st.running) return onThisWeek ? 'Checking this week…' : 'Checking…';
     if (st.error) return 'Error: ' + st.error;
@@ -135,33 +179,43 @@
         {:else if !items.length}
           <div class="queue-empty">{filter === 'mine' ? 'Nothing from your tracked series ships this week.' : 'No releases found for this week.'}</div>
         {:else}
-          {#each items as m, i (i)}
-            <div class="queue-item" class:release--tracked={m.tracked}
-              style={m.tracked ? 'cursor:pointer' : ''}
-              onclick={() => { if (m.tracked) navigate('/volume/' + m.seriesId); }} role="button" tabindex="0"
-              onkeydown={(e) => { if (e.key === 'Enter' && m.tracked) navigate('/volume/' + m.seriesId); }}>
-              <div class="queue-item__main">
-                <div class="queue-item__series">{m.series} #{m.number ?? '?'}
-                  {#if m.tracked}<span class="coll-badge coll-badge--cv" title="In your collection">tracked</span>{/if}</div>
-                <div class="queue-item__title">{m.publisher || ''}{m.shipdate ? ' · ' + m.shipdate : ''}</div>
-              </div>
-              {#if m.tracked}
-                <span>
-                  {#if m.owned}<span class="badge badge--done"><span class="dot"></span>owned</span>
-                  {:else if queued.has(relKey(m))}<Badge status="queued" />
-                  {:else}<span class="badge badge--queued"><span class="dot"></span>missing</span>
-                    {#if m.isNew}<span class="coll-badge coll-badge--cv">new</span>{/if}{/if}
-                </span>
-                {#if !m.owned && !queued.has(relKey(m)) && can('downloads.grab')}
-                  <!-- Close the loop: download the missing release right here. -->
-                  <button class="btn btn--ghost btn--sm" title="Download this issue" disabled={m._busy}
-                    onclick={async (e) => { e.stopPropagation(); m._busy = true; if (!(await downloadRelease(m))) m._busy = false; }}><Icon name="download" /></button>
-                {/if}
-              {:else if m.cvId && isTrusted()}
-                <button class="btn btn--ghost btn--sm" disabled={m._adding}
-                  onclick={(e) => { e.stopPropagation(); addRelease(m); }}>{#if m._added}Added{:else if m._adding}Adding…{:else}<Icon name="plus" /> Add{/if}</button>
-              {/if}
+          {#each groups as g (g.name)}
+            <div class="rel-group__head" class:rel-group__head--mine={g.mine}>
+              <span>{g.name}</span><span class="rel-group__count">{g.items.length}</span>
             </div>
+            {#each g.items as m, i (g.name + i)}
+              {@const cover = coverOf(m)}
+              <div class="queue-item rel-item" class:release--tracked={m.tracked}
+                style={m.tracked ? 'cursor:pointer' : ''}
+                onclick={() => { if (m.tracked) navigate('/volume/' + m.seriesId); }} role="button" tabindex="0"
+                onkeydown={(e) => { if (e.key === 'Enter' && m.tracked) navigate('/volume/' + m.seriesId); }}>
+                <div class="rel-thumb">
+                  {#if cover}<img src={cover} alt="" loading="lazy" />
+                  {:else}<span class="rel-thumb__ph">#{m.number ?? '?'}</span>{/if}
+                </div>
+                <div class="queue-item__main">
+                  <div class="queue-item__series">{m.series} <span class="rel-num">#{m.number ?? '?'}</span>
+                    {#if m.isNew}<span class="coll-badge coll-badge--cv">new</span>{/if}</div>
+                  {#if m.title}<div class="rel-story">{m.title}</div>{/if}
+                  <div class="queue-item__title">{g.mine && m.publisher ? m.publisher + ' · ' : ''}{m.shipdate || ''}</div>
+                </div>
+                {#if m.tracked}
+                  <span>
+                    {#if m.owned}<span class="badge badge--done"><span class="dot"></span>owned</span>
+                    {:else if queued.has(relKey(m))}<Badge status="queued" />
+                    {:else}<span class="badge badge--queued"><span class="dot"></span>missing</span>{/if}
+                  </span>
+                  {#if !m.owned && !queued.has(relKey(m)) && can('downloads.grab')}
+                    <!-- Close the loop: download the missing release right here. -->
+                    <button class="btn btn--ghost btn--sm" title="Download this issue" disabled={m._busy}
+                      onclick={async (e) => { e.stopPropagation(); m._busy = true; if (!(await downloadRelease(m))) m._busy = false; }}><Icon name="download" /></button>
+                  {/if}
+                {:else if m.cvId && isTrusted()}
+                  <button class="btn btn--ghost btn--sm" disabled={m._adding}
+                    onclick={(e) => { e.stopPropagation(); addRelease(m); }}>{#if m._added}Added{:else if m._adding}Adding…{:else}<Icon name="plus" /> Add{/if}</button>
+                {/if}
+              </div>
+            {/each}
           {/each}
         {/if}
       </div>

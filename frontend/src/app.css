@@ -1677,6 +1677,30 @@ a.cv-chip:hover { text-decoration: underline; }
 .issue.is-owned .issue__num { color: var(--green); }
 .releases-filters { display: flex; gap: 6px; padding: 0 20px 10px; }
 .release--tracked { border-left: 2px solid var(--accent); padding-left: 8px; margin-left: -10px; }
+
+/* Releases drawer: publisher group headers + cover thumbnails. */
+.rel-group__head {
+  display: flex; align-items: baseline; gap: 8px;
+  margin: 14px 0 6px; padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted);
+}
+.rel-group__head--mine { color: var(--accent); border-bottom-color: rgba(255,45,111,.35); }
+.rel-group__head:first-child { margin-top: 0; }
+.rel-group__count { font-weight: 500; color: var(--faint); letter-spacing: 0; }
+.rel-item { align-items: center; }
+.rel-thumb {
+  flex-shrink: 0; width: 42px; height: 63px; margin-right: 12px;
+  border-radius: 4px; overflow: hidden; background: var(--panel-2);
+  border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center;
+}
+.rel-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rel-thumb__ph { font-size: 11px; font-weight: 700; color: var(--faint); }
+.rel-num { color: var(--muted); font-weight: 500; }
+.rel-story { font-size: 12px; color: var(--text); opacity: .75; margin-top: 1px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 48ch; }
 .issue--nosource { opacity: .5; }
 .issue--nosource .issue__title::after { content: ' · not available'; color: var(--muted); font-size: 11px; }
 
