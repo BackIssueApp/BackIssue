@@ -69,6 +69,7 @@ const clientAssets = []; // { name, js?, css? } — front-end files served + inj
 const permissions = []; // { key, label, description, tier, plugin } — role-assignable perms
 const authProviders = []; // { id, label, loginPath } — external login (SSO/OIDC) buttons
 const credentialProviders = []; // async (username, password) => identity | null — external password backends
+const notifiers = []; // async (event, opts) => void — outbound notification channels (fired per notify())
 
 // Per-plugin catalog for the management page: everything discovered on disk,
 // loaded or not. name → { name, version, description, enabled, loaded, error, counts }.
@@ -170,6 +171,12 @@ export const pluginApi = {
   registerCredentialProvider(fn) {
     if (typeof fn === 'function') credentialProviders.push(fn);
   },
+  // Outbound notification channel: called (fire-and-forget) with every event
+  // the in-app notification centre records — { type, category, level, title,
+  // body, url, userId, seriesId }. The channel does its own filtering/transport.
+  registerNotifier(fn) {
+    if (typeof fn === 'function') { notifiers.push(fn); bump('notifiers'); }
+  },
 };
 
 // The plugin currently running its register() — so registerClientAsset can stamp
@@ -182,6 +189,7 @@ export function registeredCredentialProviders() { return credentialProviders; }
 export function registeredSources() { return sources; }
 export function registeredSettings() { return Object.assign({}, ...settings); }
 export function registeredStartups() { return startups; }
+export function registeredNotifiers() { return notifiers; }
 export function registeredRoutes() { return routes; }
 export function registeredJobs() { return jobs; }
 export function registeredClientAssets() { return clientAssets; }
@@ -228,7 +236,7 @@ export async function loadPluginsFromDir(dir, api = pluginApi, disabled = []) {
       enabled: !disabled.includes(name),
       loaded: false,
       error: null,
-      counts: { sources: 0, settings: 0, startups: 0, routes: 0, jobs: 0, assets: 0, permissions: 0 },
+      counts: { sources: 0, settings: 0, startups: 0, routes: 0, jobs: 0, assets: 0, permissions: 0, notifiers: 0 },
     };
     catalog.set(name, info);
     if (!info.enabled) {

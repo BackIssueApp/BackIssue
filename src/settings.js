@@ -32,8 +32,9 @@ export const SETTING_FIELDS = {
   // first admin user and then blanks them.
   authUser:            { type: 'string', allowEmpty: true },
   authPass:            { type: 'string', allowEmpty: true },
-  notifyWebhookUrl:    { type: 'string', allowEmpty: true },
-  notifyWebhookEvents: { type: 'string', allowEmpty: true }, // enabled categories (empty = all)
+  // notifyWebhookUrl/notifyWebhookEvents moved to the notifications hub plugin,
+  // which registers the SAME keys — existing saved values carry over untouched
+  // (and survive on disk while the plugin is absent, per saveSettings' merge).
   releaseProviderUrl:  { type: 'string' },
   releaseCheckCron:    { type: 'string', allowEmpty: true },
   releaseCheckEnabled: { type: 'bool' },

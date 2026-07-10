@@ -1,12 +1,13 @@
 // Notification system: a typed event feed. Every notable event (import,
 // download failure, new release, request activity) becomes a row in the
-// in-app notification centre AND, when a webhook is configured and the
-// event's category is enabled, a fire-and-forget POST to it.
+// in-app notification centre AND is handed (fire-and-forget) to every
+// registered outbound notifier — plugins provide the transports (Discord,
+// Telegram, generic webhooks, …) and do their own per-channel filtering.
 //
-// Events carry a category so the webhook can be filtered per category, and an
-// optional user_id: null = broadcast to everyone, a value = targeted (the
-// requester of a request, say) but still visible to user managers.
-import config from './config.js';
+// Events carry a category so channels can filter, and an optional user_id:
+// null = broadcast to everyone, a value = targeted (the requester of a
+// request, say) but still visible to user managers.
+import { registeredNotifiers } from './plugins.js';
 
 // Webhook-filter categories, in display order. An event's `category` must be
 // one of these keys; the UI shows a checkbox per category.
@@ -59,14 +60,7 @@ export function initNotificationTables(db) {
   try { db.exec('ALTER TABLE notifications ADD COLUMN series_id INTEGER'); } catch { /* exists */ }
 }
 
-// Webhook categories that are enabled. Empty/unset setting = all categories on.
-function webhookAllows(category) {
-  const raw = String(config.notifyWebhookEvents || '').trim();
-  if (!raw) return true;
-  return raw.split(',').map((s) => s.trim()).filter(Boolean).includes(category);
-}
-
-/** Record + dispatch a notification. Never throws (a bad webhook or a closed
+/** Record + dispatch a notification. Never throws (a bad channel or a closed
  *  DB must not break the thing that triggered it). Returns the row id or 0. */
 export function notify(db, { type, category = 'system', level = 'info', title, body = null, url = null, userId = null, seriesId = null }, { fetchImpl = fetch } = {}) {
   let id = 0;
@@ -83,16 +77,13 @@ export function notify(db, { type, category = 'system', level = 'info', title, b
   } catch (e) {
     console.warn('notification insert failed:', e?.message || e);
   }
-  // Webhook: fire-and-forget, category-filtered. Keeps a Discord-compatible
-  // `content` so existing receivers work, plus structured fields.
-  const wurl = String(config.notifyWebhookUrl || '').trim();
-  if (wurl && webhookAllows(category)) {
-    const content = body ? `${title} — ${body}` : String(title || '');
-    Promise.resolve(fetchImpl(wurl, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ content, source: 'backissue', type, category, level, title, body, url }),
-    })).catch((e) => console.warn('notification webhook failed:', e?.message || e));
+  // Outbound channels (plugins): fire-and-forget, each does its own filtering
+  // and transport. A channel's failure never breaks the caller or the others.
+  const event = { type, category, level, title, body, url, userId, seriesId };
+  for (const fn of registeredNotifiers()) {
+    Promise.resolve()
+      .then(() => fn(event, { fetchImpl }))
+      .catch((e) => console.warn('notification channel failed:', e?.message || e));
   }
   return id;
 }

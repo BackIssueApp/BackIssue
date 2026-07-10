@@ -9,6 +9,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 ## [Unreleased]
 
 ### Added
+- Plugin hook for outbound notification channels (`registerNotifier`): every
+  in-app notification event is handed to registered plugin channels. First
+  consumer is the new **Notifications Hub** plugin — Discord (rich embeds with
+  cover art), Telegram, Pushover, ntfy, and a generic webhook, each with its
+  own category filter and a per-channel test button in Settings.
 - Per-user follows: the star is now a personal pull-list bookmark for each user.
   Download automation is controlled by a separate per-series **Auto-download**
   toggle (⋯ menu on the series page). Existing auto-downloads carry over
@@ -25,6 +30,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 - Plugin updates no longer fail on Windows when the running server has the
   plugin's native module loaded (the old install is swapped aside instead of
   deleted in place).
+
+### Removed
+- The built-in outbound webhook (Settings → Notifications). The Notifications
+  Hub plugin's generic-webhook channel replaces it and reuses the same saved
+  settings, so existing webhook configs carry over by installing the plugin.
 
 ## [0.5.1] — 2026-07-09
 

@@ -1,9 +1,9 @@
 // The notification system: per-user feed (broadcast + targeted), read
-// receipts, retention pruning, and category-filtered webhook dispatch.
+// receipts, retention pruning, and fan-out to registered outbound notifiers.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../src/db.js';
-import config from '../src/config.js';
+import { pluginApi } from '../src/plugins.js';
 import { initNotificationTables, notify, listNotifications, unreadCount, markRead } from '../src/notifications.js';
 
 function db() { const d = openDb(':memory:'); initNotificationTables(d); return d; }
@@ -79,35 +79,37 @@ test('read receipts are per-user', () => {
   assert.equal(unreadCount(d, 2), 0, 'mark-all clears user 2');
 });
 
-test('webhook fires only for enabled categories, with structured payload', async () => {
+// The notifier registry has no unregister, so this single test covers the full
+// dispatch contract: event shape, fan-out to every channel, the fetchImpl
+// handoff, and a throwing channel neither breaking notify() nor its siblings.
+test('notify() hands the event to every registered notifier, fire-and-forget', async () => {
   const d = db();
-  const posts = [];
-  const fetchImpl = async (url, opts) => { posts.push({ url, body: JSON.parse(opts.body) }); return { ok: true }; };
-  const prevUrl = config.notifyWebhookUrl, prevEv = config.notifyWebhookEvents;
-  config.notifyWebhookUrl = 'https://hook.example/x';
-  config.notifyWebhookEvents = 'failure'; // only failures
-  try {
-    notify(d, { type: 'import.done', category: 'import', title: 'Downloaded', body: 'X #1' }, { fetchImpl });
-    notify(d, { type: 'import.failed', category: 'failure', level: 'error', title: 'Failed', body: 'Y #2' }, { fetchImpl });
-    await new Promise((r) => setTimeout(r, 10)); // fire-and-forget
-    assert.equal(posts.length, 1, 'only the failure category posted');
-    assert.equal(posts[0].body.category, 'failure');
-    assert.equal(posts[0].body.content, 'Failed — Y #2');
-    assert.equal(posts[0].body.source, 'backissue');
-  } finally { config.notifyWebhookUrl = prevUrl; config.notifyWebhookEvents = prevEv; }
-});
+  const got = [];
+  const fetches = [];
+  const fetchImpl = async () => ({ ok: true });
+  pluginApi.registerNotifier((ev, opts) => { got.push(ev); fetches.push(opts.fetchImpl); });
+  pluginApi.registerNotifier(() => { throw new Error('boom'); }); // a bad channel is isolated
 
-test('empty category setting = all categories fire', async () => {
-  const d = db();
-  const posts = [];
-  const fetchImpl = async (url, opts) => { posts.push(JSON.parse(opts.body)); return { ok: true }; };
-  const prevUrl = config.notifyWebhookUrl, prevEv = config.notifyWebhookEvents;
-  config.notifyWebhookUrl = 'https://hook.example/x';
-  config.notifyWebhookEvents = '';
-  try {
-    notify(d, { type: 'a', category: 'import', title: 'A' }, { fetchImpl });
-    notify(d, { type: 'b', category: 'request', title: 'B' }, { fetchImpl });
-    await new Promise((r) => setTimeout(r, 10));
-    assert.equal(posts.length, 2);
-  } finally { config.notifyWebhookUrl = prevUrl; config.notifyWebhookEvents = prevEv; }
+  const id = notify(d, {
+    type: 'import.failed', category: 'failure', level: 'error',
+    title: 'Failed', body: 'Y #2', url: '/wanted', seriesId: 3,
+  }, { fetchImpl });
+  await new Promise((r) => setTimeout(r, 10)); // fire-and-forget settles
+
+  assert.ok(id > 0, 'notify still returns the row id despite the throwing channel');
+  assert.equal(got.length, 1);
+  assert.deepEqual(got[0], {
+    type: 'import.failed', category: 'failure', level: 'error',
+    title: 'Failed', body: 'Y #2', url: '/wanted', userId: null, seriesId: 3,
+  });
+  assert.equal(fetches[0], fetchImpl, 'channels receive the injected fetch');
+
+  // Defaults fill in for fields the caller omits.
+  notify(d, { type: 'x', title: 'Bare' });
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(got.length, 2, 'every event reaches every notifier');
+  assert.deepEqual(got[1], {
+    type: 'x', category: 'system', level: 'info',
+    title: 'Bare', body: null, url: null, userId: null, seriesId: null,
+  });
 });

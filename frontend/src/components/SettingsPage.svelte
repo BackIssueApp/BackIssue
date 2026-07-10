@@ -72,21 +72,6 @@
     }, 250);
   }
 
-  // Webhook notification categories (empty saved value = all enabled).
-  const NOTIFY_CATS = [
-    ['import', 'Imports & downloads'], ['failure', 'Failures'],
-    ['release', 'New releases'], ['request', 'Requests'], ['system', 'System'],
-  ];
-  let webhookCats = $state(Object.fromEntries(NOTIFY_CATS.map(([k]) => [k, true])));
-  function loadWebhookCats(csv) {
-    const list = String(csv || '').split(',').map((s) => s.trim()).filter(Boolean);
-    const all = list.length === 0; // empty = all on
-    for (const [k] of NOTIFY_CATS) webhookCats[k] = all || list.includes(k);
-  }
-  function serializeWebhookCats() {
-    const on = NOTIFY_CATS.filter(([k]) => webhookCats[k]).map(([k]) => k);
-    return on.length === NOTIFY_CATS.length ? '' : on.join(','); // all → empty (= all)
-  }
 
   let root = $state(null); // this page's DOM root, for the generic set-* field scan
 
@@ -109,7 +94,6 @@
     body.newznabIndexers = serializeIndexers(indexerList);
     body.torznabIndexers = serializeIndexers(torznabList);
     body.rootFolders = rootFolderList.map((s) => s.trim()).filter(Boolean).join('\n');
-    body.notifyWebhookEvents = serializeWebhookCats();
     if (sourceOrder.length) body.sourcePriority = sourceOrder.map((s) => s.id).join(',');
     return body;
   }
@@ -164,14 +148,16 @@
     torznabList = parseIndexerString(s.torznabIndexers);
     rootFolderList = parseRoots(s.rootFolders);
     if (!rootFolderList.length) rootFolderList = [''];
-    loadWebhookCats(s.notifyWebhookEvents);
     try { sourceOrder = (await apiGet('/api/sources')).sources || []; } catch { sourceOrder = []; }
     for (const cb of BackIssue._settingsHooks) { try { cb(s); } catch { /* ignore */ } }
     syncSourceUI();
     previewNaming();
-    // Start each source expanded iff it's enabled — a tidy collapsed row when off.
+    // Start each source expanded iff it's enabled — a tidy collapsed row when
+    // off. Only cards WITH an enable switch: switchless cards (notification
+    // channels) decide their own initial state in their onSettingsLoad hook.
     for (const b of root.querySelectorAll('.src-block')) {
-      b.classList.toggle('is-open', !!b.querySelector('.switch input')?.checked);
+      const sw = b.querySelector('.switch input');
+      if (sw) b.classList.toggle('is-open', sw.checked);
     }
     dirty = false;               // everything above was programmatic, not user edits
     dirtySections = new Set();
@@ -613,16 +599,11 @@
         <!-- NOTIFICATIONS -->
         <section class="set-group" id="sec-notifications">
           <h3 class="set-group__head">Notifications</h3>
-          <p class="set-group__sub">Where BackIssue sends alerts. The in-app bell always records everything regardless.</p>
-          <section class="settings-section">
-            <label class="field"><span>Webhook URL</span><input id="set-notifyWebhookUrl" type="text" spellcheck="false" placeholder="https://discord.com/api/webhooks/…" /></label>
-            <p class="modal__note">POSTed for the categories below (Discord-compatible JSON: <code>{'{ content, type, category, level, … }'}</code>). Also a post-event hook — point it at anything that should react (e.g. a reader-scan trigger). Blank = off.</p>
-            <div class="notify-cats">
-              {#each NOTIFY_CATS as [key, label] (key)}
-                <label class="notify-cat"><input type="checkbox" bind:checked={webhookCats[key]} />{label}</label>
-              {/each}
-            </div>
-          </section>
+          <p class="set-group__sub">Where BackIssue sends alerts. The in-app bell always records everything regardless. Open a channel to configure it.</p>
+          <!-- Outbound channels are provided by plugins (the notifications hub
+               injects one collapsible card per channel, like the source cards). -->
+          <div id="settings-plugin-notifications"></div>
+          <p class="modal__note" id="notify-hub-empty-note">No outbound channels installed — add the <b>Notifications Hub</b> plugin from the Plugins page to send alerts to Discord, Telegram, Pushover, ntfy, or any webhook.</p>
         </section>
       </div>
     </div>
