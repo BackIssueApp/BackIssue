@@ -6,7 +6,7 @@ import path from 'node:path';
 import JSZip from 'jszip';
 import { openDb, getLibraryFile, upsertSeries, upsertIssue, upsertCvSeries, upsertCvIssue, setSeriesCv, seriesCollectionDetail, upsertLibraryFile } from '../src/db.js';
 import { indexLibrary, indexFolderForSeries, reconcileLibrary, indexDownloadedFile, removeSupersededFiles } from '../src/library.js';
-import { linkFileCvIssue } from '../src/db.js';
+import { linkFileCvIssue, linkLibraryFile } from '../src/db.js';
 
 async function cbz(p, { ci = true } = {}) {
   const z = new JSZip();
@@ -30,6 +30,34 @@ test('indexLibrary links each file to its catalog series/issue', async () => {
   const row = getLibraryFile(db, path.join(sdir, 'Earth X V1999 #001.cbz'));
   assert.equal(row.series_id, sid);
   assert.equal(row.issue_id, iid);
+  await fs.rm(root, { recursive: true, force: true });
+});
+
+test('indexLibrary preserves a file\'s existing series link on re-scan (no re-match)', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'lib-'));
+  const sdir = path.join(root, 'DC', 'Superman (2011)');
+  await fs.mkdir(sdir, { recursive: true });
+  const mk = async (padBytes) => {
+    const z = new JSZip();
+    z.file('001.jpg', Buffer.from([1]));
+    z.file('pad.bin', Buffer.alloc(padBytes)); // vary size so the re-scan sees a "changed" file
+    z.file('ComicInfo.xml', '<ComicInfo><Series>Superman</Series><Volume>2011</Volume><Number>1</Number></ComicInfo>');
+    return z.generateAsync({ type: 'nodebuffer' });
+  };
+  const fp = path.join(sdir, 'Superman V2011 #001.cbz');
+  await fs.writeFile(fp, await mk(100));
+  const db = openDb(':memory:');
+  // Two same-named series; the file naturally matches A (title carries the year).
+  const a = upsertSeries(db, { title: 'Superman (2011)', url: '/c/a', publisher: 'DC' });
+  const b = upsertSeries(db, { title: 'Superman', url: '/c/b', publisher: 'DC' });
+  await indexLibrary({ db, dir: root });
+  assert.equal(getLibraryFile(db, fp).series_id, a, 'first index attributes to the natural match A');
+  // Simulate a prior/correct attribution to B (e.g. a per-series scan or import).
+  linkLibraryFile(db, fp, b, null);
+  // Change the file on disk so the re-scan re-reads it (the path that used to re-match).
+  await fs.writeFile(fp, await mk(5000));
+  await indexLibrary({ db, dir: root });
+  assert.equal(getLibraryFile(db, fp).series_id, b, 're-scan preserves the existing link — does not re-match to A');
   await fs.rm(root, { recursive: true, force: true });
 });
 

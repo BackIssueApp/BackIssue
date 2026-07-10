@@ -9,8 +9,24 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 ## [Unreleased]
 
 ### Added
+- New **Download issue metadata** tool (Tools page): fetches ComicVine detail
+  — descriptions, credits, dates, covers — for every issue in your collection
+  that's missing it. Already-cached issues are skipped, and it stops cleanly on
+  a ComicVine rate limit so you can re-run to finish.
+- New **Re-index series folders** tool (Tools page): for every ComicVine-matched
+  series, authoritatively re-indexes its own folder and attributes the files
+  there — without fuzzy matching. Fixes files that were attached to the wrong
+  same-named series, and repairs owned/missing counts. (Discovering brand-new
+  comics is still "Scan entire library".)
 - Profile → API key now shows a **QR code** when you generate a key, so a
   companion app can pair by scanning it instead of typing the key.
+
+### Fixed
+- **Scan entire library** no longer re-attributes a file that already belongs
+  to a series. Previously a re-scan re-ran the fuzzy matcher on every file and
+  could move owned files onto a different same-named series (e.g. an unmatched
+  catalog row whose title carries the year), showing them as missing. A scan
+  now only matches files that aren't linked to a series yet.
 
 ## [0.6.0] — 2026-07-09
 

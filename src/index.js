@@ -17,7 +17,7 @@ import { findComicFiles, groupSeries } from './scanner.js';
 import { extractYear } from './matcher.js';
 import { poolWithResource } from './pool.js';
 import { makeCvClient, cvKey } from './cv.js';
-import { tagFileFromCv, ensureCvIssueDetail } from './metatagger.js';
+import { tagFileFromCv, ensureCvIssueDetail, fetchAllIssueMetadata } from './metatagger.js';
 import { fetchWeeklyReleases, matchReleases } from './releases.js';
 import { startJob, listJobs, clearFinishedJobs, attachJobsDb } from './jobs.js';
 import { createScheduler } from './scheduler.js';
@@ -101,11 +101,13 @@ const state = { crawl: { running: false }, queue: { running: false }, follow: { 
 // Library-wide maintenance tools (the Tools page). Each runs as a job with progress.
 const TOOLS = {
   'scan-library': { label: 'Scan entire library', desc: 'Walk your root folders and index every comic file — finds files not yet in the library and drops ones deleted from disk.', run: (op) => scanEntireLibrary(db, parseRootFolders(config.rootFolders), op) },
+  'reindex-series': { label: 'Re-index series folders', desc: "For every ComicVine-matched series, re-index its OWN folder and attribute the files there — authoritatively, without fuzzy matching. Fixes files that were attached to the wrong same-named series. (Finding brand-new comics is still 'Scan entire library'.)", run: (op) => reindexSeriesFolders(op) },
   'tag-untagged': { label: 'Tag all untagged files', desc: 'Write ComicVine metadata into every owned file that has none (converts .cbr as needed).', needsCv: true, run: (op) => tagAllUntagged(db, cvClient(), op) },
   'convert-cbr': { label: 'Convert all CBR → CBZ', desc: 'Repack every .cbr as a .cbz so it can be tagged and read consistently.', run: (op) => convertAllCbr(db, op) },
   'remove-duplicates': { label: 'Remove duplicate files', desc: 'Delete old/corrupt copies that a good copy of the same issue has already replaced.', run: (op) => removeAllDuplicates(db, op) },
   'verify': { label: 'Verify archives', desc: 'Deep-check every comic file for corruption and prune ones missing from disk.', run: (op, opts) => verifyLibrary(db, op, opts) },
   'relink-cv': { label: 'Re-link to ComicVine', desc: 'Re-map owned files to ComicVine issues for every matched comic (fixes owned/missing counts).', run: (op) => relinkAllCv(db, op) },
+  'fetch-metadata': { label: 'Download issue metadata', desc: 'Fetch ComicVine detail (descriptions, credits, dates, covers) for every issue in your collection that is missing it. Already-cached issues are skipped; if ComicVine rate-limits, it stops cleanly — just run it again to finish.', needsCv: true, run: (op) => fetchAllIssueMetadata(db, cvClient(), op) },
   'rename-files': { label: 'Rename files to pattern', desc: 'Rename every CV-linked file to your file pattern (same folder — no moves) so imported scene-named files match downloaded ones. Collisions are skipped.', run: (op) => renameAllFiles(db, op) },
   'backup-db': { label: 'Back up database', desc: 'Snapshot the catalog database into backups/ next to it (keeps the newest 5). Safe while the app is in use. Restore: stop the app and copy a snapshot over catalog.db.', run: (op) => backupDatabase(db, config.dbPath, op) },
 };
@@ -252,6 +254,31 @@ async function scanSeriesFolder(seriesId) {
   }).then((r) => { state.scanFolder = { running: false, seriesId, dir, error: r?.error || undefined, pruned: r?.pruned }; if (r?.error) { job.fail(new Error(r.error)); } else { logInfo(`Scanned folder for ${series.title || dir}: ${r?.total || 0} file(s)${r?.pruned ? ', ' + r.pruned + ' pruned' : ''}`, 'library'); job.finish({ files: r?.total, pruned: r?.pruned }); } })
     .catch((e) => { state.scanFolder = { running: false, seriesId, dir, error: String(e?.message || e) }; job.fail(e); });
   return { started: true, dir };
+}
+
+// Authoritatively (re)index every ComicVine-matched series by scanning its OWN
+// folder and force-attributing the files there — instead of the folder-walk
+// scan's fuzzy file→series matching, which can hand a file to a same-named
+// series (e.g. an unmatched catalog row whose title carries the year). This
+// never mis-attributes and repairs files that landed on the wrong row.
+// Discovering brand-new comics is still the job of "Scan entire library".
+async function reindexSeriesFolders(op = () => {}) {
+  const ids = db.prepare('SELECT id FROM series WHERE cv_id IS NOT NULL ORDER BY title').all().map((r) => r.id);
+  let done = 0, scanned = 0, foldersMissing = 0, files = 0, pruned = 0;
+  op({ done: 0, total: ids.length });
+  for (const id of ids) {
+    const series = getSeriesById(db, id);
+    if (series) {
+      const dir = resolveSeriesDir(db, series);
+      try {
+        const r = await indexFolderForSeries({ db, dir, seriesId: id, cvId: series.cv_id });
+        if (r?.error) foldersMissing++;
+        else { scanned++; files += r.total || 0; pruned += r.pruned || 0; }
+      } catch { foldersMissing++; }
+    }
+    op({ done: ++done, total: ids.length, message: `${scanned} folders · ${files} files` });
+  }
+  return { series: scanned, files, foldersMissing, ...(pruned ? { pruned } : {}) };
 }
 
 // (Re)write the authoritative ComicVine ComicInfo.xml into every owned file of

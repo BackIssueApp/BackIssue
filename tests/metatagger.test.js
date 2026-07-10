@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import JSZip from 'jszip';
-import { buildComicInfoXml, stripHtml, mapCredits, tagCbzBuffer, writeComicInfo, ensureCvIssueDetail, tagFileFromCv } from '../src/metatagger.js';
+import { buildComicInfoXml, stripHtml, mapCredits, tagCbzBuffer, writeComicInfo, ensureCvIssueDetail, tagFileFromCv, fetchAllIssueMetadata } from '../src/metatagger.js';
 import { openDb, upsertSeries, upsertCvSeries, upsertCvIssue, upsertLibraryFile, linkLibraryFile, linkFileCvIssue, getLibraryFile } from '../src/db.js';
 
 const SERIES = { comicvine_id: 46568, name: 'Saga', publisher: 'Image', start_year: '2012', count_of_issues: 72, site_detail_url: 'https://cv/saga' };
@@ -105,6 +105,45 @@ test('ensureCvIssueDetail fetches once and caches', async () => {
   assert.deepEqual(JSON.parse(a.credits), [{ name: 'W', role: 'writer' }]);
   await ensureCvIssueDetail(db, client, 3003);
   assert.equal(calls, 1); // cached — one API call per issue, ever
+});
+
+test('fetchAllIssueMetadata fetches only issues missing detail, and converges', async () => {
+  const db = openDb(':memory:');
+  upsertCvSeries(db, { id: 100, name: 'Test' });
+  // Three issues with no detail, plus one already detailed.
+  upsertCvIssue(db, { id: 1, cv_series_id: 100, number: '1' });
+  upsertCvIssue(db, { id: 2, cv_series_id: 100, number: '2' });
+  upsertCvIssue(db, { id: 3, cv_series_id: 100, number: '3' });
+  const alreadyClient = { async issue(id) { return { id, issue_number: '4', name: 'Four', description: 'd', credits: [] }; } };
+  upsertCvIssue(db, { id: 4, cv_series_id: 100, number: '4' });
+  await ensureCvIssueDetail(db, alreadyClient, 4); // #4 now has_detail=1
+
+  const seen = [];
+  const progress = [];
+  const client = { async issue(id) { seen.push(id); return { id, issue_number: String(id), name: `Issue ${id}`, cover_date: '2020-01-01', description: 'x', credits: [] }; } };
+  const r = await fetchAllIssueMetadata(db, client, (p) => progress.push(p));
+
+  assert.deepEqual(seen.sort((a, b) => a - b), [1, 2, 3], 'only the undetailed issues were fetched (not #4)');
+  assert.deepEqual(r, { fetched: 3, failed: 0 });
+  assert.equal(progress[0].total, 3, 'progress reports the count to do');
+  // Converges: a second run has nothing left.
+  const r2 = await fetchAllIssueMetadata(db, client, () => {});
+  assert.deepEqual(r2, { fetched: 0, failed: 0 });
+});
+
+test('fetchAllIssueMetadata stops cleanly on a rate limit and reports remaining', async () => {
+  const db = openDb(':memory:');
+  upsertCvSeries(db, { id: 200, name: 'RL' });
+  for (const n of [1, 2, 3]) upsertCvIssue(db, { id: n, cv_series_id: 200, number: String(n) });
+  let calls = 0;
+  const client = { async issue(id) {
+    calls++;
+    if (calls === 2) { const e = new Error('rate limited'); e.rateLimited = true; throw e; }
+    return { id, issue_number: String(id), name: `I${id}`, description: 'd', credits: [] };
+  } };
+  const r = await fetchAllIssueMetadata(db, client, () => {});
+  assert.equal(r.fetched, 1, 'the first issue was fetched before the limit hit');
+  assert.equal(r.remaining, 2, 'the rest remain for a re-run');
 });
 
 test('tagFileFromCv tags a linked file end-to-end and logs it', async () => {

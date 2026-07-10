@@ -104,6 +104,33 @@ export async function ensureCvIssueDetail(db, client, cvIssueId) {
   return getCvIssue(db, cvIssueId);
 }
 
+// Download ComicVine detail (description, credits, dates, cover) for every
+// cached issue that doesn't have it yet — the "Download issue metadata" tool.
+// Sequential, so the CV client's own pacing/key rotation governs the rate;
+// stops cleanly on a rate limit so a re-run finishes the rest. cv_issues only
+// holds issues for series in the collection, so this is naturally scoped, and
+// has_detail flips to 1 on each fetch so the set converges (no re-fetching).
+export async function fetchAllIssueMetadata(db, client, onProgress = () => {}) {
+  const ids = db.prepare('SELECT comicvine_id FROM cv_issues WHERE has_detail = 0 ORDER BY comicvine_id')
+    .all().map((r) => r.comicvine_id);
+  let fetched = 0;
+  let failed = 0;
+  let rateLimited = false;
+  onProgress({ done: 0, total: ids.length });
+  for (const id of ids) {
+    try {
+      await ensureCvIssueDetail(db, client, id);
+      fetched++;
+    } catch (e) {
+      if (e?.rateLimited) { rateLimited = true; break; } // all keys throttled — stop, resume on re-run
+      failed++;
+    }
+    onProgress({ done: fetched + failed, total: ids.length, message: `${fetched} fetched` });
+  }
+  const remaining = ids.length - fetched - failed;
+  return rateLimited ? { fetched, failed, remaining } : { fetched, failed };
+}
+
 // Replace/insert ComicInfo.xml inside a CBZ buffer (used at download time).
 export async function tagCbzBuffer(buffer, xml) {
   const zip = await JSZip.loadAsync(buffer);

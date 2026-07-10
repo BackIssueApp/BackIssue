@@ -104,9 +104,16 @@ export async function indexLibrary({ db, dir, deep = false, onProgress = () => {
         ci_series: ci.series || null, ci_number: ci.number || null, ci_volume: ci.volume || null, ci_title: ci.title || null,
         valid, error, verified,
       });
-      // Link the file to a catalog series/issue so it joins the Collection.
-      const link = linkFile(db, { path: f.path, dir: f.dir, name: f.name, ci_series: ci.series, ci_volume: ci.volume, ci_number: ci.number, has_metadata: info.hasComicInfo ? 1 : 0 });
-      linkLibraryFile(db, f.path, link.seriesId, link.issueId);
+      // Only attribute files that aren't linked yet. A re-scan must NOT reassign
+      // a file that already belongs to a series — the fuzzy matcher can pick a
+      // different same-named series (e.g. an unmatched catalog row whose title
+      // carries the year), silently moving owned files off their series. Files
+      // that already have a series keep it (upsertLibraryFile preserves it);
+      // this mirrors the unchanged-file path above.
+      if (existing?.series_id == null) {
+        const link = linkFile(db, { path: f.path, dir: f.dir, name: f.name, ci_series: ci.series, ci_volume: ci.volume, ci_number: ci.number, has_metadata: info.hasComicInfo ? 1 : 0 });
+        linkLibraryFile(db, f.path, link.seriesId, link.issueId);
+      }
       onProgress({ done: ++done, total: files.length, read: 1 });
     },
     () => {},
