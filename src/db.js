@@ -102,6 +102,15 @@ export function initSchema(db) {
       confidence TEXT, status TEXT NOT NULL DEFAULT 'review',
       scanned_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    -- Personal follows: each user's own pull list. Distinct from
+    -- series.followed, which is the GLOBAL monitor flag driving download
+    -- automation (name kept for compatibility — plugins query it directly).
+    CREATE TABLE IF NOT EXISTS user_follows (
+      user_id INTEGER NOT NULL,
+      series_id INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, series_id)
+    );
   `);
 }
 
@@ -476,7 +485,7 @@ export function pruneLibraryFiles(db, seen) {
 // Last path segment (folder name) of a dir, across / or \ separators.
 function dirBaseName(d) { return d ? (String(d).split(/[\\/]/).filter(Boolean).pop() || null) : null; }
 
-export function collectionSeries(db, { filter = 'all', search = '', sort = 'title', includeRestricted = true } = {}) {
+export function collectionSeries(db, { filter = 'all', search = '', sort = 'title', includeRestricted = true, userId = null } = {}) {
   // Sort options for the rail: title (default), recently added (id desc — rows
   // are only ever inserted), most missing (CV total minus owned).
   const ORDERS = {
@@ -490,6 +499,7 @@ export function collectionSeries(db, { filter = 'all', search = '', sort = 'titl
   const orderBy = ORDERS[sort] || ORDERS.title;
   const rows = db.prepare(`
     SELECT s.id, s.title, s.publisher, s.year, s.cover_url, s.followed, s.cv_id, s.cv_locked, s.url, s.restricted,
+      EXISTS(SELECT 1 FROM user_follows uf WHERE uf.series_id=s.id AND uf.user_id=@uid) my_follow,
       cv.name cv_name, cv.publisher cv_publisher, cv.start_year cv_year, cv.image_url cv_image,
       (SELECT COUNT(*) FROM issues i WHERE i.series_id=s.id) bc_total,
       (SELECT COUNT(*) FROM issues i WHERE i.series_id=s.id AND EXISTS
@@ -512,10 +522,11 @@ export function collectionSeries(db, { filter = 'all', search = '', sort = 'titl
       (SELECT COALESCE(SUM(lf.size),0) FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1) size_bytes
     FROM series s
     LEFT JOIN cv_series cv ON cv.comicvine_id=s.cv_id
-    WHERE (s.followed=1 OR EXISTS(SELECT 1 FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1))
+    WHERE (s.followed=1 OR EXISTS(SELECT 1 FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1)
+           OR EXISTS(SELECT 1 FROM user_follows uf WHERE uf.series_id=s.id AND uf.user_id=@uid))
       ${includeRestricted ? '' : 'AND s.restricted = 0'}
       ${search ? 'AND (s.title LIKE @q OR cv.name LIKE @q OR cv.publisher LIKE @q)' : ''}
-    ${orderBy}`).all(search ? { q: `%${search}%` } : {});
+    ${orderBy}`).all({ uid: userId ?? -1, ...(search ? { q: `%${search}%` } : {}) });
   // ComicVine is the data source. A matched comic shows CV name/publisher/year/
   // cover and rolls up against CV's issues. An unmatched comic surfaces NO source
   // metadata — just a neutral "needs a ComicVine match" state (sources are download-only).
@@ -523,7 +534,7 @@ export function collectionSeries(db, { filter = 'all', search = '', sort = 'titl
     const sourced = !String(r.url).startsWith('cv:');
     if (!r.cv_id) {
       return {
-        id: r.id, followed: r.followed, cv_id: null, cv_locked: 0, sourced, matched: false, source: 'unmatched',
+        id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, cv_id: null, cv_locked: 0, sourced, matched: false, source: 'unmatched',
         title: null, publisher: null, year: null, cover_url: null, restricted: !!r.restricted,
         folder: dirBaseName(r.file_dir), files: r.file_count,
         total: 0, owned: 0, missing: 0, untagged: r.untagged, corrupt: r.corrupt,
@@ -533,7 +544,7 @@ export function collectionSeries(db, { filter = 'all', search = '', sort = 'titl
     const total = r.cv_total;
     const owned = Math.min(r.cv_owned, r.cv_total);
     return {
-      id: r.id, followed: r.followed, cv_id: r.cv_id, cv_locked: r.cv_locked, sourced, matched: true, source: 'cv',
+      id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, cv_id: r.cv_id, cv_locked: r.cv_locked, sourced, matched: true, source: 'cv',
       title: r.cv_name || r.title, publisher: r.cv_publisher || null, year: r.cv_year || null, cover_url: r.cv_image || null,
       cv_name: r.cv_name, cv_year: r.cv_year, restricted: !!r.restricted,
       total, owned, missing: Math.max(0, total - owned), untagged: r.untagged, corrupt: r.corrupt,
@@ -541,13 +552,14 @@ export function collectionSeries(db, { filter = 'all', search = '', sort = 'titl
     };
   })
     .filter((r) => filter === 'incomplete' ? r.missing > 0
-      : filter === 'unmonitored' ? !r.followed
+      : filter === 'followed' ? !!r.followed
+      : filter === 'unmonitored' ? !r.monitored
       : filter === 'problems' ? (r.untagged > 0 || r.corrupt > 0)
       : filter === 'unmatched' ? !r.cv_id
       : true);
 }
 
-export function seriesCollectionDetail(db, id) {
+export function seriesCollectionDetail(db, id, userId = null) {
   const series = getSeriesById(db, id);
   if (!series) return null;
   const files = db.prepare('SELECT * FROM library_files WHERE series_id=? ORDER BY name').all(id);
@@ -569,7 +581,11 @@ export function seriesCollectionDetail(db, id) {
     publisher: (cvRow && cvRow.publisher) || series.publisher,
     year: (cvRow && cvRow.start_year) || series.year,
     cover_url: (cvRow && cvRow.image_url) || series.cover_url,
-    followed: series.followed, cv_id: series.cv_id, cv_locked: series.cv_locked, sourced, path: series.path,
+    followed: userId != null
+      ? (db.prepare('SELECT 1 FROM user_follows WHERE user_id=? AND series_id=?').get(userId, id) ? 1 : 0)
+      : 0,
+    monitored: series.followed,
+    cv_id: series.cv_id, cv_locked: series.cv_locked, sourced, path: series.path,
     restricted: !!series.restricted,
     aliases: series.aliases || '',                 // user-added search names (editable)
     cv_aliases: parseAliases(cvRow && cvRow.aliases), // ComicVine's aliases (read-only hint)
@@ -639,7 +655,11 @@ export function seriesCollectionDetail(db, id) {
   return {
     series: {
       id: series.id, title: null, publisher: null, year: null, cover_url: null,
-      followed: series.followed, cv_id: null, cv_locked: 0, sourced, path: series.path,
+      followed: userId != null
+        ? (db.prepare('SELECT 1 FROM user_follows WHERE user_id=? AND series_id=?').get(userId, id) ? 1 : 0)
+        : 0,
+      monitored: series.followed,
+      cv_id: null, cv_locked: 0, sourced, path: series.path,
       folder: dirBaseName(files[0]?.dir),
     },
     cv: null, source: 'unmatched', sourced, matched: false,
@@ -1028,8 +1048,16 @@ export function setSeriesComplete(db, id, complete = 1) {
   db.prepare('UPDATE series SET complete=? WHERE id=?').run(complete ? 1 : 0, id);
 }
 
+// GLOBAL monitor flag (column named 'followed' for compatibility): drives the
+// download automation lanes and plugin queries.
 export function setFollowed(db, id, followed) {
   db.prepare('UPDATE series SET followed=? WHERE id=?').run(followed ? 1 : 0, id);
+}
+
+// PERSONAL follow: this user's pull list. No effect on automation.
+export function setUserFollow(db, userId, seriesId, follow) {
+  if (follow) db.prepare('INSERT OR IGNORE INTO user_follows (user_id, series_id) VALUES (?, ?)').run(userId, seriesId);
+  else db.prepare('DELETE FROM user_follows WHERE user_id=? AND series_id=?').run(userId, seriesId);
 }
 
 export function listFollowed(db) {

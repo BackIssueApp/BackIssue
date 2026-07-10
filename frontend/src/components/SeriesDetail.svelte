@@ -245,12 +245,26 @@
 
   async function toggleFollow() {
     if (!s) return;
-    const monitored = !s.followed;
+    const follow = !s.followed;
     try {
-      const r = await apiPost(`/api/collection/${s.id}/monitor`, { monitored });
+      const r = await apiPost(`/api/collection/${s.id}/follow`, { follow });
       if (r?.error) return notify(r.error, 'error'); // star stays truthful
     } catch { return notify('Could not update — is the app reachable?', 'error'); }
-    detail.series.followed = monitored ? 1 : 0;
+    detail.series.followed = follow ? 1 : 0; // personal follow, not the monitor flag
+    loadCollection();
+  }
+
+  // The GLOBAL monitor flag — what download automation fetches. Library-manage
+  // roles flip it from the ⋯ menu; personal follows never touch it.
+  async function toggleMonitored() {
+    if (!s) return;
+    const monitored = !s.monitored;
+    try {
+      const r = await apiPost(`/api/collection/${s.id}/monitor`, { monitored });
+      if (r?.error) return notify(r.error, 'error');
+    } catch { return notify('Could not update — is the app reachable?', 'error'); }
+    detail.series.monitored = monitored ? 1 : 0;
+    notify(monitored ? 'Auto-download enabled for this series.' : 'Auto-download disabled for this series.', 'ok');
     loadCollection();
   }
 
@@ -495,6 +509,10 @@
                   onclick={(e) => { e.stopPropagation(); moreOpen = !moreOpen; }}>⋯</button>
                 {#if moreOpen}
                   <div class="series-more__menu" role="menu">
+                    {#if can('library.manage')}
+                      <button class="menu__item" role="menuitem" title="Auto-download: should the system search for and fetch this series' new/missing issues?"
+                        onclick={() => { moreOpen = false; toggleMonitored(); }}><Icon name="download" /> {s.monitored ? 'Auto-download: on' : 'Auto-download: off'}</button>
+                    {/if}
                     {#if isTrusted()}
                       <button class="menu__item" role="menuitem" disabled={refreshBusy} title="Re-pull metadata + issues from ComicVine"
                         onclick={() => { moreOpen = false; refreshSeries(); }}><Icon name="refresh" /> {refreshBusy ? 'Refreshing…' : 'Refresh metadata'}</button>

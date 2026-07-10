@@ -5,7 +5,7 @@ import fsp from 'node:fs/promises';
 import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
-import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, seriesCollectionDetail, setSeriesPath, getSeriesById, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, restrictedSeriesIds, isCvIssueRestricted, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
+import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, seriesCollectionDetail, setSeriesPath, getSeriesById, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, restrictedSeriesIds, isCvIssueRestricted, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
 import { resolveSeriesDir, defaultRootedDir } from './paths.js';
 import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
@@ -193,6 +193,8 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     // Reading lists are personal curation (no files touched) — any signed-in
     // user manages their own, including non-GET verbs.
     [/^\/api\/lists/, 'library.view'],
+    // Personal follows likewise: each user curates their own pull list.
+    [/^\/api\/collection\/\d+\/follow$/, 'library.view'],
   ];
   const DOWNLOAD_RULES = [
     /^\/api\/collection\/\d+\/(download|redownload)$/,
@@ -948,7 +950,8 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     const action = String(req.body?.action || '');
     if (!ids.length) return res.status(400).json({ error: 'ids required' });
     if (action === 'follow' || action === 'unfollow') {
-      for (const id of ids) setFollowed(db, id, action === 'follow');
+      // Personal follows — the actor's own pull list, not the monitor flag.
+      for (const id of ids) setUserFollow(db, req.user.id, id, action === 'follow');
       return res.json({ done: ids.length });
     }
     if (action === 'remove') {
@@ -1011,11 +1014,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   app.post('/api/queue/resume', (req, res) => { state.queue.paused = false; res.json({ paused: false }); });
   app.post('/api/queue/clear', (req, res) => { res.json({ cleared: cancelQueued(db) }); });
 
-  app.get('/api/collection', (req, res) => res.json(collectionSeries(db, { filter: req.query.filter, search: req.query.search, sort: req.query.sort, includeRestricted: canRestricted(req) })));
+  app.get('/api/collection', (req, res) => res.json(collectionSeries(db, { filter: req.query.filter, search: req.query.search, sort: req.query.sort, includeRestricted: canRestricted(req), userId: req.user.id })));
   app.get('/api/collection/:id', (req, res) => {
     // A restricted series is invisible to roles without the permission.
     if (!canRestricted(req) && isSeriesRestricted(db, Number(req.params.id))) return res.status(404).json({ error: 'not found' });
-    const d = seriesCollectionDetail(db, Number(req.params.id));
+    const d = seriesCollectionDetail(db, Number(req.params.id), req.user.id);
     if (!d) return res.status(404).json({ error: 'not found' });
     const row = getSeriesById(db, Number(req.params.id));
     if (row) {
@@ -1141,10 +1144,18 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     const row = getSeriesById(db, Number(req.params.id));
     res.json({ path: row?.path || null, location: row ? resolveSeriesDir(db, row) : null });
   });
+  // GLOBAL monitor flag — what download automation fetches (library.manage).
   app.post('/api/collection/:id/monitor', (req, res) => {
     const monitored = !!(req.body && req.body.monitored);
     setFollowed(db, Number(req.params.id), monitored);
     res.json({ monitored });
+  });
+  // PERSONAL follow — the signed-in user's own pull list (any library.view user;
+  // see PERM_RULES). No effect on automation.
+  app.post('/api/collection/:id/follow', (req, res) => {
+    const follow = !!(req.body && req.body.follow);
+    setUserFollow(db, req.user.id, Number(req.params.id), follow);
+    res.json({ followed: follow });
   });
 
   // --- ComicVine metadata ---
@@ -1169,6 +1180,9 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     if (!comicvineId) return res.status(400).json({ error: 'comicvineId required' });
     try {
       const r = await addFromCv(comicvineId);
+      // Adding implies personal interest: the adder follows it automatically
+      // (the add itself sets the global monitor flag for automation).
+      if (r?.seriesId != null) setUserFollow(db, req.user.id, r.seriesId, true);
       // Adding implies wanting: queue every missing issue right away. Runs
       // only under the ADDER's own download permission (a role that may
       // reshape the library but not download gets the add, nothing more),

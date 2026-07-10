@@ -15,7 +15,8 @@
   const FILTERS = [
     { key: 'all', label: 'All' },
     { key: 'incomplete', label: 'Incomplete' },
-    { key: 'unmonitored', label: 'Not followed' },
+    { key: 'followed', label: 'Followed' },
+    { key: 'unmonitored', label: 'Not monitored' },
     { key: 'problems', label: 'Problems' },
     { key: 'unmatched', label: 'Unmatched' },
   ];
@@ -51,10 +52,10 @@
   }
 
   async function toggleMon(s) {
-    const monitored = !s.followed;
-    s.followed = monitored ? 1 : 0; // optimistic
-    const r = await apiPost('/api/collection/' + s.id + '/monitor', { monitored });
-    if (r?.error) { s.followed = monitored ? 0 : 1; notify(r.error, 'error'); }
+    const follow = !s.followed;
+    s.followed = follow ? 1 : 0; // optimistic — personal follow, not the monitor flag
+    const r = await apiPost('/api/collection/' + s.id + '/follow', { follow });
+    if (r?.error) { s.followed = follow ? 0 : 1; notify(r.error, 'error'); }
   }
 
   function toggleSelecting() {

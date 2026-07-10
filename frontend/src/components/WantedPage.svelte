@@ -84,7 +84,7 @@
     <span id="wanted-summary" class="scan-summary">{fmt(total)} missing issue{total === 1 ? '' : 's'}</span>
     <div class="filter" id="wanted-filter">
       <button class="filter__btn" class:is-active={!followed} onclick={() => setQuery({ wf: null })}>All</button>
-      <button class="filter__btn" class:is-active={followed} onclick={() => setQuery({ wf: 'followed' })}>Followed only</button>
+      <button class="filter__btn" class:is-active={followed} onclick={() => setQuery({ wf: 'followed' })}>Monitored only</button>
       <button class="filter__btn" id="wanted-unreleased" class:is-active={hideUnreleased}
         title="Hides issues whose known cover date is in the future (most cached issues have no date — this only hides what we know)"
         onclick={() => setQuery({ hide: hideUnreleased ? null : '1' })}>Hide unreleased</button>
@@ -111,7 +111,7 @@
           <div class="wanted-series">
             {#if it.series_cover}<img class="wanted-cover" src={it.series_cover} loading="lazy" alt="" />{/if}
             <a class="stat-link" onclick={(e) => { e.preventDefault(); navigate('/volume/' + it.series_id); }} href={'/volume/' + it.series_id}>{it.series_title}</a>
-            {#if it.followed}<span class="wanted-star" title="Followed"><Icon name="star" fill /></span>{/if}
+            {#if it.followed}<span class="wanted-star" title="Monitored"><Icon name="star" fill /></span>{/if}
           </div>
         {/if}
         <div class="wanted-row">

@@ -395,3 +395,42 @@ test('restricted series: hidden from collection/list/wanted when includeRestrict
   setSeriesRestricted(db, mature, 0);
   assert.equal(collectionSeries(db, { includeRestricted: false }).length, 2);
 });
+
+test('personal follows are per-user; the monitor flag stays global', async () => {
+  const { setUserFollow } = await import('../src/db.js');
+  const db = openDb(':memory:');
+  const s = upsertSeries(db, { title: 'Saga', url: 'cv:1' });
+  setFollowed(db, s, true); // GLOBAL monitor flag (automation)
+
+  // No personal follow yet: both users see followed=0 but monitored=1.
+  const a = collectionSeries(db, { userId: 1 }).find((r) => r.id === s);
+  assert.equal(a.followed, 0);
+  assert.equal(a.monitored, 1);
+
+  // User 1 follows; user 2 doesn't see it.
+  setUserFollow(db, 1, s, true);
+  assert.equal(collectionSeries(db, { userId: 1 }).find((r) => r.id === s).followed, 1);
+  assert.equal(collectionSeries(db, { userId: 2 }).find((r) => r.id === s).followed, 0);
+
+  // The 'followed' filter is personal too.
+  assert.equal(collectionSeries(db, { userId: 1, filter: 'followed' }).length, 1);
+  assert.equal(collectionSeries(db, { userId: 2, filter: 'followed' }).length, 0);
+
+  // Detail view mirrors it.
+  assert.equal(seriesCollectionDetail(db, s, 1).series.followed, 1);
+  assert.equal(seriesCollectionDetail(db, s, 2).series.followed, 0);
+  assert.equal(seriesCollectionDetail(db, s, 2).series.monitored, 1);
+
+  // A personally-followed but unmonitored, fileless series is still visible
+  // to its follower (collection membership includes personal follows).
+  const quiet = upsertSeries(db, { title: 'Quiet', url: 'cv:2' });
+  setUserFollow(db, 2, quiet, true);
+  assert.ok(collectionSeries(db, { userId: 2 }).find((r) => r.id === quiet), 'follower sees it');
+  assert.ok(!collectionSeries(db, { userId: 1 }).find((r) => r.id === quiet), 'others do not');
+
+  // Unfollow removes it from the personal list without touching the monitor flag.
+  setUserFollow(db, 1, s, false);
+  const after = collectionSeries(db, { userId: 1 }).find((r) => r.id === s);
+  assert.equal(after.followed, 0);
+  assert.equal(after.monitored, 1);
+});
