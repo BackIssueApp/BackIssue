@@ -63,7 +63,7 @@ test('monitor: a completed 0-Day pack imports the missing collection issue', asy
     const mon = createDownloadMonitor({ db, onProgress: (p) => events.push(p) });
     await mon.tick();
     // Saga #2 imported; #1 (owned) and "Not Mine" skipped/unmatched.
-    assert.ok(db.prepare('SELECT 1 FROM library_files WHERE cv_issue_id=2 AND valid=1').get(), 'Saga #2 should be imported');
+    assert.ok(db.prepare('SELECT 1 FROM library_files WHERE cv_issue_id=2 AND valid=1').get(), 'Saga #2 should be imported: ' + JSON.stringify(events.filter((e) => e.event === 'pack-import' || e.event === 'pack-failed')));
     assert.ok(events.some((e) => e.event === 'pack-start'), 'logs a start event');
     assert.ok(events.some((e) => e.event === 'pack-import' && e.outcome === 'imported' && /Saga #2/.test(e.reason)), 'logs the per-import');
     const done = events.find((e) => e.event === 'pack-done');

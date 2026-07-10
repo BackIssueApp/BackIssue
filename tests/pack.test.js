@@ -40,7 +40,7 @@ test('processPack (collection, dry-run): imports missing collection issues, skip
   await cbz(path.join(dir, 'Random Unowned 005 (2026) (digital).cbz'));      // not in collection → unmatched
   const r = await processPack(db, { dir, scope: { type: 'collection' }, dryRun: true });
   assert.equal(r.total, 3);
-  assert.equal(r.imported, 1);   // Saga #2
+  assert.equal(r.imported, 1, JSON.stringify(r.details));   // Saga #2
   assert.equal(r.skipped, 1);    // Saga #1 owned
   assert.equal(r.unmatched, 1);  // Random Unowned
   assert.equal(r.details.find((d) => d.outcome === 'would-import').file, 'Saga 002 (2012) (digital) (Empire).cbz');
@@ -56,7 +56,7 @@ test('processPack (collection): really imports the missing issue into the librar
   try {
     await cbz(path.join(dir, 'Saga 002 (2012) (digital) (Empire).cbz'));
     const r = await processPack(db, { dir, scope: { type: 'collection' }, cvClient: () => { throw new Error('no cv'); } });
-    assert.equal(r.imported, 1);
+    assert.equal(r.imported, 1, JSON.stringify(r.details));
     assert.equal(r.failed, 0);
     // the source pack file is left in place (seeding-safe)
     assert.equal(await fs.access(path.join(dir, 'Saga 002 (2012) (digital) (Empire).cbz')).then(() => true, () => false), true);
@@ -110,7 +110,7 @@ test('processPack: a .cbr file imports (converted to cbz — not "not a .cbr")',
     // A RAR-content .cbr (the case that failed with "not a .cbr") for missing Saga #2.
     await fs.copyFile('tests/fixtures/sample.cbr', path.join(dir, 'Saga 002 (2012) (digital) (Empire).cbr'));
     const r = await processPack(db, { dir, scope: { type: 'collection' }, cvClient: () => { throw new Error('no cv'); } });
-    assert.equal(r.imported, 1);
+    assert.equal(r.imported, 1, JSON.stringify(r.details));
     assert.equal(r.failed, 0);
     assert.ok(db.prepare('SELECT 1 FROM library_files WHERE cv_issue_id=2 AND valid=1').get());
   } finally {
@@ -133,6 +133,6 @@ test('processPack (series scope): forces every file onto one series volume', asy
   // Filename says a different series name, but series-scope pins it to Saga.
   await cbz(path.join(dir, 'Whatever The Pack Is Called 002 (2012).cbz'));
   const r = await processPack(db, { dir, scope: { type: 'series', seriesId: saga }, dryRun: true });
-  assert.equal(r.imported, 1); // matched Saga #2 by number despite the filename series
+  assert.equal(r.imported, 1, JSON.stringify(r.details)); // matched Saga #2 by number despite the filename series
   await fs.rm(dir, { recursive: true, force: true });
 });
