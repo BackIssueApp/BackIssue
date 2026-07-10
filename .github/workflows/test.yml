@@ -19,5 +19,7 @@ jobs:
       - run: npm ci
       # Build the UI FIRST — the server serves frontend/dist (gitignored), and
       # shell-serving tests assert against it.
-      - run: npm ci --prefix frontend && npm run build --prefix frontend
+      # npm install (not ci): the lockfile is generated on Windows and omits
+      # rolldown's per-platform native binding for linux — same as the Dockerfile.
+      - run: npm install --prefix frontend && npm run build --prefix frontend
       - run: npm test
