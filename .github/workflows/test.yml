@@ -19,7 +19,7 @@ jobs:
       - run: npm ci
       # Build the UI FIRST — the server serves frontend/dist (gitignored), and
       # shell-serving tests assert against it.
-      # npm install (not ci): the lockfile is generated on Windows and omits
-      # rolldown's per-platform native binding for linux — same as the Dockerfile.
-      - run: npm install --prefix frontend && npm run build --prefix frontend
+      # Drop the committed lockfile first: generated on Windows, it omits this
+      # platform's native bundler binding (npm/cli#4828) — same as the Dockerfile.
+      - run: rm -f frontend/package-lock.json && npm install --prefix frontend && npm run build --prefix frontend
       - run: npm test
