@@ -17,6 +17,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
-      # The UI must at least build — catches Svelte/compile errors PRs introduce.
+      # Build the UI FIRST — the server serves frontend/dist (gitignored), and
+      # shell-serving tests assert against it.
       - run: npm ci --prefix frontend && npm run build --prefix frontend
+      - run: npm test
