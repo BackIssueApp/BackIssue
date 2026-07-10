@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-07-09
+
 ### Added
 - Personal **API keys** for building your own apps against a BackIssue
   install: generate one key per account from your Profile, send it as
