@@ -1,0 +1,22 @@
+# Run the test suite on every pull request and push to main — the check that
+# branch protection requires before a PR can merge.
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      # The UI must at least build — catches Svelte/compile errors PRs introduce.
+      - run: npm ci --prefix frontend && npm run build --prefix frontend
