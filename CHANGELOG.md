@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-07-10
+
 ### Added
 - New **Download issue metadata** tool (Tools page): fetches ComicVine detail
   — descriptions, credits, dates, covers — for every issue in your collection
