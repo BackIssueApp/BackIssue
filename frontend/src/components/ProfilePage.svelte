@@ -15,6 +15,7 @@
   let email = $state('');
   let apiKey = $state(null);      // { prefix, created_at, last_used } | null
   let freshKey = $state('');      // the raw key, shown once after generation
+  let qrDataUrl = $state('');     // QR of the connection payload for the mobile app
 
   const PROVIDER_LABELS = { whmcs: 'WHMCS', oidc: 'SSO' };
   const providerLabel = (id) => PROVIDER_LABELS[id] || String(id || '').toUpperCase();
@@ -36,7 +37,16 @@
     const r = await apiPost('/api/auth/apikey', {});
     if (r.error) return notify(r.error, 'error');
     freshKey = r.key;
+    renderQr(r.key);
     load();
+  }
+  // QR encodes { u: server origin, k: key } so the mobile app can pair by scan.
+  async function renderQr(key) {
+    try {
+      const QRCode = (await import('qrcode')).default;
+      const payload = JSON.stringify({ u: location.origin, k: key });
+      qrDataUrl = await QRCode.toDataURL(payload, { margin: 1, width: 240 });
+    } catch { qrDataUrl = ''; }
   }
   async function revokeKey() {
     if (!(await confirmDialog({
@@ -123,6 +133,12 @@
             <button class="btn btn--ghost btn--sm" onclick={copyKey}><Icon name="copy" size={14} /> Copy</button>
           </div>
           <p class="modal__note">Copy it now — it won't be shown again.</p>
+          {#if qrDataUrl}
+            <div class="apikey-qr">
+              <img src={qrDataUrl} alt="Pairing QR code" width="200" height="200" />
+              <p class="modal__note">Or scan this in the <b>BackIssue</b> mobile app (Connect → Scan QR) to pair without typing.</p>
+            </div>
+          {/if}
         {:else if apiKey}
           <div class="profile-meta">
             <span><b>Key</b> <code class="mono">{apiKey.prefix}…</code></span>

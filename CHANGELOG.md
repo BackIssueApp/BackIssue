@@ -8,6 +8,10 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+- Profile → API key now shows a **QR code** when you generate a key, so a
+  companion app can pair by scanning it instead of typing the key.
+
 ## [0.6.0] — 2026-07-09
 
 ### Added
