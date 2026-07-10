@@ -1075,6 +1075,14 @@ body.settings .settings-page { display: flex; flex-direction: column; height: 10
   background: rgba(255,255,255,.015);
 }
 
+/* The just-generated API key: shown once, monospace, with a copy button. */
+.apikey-fresh {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border: 1px solid var(--accent); border-radius: 8px;
+  background: rgba(255,255,255,.02);
+}
+.apikey-fresh code { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 12px; }
+
 /* ---------- Profile page ---------- */
 body.profilepage .home { display: none; }
 body.profilepage .profile-page { display: flex; flex-direction: column; height: 100%; }

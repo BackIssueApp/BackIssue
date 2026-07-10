@@ -111,6 +111,16 @@ export function initUserTables(db) {
       PRIMARY KEY (provider, subject)
     );
     CREATE INDEX IF NOT EXISTS idx_extid_user ON external_identities(user_id);
+    -- Personal API keys for third-party clients (one per user — the PK).
+    -- Only the hash is stored; the raw key is shown once at generation. The
+    -- prefix (first chars) is kept so the UI can say WHICH key exists.
+    CREATE TABLE IF NOT EXISTS api_keys (
+      user_id INTEGER PRIMARY KEY,
+      key_hash TEXT NOT NULL UNIQUE,
+      prefix TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+      last_used TEXT
+    );
   `);
   clearRoleCache();
 }
@@ -353,7 +363,49 @@ export function setDisabled(db, id, disabled) {
 
 export function deleteUser(db, id) {
   db.prepare('DELETE FROM sessions WHERE user_id=?').run(id);
+  db.prepare('DELETE FROM api_keys WHERE user_id=?').run(id);
   db.prepare('DELETE FROM users WHERE id=?').run(id);
+}
+
+// ---- API keys ---------------------------------------------------------------
+// A personal credential for third-party clients (reader apps, scripts, …).
+// One key per user; requests made with it act AS that user, so the existing
+// role/permission checks clamp what the key can reach. Independent of the
+// password: changing the password keeps the key, regenerating the key replaces
+// it (the old one stops working immediately).
+
+/** Generate (or regenerate) the user's API key. Returns the RAW key — the only
+ *  time it's available; only its hash is stored. */
+export function createApiKey(db, userId) {
+  const key = 'bi_' + crypto.randomBytes(20).toString('hex');
+  db.prepare(`INSERT INTO api_keys (user_id, key_hash, prefix) VALUES (?, ?, ?)
+              ON CONFLICT(user_id) DO UPDATE SET key_hash=excluded.key_hash,
+                prefix=excluded.prefix,
+                created_at=strftime('%Y-%m-%dT%H:%M:%SZ','now'), last_used=NULL`)
+    .run(userId, tokenHash(key), key.slice(0, 8));
+  return key;
+}
+
+/** API key → user row (same shape as sessionUser), or null. Disabled accounts'
+ *  keys don't resolve. Stamps last_used. */
+export function apiKeyUser(db, key) {
+  if (!key || !String(key).startsWith('bi_')) return null;
+  const row = db.prepare(`
+    SELECT u.id, u.username, u.role, u.disabled FROM api_keys k
+      JOIN users u ON u.id = k.user_id
+     WHERE k.key_hash = ?`).get(tokenHash(key));
+  if (!row || row.disabled) return null;
+  db.prepare("UPDATE api_keys SET last_used=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE user_id=?").run(row.id);
+  return row;
+}
+
+/** What the profile UI shows: the key's prefix + timestamps, never the key. */
+export function apiKeyInfo(db, userId) {
+  return db.prepare('SELECT prefix, created_at, last_used FROM api_keys WHERE user_id=?').get(userId) || null;
+}
+
+export function revokeApiKey(db, userId) {
+  return db.prepare('DELETE FROM api_keys WHERE user_id=?').run(userId).changes > 0;
 }
 
 // ---- sessions -------------------------------------------------------------

@@ -9,6 +9,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 ## [Unreleased]
 
 ### Added
+- Personal **API keys** for building your own apps against a BackIssue
+  install: generate one key per account from your Profile, send it as
+  `X-Api-Key` (or `Authorization: Bearer`), and use the same API the web UI
+  runs on — including plugin routes (e.g. the Reader's page endpoints for an
+  external comic-reader app). A key acts as its user: everything is clamped
+  to the role's permissions, keys are stored hashed and shown once, and
+  regenerating or revoking takes effect immediately.
 - Plugin hook for outbound notification channels (`registerNotifier`): every
   in-app notification event is handed to registered plugin channels. First
   consumer is the new **Notifications Hub** plugin — Discord (rich embeds with

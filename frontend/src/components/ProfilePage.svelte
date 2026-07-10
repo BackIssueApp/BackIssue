@@ -13,6 +13,8 @@
   let { active = false } = $props();
   let profile = $state(null);
   let email = $state('');
+  let apiKey = $state(null);      // { prefix, created_at, last_used } | null
+  let freshKey = $state('');      // the raw key, shown once after generation
 
   const PROVIDER_LABELS = { whmcs: 'WHMCS', oidc: 'SSO' };
   const providerLabel = (id) => PROVIDER_LABELS[id] || String(id || '').toUpperCase();
@@ -21,8 +23,37 @@
   async function load() {
     try { const r = await apiGet('/api/auth/profile'); profile = r.user; email = profile?.email || ''; }
     catch { profile = null; }
+    try { apiKey = (await apiGet('/api/auth/apikey')).key; } catch { apiKey = null; }
   }
   $effect(() => { if (active) load(); });
+
+  async function generateKey() {
+    if (apiKey && !(await confirmDialog({
+      title: 'Replace your API key?',
+      message: 'A new key is generated and the current one stops working immediately. Anything using the old key must be updated.',
+      confirmLabel: 'Replace key', danger: true,
+    }))) return;
+    const r = await apiPost('/api/auth/apikey', {});
+    if (r.error) return notify(r.error, 'error');
+    freshKey = r.key;
+    load();
+  }
+  async function revokeKey() {
+    if (!(await confirmDialog({
+      title: 'Revoke your API key?',
+      message: 'The key stops working immediately. Anything using it loses access.',
+      confirmLabel: 'Revoke key', danger: true,
+    }))) return;
+    const r = await fetch('/api/auth/apikey', { method: 'DELETE' }).then((x) => x.json()).catch(() => ({ error: 'request failed' }));
+    if (r.error) return notify(r.error, 'error');
+    freshKey = '';
+    notify('API key revoked.', 'ok');
+    load();
+  }
+  async function copyKey() {
+    try { await navigator.clipboard.writeText(freshKey); notify('Key copied.', 'ok'); }
+    catch { notify('Copy failed — select and copy it manually.', 'error'); }
+  }
 
   async function saveEmail() {
     const r = await apiPost('/api/auth/email', { email });
@@ -78,6 +109,30 @@
           <button class="btn btn--ghost" onclick={openAccountModal}>Change password</button>
           <button class="btn btn--ghost" onclick={signOutOthers}>Sign out other devices</button>
           <button class="btn btn--ghost btn--danger" onclick={logout}>Sign out</button>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <p class="modal__subhead">API key</p>
+        <p class="modal__note">A personal key for apps and scripts that talk to this BackIssue install
+          — send it as an <code>X-Api-Key</code> header (or <code>Authorization: Bearer</code>).
+          It can do exactly what your account can do, nothing more.</p>
+        {#if freshKey}
+          <div class="apikey-fresh">
+            <code class="mono">{freshKey}</code>
+            <button class="btn btn--ghost btn--sm" onclick={copyKey}><Icon name="copy" size={14} /> Copy</button>
+          </div>
+          <p class="modal__note">Copy it now — it won't be shown again.</p>
+        {:else if apiKey}
+          <div class="profile-meta">
+            <span><b>Key</b> <code class="mono">{apiKey.prefix}…</code></span>
+            <span><b>Created</b> {fmtDate(apiKey.created_at)}</span>
+            <span><b>Last used</b> {fmtDate(apiKey.last_used)}</span>
+          </div>
+        {/if}
+        <div class="profile-actions">
+          <button class="btn btn--ghost" onclick={generateKey}>{apiKey ? 'Replace key' : 'Generate key'}</button>
+          {#if apiKey}<button class="btn btn--ghost btn--danger" onclick={revokeKey}>Revoke</button>{/if}
         </div>
       </section>
 

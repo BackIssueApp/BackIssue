@@ -140,8 +140,14 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       const u = users.sessionUser(db, token);
       if (u) return u;
     }
-    if (readCookie(req, NOBASIC) === '1') return null; // logged out: ignore cached Basic
+    // Personal API key (third-party clients): `X-Api-Key: bi_…` or
+    // `Authorization: Bearer bi_…`. Resolves to the key's user, so the normal
+    // role/permission checks below clamp exactly like an interactive session.
+    // Browsers never attach these headers on their own, so no CSRF exposure.
     const hdr = String(req.headers.authorization || '');
+    const apiKey = String(req.headers['x-api-key'] || (hdr.startsWith('Bearer ') ? hdr.slice(7) : '')).trim();
+    if (apiKey) return users.apiKeyUser(db, apiKey);
+    if (readCookie(req, NOBASIC) === '1') return null; // logged out: ignore cached Basic
     if (hdr.startsWith('Basic ')) {
       const [name, ...rest] = Buffer.from(hdr.slice(6), 'base64').toString().split(':');
       const key = authKey(req, name);
@@ -434,6 +440,22 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   app.post('/api/auth/logout-others', (req, res) => {
     if (!req.user || req.user.id === 0) return res.status(403).json({ error: 'sign in with a real account first' });
     res.json({ cleared: users.destroyOtherSessions(db, req.user.id, readCookie(req)) });
+  });
+  // ---- personal API key (self-service — any signed-in user) ----
+  // One key per user, for third-party clients. Requests made with it act as
+  // this user, permission-clamped by their role like any session. The raw key
+  // is returned ONCE from POST; GET only ever shows the prefix.
+  app.get('/api/auth/apikey', (req, res) => {
+    if (!req.user || req.user.id === 0) return res.json({ key: null });
+    res.json({ key: users.apiKeyInfo(db, req.user.id) });
+  });
+  app.post('/api/auth/apikey', (req, res) => {
+    if (!req.user || req.user.id === 0) return res.status(403).json({ error: 'sign in with a real account first' });
+    res.json({ key: users.createApiKey(db, req.user.id) });
+  });
+  app.delete('/api/auth/apikey', (req, res) => {
+    if (!req.user || req.user.id === 0) return res.status(403).json({ error: 'sign in with a real account first' });
+    res.json({ revoked: users.revokeApiKey(db, req.user.id) });
   });
 
   // ---- user administration (needs users.manage via PERM_RULES) ----
