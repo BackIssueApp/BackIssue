@@ -26,10 +26,13 @@ async function setup() {
   upsertCvSeries(db, { id: 46568, name: 'Saga', publisher: 'Image', start_year: '2012', count_of_issues: 2 });
   upsertCvIssue(db, { id: 1, cv_series_id: 46568, number: '1', name: 'a' });
   upsertCvIssue(db, { id: 2, cv_series_id: 46568, number: '2', name: 'b' });
-  // #1 already owned
-  upsertLibraryFile(db, { path: '/lib/saga1.cbz', dir: '/lib', name: 'saga1.cbz', size: 1, mtime: 1, valid: 1, series_id: saga });
-  linkFileCvIssue(db, '/lib/saga1.cbz', 1);
-  return { db, saga };
+  // #1 already owned. The seeded dir must be a REAL writable tmpdir: imports
+  // land next to a series' existing files, so a fake absolute path like '/lib'
+  // sprays output into the filesystem root (C:\lib on Windows; EACCES on CI).
+  const lib = await fs.mkdtemp(path.join(os.tmpdir(), 'seedlib-'));
+  upsertLibraryFile(db, { path: path.join(lib, 'saga1.cbz'), dir: lib, name: 'saga1.cbz', size: 1, mtime: 1, valid: 1, series_id: saga });
+  linkFileCvIssue(db, path.join(lib, 'saga1.cbz'), 1);
+  return { db, saga, lib };
 }
 
 test('processPack (collection, dry-run): imports missing collection issues, skips owned, ignores others', async () => {

@@ -43,8 +43,11 @@ test('monitor: a completed 0-Day pack imports the missing collection issue', asy
   upsertCvSeries(db, { id: 46568, name: 'Saga', publisher: 'Image', start_year: '2012', count_of_issues: 2 });
   upsertCvIssue(db, { id: 1, cv_series_id: 46568, number: '1', name: 'a' });
   upsertCvIssue(db, { id: 2, cv_series_id: 46568, number: '2', name: 'b' });
-  upsertLibraryFile(db, { path: '/lib/s1.cbz', dir: '/lib', name: 's1.cbz', size: 1, mtime: 1, valid: 1, series_id: saga });
-  linkFileCvIssue(db, '/lib/s1.cbz', 1);
+  // Seed the owned file in a real tmpdir — imports land next to it (a fake
+  // '/lib' path sprayed output into the filesystem root / EACCES'd on CI).
+  const seedLib = await fs.mkdtemp(path.join(os.tmpdir(), 'seedlib-'));
+  upsertLibraryFile(db, { path: path.join(seedLib, 's1.cbz'), dir: seedLib, name: 's1.cbz', size: 1, mtime: 1, valid: 1, series_id: saga });
+  linkFileCvIssue(db, path.join(seedLib, 's1.cbz'), 1);
   const hash = 'abcdef0123456789abcdef0123456789abcdef01';
   recordGrab(db, { source: 'torrent', client: 'qbittorrent', downloadId: hash, category: 'bc', title: '0-Day Week of 2026.06.24', kind: 'pack', seriesId: null });
 
