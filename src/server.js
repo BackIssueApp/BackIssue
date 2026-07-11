@@ -1,6 +1,7 @@
 import express from 'express';
 import compression from 'compression';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import fsp from 'node:fs/promises';
 import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -159,6 +160,51 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     return null;
   };
 
+  // External credential backends (a WHMCS/LDAP plugin) also verify HTTP Basic
+  // credentials — so an OPDS reader, or any Basic client, signs in with the
+  // very same account it uses on the web login form. This runs ONLY after
+  // local Basic verification has already missed (resolveUser returned null)
+  // and a provider is registered. The verified pair is cached for a few
+  // minutes so we don't call the backend on every request (Basic is re-sent on
+  // each one) — mirroring verifyBasicCached for local passwords.
+  const providerBasicCache = new Map(); // name+passwordHash -> { user, until }
+  const verifyBasicViaProviders = async (username, password) => {
+    const ck = `${String(username).toLowerCase()}:${crypto.createHash('sha256').update(String(password)).digest('hex')}`;
+    const hit = providerBasicCache.get(ck);
+    if (hit && hit.until > Date.now()) return hit.user;
+    for (const provider of registeredCredentialProviders()) {
+      let identity = null;
+      try { identity = await provider(String(username || ''), String(password || '')); }
+      catch { /* the provider logs its own errors; treat as no match */ }
+      if (identity && identity.subject) {
+        // Matched this backend: provision/link the local account (same path as
+        // the login form's issueSession, minus the session cookie).
+        let user = null;
+        try { user = users.resolveExternalUser(db, { defaultRole: 'viewer', ...identity }); }
+        catch { user = null; }
+        if (!user || user.disabled) return null;
+        providerBasicCache.set(ck, { user, until: Date.now() + 5 * 60_000 });
+        if (providerBasicCache.size > 500) providerBasicCache.clear(); // crude cap
+        return user;
+      }
+    }
+    return null;
+  };
+  const resolveUserViaProviders = async (req) => {
+    const hdr = String(req.headers.authorization || '');
+    if (!hdr.startsWith('Basic ')) return null;         // only Basic falls through
+    if (readCookie(req, NOBASIC) === '1') return null;   // logged out: ignore cached Basic
+    if (!registeredCredentialProviders().length) return null;
+    const [name, ...rest] = Buffer.from(hdr.slice(6), 'base64').toString().split(':');
+    const key = authKey(req, name);
+    if (users.authBlockedFor(key)) return null;          // respect the lockout; don't probe the backend
+    const user = await verifyBasicViaProviders(name, rest.join(':'));
+    // resolveUser already recorded this key's local-Basic miss for the request;
+    // only a provider SUCCESS needs to clear it. A miss leaves that one failure.
+    if (user) users.authSucceeded(key);
+    return user;
+  };
+
   // ---- permission catalog + per-request resolution -------------------------
   // Every gated action is a named permission (users.CORE_PERMISSIONS plus
   // whatever loaded plugins registered). Roles grant permission sets: the
@@ -278,7 +324,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   app.get('/healthz', (req, res) => res.json({ ok: true }));
 
   const anyUsers = db.prepare('SELECT EXISTS(SELECT 1 FROM users) e');
-  app.use((req, res, next) => {
+  app.use(async (req, res, next) => {
+    // This middleware is async (external credential backends verify Basic
+    // asynchronously), so a thrown error becomes a rejected promise Express 4
+    // won't catch — wrap the body and hand any error to next() ourselves.
+    try {
     // The SPA shell, its assets, and auth endpoints are public — everything
     // under /api and /plugins requires an authenticated user.
     if (!req.path.startsWith('/api') && !req.path.startsWith('/plugins')) return next();
@@ -296,7 +346,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       req.user = { id: 0, username: 'local', role: 'admin' };
       return next();
     }
-    const user = resolveUser(req);
+    // Session cookie / API key / local-password Basic first (synchronous); an
+    // unmatched Basic request then falls through to external credential
+    // backends (WHMCS/LDAP) so those users reach the API and OPDS too.
+    let user = resolveUser(req);
+    if (!user) user = await resolveUserViaProviders(req);
     if (!user) {
       if (wantsBasicChallenge(req)) res.set('WWW-Authenticate', 'Basic realm="BackIssue"');
       return res.status(401).json({ error: 'authentication required' });
@@ -307,6 +361,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       return res.status(403).json({ error: `your role doesn't include the permission: ${label}` });
     }
     next();
+    } catch (err) { next(err); }
   });
 
   // ---- auth endpoints ----
@@ -413,6 +468,12 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     res.json({ ok: true });
   });
   app.post('/api/auth/password', (req, res) => {
+    if (!req.user || req.user.id === 0) return res.status(403).json({ error: 'sign in with a real account first' });
+    // External-login accounts have no local password to change, and setting one
+    // would defeat the provider's access control — say so plainly.
+    if (users.hasExternalIdentity(db, req.user.id)) {
+      return res.status(403).json({ error: 'this account signs in through an external service — its password is managed there' });
+    }
     const { current, next: nextPw } = req.body || {};
     if (!users.verifyCredentials(db, req.user.username, current)) {
       return res.status(400).json({ error: 'current password is wrong' });

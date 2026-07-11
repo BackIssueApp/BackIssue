@@ -438,3 +438,57 @@ test('login falls back to a plugin credential provider and provisions the user',
     assert.equal(admin.status, 200);
   } finally { s.close(); }
 });
+
+test('HTTP Basic falls back to a credential provider (WHMCS/LDAP), so OPDS clients can use those creds', async () => {
+  // OPDS and other machine clients authenticate with HTTP Basic. A verified
+  // external identity from a credential backend must work there too — not just
+  // on the interactive login form.
+  const { clearAuthThrottle } = await import('../src/users.js');
+  clearAuthThrottle();
+  pluginApi.registerCredentialProvider(async (username, password) =>
+    username === 'opds@x.com' && password === 'secret'
+      ? { provider: 'mock-basic-billing', subject: 'basic-1', email: 'opds@x.com', name: 'OpdsUser', defaultRole: 'viewer' }
+      : null);
+  const { app } = makeApp();
+  const s = await listen(app);
+  const base = `http://localhost:${s.address().port}`;
+  try {
+    // Close open mode so auth is enforced.
+    const reg = await fetch(`${base}/api/auth/register`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: 'admin', password: 'adminpass1' }),
+    });
+    const adminH = { cookie: cookieOf(reg), 'content-type': 'application/json' };
+
+    // No credentials → 401.
+    assert.equal((await fetch(`${base}/api/series`)).status, 401);
+    // Wrong remote password over Basic → local miss, provider returns null → 401.
+    const badB = 'Basic ' + Buffer.from('opds@x.com:nope').toString('base64');
+    assert.equal((await fetch(`${base}/api/series`, { headers: { authorization: badB } })).status, 401);
+    // Correct remote creds over Basic → provider verifies, account is
+    // provisioned, and the read (needs library.view; viewer has it) is allowed.
+    const okB = 'Basic ' + Buffer.from('opds@x.com:secret').toString('base64');
+    assert.equal((await fetch(`${base}/api/series`, { headers: { authorization: okB } })).status, 200);
+    // The provisioned viewer still can't reach an admin surface.
+    assert.equal((await fetch(`${base}/api/settings`, { headers: { authorization: okB } })).status, 403);
+
+    // The provisioned WHMCS account must NOT be able to gain a local password —
+    // otherwise it could keep signing in after its subscription lapsed.
+    const list = await (await fetch(`${base}/api/users`, { headers: adminH })).json();
+    const extUser = list.users.find((u) => u.providers?.includes('mock-basic-billing'));
+    assert.ok(extUser, 'the external account is listed with its provider');
+    // Admin set-password on it is refused…
+    const adminSet = await fetch(`${base}/api/users/${extUser.id}`, {
+      method: 'PATCH', headers: adminH, body: JSON.stringify({ password: 'admin-set-one' }),
+    });
+    assert.equal(adminSet.status, 400);
+    assert.match((await adminSet.json()).error, /external service/);
+    // …and self-service change-password over its own Basic session is refused too.
+    const selfSet = await fetch(`${base}/api/auth/password`, {
+      method: 'POST', headers: { authorization: okB, 'content-type': 'application/json' },
+      body: JSON.stringify({ current: 'secret', next: 'self-set-one' }),
+    });
+    assert.equal(selfSet.status, 403);
+    assert.match((await selfSet.json()).error, /external service/);
+  } finally { clearAuthThrottle(); s.close(); }
+});

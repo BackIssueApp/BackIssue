@@ -19,6 +19,9 @@
 
   const PROVIDER_LABELS = { whmcs: 'WHMCS', oidc: 'SSO' };
   const providerLabel = (id) => PROVIDER_LABELS[id] || String(id || '').toUpperCase();
+  // Accounts that sign in through an external service (SSO/OIDC, billing, …)
+  // don't have a local password — it's managed by that provider.
+  const isExternal = $derived((profile?.providers || []).length > 0);
   const fmtDate = (s) => (s ? new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—');
 
   async function load() {
@@ -116,10 +119,15 @@
           </div>
         {/if}
         <div class="profile-actions">
-          <button class="btn btn--ghost" onclick={openAccountModal}>Change password</button>
+          {#if !isExternal}
+            <button class="btn btn--ghost" onclick={openAccountModal}>Change password</button>
+          {/if}
           <button class="btn btn--ghost" onclick={signOutOthers}>Sign out other devices</button>
           <button class="btn btn--ghost btn--danger" onclick={logout}>Sign out</button>
         </div>
+        {#if isExternal}
+          <p class="modal__note">You sign in through {profile.providers.map(providerLabel).join(', ')}, so your password is managed there — not here.</p>
+        {/if}
       </section>
 
       <section class="settings-section">

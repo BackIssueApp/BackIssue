@@ -8,6 +8,20 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Changed
+- External login backends (credential-provider plugins) now also verify
+  **HTTP Basic** credentials, not just the web login form — so users who sign
+  in with those credentials can reach the API and **OPDS** with them too. A
+  verified pair is cached briefly so the backend isn't called on every
+  request, and the login lockout still applies.
+
+### Security
+- Accounts that sign in through an external service can no longer be given a
+  **local password** — neither by the user (Change password is hidden and the
+  endpoint refuses) nor by an admin. Access stays governed by the provider, so
+  revoking it there (e.g. a lapsed subscription) reliably locks the account
+  out, with no local password left as a back door.
+
 ## [0.6.1] — 2026-07-10
 
 ### Added

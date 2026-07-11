@@ -149,6 +149,14 @@ export function linkExternalIdentity(db, provider, subject, userId) {
     .run(String(provider), String(subject), userId);
 }
 
+/** Does this account sign in through an external provider (SSO/OIDC, WHMCS, …)?
+ *  Such accounts must not hold a local password — their access is governed by
+ *  the provider, so a local password would let them keep signing in after the
+ *  provider has cut them off (e.g. a lapsed subscription). */
+export function hasExternalIdentity(db, id) {
+  return !!db.prepare('SELECT 1 FROM external_identities WHERE user_id = ?').get(id);
+}
+
 // Create a user with no usable password — they authenticate via their external
 // provider. A unique username is derived from the requested one.
 export function createExternalUser(db, { username, email, role = 'viewer' }) {
@@ -344,6 +352,13 @@ export function verifyCredentials(db, username, password) {
 }
 
 export function setPassword(db, id, password) {
+  // An externally-provisioned account (WHMCS/SSO) must never gain a local
+  // password: it would let them bypass the provider's own access control and
+  // keep signing in after the provider stopped vouching for them. The single
+  // choke point for BOTH self-service change-password and admin set-password.
+  if (hasExternalIdentity(db, id)) {
+    throw new Error('this account signs in through an external service — it can’t have a local password');
+  }
   if (String(password || '').length < 8) throw new Error('password must be at least 8 characters');
   db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hashPassword(password), id);
   // password change invalidates every session except none — callers decide;

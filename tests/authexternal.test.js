@@ -37,6 +37,25 @@ test('an auto-provisioned external user cannot log in with a password', () => {
   assert.equal(users.verifyCredentials(d, u.username, 'anything'), null);
 });
 
+test('setPassword refuses external accounts (so an expired provider truly locks them out)', () => {
+  const d = freshDb();
+  // A plain local account can set/change its password.
+  const local = users.createUser(d, { username: 'localguy', password: 'password1', role: 'viewer' });
+  users.setPassword(d, local.id, 'a-new-strong-one');
+  assert.ok(users.verifyCredentials(d, 'localguy', 'a-new-strong-one'), 'local password change works');
+
+  // A WHMCS-provisioned account cannot — no local password may be set on it.
+  const ext = users.resolveExternalUser(d, { provider: 'whmcs', subject: '99', email: 'w@x.com', name: 'W', defaultRole: 'viewer' });
+  assert.equal(users.hasExternalIdentity(d, ext.id), true);
+  assert.throws(() => users.setPassword(d, ext.id, 'sneaky-password'), /external service/);
+  assert.equal(users.verifyCredentials(d, ext.username, 'sneaky-password'), null, 'still no usable local password');
+
+  // Linking an external identity onto a formerly-local account also freezes it.
+  d.prepare('UPDATE users SET email=? WHERE id=?').run('localguy@x.com', local.id);
+  users.resolveExternalUser(d, { provider: 'whmcs', subject: '100', email: 'localguy@x.com' });
+  assert.throws(() => users.setPassword(d, local.id, 'another-strong-one'), /external service/);
+});
+
 test('defaultRole is honored for auto-provisioned users, and subject is required', () => {
   const d = freshDb();
   const u = users.resolveExternalUser(d, { provider: 'oidc', subject: 's2', email: 'd@x.com', defaultRole: 'admin' });
