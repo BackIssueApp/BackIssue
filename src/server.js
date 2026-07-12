@@ -247,6 +247,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     [/^\/api\/lists/, 'library.view'],
     // Personal follows likewise: each user curates their own pull list.
     [/^\/api\/collection\/\d+\/follow$/, 'library.view'],
+    // The download queue is download-pipeline visibility, not general library
+    // data — a read-only viewer shouldn't see what others are grabbing. Reading
+    // the queue needs downloads.grab, same as the /queue view in the web UI.
+    // ($-anchored so it gates only the GET list, not queue/cancel|retry|pause…)
+    [/^\/api\/queue$/, 'downloads.grab'],
   ];
   const DOWNLOAD_RULES = [
     /^\/api\/collection\/\d+\/(download|redownload)$/,

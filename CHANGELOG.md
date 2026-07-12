@@ -21,6 +21,10 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   endpoint refuses) nor by an admin. Access stays governed by the provider, so
   revoking it there (e.g. a lapsed subscription) reliably locks the account
   out, with no local password left as a back door.
+- Viewing the **download queue** now requires the `downloads.grab` permission.
+  Previously any signed-in user could read `/api/queue`; a read-only viewer
+  shouldn't see what others are downloading. (The web UI already hid the queue
+  view — this enforces it at the API.)
 
 ## [0.6.1] — 2026-07-10
 
