@@ -15,6 +15,14 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   verified pair is cached briefly so the backend isn't called on every
   request, and the login lockout still applies.
 
+### Fixed
+- **"-1" issues** (the Marvel Flashback minus-one issues) can now be found and
+  downloaded. Search read `-1` as `1`, so the query dropped the number and every
+  result came back as the wrong issue. The release parser now treats a
+  standalone leading minus as the issue number — a hyphen inside a series name
+  (*X-23*, *Spider-Man*) is unaffected — and the search query keeps the `-1`.
+  Fixes matching across Usenet, torrents, and AirDC++.
+
 ### Security
 - Accounts that sign in through an external service can no longer be given a
   **local password** — neither by the user (Change password is hidden and the

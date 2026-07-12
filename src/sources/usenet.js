@@ -36,7 +36,10 @@ export function parseReleaseName(title) {
     .replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')
     .replace(/_+/g, ' ')
     .replace(/(?<!\d)\.|\.(?!\d)/g, ' ');
-  const nums = cleaned.match(/\d+(?:\.\d+)?/g);
+  // Capture an optional leading minus for the "-1" (Flashback) issues, but ONLY
+  // when it's a standalone token — a "-" glued to a word char is a hyphenated
+  // series name (X-23, Spider-Man), not a negative issue number.
+  const nums = cleaned.match(/(?<!\w)-?\d+(?:\.\d+)?/g);
   let number = null, series = cleaned;
   if (nums) {
     const last = nums[nums.length - 1];
@@ -86,10 +89,15 @@ export function suspiciouslySmall(size) {
 }
 
 // The zero-padded issue token, or '' for fractional/special numbers (query stays
-// broad and the strict matcher filters).
+// broad and the strict matcher filters). A negative "-1" issue is searchable as
+// a literal token (releases name it "-1", not "-001"), so it keeps its sign and
+// isn't padded — without it the query would fall back to the bare series name
+// and never surface the issue.
 export function issueToken(issue) {
   const norm = normalizeNumber(issue?.issue_number);
-  return /^\d+$/.test(norm) ? norm.padStart(3, '0') : '';
+  if (/^\d+$/.test(norm)) return norm.padStart(3, '0');
+  if (/^-\d+$/.test(norm)) return norm; // "-1" stays "-1"
+  return '';
 }
 
 export function buildQuery(ctx) {

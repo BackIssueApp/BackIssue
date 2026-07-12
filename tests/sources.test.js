@@ -123,6 +123,20 @@ test('usenet parseReleaseName: series / number / year', () => {
   // decimal issue numbers survive (the ½ promo / point-ones): dot between digits kept
   assert.deepEqual(parseReleaseName('Spider-Man 000.5 (1998) (Marvel-Wizard)'), { series: 'Spider-Man', number: '0.5', year: '1998' });
   assert.deepEqual(parseReleaseName('Amazing Spider-Man 001.1 (2014)'), { series: 'Amazing Spider-Man', number: '1.1', year: '2014' });
+  // "-1" (Marvel Flashback) issues: the leading minus is the issue number...
+  assert.deepEqual(parseReleaseName('X-Men -1 (1997)'), { series: 'X-Men', number: '-1', year: '1997' });
+  // ...but a hyphen inside a series name (X-23) is NOT mistaken for a negative.
+  assert.deepEqual(parseReleaseName('X-23 5 (2010)'), { series: 'X-23', number: '5', year: '2010' });
+});
+
+test('usenet: "-1" (Flashback) issues are searchable and matched, not confused with #1', () => {
+  // the query carries the literal -1, not just the broad series name
+  assert.equal(buildQuery({ seriesTitle: 'X-Men', issue: { issue_number: '-1' } }), 'X-Men -1');
+  const want = { series: 'X-Men', names: ['X-Men'], number: '-1', year: '1991' };
+  assert.notEqual(scoreRelease('X-Men -1 (1997) (Digital)', want), null); // the -1 release matches
+  assert.equal(scoreRelease('X-Men 001 (1991)', want), null);             // #1 is not #-1
+  // and a want for #1 is NOT satisfied by the -1 release
+  assert.equal(scoreRelease('X-Men -1 (1997)', { series: 'X-Men', names: ['X-Men'], number: '1' }), null);
 });
 
 test('usenet scoreRelease: fractional issue numbers match (½ / 1/2 / 0.5 / 000.5)', () => {
