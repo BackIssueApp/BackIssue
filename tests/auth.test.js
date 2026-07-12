@@ -98,6 +98,8 @@ test('roles gate routes: viewer is read-only (no download or mutate); admin rout
     assert.equal(dl.status, 403, 'viewer may not queue downloads');
     // viewer: the download queue is download-pipeline visibility → 403
     assert.equal((await fetch(`${base}/api/queue`, { headers: V })).status, 403, 'viewer may not view the download queue');
+    // viewer: import/download history exposes the source → 403
+    assert.equal((await fetch(`${base}/api/history`, { headers: V })).status, 403, 'viewer may not view download history');
     // viewer: library mutation → 403
     const mut = await fetch(`${base}/api/collection/bulk`, { method: 'POST', headers: V, body: '{"ids":[],"action":"follow"}' });
     assert.equal(mut.status, 403);
@@ -183,6 +185,7 @@ test('custom roles: explicit permission sets gate exactly what they name', async
     const grab = await fetch(`${base}/api/redownload`, { method: 'POST', headers: dlH, body: '{"issueIds":[]}' });
     assert.notEqual(grab.status, 403, 'downloads.grab grants download POSTs');
     assert.equal((await fetch(`${base}/api/queue`, { headers: dlH })).status, 200, 'downloads.grab grants queue visibility');
+    assert.equal((await fetch(`${base}/api/history`, { headers: dlH })).status, 200, 'downloads.grab grants history visibility');
     const mut = await fetch(`${base}/api/collection/bulk`, { method: 'POST', headers: dlH, body: '{"ids":[],"action":"follow"}' });
     assert.equal(mut.status, 403, 'no library.manage → mutations blocked');
     assert.equal((await fetch(`${base}/api/settings`, { headers: dlH })).status, 403);

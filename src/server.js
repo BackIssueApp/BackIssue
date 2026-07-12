@@ -252,6 +252,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     // the queue needs downloads.grab, same as the /queue view in the web UI.
     // ($-anchored so it gates only the GET list, not queue/cancel|retry|pause…)
     [/^\/api\/queue$/, 'downloads.grab'],
+    // Import/download history exposes the download source (e.g. which indexer or
+    // client fetched each issue) — download-pipeline detail a read-only viewer
+    // shouldn't see. Covers /api/history and /api/history/failed. The web UI
+    // already gates its /history view behind the same permission.
+    [/^\/api\/history/, 'downloads.grab'],
   ];
   const DOWNLOAD_RULES = [
     /^\/api\/collection\/\d+\/(download|redownload)$/,

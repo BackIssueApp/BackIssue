@@ -25,6 +25,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   Previously any signed-in user could read `/api/queue`; a read-only viewer
   shouldn't see what others are downloading. (The web UI already hid the queue
   view — this enforces it at the API.)
+- Viewing the **download history** (`/api/history`) now likewise requires
+  `downloads.grab` — it exposes the download source per issue, which a
+  read-only viewer shouldn't see.
 
 ## [0.6.1] — 2026-07-10
 
