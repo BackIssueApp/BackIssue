@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>BackIssue</Name>
+  <Repository>ghcr.io/backissueapp/backissue:latest</Repository>
+  <Registry>https://ghcr.io/backissueapp/backissue</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://backissue.app</Support>
+  <Project>https://backissue.app</Project>
+  <Overview>BackIssue is a self-hosted comic library manager. Track the comic series you want, download new issues automatically as they release, tag them with metadata, and keep everything organized on disk. ComicVine is the source of truth for every comic's identity; download sources (Usenet, torrents, and more) are added as plugins from an in-app catalog. On first run it walks you through creating an admin account and picking plugins.&#13;&#13;Unraid setup: map your comics library to the container (default /comics), then in BackIssue open Settings &gt; Library and add /comics as a root folder.</Overview>
+  <Category>MediaApp:Books Downloaders:</Category>
+  <WebUI>http://[IP]:[PORT:8787]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/BackIssueApp/BackIssue/main/templates/backissue.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/BackIssueApp/BackIssue/main/templates/backissue-icon.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="WebUI Port" Target="8787" Default="8787" Mode="tcp" Description="Port for the BackIssue web interface." Type="Port" Display="always" Required="true" Mask="false">8787</Config>
+  <Config Name="App Data" Target="/data" Default="/mnt/user/appdata/backissue" Mode="rw" Description="Database, settings, and app state. Keep this on appdata." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/backissue</Config>
+  <Config Name="Comics Library" Target="/comics" Default="/mnt/user/comics" Mode="rw" Description="Your comics library on disk. In BackIssue: Settings &gt; Library, add /comics as a root folder." Type="Path" Display="always" Required="false" Mask="false">/mnt/user/comics</Config>
+  <Config Name="Downloads (optional)" Target="/downloads" Default="" Mode="rw" Description="Only needed if a separate download client (SABnzbd/qBittorrent) writes completed files that BackIssue must read at the same path. Leave unset otherwise." Type="Path" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Trust Proxy" Target="TRUST_PROXY" Default="" Mode="" Description="Set to 1 (or your proxy subnet) when running behind a reverse proxy, so real client IPs and Secure cookies work. Leave blank for a direct connection." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="User ID the app runs as — files it writes to your shares are owned by this user. Unraid default is 99 (nobody)." Type="Variable" Display="advanced" Required="false" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Group ID the app runs as. Unraid default is 100 (users)." Type="Variable" Display="advanced" Required="false" Mask="false">100</Config>
+  <Config Name="UMASK" Target="UMASK" Default="022" Mode="" Description="Permission mask for new files (022 = files 644, dirs 755)." Type="Variable" Display="advanced" Required="false" Mask="false">022</Config>
+</Container>

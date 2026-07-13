@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Maintainer>
+  <Icon>https://raw.githubusercontent.com/BackIssueApp/BackIssue/main/templates/backissue-icon.png</Icon>
+  <Profile>BackIssue is a self-hosted comic library manager. Track the series you want, download new issues automatically as they release, tag them with metadata from ComicVine, and keep everything organized on disk. Download sources such as Usenet and torrents are added as plugins from an in-app catalog. Maintained by the BackIssue project.</Profile>
+  <WebPage>https://backissue.app</WebPage>
+</Maintainer>
