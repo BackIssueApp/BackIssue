@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.6.2] — 2026-07-12
+
 ### Changed
 - External login backends (credential-provider plugins) now also verify
   **HTTP Basic** credentials, not just the web login form — so users who sign
