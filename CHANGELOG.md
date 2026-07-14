@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.6.3] — 2026-07-13
+
 ### Added
 - **Unraid** — BackIssue can now be installed straight from the **Apps** tab. The
   repository ships a Community Applications template (`templates/backissue.xml`)
