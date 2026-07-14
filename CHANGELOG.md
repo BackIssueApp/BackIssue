@@ -13,6 +13,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   repository ships a Community Applications template (`templates/backissue.xml`)
   with the paths, ports, and permissions pre-mapped, plus a `ca_profile.xml`.
 
+### Fixed
+- **Add indexer** in Settings opens its dialog again. The indexer modal was never
+  mounted, so the "Add indexer" button — and the per-row Edit button, for both
+  Newznab and Torznab — did nothing.
+
 ## [0.6.2] — 2026-07-12
 
 ### Changed

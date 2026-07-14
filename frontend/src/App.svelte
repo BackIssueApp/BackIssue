@@ -35,6 +35,7 @@
 import EditMetadataModal from './components/EditMetadataModal.svelte';
   import SourceSearchModal from './components/SourceSearchModal.svelte';
   import PackSearchModal from './components/PackSearchModal.svelte';
+  import IndexerModal from './components/IndexerModal.svelte';
   import DialogModal from './components/DialogModal.svelte';
   import Onboarding from './components/Onboarding.svelte';
   import Toasts from './components/Toasts.svelte';
@@ -192,6 +193,7 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
 <EditMetadataModal />
 <SourceSearchModal />
 <PackSearchModal />
+<IndexerModal />
 <DialogModal />
 <Onboarding />
 
