@@ -286,3 +286,29 @@ test('importMetaForFolder: CBR-only folders return null (no in-memory RAR reads)
   const meta = await importMetaForFolder(['/lib/X/a.cbr', '/lib/X/b.cbr']);
   assert.equal(meta, null);
 });
+
+test('importMetaForFolder extracts ComicVine ids from Web and Notes tags', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'imeta-'));
+  const mk = async (file, extra) => writeCbz(path.join(dir, file), {
+    'ComicInfo.xml': `<?xml version="1.0"?><ComicInfo><Series>S</Series>${extra}</ComicInfo>`, '001.jpg': 'x',
+  });
+  // Volume URL in Web → direct volume id.
+  await mk('a.cbz', '<Web>https://comicvine.gamespot.com/x-men/4050-2133/</Web>');
+  assert.equal((await importMetaForFolder([path.join(dir, 'a.cbz')])).cvVolumeId, 2133);
+  // Issue URL in Web → issue id.
+  await mk('b.cbz', '<Web>https://comicvine.gamespot.com/x-men-1/4000-12345/</Web>');
+  assert.equal((await importMetaForFolder([path.join(dir, 'b.cbz')])).cvIssueId, 12345);
+  // ComicTagger-style Notes.
+  await mk('c.cbz', '<Notes>Tagged with ComicTagger 1.6.0 using info from Comic Vine [CVDB98765]</Notes>');
+  assert.equal((await importMetaForFolder([path.join(dir, 'c.cbz')])).cvIssueId, 98765);
+  // Mylar/Kapowarr-style Notes.
+  await mk('d.cbz', '<Notes>Tagged. Issue ID 55555</Notes>');
+  assert.equal((await importMetaForFolder([path.join(dir, 'd.cbz')])).cvIssueId, 55555);
+  // No breadcrumbs → no id fields, series still returned.
+  await mk('e.cbz', '');
+  const plain = await importMetaForFolder([path.join(dir, 'e.cbz')]);
+  assert.equal(plain.series, 'S');
+  assert.equal(plain.cvVolumeId, undefined);
+  assert.equal(plain.cvIssueId, undefined);
+  await fs.rm(dir, { recursive: true, force: true });
+});

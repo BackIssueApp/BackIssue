@@ -50,7 +50,11 @@ export function parseComicInfo(xml) {
   try {
     const $ = load(xml, { xmlMode: true });
     const g = (t) => { const v = $(t).first().text().trim(); return v || null; };
-    return { series: g('Series'), number: g('Number'), volume: g('Volume'), title: g('Title'), count: g('Count'), publisher: g('Publisher'), year: g('Year') };
+    return { series: g('Series'), number: g('Number'), volume: g('Volume'), title: g('Title'), count: g('Count'), publisher: g('Publisher'), year: g('Year'),
+      // Where taggers leave ComicVine breadcrumbs: Web is the CV detail URL,
+      // Notes carries the id (ComicTagger's "[CVDB123]", Kapowarr/Mylar's
+      // "Issue ID 123"). Used by the import scan's exact-match fast path.
+      web: g('Web'), notes: g('Notes') };
   } catch { return null; }
 }
 

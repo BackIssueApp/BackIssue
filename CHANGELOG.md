@@ -22,8 +22,10 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   `ComicInfo.xml` from tagged CBZ files (Mylar, ComicTagger, Kapowarr): the
   tagged series name drives the ComicVine search, and the tagged volume year
   and publisher sharpen match ranking — so a tagged library matches correctly
-  even when folder names are ambiguous. Folder names remain the fallback for
-  untagged files.
+  even when folder names are ambiguous. Better yet, when the tagger left a
+  ComicVine id behind (the `Web` link, or "[CVDB…]" / "Issue ID …" in Notes),
+  the volume is matched **exactly** by id — no name search, no ambiguity —
+  and auto-accepted. Folder names remain the fallback for untagged files.
 - **Mylar-style folder layouts import correctly.** Libraries organized as
   `Publisher/Series/Volume (year)` (e.g. `Marvel/X-Men/v2004`) previously
   matched against the volume folder's name ("V2004") instead of the series.

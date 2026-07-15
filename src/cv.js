@@ -127,11 +127,13 @@ export function makeCvClient(config, { fetchImpl, key, politeMs } = {}) {
   // issue, ever) for issues we own; feeds the metadata tagger.
   async function issue(id) {
     const enrich = config.cvEnrich ? '&enrich=metron' : '';
-    const data = await call(`/issue/${ISSUE_PREFIX}-${id}/?field_list=id,name,issue_number,cover_date,store_date,description,person_credits,character_credits,team_credits,location_credits,story_arc_credits,associated_images,site_detail_url,image${enrich}`);
+    const data = await call(`/issue/${ISSUE_PREFIX}-${id}/?field_list=id,name,issue_number,volume,cover_date,store_date,description,person_credits,character_credits,team_credits,location_credits,story_arc_credits,associated_images,site_detail_url,image${enrich}`);
     await sleep(pace);
     const r = data.results || {};
     return {
       id: r.id, number: r.issue_number ?? null, name: r.name ?? null,
+      // The owning volume — lets an embedded issue id resolve to its series.
+      volume: r.volume ? { id: r.volume.id, name: r.volume.name ?? null } : null,
       cover_date: r.cover_date ?? null, store_date: r.store_date ?? null,
       description: r.description ?? null,
       site_detail_url: r.site_detail_url ?? null,

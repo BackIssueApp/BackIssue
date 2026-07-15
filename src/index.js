@@ -376,11 +376,22 @@ async function runImportScan({ fresh = false } = {}) {
         const year = extractYear(g.seriesName) || meta?.year || null;
         const publisher = meta?.publisher || g.publisher;
         let cand = null, confidence = 'none';
+        // Fast path: a ComicVine id embedded by the tagger IS the identity — no
+        // name search, no ranking, no ambiguity. A volume id is used directly;
+        // an issue id resolves to its volume with one extra call. Any failure
+        // here (stale id, CV hiccup) just falls back to the name search.
+        if (meta?.cvVolumeId || meta?.cvIssueId) {
+          try {
+            const volId = meta.cvVolumeId || (await client.issue(meta.cvIssueId))?.volume?.id;
+            const v = volId ? await client.volume(volId) : null;
+            if (v?.id) { cand = { id: v.id, name: v.name, start_year: v.start_year, image_url: v.image_url }; confidence = 'high'; }
+          } catch (e) { console.warn('import scan: embedded CV id lookup failed for', name, e?.message || e); }
+        }
         // A bulk scan fires hundreds of CV searches — transient failures (rate
         // limits) are expected. Retry with backoff; only after all attempts fail
         // mark the row 'error' so a failed search is never mistaken for a real
         // "ComicVine has no such volume".
-        for (let attempt = 1; attempt <= 3; attempt++) {
+        for (let attempt = 1; attempt <= 3 && !cand; attempt++) {
           try {
             const results = await client.search(name);
             const { best } = rankCandidates({ title: name, year, publisher }, results);

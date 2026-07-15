@@ -117,10 +117,29 @@ export async function importMetaForFolder(filePaths, { readInfo = readArchiveInf
       const ci = (await readInfo(p))?.comicInfo;
       if (!ci?.series) continue; // untagged or corrupt — try the next file
       const volYear = /^(?:19|20)\d{2}$/.test(String(ci.volume || '').trim()) ? String(ci.volume).trim() : null;
-      return { series: ci.series, year: volYear, publisher: ci.publisher || null };
+      return { series: ci.series, year: volYear, publisher: ci.publisher || null, ...comicVineIds(ci) };
     } catch { /* unreadable file — try the next */ }
   }
   return null;
+}
+
+// ComicVine ids left behind by taggers — an exact identity, better than any
+// name search. The Web tag is the CV detail URL (4050-… volume, 4000-… issue);
+// Notes carries the issue id as ComicTagger's "[CVDB123]" or Mylar/Kapowarr's
+// "Issue ID 123". Returns { cvVolumeId?, cvIssueId? } (numbers, or absent).
+function comicVineIds(ci) {
+  const out = {};
+  const web = String(ci.web || '');
+  const volM = web.match(/\/4050-(\d+)/);
+  if (volM) out.cvVolumeId = Number(volM[1]);
+  const issM = web.match(/\/4000-(\d+)/);
+  if (issM) out.cvIssueId = Number(issM[1]);
+  if (!out.cvIssueId) {
+    const notes = String(ci.notes || '');
+    const m = notes.match(/\[CVDB\s*(\d+)\]/i) || notes.match(/\bIssue\s*ID\s*[:#]?\s*(\d+)/i);
+    if (m) out.cvIssueId = Number(m[1]);
+  }
+  return out;
 }
 
 // List series-level folders, including empty ones. The depth of series folders
