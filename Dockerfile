@@ -44,24 +44,33 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV DATA_DIR=/data
 ENV PLUGINS_DIR=/data/plugins
-# Build provenance: release builds leave the defaults; dev/nightly builds pass
-# BUILD_CHANNEL (+ commit sha) so the app reports e.g. "0.5.0-dev.a1b2c3d".
-ARG BUILD_CHANNEL=release
-ARG BUILD_SHA=""
-ENV BUILD_CHANNEL=$BUILD_CHANNEL
-ENV BUILD_SHA=$BUILD_SHA
 
 # Everything the server reads at runtime: prod deps, the server, its version
 # (from package.json), the built UI, and the entrypoint. Plugins live on the
 # mounted /data volume (PLUGINS_DIR), so none are baked in.
+#
+# Layers are ordered by how often they change, least-often first, so a routine
+# code push republishes only the small tail layers and `docker pull` reports
+# the fat ones as "Already exists": node_modules (changes only with the
+# lockfile) → entrypoint → package.json (per release) → src (per commit) →
+# dist (per build). The per-build ARG/ENV stamps live at the BOTTOM of this
+# file: an ARG that changes every commit placed above these COPYs busts their
+# cache and forces users to re-download the whole image on every update.
 COPY --from=build /app/node_modules ./node_modules
+# Normalize entrypoint line endings (repo may be checked out CRLF) + executable.
+COPY docker ./docker
+RUN sed -i 's/\r$//' docker/entrypoint.sh && chmod +x docker/entrypoint.sh
 COPY package.json ./
 COPY src ./src
-COPY docker ./docker
 COPY --from=build /app/frontend/dist ./frontend/dist
 
-# Normalize entrypoint line endings (repo may be checked out CRLF) + executable.
-RUN sed -i 's/\r$//' docker/entrypoint.sh && chmod +x docker/entrypoint.sh
+# Build provenance: release builds leave the defaults; dev/nightly builds pass
+# BUILD_CHANNEL (+ commit sha) so the app reports e.g. "0.5.0-dev.a1b2c3d".
+# Zero-byte config layers — declared last, see the layer-order note above.
+ARG BUILD_CHANNEL=release
+ARG BUILD_SHA=""
+ENV BUILD_CHANNEL=$BUILD_CHANNEL
+ENV BUILD_SHA=$BUILD_SHA
 
 # Persisted data on the mounted volume: db, settings, downloads, tag staging,
 # AND installed plugins — so catalog plugins survive image updates and are

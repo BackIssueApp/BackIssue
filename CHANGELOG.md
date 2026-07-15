@@ -9,6 +9,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 ## [Unreleased]
 
 ### Fixed
+- **Image updates no longer re-download the whole image.** A per-commit build
+  stamp sat above the dependency layer in the Dockerfile, changing every
+  layer's identity on every build — so each `docker compose pull` fetched
+  ~the full image even for a one-line change. Layers are now ordered by how
+  often they change, with the build stamp last: after the first pull of a
+  fixed image, routine updates download only a few MB.
 - **Usenet imports survive extra or mislabeled files in the finished download.**
   A damaged leftover archive (e.g. a stray `.rar` part) sitting next to the real
   comic could be picked first and fail the whole import with "Archive header or
