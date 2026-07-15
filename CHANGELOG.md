@@ -8,6 +8,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+- **Usenet download cleanup** — when the download client refuses to remove a
+  finished download, it's now logged instead of failing silently, and SABnzbd's
+  history delete is checked for a logical failure. Completed files that weren't
+  being removed now surface a reason in the log.
+
 ## [0.6.3] — 2026-07-13
 
 ### Added

@@ -18,6 +18,18 @@ import { startJob } from './jobs.js';
 
 const grabbedAtMs = (s) => Date.parse(String(s).replace(' ', 'T') + 'Z');
 
+// Remove a finished/failed download from its client, deleting the files. Logs
+// failures instead of silently swallowing them, so a client that refuses the
+// delete (auth, permissions, a logical error) is visible rather than leaving
+// files to pile up.
+async function cleanup(client, downloadId, why, grabId) {
+  try {
+    await client.remove(downloadId, { deleteFiles: true });
+  } catch (e) {
+    console.warn(`download monitor: client cleanup (${why}) failed for grab ${grabId}:`, e?.message || e);
+  }
+}
+
 // Import a finished pack: post-process its folder, importing every wanted, still-
 // missing issue. A per-series pack (series_id set) forces one volume; a 0-day pack
 // (series_id null) matches across the whole collection. Left in the client to seed.
@@ -38,7 +50,7 @@ async function handlePackGrab({ db, grab, item, client, policy, source, cvClient
     if (item.state === 'failed') {
       setGrabStatus(db, grab.id, 'failed', { error: item.error || 'client reported failure' });
       onProgress({ event: 'pack-failed', source, title: grab.title, seriesId: grab.series_id ?? null, error: item.error || 'download failed' });
-      if (policy.removeOnFailed) await client.remove(grab.download_id, { deleteFiles: true }).catch(() => {});
+      if (policy.removeOnFailed) await cleanup(client, grab.download_id, 'failed', grab.id);
       return;
     }
     if (item.state === 'done') {
@@ -58,7 +70,7 @@ async function handlePackGrab({ db, grab, item, client, policy, source, cvClient
       job.finish({ imported: summary.imported, skipped: summary.skipped, unmatched: summary.unmatched, failed: summary.failed });
       setGrabStatus(db, grab.id, 'imported', { importedAt: new Date(now()).toISOString() });
       onProgress({ event: 'pack-done', source, title: grab.title, seriesId: grab.series_id ?? null, summary });
-      if (policy.removeOnDone) await client.remove(grab.download_id, { deleteFiles: true }).catch(() => {});
+      if (policy.removeOnDone) await cleanup(client, grab.download_id, 'done', grab.id);
     }
   } catch (e) {
     setGrabStatus(db, grab.id, 'failed', { error: String(e?.message || e) });
@@ -174,7 +186,7 @@ export function createDownloadMonitor({ db, onProgress = () => {}, now = () => D
               setGrabStatus(db, grab.id, 'failed', { error: item.error || 'client reported failure' });
               setIssueStatus(db, issue.id, 'failed', { error: `${source}: ${item.error || 'download failed'}` });
               onProgress({ event: 'failed', issue, source, error: item.error || 'download failed' });
-              if (policy.removeOnFailed) await client.remove(grab.download_id, { deleteFiles: true }).catch(() => {});
+              if (policy.removeOnFailed) await cleanup(client, grab.download_id, 'failed', grab.id);
               continue;
             }
             if (item.state === 'done') {
@@ -184,7 +196,7 @@ export function createDownloadMonitor({ db, onProgress = () => {}, now = () => D
               await finishImport(db, { issue, ic, fetched, source, onProgress });
               setGrabStatus(db, grab.id, 'imported', { importedAt: new Date(now()).toISOString() });
               // Cleanup per policy (usenet: remove + delete; torrent: keep seeding).
-              if (policy.removeOnDone) await client.remove(grab.download_id, { deleteFiles: true }).catch(() => {});
+              if (policy.removeOnDone) await cleanup(client, grab.download_id, 'done', grab.id);
             }
           } catch (e) {
             console.warn('download monitor: import failed for grab', grab.id, e?.message || e);

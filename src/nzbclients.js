@@ -73,8 +73,15 @@ function sabnzbd(config, { fetchImpl = fetch } = {}) {
       return [...out.values()];
     },
     async remove(id, { deleteFiles = true } = {}) {
-      await call({ mode: 'queue', name: 'delete', value: id, del_files: deleteFiles ? 1 : 0 }).catch(() => {});
-      await call({ mode: 'history', name: 'delete', value: id, del_files: deleteFiles ? 1 : 0 }).catch(() => {});
+      const del_files = deleteFiles ? 1 : 0;
+      // A completed download lives in HISTORY, so the queue delete is a harmless
+      // no-op then (best-effort). The history delete is what actually removes the
+      // finished files — SAB answers HTTP 200 with {status:false} when it refuses,
+      // so check it and throw rather than silently leaving the files behind.
+      await call({ mode: 'queue', name: 'delete', value: id, del_files }).catch(() => {});
+      const r = await call({ mode: 'history', name: 'delete', value: id, del_files });
+      if (r && r.status === false) throw new Error(`SABnzbd refused history delete for ${id}: ${r.error || JSON.stringify(r)}`);
+      return r;
     },
   };
 }
