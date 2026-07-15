@@ -8,6 +8,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+- **Browser image variant** — a `…-browser` image tag (e.g.
+  `ghcr.io/backissueapp/backissue:latest-browser`) built with Chromium + Xvfb for
+  plugins/addons that drive a real browser. Most installs use the lean default;
+  switch the tag only if an addon needs it.
+
 ### Fixed
 - **Usenet download cleanup** — when the download client refuses to remove a
   finished download, it's now logged instead of failing silently, and SABnzbd's

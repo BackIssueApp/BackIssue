@@ -4,6 +4,12 @@
 # ONLY thing that moves 'latest'. The nightly schedule refreshes ':nightly';
 # every push to main builds a rolling ':dev' image of the current tree, for
 # testing changes without cutting a version.
+#
+# Two variants are built from the same context:
+#   - lean    (Dockerfile)          → :latest, :X.Y.Z, :dev, :nightly, …
+#   - browser (Dockerfile.browser)  → the same tags with a '-browser' suffix
+#     (e.g. :latest-browser). Bundles Chromium + Xvfb (~1GB) for plugins/addons
+#     that drive a real browser (Cloudflare-walled sources).
 name: Docker image
 
 on:
@@ -21,6 +27,16 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: lean
+            dockerfile: Dockerfile
+            flavor: ""
+          - variant: browser
+            dockerfile: Dockerfile.browser
+            flavor: suffix=-browser,onlatest=true
     steps:
       - uses: actions/checkout@v7
 
@@ -38,6 +54,8 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/backissueapp/backissue
+          # Browser variant appends '-browser' to every tag (incl. latest).
+          flavor: ${{ matrix.flavor }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -52,6 +70,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -60,5 +79,6 @@ jobs:
           build-args: |
             BUILD_CHANNEL=${{ startsWith(github.ref, 'refs/tags/v') && 'release' || (github.event_name == 'schedule' && 'nightly' || 'dev') }}
             BUILD_SHA=${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Separate cache scope per variant so the two Dockerfiles don't thrash.
+          cache-from: type=gha,scope=${{ matrix.variant }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.variant }}
