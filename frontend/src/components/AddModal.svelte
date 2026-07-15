@@ -80,10 +80,17 @@
         {:else if m.results}
           {#each m.results as v (v.id)}
             <div class="add-row">
-              <span>{v.name || '?'}
+              <span class:owned-dim={v.inLibrary}>
+                {#if v.site_detail_url}
+                  <a class="add-name" href={v.site_detail_url} target="_blank" rel="noreferrer" title="View details">{v.name || '?'}</a>
+                {:else}{v.name || '?'}{/if}
                 {#if v.start_year}<span class="scan-muted">({v.start_year})</span>{/if}
                 <span class="scan-muted">{v.publisher || ''} · {fmt(v.count_of_issues || 0)} issues</span></span>
-              <button class="btn btn--ghost btn--sm" disabled={v._busy || v._label !== 'Add'} onclick={() => add(v)}>{v._label}</button>
+              {#if v.inLibrary}
+                <button class="btn btn--ghost btn--sm" title="Already in your library — open it" onclick={() => { closeModal('add'); navigate('/series/' + v.seriesId); }}>In library</button>
+              {:else}
+                <button class="btn btn--ghost btn--sm" disabled={v._busy || v._label !== 'Add'} onclick={() => add(v)}>{v._label}</button>
+              {/if}
             </div>
           {/each}
         {/if}
@@ -91,3 +98,9 @@
     </div>
   </div>
 {/if}
+
+<style>
+  .add-name { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--line); }
+  .add-name:hover { color: var(--yellow); border-bottom-color: var(--yellow); }
+  .owned-dim { opacity: 0.5; }
+</style>

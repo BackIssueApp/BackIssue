@@ -9,6 +9,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 ## [Unreleased]
 
 ### Added
+- **Add series picker** — results already in your library are now grayed out with
+  an "In library" shortcut that opens the existing series (instead of only telling
+  you after you click Add), and each result's name links to its details page.
 - **Browser image variant** — a `…-browser` image tag (e.g.
   `ghcr.io/backissueapp/backissue:latest-browser`) built with Chromium + Xvfb for
   plugins/addons that drive a real browser. Most installs use the lean default;

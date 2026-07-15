@@ -6,7 +6,7 @@ import fsp from 'node:fs/promises';
 import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
-import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, seriesCollectionDetail, setSeriesPath, getSeriesById, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, restrictedSeriesIds, isCvIssueRestricted, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
+import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, restrictedSeriesIds, isCvIssueRestricted, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
 import { resolveSeriesDir, defaultRootedDir } from './paths.js';
 import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
@@ -1271,8 +1271,16 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   });
   app.get('/api/cv', (req, res) => res.json(state.cv || { running: false }));
   app.get('/api/cv/search', async (req, res) => {
-    try { res.json(await cvSearch(String(req.query.q || ''))); }
-    catch (e) { res.status(502).json({ error: String(e?.message || e) }); }
+    try {
+      const results = await cvSearch(String(req.query.q || ''));
+      // Flag results already in the collection so the picker can gray them out
+      // and link straight to the existing series (not just say so after an add).
+      if (Array.isArray(results)) for (const v of results) {
+        const owned = v.id != null ? getSeriesByCvId(db, v.id) : null;
+        if (owned) { v.inLibrary = true; v.seriesId = owned.id; }
+      }
+      res.json(results);
+    } catch (e) { res.status(502).json({ error: String(e?.message || e) }); }
   });
   // One volume by id — used when a ComicVine URL/id is pasted into the picker.
   app.get('/api/cv/volume/:id', async (req, res) => {
