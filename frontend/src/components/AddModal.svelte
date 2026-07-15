@@ -28,12 +28,18 @@
 
   let searching = $state(false);
   let needsKey = $state(false); // missing-ComicVine-key dead end → guided fix
+  // Debounced, but responses can still arrive out of order (a broad early query
+  // like "hu" resolving after "hulk"). Tag each request; only the newest one may
+  // write results, so a stale response can't clobber the current query's.
+  let searchSeq = 0;
   async function search(q) {
-    if (q.trim().length < 2) { m.results = null; m.error = ''; return; }
+    const seq = ++searchSeq;
+    if (q.trim().length < 2) { m.results = null; m.error = ''; searching = false; return; }
     searching = true; m.error = ''; needsKey = false;
     let list;
     try { list = await apiGet('/api/cv/search?q=' + encodeURIComponent(q)); }
-    catch { m.error = 'Search failed — is the app reachable?'; searching = false; return; }
+    catch { if (seq === searchSeq) { m.error = 'Search failed — is the app reachable?'; searching = false; } return; }
+    if (seq !== searchSeq) return; // superseded by a newer search — drop this response
     searching = false;
     if (list.error) {
       // The #1 first-run dead end: no ComicVine key. Point at the fix.

@@ -26,6 +26,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   notifications read now only needs viewer access.)
 
 ### Fixed
+- **Add series search** — results no longer flip to a stale query (e.g. showing
+  "Hu…" matches right after you finished typing "Hulk"). Out-of-order search
+  responses are discarded, so only the current query's results are shown.
 - **Browser image** — the headed browser now starts reliably after a container
   restart. A stale X11 lock kept across a `docker restart` (autoheal, restart
   policy) made Xvfb abort with "display already active", leaving the browser with
