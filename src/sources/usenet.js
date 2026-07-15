@@ -3,6 +3,7 @@ import path from 'node:path';
 import JSZip from 'jszip';
 import { parseIndexers, searchNewznab } from '../newznab.js';
 import { makeNzbClient } from '../nzbclients.js';
+import { loadReleaseBlacklist, normReleaseTitle } from '../db.js';
 import { normalizeNumber } from '../matcher.js';
 import { cbrBufferToCbz } from '../archive.js';
 
@@ -195,11 +196,15 @@ export const usenet = {
       for (const r of results) if (r.nzbUrl && !byUrl.has(r.nzbUrl)) byUrl.set(r.nzbUrl, r);
     }
     const target = { series: ctx.seriesTitle, names, number: ctx.issue?.issue_number, year: ctx.seriesYear };
+    // Drop releases that previously failed to download — a broken post is very
+    // likely to fail again on retry, so skip it and let the next-best win.
+    const blocked = ctx.db ? loadReleaseBlacklist(ctx.db, 'usenet') : { guids: new Set(), titles: new Set() };
+    const isBlocked = (r) => (r.guid && blocked.guids.has(r.guid)) || blocked.titles.has(normReleaseTitle(r.title));
     // Keep only true matches (series matches any alias + number) that aren't
     // suspiciously small (fake-release guard), then prefer the best year. Larger
     // files sort first within a score (searchNewznab order).
     const scored = [...byUrl.values()]
-      .filter((r) => !suspiciouslySmall(r.size))
+      .filter((r) => !suspiciouslySmall(r.size) && !isBlocked(r))
       .map((r) => ({ r, score: scoreRelease(r.title, target) }))
       .filter((x) => x.score != null)
       .sort((a, b) => b.score - a.score);
@@ -212,7 +217,7 @@ export const usenet = {
   async grab(candidate, ctx) {
     const client = makeNzbClient(ctx.config, {});
     const downloadId = await client.add(candidate.nzbUrl, { name: candidate.title, category: ctx.config.nzbCategory });
-    return { downloadId, client: ctx.config.nzbClient, category: ctx.config.nzbCategory, title: candidate.title };
+    return { downloadId, client: ctx.config.nzbClient, category: ctx.config.nzbCategory, title: candidate.title, releaseGuid: candidate.guid || null };
   },
 
   // Multi-result manual search (for the source-search modal). Returns a list of

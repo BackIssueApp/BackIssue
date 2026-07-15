@@ -6,7 +6,7 @@
 // `grabs` table + each client's own state, it survives restarts — on boot it
 // reconciles whatever finished while we were down.
 import config from './config.js';
-import { activeGrabs, setGrabStatus, setIssueStatus, getIssueById } from './db.js';
+import { activeGrabs, setGrabStatus, setIssueStatus, getIssueById, blacklistRelease } from './db.js';
 import { makeNzbClient } from './nzbclients.js';
 import { makeTorrentClient } from './torrentclients.js';
 import { importCompleted } from './sources/usenet.js';
@@ -186,6 +186,14 @@ export function createDownloadMonitor({ db, onProgress = () => {}, now = () => D
               setGrabStatus(db, grab.id, 'failed', { error: item.error || 'client reported failure' });
               setIssueStatus(db, issue.id, 'failed', { error: `${source}: ${item.error || 'download failed'}` });
               onProgress({ event: 'failed', issue, source, error: item.error || 'download failed' });
+              // The client itself reported the download broken (failed par2/repair,
+              // missing articles) — blacklist this exact release so a retry picks a
+              // different one instead of re-grabbing the same dud. Only usenet: this
+              // is the "bad NZB" signal, not an import error or an offline client.
+              if (source === 'usenet') {
+                blacklistRelease(db, { source, guid: grab.release_guid, title: grab.title, issueId: grab.issue_id, reason: item.error || 'download failed' });
+                console.warn(`download monitor: blacklisted failed usenet release "${grab.title}"`);
+              }
               if (policy.removeOnFailed) await cleanup(client, grab.download_id, 'failed', grab.id);
               continue;
             }

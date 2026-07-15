@@ -287,7 +287,7 @@ export async function runQueue({ db, onProgress = () => {}, concurrency = config
           try {
             onProgress({ event: 'start', issue, source: src.id });
             const g = await src.grab(candidate, ctx);
-            recordGrab(db, { issueId: issue.id, source: src.id, client: g.client, downloadId: g.downloadId, category: g.category, title: g.title });
+            recordGrab(db, { issueId: issue.id, source: src.id, client: g.client, downloadId: g.downloadId, category: g.category, title: g.title, releaseGuid: g.releaseGuid });
             setIssueStatus(db, issue.id, 'grabbed');
             onProgress({ event: 'grabbed', issue, source: src.id, phase: 'grabbed' });
             handled = true;

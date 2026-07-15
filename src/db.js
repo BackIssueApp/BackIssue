@@ -69,6 +69,22 @@ export function initSchema(db) {
       imported_at TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_grabs_status ON grabs(status);
+    -- Releases that failed to download and shouldn't be auto-grabbed again. A
+    -- broken usenet post (failed par2/repair, missing articles) is recorded here
+    -- so a retry falls through to the next-best release instead of re-fetching
+    -- the same dud. Keyed by both indexer guid and a normalized title, so it's
+    -- caught even when the same release is re-posted under a fresh guid.
+    CREATE TABLE IF NOT EXISTS release_blacklist (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source TEXT NOT NULL,
+      guid TEXT,
+      title_norm TEXT,
+      issue_id INTEGER,
+      reason TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_blacklist_guid ON release_blacklist(source, guid);
+    CREATE INDEX IF NOT EXISTS idx_blacklist_title ON release_blacklist(source, title_norm);
     CREATE TABLE IF NOT EXISTS logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       ts INTEGER NOT NULL, level TEXT NOT NULL, category TEXT, message TEXT NOT NULL
@@ -178,6 +194,9 @@ function migrate(db) {
   const grabCols = db.prepare('PRAGMA table_info(grabs)').all().map((c) => c.name);
   if (grabCols.length && !grabCols.includes('series_id')) db.exec('ALTER TABLE grabs ADD COLUMN series_id INTEGER');
   if (grabCols.length && !grabCols.includes('kind')) db.exec("ALTER TABLE grabs ADD COLUMN kind TEXT NOT NULL DEFAULT 'issue'");
+  // Indexer guid of the grabbed release, so a failure can blacklist that exact
+  // release (not just its title) and future searches skip it.
+  if (grabCols.length && !grabCols.includes('release_guid')) db.exec('ALTER TABLE grabs ADD COLUMN release_guid TEXT');
   // The Mylar integration is gone — BackIssue replaces it.
   db.exec('DROP TABLE IF EXISTS mylar_series_map');
   // The dedicated tag log was folded into the Logs page (category 'tag').
@@ -273,11 +292,78 @@ export function getIssueById(db, id) {
 // remember which issue it maps to and the client's own id so the background
 // monitor can match completed downloads back to the right issue — even across
 // an app restart.
-export function recordGrab(db, { issueId = 0, source, client = null, downloadId = null, category = null, title = null, seriesId = null, kind = 'issue' }) {
+export function recordGrab(db, { issueId = 0, source, client = null, downloadId = null, category = null, title = null, seriesId = null, kind = 'issue', releaseGuid = null }) {
   // issue_id is NOT NULL in the schema; pack grabs have no single issue → 0 sentinel.
   return db.prepare(
-    `INSERT INTO grabs (issue_id, source, client, download_id, category, title, series_id, kind) VALUES (?,?,?,?,?,?,?,?)`
-  ).run(issueId ?? 0, source, client, downloadId != null ? String(downloadId) : null, category, title, seriesId, kind).lastInsertRowid;
+    `INSERT INTO grabs (issue_id, source, client, download_id, category, title, series_id, kind, release_guid) VALUES (?,?,?,?,?,?,?,?,?)`
+  ).run(issueId ?? 0, source, client, downloadId != null ? String(downloadId) : null, category, title, seriesId, kind, releaseGuid || null).lastInsertRowid;
+}
+
+// Normalize a release title to a stable comparison key: lowercase, drop a comic
+// extension, and reduce everything non-alphanumeric to single spaces. Two ways
+// of writing the same scene release ("Series 005 (2020).cbz" vs
+// "Series.005.2020") collapse to the same key. Used by both the blacklist store
+// and the search filter — they MUST normalize identically.
+export function normReleaseTitle(title) {
+  return String(title || '')
+    .toLowerCase()
+    .replace(/\.(cbz|cbr|cb7|cbt|pdf|nzb)$/i, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+// Record a release that failed to download so it isn't auto-grabbed again.
+// Deduplicated on (source, guid, title_norm) so the same dud failing twice
+// doesn't pile up rows.
+export function blacklistRelease(db, { source, guid = null, title = null, issueId = null, reason = null }) {
+  const titleNorm = title ? normReleaseTitle(title) : null;
+  if (!guid && !titleNorm) return; // nothing to key on
+  const dup = db.prepare(
+    `SELECT 1 FROM release_blacklist WHERE source=? AND IFNULL(guid,'')=IFNULL(?,'') AND IFNULL(title_norm,'')=IFNULL(?,'') LIMIT 1`
+  ).get(source, guid || null, titleNorm || null);
+  if (dup) return;
+  db.prepare(
+    `INSERT INTO release_blacklist (source, guid, title_norm, issue_id, reason) VALUES (?,?,?,?,?)`
+  ).run(source, guid || null, titleNorm || null, issueId ?? null, reason ? String(reason).slice(0, 500) : null);
+}
+
+// Load the blacklist for a source as fast-lookup sets the search filter checks
+// each candidate against (by guid and by normalized title).
+export function loadReleaseBlacklist(db, source) {
+  const rows = db.prepare(`SELECT guid, title_norm FROM release_blacklist WHERE source=?`).all(source);
+  const guids = new Set(), titles = new Set();
+  for (const r of rows) { if (r.guid) guids.add(r.guid); if (r.title_norm) titles.add(r.title_norm); }
+  return { guids, titles };
+}
+
+// Blacklisted releases for the management view — most recent first, with the
+// series/issue they were grabbed for resolved for a friendly label. The stored
+// grab title is the human-readable release name; title_norm is the match key.
+export function listBlacklist(db, { limit = 200, offset = 0 } = {}) {
+  const rows = db.prepare(`
+    SELECT b.id, b.source, b.title_norm, b.reason, b.created_at, b.issue_id,
+           g.title, i.issue_number, i.series_id,
+           COALESCE(cv.name, s.title) AS series_title
+      FROM release_blacklist b
+      LEFT JOIN issues i ON i.id = b.issue_id
+      LEFT JOIN series s ON s.id = i.series_id
+      LEFT JOIN cv_series cv ON cv.comicvine_id = s.cv_id
+      LEFT JOIN grabs g ON g.id = (
+        SELECT gg.id FROM grabs gg WHERE gg.issue_id = b.issue_id AND gg.source = b.source
+        ORDER BY gg.id DESC LIMIT 1)
+     ORDER BY b.id DESC LIMIT ? OFFSET ?`).all(limit, offset);
+  const total = db.prepare('SELECT COUNT(*) n FROM release_blacklist').get().n;
+  return { rows, total };
+}
+
+// Remove one blacklist entry (lets that release be auto-grabbed again).
+export function deleteBlacklistEntry(db, id) {
+  return db.prepare('DELETE FROM release_blacklist WHERE id=?').run(id).changes;
+}
+
+// Empty the whole blacklist.
+export function clearBlacklist(db) {
+  return db.prepare('DELETE FROM release_blacklist').run().changes;
 }
 
 // Has this exact pack (by title) already been grabbed and not failed? Used to

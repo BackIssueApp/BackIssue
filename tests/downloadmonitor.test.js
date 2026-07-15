@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { recordGrab, activeGrabs, setGrabStatus } from '../src/db.js';
+import { recordGrab, activeGrabs, setGrabStatus, blacklistRelease, loadReleaseBlacklist, normReleaseTitle, listBlacklist, deleteBlacklistEntry, clearBlacklist } from '../src/db.js';
 
 // The monitor's tick pulls a lot of collaborators (client, CV, import). Rather
 // than stand all that up, these tests exercise the persisted grab bookkeeping the
@@ -33,4 +33,55 @@ test('download_id is coerced to text (client ids may be numeric)', () => {
   const db = openDb(':memory:');
   recordGrab(db, { issueId: 1, source: 'usenet', downloadId: 42 });
   assert.equal(activeGrabs(db)[0].download_id, '42');
+});
+
+test('recordGrab stores the release guid so a failure can blacklist it', () => {
+  const db = openDb(':memory:');
+  recordGrab(db, { issueId: 1, source: 'usenet', downloadId: 'x', title: 'Saga 001', releaseGuid: 'guid-abc' });
+  assert.equal(activeGrabs(db)[0].release_guid, 'guid-abc');
+});
+
+test('blacklistRelease + loadReleaseBlacklist round-trips by guid and normalized title', () => {
+  const db = openDb(':memory:');
+  blacklistRelease(db, { source: 'usenet', guid: 'guid-1', title: 'Series 005 (2020).cbz', issueId: 3, reason: 'par2 failed' });
+  const bl = loadReleaseBlacklist(db, 'usenet');
+  assert.ok(bl.guids.has('guid-1'));
+  // Stored under the normalized key, so a differently-punctuated repost matches.
+  assert.ok(bl.titles.has(normReleaseTitle('Series.005.2020')));
+  // Scoped per source: a torrent search sees an empty blacklist.
+  const other = loadReleaseBlacklist(db, 'torrent');
+  assert.equal(other.guids.size, 0);
+  assert.equal(other.titles.size, 0);
+});
+
+test('blacklistRelease dedupes the same failed release', () => {
+  const db = openDb(':memory:');
+  blacklistRelease(db, { source: 'usenet', guid: 'g', title: 'Hulk 001' });
+  blacklistRelease(db, { source: 'usenet', guid: 'g', title: 'Hulk 001' });
+  const n = db.prepare('SELECT COUNT(*) c FROM release_blacklist').get().c;
+  assert.equal(n, 1);
+});
+
+test('blacklistRelease with neither guid nor title records nothing', () => {
+  const db = openDb(':memory:');
+  blacklistRelease(db, { source: 'usenet' });
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM release_blacklist').get().c, 0);
+});
+
+test('listBlacklist paginates newest-first; delete and clear remove entries', () => {
+  const db = openDb(':memory:');
+  blacklistRelease(db, { source: 'usenet', guid: 'g1', title: 'Alpha 001', reason: 'par2' });
+  blacklistRelease(db, { source: 'usenet', guid: 'g2', title: 'Beta 002', reason: 'articles' });
+  const { rows, total } = listBlacklist(db, {});
+  assert.equal(total, 2);
+  assert.equal(rows[0].title_norm, normReleaseTitle('Beta 002')); // newest first
+  assert.equal(rows[0].reason, 'articles');
+
+  assert.equal(deleteBlacklistEntry(db, rows[0].id), 1);
+  assert.equal(listBlacklist(db, {}).total, 1);
+  // The just-removed release is no longer filtered out of searches.
+  assert.ok(!loadReleaseBlacklist(db, 'usenet').guids.has('g2'));
+
+  assert.equal(clearBlacklist(db), 1);
+  assert.equal(listBlacklist(db, {}).total, 0);
 });

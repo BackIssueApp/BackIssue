@@ -8,6 +8,18 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.6.5] — 2026-07-15
+
+### Added
+- **Failed Usenet releases are blacklisted.** When the download client reports a
+  Usenet download as failed (broken par2/repair, missing articles), that exact
+  release is remembered and skipped on future searches, so a retry grabs the
+  next-best release instead of re-fetching the same broken one over and over.
+  Only a client-reported failure blacklists — an import hiccup or an offline
+  client doesn't. A new **Blocklist** tab on the History page lists blocked
+  releases and lets you remove one (allowing it to be auto-grabbed again) or
+  clear them all.
+
 ## [0.6.4] — 2026-07-15
 
 ### Added

@@ -6,7 +6,7 @@ import fsp from 'node:fs/promises';
 import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
-import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, restrictedSeriesIds, isCvIssueRestricted, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
+import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, restrictedSeriesIds, isCvIssueRestricted, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
 import { resolveSeriesDir, defaultRootedDir } from './paths.js';
 import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
@@ -270,6 +270,9 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     // shouldn't see. Covers /api/history and /api/history/failed. The web UI
     // already gates its /history view behind the same permission.
     [/^\/api\/history/, 'downloads.grab'],
+    // The failed-release blacklist — viewing it and clearing entries (which lets
+    // a release be auto-grabbed again) is download-pipeline management.
+    [/^\/api\/blacklist(\/|$)/, 'downloads.grab'],
   ];
   const DOWNLOAD_RULES = [
     /^\/api\/collection\/\d+\/(download|redownload)$/,
@@ -974,6 +977,21 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     }
     res.json(r);
   });
+  // Blacklisted releases — usenet posts that failed to download and are skipped
+  // on future auto-searches. Viewing + clearing needs downloads.grab (PERM_RULES).
+  app.get('/api/blacklist', (req, res) => {
+    const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 200));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const r = listBlacklist(db, { limit, offset });
+    if (!canRestricted(req)) {
+      const rset = restrictedSeriesIds(db);
+      r.rows = r.rows.filter((i) => i.series_id == null || !rset.has(i.series_id));
+    }
+    res.json(r);
+  });
+  // Un-blacklist one release (it becomes eligible for auto-grab again).
+  app.delete('/api/blacklist/:id', (req, res) => res.json({ removed: deleteBlacklistEntry(db, Number(req.params.id)) }));
+  app.post('/api/blacklist/clear', (req, res) => res.json({ cleared: clearBlacklist(db) }));
   // Wanted — every missing issue across the collection (paged, filterable).
   app.get('/api/wanted', (req, res) => {
     const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 200));
