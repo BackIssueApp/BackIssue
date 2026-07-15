@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.6.6] — 2026-07-15
+
 ### Fixed
 - **Usenet grabs no longer fail with "Too few parameter values were provided".**
   Indexers that answer in JSON sometimes send the release guid as an object
