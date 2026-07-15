@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.6.4] — 2026-07-15
+
 ### Added
 - **Add series picker** — results already in your library are now grayed out with
   an "In library" shortcut that opens the existing series (instead of only telling
