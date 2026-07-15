@@ -41,6 +41,19 @@ test('recordGrab stores the release guid so a failure can blacklist it', () => {
   assert.equal(activeGrabs(db)[0].release_guid, 'guid-abc');
 });
 
+test('recordGrab survives a non-string guid (malformed indexer response)', () => {
+  // A plain object among positional binds is read by better-sqlite3 as a
+  // named-parameter bag → "Too few parameter values were provided". The guid is
+  // sanitized to a string or dropped, never bound raw.
+  const db = openDb(':memory:');
+  recordGrab(db, { issueId: 1, source: 'usenet', downloadId: 'x', title: 'T', releaseGuid: { rel: 'permalink' } });
+  assert.equal(activeGrabs(db)[0].release_guid, null);
+  blacklistRelease(db, { source: 'usenet', guid: { rel: 'permalink' }, title: 'T', reason: 'r' });
+  const bl = loadReleaseBlacklist(db, 'usenet');
+  assert.equal(bl.guids.size, 0); // object guid dropped…
+  assert.ok(bl.titles.has(normReleaseTitle('T'))); // …but the title still blocks it
+});
+
 test('blacklistRelease + loadReleaseBlacklist round-trips by guid and normalized title', () => {
   const db = openDb(':memory:');
   blacklistRelease(db, { source: 'usenet', guid: 'guid-1', title: 'Series 005 (2020).cbz', issueId: 3, reason: 'par2 failed' });

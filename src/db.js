@@ -292,11 +292,17 @@ export function getIssueById(db, id) {
 // remember which issue it maps to and the client's own id so the background
 // monitor can match completed downloads back to the right issue — even across
 // an app restart.
+// A guid must reach SQL as a string or null — an object passed positionally is
+// read by better-sqlite3 as a NAMED-parameter bag, shrinking the anonymous arg
+// list ("Too few parameter values were provided"). Sources normally hand us
+// strings, but a malformed indexer response can leak other shapes.
+const guidStr = (g) => (typeof g === 'string' && g) || (typeof g === 'number' ? String(g) : null);
+
 export function recordGrab(db, { issueId = 0, source, client = null, downloadId = null, category = null, title = null, seriesId = null, kind = 'issue', releaseGuid = null }) {
   // issue_id is NOT NULL in the schema; pack grabs have no single issue → 0 sentinel.
   return db.prepare(
     `INSERT INTO grabs (issue_id, source, client, download_id, category, title, series_id, kind, release_guid) VALUES (?,?,?,?,?,?,?,?,?)`
-  ).run(issueId ?? 0, source, client, downloadId != null ? String(downloadId) : null, category, title, seriesId, kind, releaseGuid || null).lastInsertRowid;
+  ).run(issueId ?? 0, source, client, downloadId != null ? String(downloadId) : null, category, title, seriesId, kind, guidStr(releaseGuid)).lastInsertRowid;
 }
 
 // Normalize a release title to a stable comparison key: lowercase, drop a comic
@@ -316,6 +322,7 @@ export function normReleaseTitle(title) {
 // Deduplicated on (source, guid, title_norm) so the same dud failing twice
 // doesn't pile up rows.
 export function blacklistRelease(db, { source, guid = null, title = null, issueId = null, reason = null }) {
+  guid = guidStr(guid);
   const titleNorm = title ? normReleaseTitle(title) : null;
   if (!guid && !titleNorm) return; // nothing to key on
   const dup = db.prepare(

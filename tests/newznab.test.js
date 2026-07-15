@@ -48,6 +48,22 @@ test('parseNewznabJson: items with no link are skipped', () => {
   assert.equal(parseNewznabJson(json, 'NZ').length, 1);
 });
 
+test('parseNewznabJson: guid is ALWAYS a string, whatever shape the indexer sends', () => {
+  // Object guid with no text at all — must fall back to the nzb URL, never leak
+  // the object (an object guid bound to SQL later reads as a named-parameter
+  // bag: "Too few parameter values were provided").
+  const json = { channel: { item: [
+    { title: 'A', guid: { rel: 'permalink' }, link: 'https://nz/a' },
+    { title: 'B', guid: { text: 'gb' }, link: 'https://nz/b' },
+    { title: 'C', guid: 12345, link: 'https://nz/c' },
+  ] } };
+  const out = parseNewznabJson(json, 'NZ');
+  assert.equal(out[0].guid, 'https://nz/a');
+  assert.equal(out[1].guid, 'gb');
+  assert.equal(out[2].guid, '12345');
+  for (const r of out) assert.equal(typeof r.guid, 'string');
+});
+
 test('testIndexer: requires a url', async () => {
   const r = await testIndexer({ url: '' });
   assert.equal(r.ok, false);

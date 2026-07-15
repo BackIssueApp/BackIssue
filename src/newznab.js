@@ -94,7 +94,14 @@ export function parseNewznabJson(json, indexerName) {
       const s = it.attr.find((a) => (a['@attributes'] || a)?.name === 'size');
       if (s) size = Number((s['@attributes'] || s).value) || 0;
     }
-    out.push({ title: it.title || '(untitled)', guid: (it.guid && (it.guid['#text'] || it.guid)) || nzbUrl, nzbUrl, size, indexer: indexerName });
+    // guid arrives as a plain string on some indexers and as an object (with the
+    // value under #text or text) on others — and some object shapes carry no text
+    // at all. Coerce to a string ALWAYS; an object leaking through here ends up
+    // bound to SQL later, where better-sqlite3 reads it as a named-parameter bag
+    // ("Too few parameter values were provided").
+    const rawGuid = it.guid && typeof it.guid === 'object' ? (it.guid['#text'] ?? it.guid.text) : it.guid;
+    const guid = (typeof rawGuid === 'string' && rawGuid.trim()) || (typeof rawGuid === 'number' ? String(rawGuid) : '') || nzbUrl;
+    out.push({ title: it.title || '(untitled)', guid, nzbUrl, size, indexer: indexerName });
   }
   return out;
 }

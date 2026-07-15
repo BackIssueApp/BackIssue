@@ -9,6 +9,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 ## [Unreleased]
 
 ### Fixed
+- **Usenet grabs no longer fail with "Too few parameter values were provided".**
+  Indexers that answer in JSON sometimes send the release guid as an object
+  rather than a string; since 0.6.5 that guid is recorded with the grab, and the
+  object shape broke the database write, failing the download at the moment it
+  was handed to the client. Guids are now always normalized to strings (falling
+  back to the NZB URL), and the database layer drops any non-string guid instead
+  of failing the grab.
 - **Failed downloads log the full error trace.** A download that fails with a
   generic low-level error (e.g. a database driver message) previously recorded
   only the bare message on the queue row; the Logs page now captures the stack
