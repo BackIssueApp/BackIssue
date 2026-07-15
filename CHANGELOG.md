@@ -15,6 +15,10 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   switch the tag only if an addon needs it.
 
 ### Fixed
+- **Browser image** — the headed browser now starts reliably after a container
+  restart. A stale X11 lock kept across a `docker restart` (autoheal, restart
+  policy) made Xvfb abort with "display already active", leaving the browser with
+  no display; the entrypoint now clears the stale lock/socket on boot.
 - **Usenet download cleanup** — when the download client refuses to remove a
   finished download, it's now logged instead of failing silently, and SABnzbd's
   history delete is checked for a logical failure. Completed files that weren't

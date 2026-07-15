@@ -8,6 +8,13 @@
 set -e
 
 export DISPLAY=:99
+# A `docker restart` (e.g. autoheal, or the restart policy after a crash) keeps
+# the container's /tmp, so a leftover lock/socket from the previous run makes
+# Xvfb abort with "Server is already active for display 99". Clear any stale ones
+# so Xvfb always starts clean — and so the socket wait below tracks the REAL new
+# socket rather than being fooled by a stale one into launching against a dead
+# display.
+rm -f /tmp/.X99-lock /tmp/.X11-unix/X99
 Xvfb :99 -screen 0 1366x900x24 -nolisten tcp >/tmp/xvfb.log 2>&1 &
 
 # Wait for the display socket before launching anything that needs it.
