@@ -8,6 +8,14 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+- **Failed downloads log the full error trace.** A download that fails with a
+  generic low-level error (e.g. a database driver message) previously recorded
+  only the bare message on the queue row; the Logs page now captures the stack
+  trace so the actual source is identifiable. Release blacklisting is also
+  hardened: a bookkeeping error there can no longer replace the real failure
+  reason on the queue row or fail a search.
+
 ## [0.6.5] — 2026-07-15
 
 ### Added

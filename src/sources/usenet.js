@@ -198,7 +198,12 @@ export const usenet = {
     const target = { series: ctx.seriesTitle, names, number: ctx.issue?.issue_number, year: ctx.seriesYear };
     // Drop releases that previously failed to download — a broken post is very
     // likely to fail again on retry, so skip it and let the next-best win.
-    const blocked = ctx.db ? loadReleaseBlacklist(ctx.db, 'usenet') : { guids: new Set(), titles: new Set() };
+    // Best-effort: if the blacklist can't load, search unfiltered rather than fail.
+    let blocked = { guids: new Set(), titles: new Set() };
+    if (ctx.db) {
+      try { blocked = loadReleaseBlacklist(ctx.db, 'usenet'); }
+      catch (e) { console.warn('usenet: blacklist load failed —', e?.stack || e?.message || e); }
+    }
     const isBlocked = (r) => (r.guid && blocked.guids.has(r.guid)) || blocked.titles.has(normReleaseTitle(r.title));
     // Keep only true matches (series matches any alias + number) that aren't
     // suspiciously small (fake-release guard), then prefer the best year. Larger

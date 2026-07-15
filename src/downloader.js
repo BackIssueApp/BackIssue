@@ -324,6 +324,9 @@ export async function runQueue({ db, onProgress = () => {}, concurrency = config
         const reason = lastErr ? String(lastErr.message || lastErr)
           : sources.length ? 'No enabled source had a match for this issue'
           : 'No download sources are enabled';
+        // The queue row only shows the message — log the stack so a generic
+        // error (e.g. a driver-level throw) is traceable to its actual source.
+        if (lastErr?.stack) console.warn(`download failed for issue ${issue.id} (${issue.title}):`, lastErr.stack);
         setIssueStatus(db, issue.id, 'failed', { error: reason });
         onProgress({ event: 'failed', issue, error: reason });
       }

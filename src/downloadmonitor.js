@@ -191,8 +191,14 @@ export function createDownloadMonitor({ db, onProgress = () => {}, now = () => D
               // different one instead of re-grabbing the same dud. Only usenet: this
               // is the "bad NZB" signal, not an import error or an offline client.
               if (source === 'usenet') {
-                blacklistRelease(db, { source, guid: grab.release_guid, title: grab.title, issueId: grab.issue_id, reason: item.error || 'download failed' });
-                console.warn(`download monitor: blacklisted failed usenet release "${grab.title}"`);
+                // Best-effort: a bookkeeping failure here must never replace the
+                // real failure reason already recorded on the issue row.
+                try {
+                  blacklistRelease(db, { source, guid: grab.release_guid, title: grab.title, issueId: grab.issue_id, reason: item.error || 'download failed' });
+                  console.warn(`download monitor: blacklisted failed usenet release "${grab.title}"`);
+                } catch (e) {
+                  console.warn(`download monitor: blacklisting failed for grab ${grab.id}:`, e?.stack || e?.message || e);
+                }
               }
               if (policy.removeOnFailed) await cleanup(client, grab.download_id, 'failed', grab.id);
               continue;
@@ -207,7 +213,7 @@ export function createDownloadMonitor({ db, onProgress = () => {}, now = () => D
               if (policy.removeOnDone) await cleanup(client, grab.download_id, 'done', grab.id);
             }
           } catch (e) {
-            console.warn('download monitor: import failed for grab', grab.id, e?.message || e);
+            console.warn('download monitor: import failed for grab', grab.id, e?.stack || e?.message || e);
             setGrabStatus(db, grab.id, 'failed', { error: String(e?.message || e) });
             setIssueStatus(db, issue.id, 'failed', { error: `${source} import: ${e?.message || e}` });
             onProgress({ event: 'failed', issue, source, error: String(e?.message || e) });
