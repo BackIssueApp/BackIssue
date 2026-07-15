@@ -56,14 +56,39 @@ export function parseIssueFromFilename(name) {
   return issueNumberFromTitle(base);
 }
 
+// A folder whose name is nothing but a volume marker — "v2004", "V2",
+// "Vol. 3 (1999)", "Volume 12" — signals a three-level Publisher/Series/Volume
+// layout (Mylar-style). Requires digits right after the marker so real series
+// names ("V for Vendetta") never match.
+const VOLUME_DIR_RE = /^v(?:ol(?:ume)?)?[.\s]*\d+\s*(?:\((?:19|20)\d{2}\))?$/i;
+
+// Series name + publisher for a series-level folder. Normally the folder IS the
+// series (name = folder, publisher = parent); when the folder is only a volume
+// marker, the series name comes from the parent and the publisher from the
+// grandparent, with the volume's year kept in the name ("X-Men (2004)") so
+// matching can rank the right ComicVine volume. The folder itself stays the
+// series dir — each volume folder maps to its own ComicVine volume.
+export function seriesIdentityFromDir(dir) {
+  const base = path.basename(dir);
+  if (VOLUME_DIR_RE.test(base)) {
+    const parent = path.dirname(dir);
+    const title = path.basename(parent);
+    const year = extractYear(base);
+    const seriesName = year && !extractYear(title) ? `${title} (${year})` : title;
+    return { seriesName, publisher: path.basename(path.dirname(parent)) };
+  }
+  return { seriesName: base, publisher: path.basename(path.dirname(dir)) };
+}
+
 // Group comic files by their immediate parent (the series folder). The series
-// name is the folder name and the publisher is the parent folder.
+// name is the folder name and the publisher is the parent folder (see
+// seriesIdentityFromDir for the volume-subfolder layout).
 export function groupSeries(files, seriesFolders = []) {
   const byDir = new Map();
   for (const f of files) {
     let g = byDir.get(f.dir);
     if (!g) {
-      g = { seriesName: path.basename(f.dir), publisher: path.basename(path.dirname(f.dir)), dir: f.dir, present: new Set() };
+      g = { ...seriesIdentityFromDir(f.dir), dir: f.dir, present: new Set() };
       byDir.set(f.dir, g);
     }
     const base = f.name.replace(/\.(cbz|cbr|pdf)$/i, '');
@@ -73,7 +98,7 @@ export function groupSeries(files, seriesFolders = []) {
   // Include series folders that had no comic files at all, so an empty folder is
   // reported as "all missing" rather than silently omitted.
   for (const d of seriesFolders) {
-    if (!byDir.has(d)) byDir.set(d, { seriesName: path.basename(d), publisher: path.basename(path.dirname(d)), dir: d, present: new Set() });
+    if (!byDir.has(d)) byDir.set(d, { ...seriesIdentityFromDir(d), dir: d, present: new Set() });
   }
   return [...byDir.values()];
 }

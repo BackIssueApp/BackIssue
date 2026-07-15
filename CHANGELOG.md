@@ -8,6 +8,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+- **Mylar-style folder layouts import correctly.** Libraries organized as
+  `Publisher/Series/Volume (year)` (e.g. `Marvel/X-Men/v2004`) previously
+  matched against the volume folder's name ("V2004") instead of the series.
+  A folder that is only a volume marker (`v2004`, `Vol. 3 (1999)`, `Volume 2`)
+  now takes its series name from the folder above it — searched and matched as
+  "X-Men (2004)" — while each volume folder still maps to its own ComicVine
+  volume. Applies to both the import tab and library scans.
+
 ## [0.6.6] — 2026-07-15
 
 ### Fixed

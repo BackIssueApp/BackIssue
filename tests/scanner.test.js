@@ -151,6 +151,36 @@ test('groupSeries gives an Annual file a namespaced key, not a regular number', 
   assert.deepEqual([...g.present].sort(), ['1', 'annual:1']);
 });
 
+test('groupSeries reads a Publisher/Series/Volume layout (Mylar-style)', () => {
+  // The immediate parent is only a volume marker — the series name must come
+  // from the folder above it (with the volume's year), publisher from the one
+  // above that. Each volume folder stays its own group (own ComicVine volume).
+  const files = [
+    { path: '/lib/Marvel/X-Men/V2004 (2004)/X-Men 001.cbz', dir: '/lib/Marvel/X-Men/V2004 (2004)', name: 'X-Men 001.cbz' },
+    { path: '/lib/Marvel/X-Men/v1963/X-Men 001.cbz', dir: '/lib/Marvel/X-Men/v1963', name: 'X-Men 001.cbz' },
+    { path: '/lib/DC/Sandman/Vol. 2 (1989)/Sandman 001.cbz', dir: '/lib/DC/Sandman/Vol. 2 (1989)', name: 'Sandman 001.cbz' },
+  ];
+  const groups = groupSeries(files);
+  assert.equal(groups.length, 3);
+  const x04 = groups.find((g) => g.dir.endsWith('V2004 (2004)'));
+  assert.equal(x04.seriesName, 'X-Men (2004)');
+  assert.equal(x04.publisher, 'Marvel');
+  const x63 = groups.find((g) => g.dir.endsWith('v1963'));
+  assert.equal(x63.seriesName, 'X-Men (1963)'); // year lifted out of the marker itself
+  const sandman = groups.find((g) => g.dir.endsWith('Vol. 2 (1989)'));
+  assert.equal(sandman.seriesName, 'Sandman (1989)');
+  assert.equal(sandman.publisher, 'DC');
+});
+
+test('groupSeries: series names starting with V are NOT mistaken for volume folders', () => {
+  const files = [
+    { path: '/lib/DC/V for Vendetta/V for Vendetta 001.cbz', dir: '/lib/DC/V for Vendetta', name: 'V for Vendetta 001.cbz' },
+  ];
+  const [g] = groupSeries(files);
+  assert.equal(g.seriesName, 'V for Vendetta');
+  assert.equal(g.publisher, 'DC');
+});
+
 test('groupSeries includes empty series folders (no comic files) with 0 present', () => {
   const files = [{ path: '/lib/Marvel/Earth X (1999)/a.cbz', dir: '/lib/Marvel/Earth X (1999)', name: 'Earth X V1999 #001.cbz' }];
   const folders = ['/lib/Marvel/Earth X (1999)', '/lib/DC/Empty Series (2020)'];
