@@ -14,6 +14,14 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   plugins/addons that drive a real browser. Most installs use the lean default;
   switch the tag only if an addon needs it.
 
+### Security
+- **Tightened API permissions.** The import folder picker (`/api/scan-folder`),
+  which lists server directories, now requires library management; download-queue
+  controls (pause / resume / clear) now require `downloads.grab`, matching who can
+  view the queue; and library-mutating writes are pinned to the manage permission
+  explicitly so they can't drift if defaults change. (Marking your own
+  notifications read now only needs viewer access.)
+
 ### Fixed
 - **Browser image** — the headed browser now starts reliably after a container
   restart. A stale X11 lock kept across a `docker restart` (autoheal, restart

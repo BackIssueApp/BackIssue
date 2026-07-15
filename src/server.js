@@ -236,22 +236,35 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     [/^\/api\/plugins(?!\/client)/, 'plugins.manage'], [/^\/api\/restart$/, 'plugins.manage'],
     [/^\/api\/jobs/, 'system.jobs'], [/^\/api\/schedules/, 'system.jobs'], [/^\/api\/tools/, 'system.jobs'],
     [/^\/api\/logs/, 'system.logs'],
-    // Import (candidate file paths, scan dirs) is a library-management feature.
+    // Import, and the folder picker it uses (which lists server directories), are
+    // library-management features — not something a read-only viewer should reach.
     [/^\/api\/import/, 'library.manage'],
+    [/^\/api\/scan-folder/, 'library.manage'],
     // Library-wide reorganize is a maintenance tool (admin); naming preview is
     // part of settings.
     [/^\/api\/library\//, 'system.jobs'],
     [/^\/api\/naming\//, 'settings.manage'],
-    // Reading lists are personal curation (no files touched) — any signed-in
-    // user manages their own, including non-GET verbs.
+    // Reading lists + notifications are personal (each user manages their own;
+    // ownership is enforced in the handlers) — any signed-in user, incl. writes.
     [/^\/api\/lists/, 'library.view'],
+    [/^\/api\/notifications/, 'library.view'],
     // Personal follows likewise: each user curates their own pull list.
     [/^\/api\/collection\/\d+\/follow$/, 'library.view'],
-    // The download queue is download-pipeline visibility, not general library
-    // data — a read-only viewer shouldn't see what others are grabbing. Reading
-    // the queue needs downloads.grab, same as the /queue view in the web UI.
-    // ($-anchored so it gates only the GET list, not queue/cancel|retry|pause…)
-    [/^\/api\/queue$/, 'downloads.grab'],
+    // Library-mutating writes (delete / scan / tag / metadata / identity) —
+    // pinned explicitly so they can never drift off the manage permission if the
+    // fall-through default ever changes. $-anchored, so GET browse of the
+    // collection stays library.view and downloads still route via DOWNLOAD_RULES.
+    [/^\/api\/collection\/\d+\/(delete|scan|refile|refresh|tag|cleanup|metadata|monitor|path|restricted|aliases|cv)$/, 'library.manage'],
+    [/^\/api\/collection\/(bulk|add-cv)$/, 'library.manage'],
+    [/^\/api\/cv\/match$/, 'library.manage'],
+    [/^\/api\/issue\/\d+\/metadata$/, 'library.manage'],
+    [/^\/api\/releases\/check$/, 'library.manage'],
+    [/^\/api\/(retry-failed|clear-failed)$/, 'library.manage'],
+    // The whole download queue — the view AND its controls (pause/resume/clear/
+    // cancel/retry) — is download-pipeline access. A read-only viewer shouldn't
+    // see or steer what others are grabbing. Needs downloads.grab, same as the
+    // /queue view in the web UI.
+    [/^\/api\/queue(\/|$)/, 'downloads.grab'],
     // Import/download history exposes the download source (e.g. which indexer or
     // client fetched each issue) — download-pipeline detail a read-only viewer
     // shouldn't see. Covers /api/history and /api/history/failed. The web UI
