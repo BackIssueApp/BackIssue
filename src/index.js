@@ -13,7 +13,7 @@ import { indexFolderForSeries, reconcileLibrary, removeSupersededFiles } from '.
 import { resolveSeriesDir, parseRootFolders } from './paths.js';
 import { refileLibrary } from './refile.js';
 import { initRssTables, unseenItems, markSeen, buildWantedIndex, matchFeedItems } from './rsswatch.js';
-import { findComicFiles, groupSeries } from './scanner.js';
+import { findComicFiles, groupSeries, importMetaForFolder } from './scanner.js';
 import { extractYear } from './matcher.js';
 import { poolWithResource } from './pool.js';
 import { makeCvClient, cvKey } from './cv.js';
@@ -342,6 +342,12 @@ async function runImportScan({ fresh = false } = {}) {
     try {
       let files = [];
       for (const r of roots) files = files.concat(await findComicFiles(r));
+      // File paths per folder, for the embedded-metadata sniff below.
+      const filesByDir = new Map();
+      for (const f of files) {
+        if (!filesByDir.has(f.dir)) filesByDir.set(f.dir, []);
+        filesByDir.get(f.dir).push(f.path);
+      }
       let groups = groupSeries(files).filter((g) => !folderIsManaged(g.dir));
       if (fresh) {
         clearImportCandidates(db);
@@ -361,8 +367,14 @@ async function runImportScan({ fresh = false } = {}) {
       const client = cvClient();
       let done = 0;
       await poolWithResource(groups, config.cvConcurrency || 3, () => null, async (g) => {
-        const name = cleanVolumeName(g.seriesName);
-        const year = extractYear(g.seriesName);
+        // Embedded ComicInfo.xml (tagged libraries) beats guessing from folder
+        // names: the tagged series name drives the search, the tagged volume
+        // year and publisher sharpen the ranking. Folder-derived values remain
+        // the fallback for untagged files.
+        const meta = await importMetaForFolder(filesByDir.get(g.dir) || []).catch(() => null);
+        const name = meta?.series || cleanVolumeName(g.seriesName);
+        const year = extractYear(g.seriesName) || meta?.year || null;
+        const publisher = meta?.publisher || g.publisher;
         let cand = null, confidence = 'none';
         // A bulk scan fires hundreds of CV searches — transient failures (rate
         // limits) are expected. Retry with backoff; only after all attempts fail
@@ -371,7 +383,7 @@ async function runImportScan({ fresh = false } = {}) {
         for (let attempt = 1; attempt <= 3; attempt++) {
           try {
             const results = await client.search(name);
-            const { best } = rankCandidates({ title: name, year, publisher: g.publisher }, results);
+            const { best } = rankCandidates({ title: name, year, publisher }, results);
             if (best) { cand = best.cand; confidence = best.confidence; }
             break;
           } catch (e) {
@@ -380,7 +392,7 @@ async function runImportScan({ fresh = false } = {}) {
           }
         }
         upsertImportCandidate(db, {
-          folder: g.dir, name, year, publisher: g.publisher, file_count: g.present.size,
+          folder: g.dir, name, year, publisher, file_count: g.present.size,
           cv_id: cand?.id ?? null, cv_name: cand?.name ?? null, cv_year: cand?.start_year ?? null, cv_image: cand?.image_url ?? null,
           confidence, status: confidence === 'high' ? 'ready' : 'review',
         });

@@ -18,6 +18,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   next candidate — or to loose page images — instead of failing the download.
 
 ### Added
+- **Import reads embedded metadata.** The library import now sniffs
+  `ComicInfo.xml` from tagged CBZ files (Mylar, ComicTagger, Kapowarr): the
+  tagged series name drives the ComicVine search, and the tagged volume year
+  and publisher sharpen match ranking — so a tagged library matches correctly
+  even when folder names are ambiguous. Folder names remain the fallback for
+  untagged files.
 - **Mylar-style folder layouts import correctly.** Libraries organized as
   `Publisher/Series/Volume (year)` (e.g. `Marvel/X-Men/v2004`) previously
   matched against the volume folder's name ("V2004") instead of the series.

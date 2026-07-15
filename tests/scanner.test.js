@@ -239,3 +239,50 @@ test('findMissing returns catalog issues whose normalized number is absent', () 
   const missing = findMissing(issues, present);
   assert.deepEqual(missing.map((m) => m.id), [11]); // #2 missing
 });
+
+// ---- importMetaForFolder (embedded ComicInfo.xml sniffing) ----------------
+import JSZip from 'jszip';
+import { importMetaForFolder } from '../src/scanner.js';
+
+async function writeCbz(file, entries) {
+  const zip = new JSZip();
+  for (const [name, content] of Object.entries(entries)) zip.file(name, content);
+  await fs.writeFile(file, await zip.generateAsync({ type: 'nodebuffer', compression: 'STORE' }));
+}
+const CI_XML = (series, volume, publisher) => `<?xml version="1.0"?>
+<ComicInfo><Series>${series}</Series><Number>1</Number><Volume>${volume}</Volume><Publisher>${publisher}</Publisher><Year>2010</Year></ComicInfo>`;
+
+test('importMetaForFolder reads series/year/publisher from a tagged CBZ', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'imeta-'));
+  const cbz = path.join(dir, 'X-Men 001.cbz');
+  await writeCbz(cbz, { 'ComicInfo.xml': CI_XML('X-Men', '2004', 'Marvel'), '001.jpg': 'x' });
+  const meta = await importMetaForFolder([cbz]);
+  assert.deepEqual(meta, { series: 'X-Men', year: '2004', publisher: 'Marvel' });
+  await fs.rm(dir, { recursive: true, force: true });
+});
+
+test('importMetaForFolder: ordinal <Volume> is not mistaken for a year', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'imeta-'));
+  const cbz = path.join(dir, 'Sandman 001.cbz');
+  await writeCbz(cbz, { 'ComicInfo.xml': CI_XML('Sandman', '2', 'DC'), '001.jpg': 'x' });
+  const meta = await importMetaForFolder([cbz]);
+  assert.equal(meta.series, 'Sandman');
+  assert.equal(meta.year, null); // Volume "2" is an ordinal, not a start year
+  await fs.rm(dir, { recursive: true, force: true });
+});
+
+test('importMetaForFolder skips untagged files and finds a tagged one', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'imeta-'));
+  const bare = path.join(dir, 'a-untagged.cbz');
+  const tagged = path.join(dir, 'b-tagged.cbz');
+  await writeCbz(bare, { '001.jpg': 'x' }); // no ComicInfo.xml
+  await writeCbz(tagged, { 'ComicInfo.xml': CI_XML('Saga', '2012', 'Image'), '001.jpg': 'x' });
+  const meta = await importMetaForFolder([bare, tagged]);
+  assert.equal(meta.series, 'Saga');
+  await fs.rm(dir, { recursive: true, force: true });
+});
+
+test('importMetaForFolder: CBR-only folders return null (no in-memory RAR reads)', async () => {
+  const meta = await importMetaForFolder(['/lib/X/a.cbr', '/lib/X/b.cbr']);
+  assert.equal(meta, null);
+});

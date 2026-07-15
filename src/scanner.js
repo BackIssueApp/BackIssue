@@ -4,6 +4,7 @@ import { issueNumberFromTitle } from './matcher.js';
 import { listSeries, listIssues, getSeriesById, getScanOverride } from './db.js';
 import { scoreMatch, normalizeNumber, normalizeTitle, extractYear } from './matcher.js';
 import { detectEdition } from './editions.js';
+import { readArchiveInfo } from './archive.js';
 
 const COMIC_RE = /\.(cbz|cbr)$/i;
 const RANK = { high: 3, medium: 2, low: 1, none: 0 };
@@ -101,6 +102,25 @@ export function groupSeries(files, seriesFolders = []) {
     if (!byDir.has(d)) byDir.set(d, { ...seriesIdentityFromDir(d), dir: d, present: new Set() });
   }
   return [...byDir.values()];
+}
+
+// Embedded metadata for an import folder: read ComicInfo.xml from the first few
+// CBZ files. A tagged library (Mylar, ComicTagger, Kapowarr) carries the
+// authoritative series/publisher — and usually the volume start year in
+// <Volume> — which beats guessing from folder names. Only CBZs are opened (a
+// central-directory read costs ~KB); CBRs are skipped because RAR needs the
+// whole file in memory, which a scan of hundreds of folders can't afford.
+export async function importMetaForFolder(filePaths, { readInfo = readArchiveInfo, maxTries = 3 } = {}) {
+  const cbzs = filePaths.filter((p) => /\.(cbz|zip)$/i.test(p)).slice(0, maxTries);
+  for (const p of cbzs) {
+    try {
+      const ci = (await readInfo(p))?.comicInfo;
+      if (!ci?.series) continue; // untagged or corrupt — try the next file
+      const volYear = /^(?:19|20)\d{2}$/.test(String(ci.volume || '').trim()) ? String(ci.volume).trim() : null;
+      return { series: ci.series, year: volYear, publisher: ci.publisher || null };
+    } catch { /* unreadable file — try the next */ }
+  }
+  return null;
 }
 
 // List series-level folders, including empty ones. The depth of series folders
