@@ -5,7 +5,7 @@ import { parseIndexers, searchNewznab } from '../newznab.js';
 import { makeNzbClient } from '../nzbclients.js';
 import { loadReleaseBlacklist, normReleaseTitle } from '../db.js';
 import { normalizeNumber } from '../matcher.js';
-import { cbrBufferToCbz } from '../archive.js';
+import { cbrBufferToCbz, sniffFormat } from '../archive.js';
 
 export const COMIC_EXT = new Set(['.cbz', '.cbr', '.pdf', '.zip', '.rar']);
 const IMG_EXT = /\.(jpe?g|png|gif|webp|bmp)$/i;
@@ -147,18 +147,39 @@ async function importCompleted(srcPath, name) {
   const files = st && st.isFile() ? [srcPath] : await walkFiles(srcPath);
   if (!files.length) throw new Error(`can't read completed download ${srcPath} for "${name}"`);
 
-  const comic = files.find((f) => COMIC_EXT.has(path.extname(f).toLowerCase()));
-  if (comic) {
-    const ext = path.extname(comic).toLowerCase();
-    if (ext === '.pdf') return { srcPath: comic, format: 'pdf' };
-    if (ext === '.cbz' || ext === '.zip') return { srcPath: comic, format: 'cbz' };
-    // .cbr / .rar → convert to CBZ so it can be tagged uniformly
-    return { buffer: await cbrBufferToCbz(await fs.readFile(comic)), format: 'cbz' };
+  // Every plausible comic, best-first: real comic extensions before generic
+  // archive ones (a leftover .rar part must never shadow the extracted comic),
+  // then larger files first within a tier (the comic dwarfs samples/leftovers).
+  const TIER = { '.cbz': 0, '.cbr': 0, '.pdf': 0, '.zip': 1, '.rar': 1 };
+  const candidates = files.filter((f) => COMIC_EXT.has(path.extname(f).toLowerCase()));
+  const size = new Map();
+  for (const c of candidates) size.set(c, (await fs.stat(c).catch(() => null))?.size ?? 0);
+  candidates.sort((a, b) =>
+    (TIER[path.extname(a).toLowerCase()] - TIER[path.extname(b).toLowerCase()]) || (size.get(b) - size.get(a)));
+
+  // Try candidates in order — a damaged or mislabeled extra file sitting next to
+  // the real comic must not fail the import. The format comes from the file's
+  // BYTES, not its extension (a ZIP posted as ".cbr" fed to the RAR extractor is
+  // a guaranteed "damaged archive" error).
+  let lastErr = null;
+  for (const comic of candidates) {
+    try {
+      const ext = path.extname(comic).toLowerCase();
+      const fmt = (await sniffFormat(comic))
+        ?? (ext === '.pdf' ? 'pdf' : (ext === '.cbz' || ext === '.zip') ? 'cbz' : 'cbr');
+      if (fmt === 'pdf') return { srcPath: comic, format: 'pdf' };
+      if (fmt === 'cbz') return { srcPath: comic, format: 'cbz' };
+      // RAR → convert to CBZ so it can be tagged uniformly
+      return { buffer: await cbrBufferToCbz(await fs.readFile(comic)), format: 'cbz' };
+    } catch (e) {
+      lastErr = e;
+      console.warn(`usenet import: "${path.basename(comic)}" unusable (${e?.message || e}) — trying the next candidate`);
+    }
   }
 
-  // No archive — some releases are just the loose page images. Pack them into a
-  // CBZ, renamed to a zero-padded index (natural-sorted) so readers show them in
-  // order regardless of the original file names.
+  // No (usable) archive — some releases are just the loose page images. Pack
+  // them into a CBZ, renamed to a zero-padded index (natural-sorted) so readers
+  // show them in order regardless of the original file names.
   const images = files.filter((f) => IMG_EXT.test(f))
     .sort((a, b) => path.basename(a).localeCompare(path.basename(b), undefined, { numeric: true, sensitivity: 'base' }));
   if (images.length) {
@@ -168,7 +189,7 @@ async function importCompleted(srcPath, name) {
     return { buffer: await zip.generateAsync({ type: 'nodebuffer', compression: 'STORE' }), format: 'cbz' };
   }
 
-  throw new Error(`no comic archive or page images found in ${srcPath} for "${name}"`);
+  throw lastErr || new Error(`no comic archive or page images found in ${srcPath} for "${name}"`);
 }
 
 // Deferred download source: usenet via Newznab indexers + SABnzbd/NZBGet.

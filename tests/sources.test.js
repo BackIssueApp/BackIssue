@@ -102,6 +102,43 @@ test('importCompleted: no archive and no images → clear error', async () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('importCompleted: a damaged extra archive next to the real comic is skipped', async () => {
+  // The reported failure: two files in the finished folder; the walk happened to
+  // hit the broken one first and the whole import failed. Candidates are now
+  // ranked (comic extensions before generic .rar leftovers) and tried in order.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'usimport-'));
+  fs.writeFileSync(path.join(dir, 'aaa-leftover.rar'), Buffer.from('Rar!\x1a\x07\x00garbage-not-a-real-archive'));
+  const zip = new JSZip(); zip.file('001.jpg', Buffer.from([0xff, 0xd8, 0xff, 1]));
+  const cbz = path.join(dir, 'zzz-comic.cbz');
+  fs.writeFileSync(cbz, await zip.generateAsync({ type: 'nodebuffer', compression: 'STORE' }));
+  const r = await importCompleted(dir, 'X');
+  assert.equal(r.format, 'cbz');
+  assert.equal(r.srcPath, cbz); // the real comic won despite sorting after the .rar
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('importCompleted: a ZIP mislabeled as .cbr is imported by its real format', async () => {
+  // Feeding ZIP bytes to the RAR extractor is a guaranteed "damaged archive"
+  // error — the format must come from the bytes, not the extension.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'usimport-'));
+  const zip = new JSZip(); zip.file('001.jpg', Buffer.from([0xff, 0xd8, 0xff, 1]));
+  const cbr = path.join(dir, 'comic.cbr');
+  fs.writeFileSync(cbr, await zip.generateAsync({ type: 'nodebuffer', compression: 'STORE' }));
+  const r = await importCompleted(dir, 'X');
+  assert.equal(r.format, 'cbz');
+  assert.equal(r.srcPath, cbr); // returned as-is (ZIP bytes), not run through RAR
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('importCompleted: every archive damaged but loose pages present → pages win', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'usimport-'));
+  fs.writeFileSync(path.join(dir, 'broken.cbr'), Buffer.from('Rar!\x1a\x07\x00garbage'));
+  fs.writeFileSync(path.join(dir, 'page1.jpg'), Buffer.from('img'));
+  const r = await importCompleted(dir, 'X');
+  assert.equal(r.format, 'cbz'); // packed from the loose page
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('usenet scoreRelease: matches an alias (2000AD ↔ 2000 AD), still rejects others', () => {
   const target = { series: '2000 AD', names: ['2000 AD', '2000AD'], number: '1' };
   assert.notEqual(scoreRelease('2000AD 001 (2016)', target), null); // indexer name → matches via alias

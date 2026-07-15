@@ -8,6 +8,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+- **Usenet imports survive extra or mislabeled files in the finished download.**
+  A damaged leftover archive (e.g. a stray `.rar` part) sitting next to the real
+  comic could be picked first and fail the whole import with "Archive header or
+  data are damaged". Import candidates are now ranked (comic files before
+  generic archives, larger first), each file's real format is detected from its
+  bytes rather than its extension, and an unusable file falls through to the
+  next candidate — or to loose page images — instead of failing the download.
+
 ### Added
 - **Mylar-style folder layouts import correctly.** Libraries organized as
   `Publisher/Series/Volume (year)` (e.g. `Marvel/X-Men/v2004`) previously
