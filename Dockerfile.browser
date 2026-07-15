@@ -49,6 +49,16 @@ ENV CHROMIUM_EXTRA_ARGS="--use-gl=angle --use-angle=swiftshader --enable-unsafe-
 VOLUME ["/data"]
 EXPOSE 8787
 
+# Build provenance: release builds leave the defaults; dev/nightly builds pass
+# BUILD_CHANNEL (+ commit sha) so the app reports e.g. "0.5.0-dev.a1b2c3d".
+# Zero-byte config layers — declared LAST on purpose: a per-commit ARG placed
+# above the fat layers (npm install, Chromium) would bust their cache and make
+# every image update a full ~1GB re-download.
+ARG BUILD_CHANNEL=release
+ARG BUILD_SHA=""
+ENV BUILD_CHANNEL=$BUILD_CHANNEL
+ENV BUILD_SHA=$BUILD_SHA
+
 # The entrypoint starts Xvfb (the virtual display) then execs the command, so the
 # headed browser has a screen to render into with no physical display attached.
 ENTRYPOINT ["/app/docker/entrypoint-browser.sh"]
