@@ -1372,8 +1372,20 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     if (!comicvineId) return res.status(400).json({ error: 'comicvineId required' });
     try {
       const r = await addFromCv(comicvineId);
-      // Adding into a library (e.g. from the manga-lane search) files it there too.
-      if (req.body?.libraryId && r?.seriesId != null) { try { assignSeriesLibrary(db, r.seriesId, Number(req.body.libraryId)); } catch { /* library gone */ } }
+      // Adding into a library files it there too. A manga-lane add resolves its
+      // destination itself: the first manga library, created on first use — no
+      // chicken-and-egg where searching manga requires a library to exist.
+      if (r?.seriesId != null) {
+        try {
+          if (req.body?.manga) {
+            const lib = listLibraries(db).find((l) => l.type === 'manga')
+              ?? { id: createLibrary(db, { name: 'Manga', type: 'manga' }) };
+            assignSeriesLibrary(db, r.seriesId, lib.id);
+          } else if (req.body?.libraryId) {
+            assignSeriesLibrary(db, r.seriesId, Number(req.body.libraryId));
+          }
+        } catch { /* library gone — boot migration re-homes */ }
+      }
       // Adding implies personal interest: the adder follows it automatically
       // (the add itself sets the global monitor flag for automation).
       if (r?.seriesId != null) setUserFollow(db, req.user.id, r.seriesId, true);
