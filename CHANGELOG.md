@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.6.7] — 2026-07-15
+
 ### Fixed
 - **Image updates no longer re-download the whole image.** A per-commit build
   stamp sat above the dependency layer in the Dockerfile, changing every
