@@ -117,6 +117,7 @@ export function initSchema(db) {
       cv_id INTEGER, cv_name TEXT, cv_year TEXT, cv_image TEXT,
       confidence TEXT, status TEXT NOT NULL DEFAULT 'review',
       series_type TEXT, -- inferred library type ('manga' from ComicInfo's Manga tag); null = comic
+      library_id INTEGER, -- library whose root folder contains this candidate; null = default
       scanned_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     -- Personal follows: each user's own pull list. Distinct from
@@ -167,6 +168,23 @@ function migrate(db) {
   // unknown values as 'comic'. Drives parsing conventions (chapters vs issues),
   // reader defaults (RTL), and library filtering.
   if (!cols.includes('type')) db.exec("ALTER TABLE series ADD COLUMN type TEXT NOT NULL DEFAULT 'comic'");
+  // Explicit libraries: named containers with a behavior type and optionally
+  // their own root folder. series.library_id NULL = the implicit default
+  // library (classic single-library behavior).
+  db.exec(`CREATE TABLE IF NOT EXISTS libraries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'comic',
+    root_folder TEXT,
+    folder_pattern TEXT, -- per-library folder naming; null = the global pattern
+    restricted INTEGER NOT NULL DEFAULT 0, -- members ride the mature-content machinery
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+  if (!cols.includes('library_id')) db.exec('ALTER TABLE series ADD COLUMN library_id INTEGER');
+  const libCols = db.prepare('PRAGMA table_info(libraries)').all().map((c) => c.name);
+  if (libCols.length && !libCols.includes('folder_pattern')) db.exec('ALTER TABLE libraries ADD COLUMN folder_pattern TEXT');
+  if (libCols.length && !libCols.includes('restricted')) db.exec('ALTER TABLE libraries ADD COLUMN restricted INTEGER NOT NULL DEFAULT 0');
   const cvcols = db.prepare('PRAGMA table_info(cv_series)').all().map((c) => c.name);
   if (cvcols.length && !cvcols.includes('site_detail_url')) db.exec('ALTER TABLE cv_series ADD COLUMN site_detail_url TEXT');
   // ComicVine-provided alternative names (its `aliases` field, newline-separated).
@@ -206,6 +224,8 @@ function migrate(db) {
   // Library type inferred by the import scan (ComicInfo's Manga tag).
   const icCols = db.prepare('PRAGMA table_info(import_candidates)').all().map((c) => c.name);
   if (icCols.length && !icCols.includes('series_type')) db.exec('ALTER TABLE import_candidates ADD COLUMN series_type TEXT');
+  // Owning explicit library (candidate folder under that library's root).
+  if (icCols.length && !icCols.includes('library_id')) db.exec('ALTER TABLE import_candidates ADD COLUMN library_id INTEGER');
   // The Mylar integration is gone — BackIssue replaces it.
   db.exec('DROP TABLE IF EXISTS mylar_series_map');
   // The dedicated tag log was folded into the Logs page (category 'tag').
@@ -251,13 +271,99 @@ export function listSeries(db, { search, includeRestricted = true } = {}) {
 export function setSeriesRestricted(db, id, restricted) {
   db.prepare('UPDATE series SET restricted=? WHERE id=?').run(restricted ? 1 : 0, id);
 }
-// Library type ('comic' | 'manga' | future e.g. 'magazine'). Whitelisted here —
-// the single write path — so no surface can invent a type the rest of the app
-// (parsing, filters, reader defaults) doesn't understand.
-export const SERIES_TYPES = ['comic', 'manga', 'magazine'];
+// Library types the CORE ships behavior for: comics (default conventions) and
+// manga (chapter-aware search, RTL reading defaults). A type only belongs here
+// when picking it actually changes behavior — anything else (e.g. magazines,
+// planned as a plugin with schedule-driven issues) registers itself via
+// registerLibraryType, which pushes into this whitelist at plugin load.
+export const SERIES_TYPES = ['comic', 'manga'];
 export function setSeriesType(db, id, type) {
   if (!SERIES_TYPES.includes(type)) throw new Error(`unknown series type "${type}"`);
   db.prepare('UPDATE series SET type=? WHERE id=?').run(type, id);
+}
+
+/* ---------- Explicit libraries ---------- */
+// A library's root_folder column holds one folder PER LINE — the first is the
+// default (where new comics are filed); the rest are extra scan locations.
+export function libraryFolders(rootFolder) {
+  return String(rootFolder || '').split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+}
+// Named containers with a behavior type (and, later, their own root folder).
+// Assigning a series to a library also sets its type — one decision, so a
+// library's contents always behave like the library says they do.
+export function createLibrary(db, { name, type = 'comic', rootFolder = null, folderPattern = null, restricted = false }) {
+  if (!String(name || '').trim()) throw new Error('a library needs a name');
+  if (!SERIES_TYPES.includes(type)) throw new Error(`unknown series type "${type}"`);
+  const ord = (db.prepare('SELECT COALESCE(MAX(sort_order),0)+1 n FROM libraries').get()).n;
+  return db.prepare('INSERT INTO libraries (name, type, root_folder, folder_pattern, restricted, sort_order) VALUES (?,?,?,?,?,?)')
+    .run(String(name).trim(), type, rootFolder || null, folderPattern || null, restricted ? 1 : 0, ord).lastInsertRowid;
+}
+export function listLibraries(db) {
+  // series_count = COLLECTION members only (followed or with files on disk) —
+  // the series table also holds catalog rows the user never added, which the
+  // collection views filter out; counting those made libraries look huge.
+  return db.prepare(`SELECT l.*, (SELECT COUNT(*) FROM series s WHERE s.library_id = l.id
+      AND (s.followed=1 OR EXISTS(SELECT 1 FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1))) series_count
+    FROM libraries l ORDER BY l.sort_order, l.id`).all();
+}
+export function getLibrary(db, id) {
+  return db.prepare('SELECT * FROM libraries WHERE id=?').get(id);
+}
+export function updateLibrary(db, id, { name, type, rootFolder, folderPattern, restricted, sortOrder } = {}) {
+  const lib = getLibrary(db, id);
+  if (!lib) throw new Error('unknown library');
+  if (type != null && !SERIES_TYPES.includes(type)) throw new Error(`unknown series type "${type}"`);
+  db.prepare('UPDATE libraries SET name=?, type=?, root_folder=?, folder_pattern=?, restricted=?, sort_order=? WHERE id=?').run(
+    name != null && String(name).trim() ? String(name).trim() : lib.name,
+    type ?? lib.type,
+    rootFolder !== undefined ? (rootFolder || null) : lib.root_folder,
+    folderPattern !== undefined ? (folderPattern || null) : lib.folder_pattern,
+    restricted !== undefined ? (restricted ? 1 : 0) : lib.restricted,
+    sortOrder ?? lib.sort_order, id);
+  // A type change re-types the members (the library defines their behavior).
+  if (type != null && type !== lib.type) db.prepare('UPDATE series SET type=? WHERE library_id=?').run(type, id);
+  // A restricted flag flip re-flags the members — they ride the existing
+  // mature-content permission, which every surface already enforces.
+  if (restricted !== undefined && (restricted ? 1 : 0) !== lib.restricted) {
+    db.prepare('UPDATE series SET restricted=? WHERE library_id=?').run(restricted ? 1 : 0, id);
+  }
+}
+// Delete a library, never its series: members move to a surviving library
+// (first comic-typed one, else the first remaining, re-typed accordingly).
+// Deleting the LAST library leaves members unassigned — the pre-libraries
+// state, where the startup migration would re-home them on next boot.
+export function deleteLibrary(db, id) {
+  const survivors = db.prepare('SELECT * FROM libraries WHERE id<>? ORDER BY sort_order, id').all(id);
+  const home = survivors.find((l) => l.type === 'comic') || survivors[0] || null;
+  if (home) {
+    db.prepare('UPDATE series SET library_id=?, type=?, restricted=CASE WHEN ? THEN 1 ELSE restricted END WHERE library_id=?')
+      .run(home.id, home.type, home.restricted ? 1 : 0, id);
+  } else {
+    db.prepare('UPDATE series SET library_id=NULL WHERE library_id=?').run(id);
+  }
+  return db.prepare('DELETE FROM libraries WHERE id=?').run(id).changes;
+}
+// Move a series into a library (typing it accordingly), or out (null). A
+// restricted library also flags the member restricted; moving OUT clears only
+// the library-inherited flag (a restricted library → default move unhides —
+// deliberate: the default library carries no restriction of its own).
+export function assignSeriesLibrary(db, seriesId, libraryId) {
+  const prev = db.prepare('SELECT library_id FROM series WHERE id=?').get(seriesId);
+  if (libraryId == null) {
+    const prevLib = prev?.library_id ? getLibrary(db, prev.library_id) : null;
+    db.prepare('UPDATE series SET library_id=NULL WHERE id=?').run(seriesId);
+    if (prevLib?.restricted) db.prepare('UPDATE series SET restricted=0 WHERE id=?').run(seriesId);
+    return;
+  }
+  const lib = getLibrary(db, libraryId);
+  if (!lib) throw new Error('unknown library');
+  db.prepare('UPDATE series SET library_id=?, type=?, restricted=CASE WHEN ? THEN 1 ELSE restricted END WHERE id=?')
+    .run(lib.id, lib.type, lib.restricted ? 1 : 0, seriesId);
+  // Leaving a restricted library for an unrestricted one clears the inherited flag.
+  if (!lib.restricted && prev?.library_id) {
+    const prevLib = getLibrary(db, prev.library_id);
+    if (prevLib?.restricted) db.prepare('UPDATE series SET restricted=0 WHERE id=?').run(seriesId);
+  }
 }
 export function isSeriesRestricted(db, id) {
   const r = db.prepare('SELECT restricted FROM series WHERE id=?').get(id);
@@ -595,7 +701,7 @@ export function pruneLibraryFiles(db, seen) {
 // Last path segment (folder name) of a dir, across / or \ separators.
 function dirBaseName(d) { return d ? (String(d).split(/[\\/]/).filter(Boolean).pop() || null) : null; }
 
-export function collectionSeries(db, { filter = 'all', search = '', sort = 'title', includeRestricted = true, userId = null } = {}) {
+export function collectionSeries(db, { filter = 'all', search = '', sort = 'title', includeRestricted = true, userId = null, library = null } = {}) {
   // Sort options for the rail: title (default), recently added (id desc — rows
   // are only ever inserted), most missing (CV total minus owned).
   const ORDERS = {
@@ -635,8 +741,9 @@ export function collectionSeries(db, { filter = 'all', search = '', sort = 'titl
     WHERE (s.followed=1 OR EXISTS(SELECT 1 FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1)
            OR EXISTS(SELECT 1 FROM user_follows uf WHERE uf.series_id=s.id AND uf.user_id=@uid))
       ${includeRestricted ? '' : 'AND s.restricted = 0'}
+      ${library != null ? 'AND s.library_id = @lib' : ''}
       ${search ? 'AND (s.title LIKE @q OR cv.name LIKE @q OR cv.publisher LIKE @q)' : ''}
-    ${orderBy}`).all({ uid: userId ?? -1, ...(search ? { q: `%${search}%` } : {}) });
+    ${orderBy}`).all({ uid: userId ?? -1, ...(library != null ? { lib: library } : {}), ...(search ? { q: `%${search}%` } : {}) });
   // ComicVine is the data source. A matched comic shows CV name/publisher/year/
   // cover and rolls up against CV's issues. An unmatched comic surfaces NO source
   // metadata — just a neutral "needs a ComicVine match" state (sources are download-only).
@@ -703,6 +810,7 @@ export function seriesCollectionDetail(db, id, userId = null) {
     cv_id: series.cv_id, cv_locked: series.cv_locked, sourced, path: series.path,
     restricted: !!series.restricted,
     type: series.type || 'comic',
+    library_id: series.library_id ?? null,
     aliases: series.aliases || '',                 // user-added search names (editable)
     cv_aliases: parseAliases(cvRow && cvRow.aliases), // ComicVine's aliases (read-only hint)
   };
@@ -777,6 +885,7 @@ export function seriesCollectionDetail(db, id, userId = null) {
       monitored: series.followed,
       cv_id: null, cv_locked: 0, sourced, path: series.path,
       type: series.type || 'comic',
+      library_id: series.library_id ?? null,
       folder: dirBaseName(files[0]?.dir),
     },
     cv: null, source: 'unmatched', sourced, matched: false,
@@ -1087,12 +1196,12 @@ export function clearImportCandidates(db, { keepImported = true } = {}) {
 }
 export function upsertImportCandidate(db, c) {
   return db.prepare(`INSERT INTO import_candidates
-    (folder,name,year,publisher,file_count,cv_id,cv_name,cv_year,cv_image,confidence,status,series_type,scanned_at)
-    VALUES (@folder,@name,@year,@publisher,@file_count,@cv_id,@cv_name,@cv_year,@cv_image,@confidence,@status,@series_type,datetime('now'))
+    (folder,name,year,publisher,file_count,cv_id,cv_name,cv_year,cv_image,confidence,status,series_type,library_id,scanned_at)
+    VALUES (@folder,@name,@year,@publisher,@file_count,@cv_id,@cv_name,@cv_year,@cv_image,@confidence,@status,@series_type,@library_id,datetime('now'))
     ON CONFLICT(folder) DO UPDATE SET name=excluded.name,year=excluded.year,publisher=excluded.publisher,
       file_count=excluded.file_count,cv_id=excluded.cv_id,cv_name=excluded.cv_name,cv_year=excluded.cv_year,
-      cv_image=excluded.cv_image,confidence=excluded.confidence,status=excluded.status,series_type=excluded.series_type,scanned_at=datetime('now')`)
-    .run({ name: null, year: null, publisher: null, file_count: 0, cv_id: null, cv_name: null, cv_year: null, cv_image: null, confidence: 'none', status: 'review', series_type: null, ...c });
+      cv_image=excluded.cv_image,confidence=excluded.confidence,status=excluded.status,series_type=excluded.series_type,library_id=excluded.library_id,scanned_at=datetime('now')`)
+    .run({ name: null, year: null, publisher: null, file_count: 0, cv_id: null, cv_name: null, cv_year: null, cv_image: null, confidence: 'none', status: 'review', series_type: null, library_id: null, ...c });
 }
 export function listImportCandidates(db) {
   return db.prepare(`SELECT * FROM import_candidates ORDER BY

@@ -94,11 +94,13 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
     const filter = p.get('filter') || 'all';
     const q = p.get('q') || '';
     const sort = p.get('sort') || 'title';
-    if (lastRail === filter + '\n' + q + '\n' + sort) return;
-    lastRail = filter + '\n' + q + '\n' + sort;
+    const library = p.get('library') || '';
+    if (lastRail === filter + '\n' + q + '\n' + sort + '\n' + library) return;
+    lastRail = filter + '\n' + q + '\n' + sort + '\n' + library;
     rail.filter = filter;
     rail.search = q;
     rail.sort = sort;
+    rail.library = library ? Number(library) : null;
     untrack(() => loadCollection());
   });
 

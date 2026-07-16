@@ -13,6 +13,7 @@
   import Cover from './Cover.svelte';
   import Badge from './Badge.svelte';
   import Icon from '../lib/Icon.svelte';
+  import { status } from '../lib/status.svelte.js';
   import { openCvPicker } from './CvPickerModal.svelte';
   import { openEditMetadata } from './EditMetadataModal.svelte';
   import { openIssueInfo } from './IssueModal.svelte';
@@ -265,6 +266,18 @@
     } catch { return notify('Could not update — is the app reachable?', 'error'); }
     detail.series.monitored = monitored ? 1 : 0;
     notify(monitored ? 'Auto-download enabled for this series.' : 'Auto-download disabled for this series.', 'ok');
+    loadCollection();
+  }
+
+  // Move the series into an explicit library (or back to the default). The
+  // library's type comes along — its members behave like the library says.
+  async function moveToLibrary(libraryId) {
+    const r = await apiPost(`/api/collection/${s.id}/library`, { libraryId });
+    if (r.error) return notify(r.error, 'error');
+    detail.det.series.library_id = libraryId;
+    const lib = (status.libraries || []).find((l) => l.id === libraryId);
+    if (lib) detail.det.series.type = lib.type;
+    notify(lib ? `Moved to ${lib.name}.` : 'Moved to the default library.', 'ok');
     loadCollection();
   }
 
@@ -558,8 +571,16 @@
                       {/if}
                     {/if}
                     {#if isTrusted()}
-                      <button id="series-type-btn" class="menu__item" role="menuitem" title="Library type — manga uses chapter-style search and right-to-left reading defaults"
-                        onclick={() => { moreOpen = false; toggleType(); }}><Icon name="book" /> {(det?.series?.type || 'comic') === 'manga' ? 'Mark as comic' : 'Mark as manga'}</button>
+                      {#if (status.libraries || []).length}
+                        <!-- Explicit libraries exist → move between them (the type rides along). -->
+                        {#each status.libraries.filter((l) => l.id !== det?.series?.library_id) as lib (lib.id)}
+                          <button class="menu__item" role="menuitem" title="Move this series into the {lib.name} library"
+                            onclick={() => { moreOpen = false; moveToLibrary(lib.id); }}><Icon name="book" /> Move to {lib.name}</button>
+                        {/each}
+                      {:else}
+                        <button id="series-type-btn" class="menu__item" role="menuitem" title="Library type — manga uses chapter-style search and right-to-left reading defaults"
+                          onclick={() => { moreOpen = false; toggleType(); }}><Icon name="book" /> {(det?.series?.type || 'comic') === 'manga' ? 'Mark as comic' : 'Mark as manga'}</button>
+                      {/if}
                       <button id="restrict-btn" class="menu__item" role="menuitem" title="Hide this series from roles without the “View mature content” permission"
                         onclick={() => { moreOpen = false; toggleRestricted(); }}><Icon name="shield" /> {det?.series?.restricted ? 'Remove mature flag' : 'Mark mature'}</button>
                       <div class="series-more__sep" role="separator"></div>

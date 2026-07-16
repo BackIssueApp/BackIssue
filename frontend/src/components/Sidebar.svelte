@@ -22,6 +22,27 @@
     ui.sidebarOpen = false;
     navigate(path);
   }
+
+  // Library entries under the main one. Explicitly created libraries (Settings
+  // → Libraries) take precedence; with none defined, auto type-lanes appear
+  // once the collection holds a second library type. One type, no libraries =
+  // the classic single entry.
+  const TYPE_LABELS = { comic: 'Comics', manga: 'Manga', magazine: 'Magazines' };
+  const typeLanes = $derived(
+    (status.libraries || []).length
+      ? status.libraries.map((l) => ({ key: 'lib:' + l.id, q: '/?library=' + l.id, label: l.name }))
+      : (status.libraryTypes || []).length > 1
+        ? status.libraryTypes.map((t) => ({
+            key: t.type === 'comic' ? 'comics' : t.type,
+            q: '/?filter=' + (t.type === 'comic' ? 'comics' : t.type),
+            label: TYPE_LABELS[t.type] || (t.type.charAt(0).toUpperCase() + t.type.slice(1)),
+          }))
+        : []);
+  const activeLane = $derived.by(() => {
+    const p = new URLSearchParams(route.search);
+    return p.get('library') ? 'lib:' + p.get('library') : (p.get('filter') || '');
+  });
+  const laneActive = (key) => isActive('/') && activeLane === key;
 </script>
 
 <aside class="sidebar" class:is-open={ui.sidebarOpen} aria-label="App sections">
@@ -31,8 +52,12 @@
 
   <nav class="sidenav">
     <div class="sidenav__head">Library</div>
-    <button class="sidenav__item" class:is-active={isActive('/')} onclick={() => go('/')}>
+    <button class="sidenav__item" class:is-active={isActive('/') && !activeLane} onclick={() => go('/')}>
       <span class="sidenav__icon"><Icon name="library" /></span> Library</button>
+    {#each typeLanes as lane (lane.key)}
+      <button class="sidenav__item sidenav__item--sub" class:is-active={laneActive(lane.key)} onclick={() => go(lane.q)}>
+        <span class="sidenav__icon"><Icon name="book" /></span> {lane.label}</button>
+    {/each}
     <button id="lists-btn" class="sidenav__item" class:is-active={isActive('/lists')} onclick={() => go('/lists')}>
       <span class="sidenav__icon"><Icon name="list" /></span> Lists</button>
     {#if isTrusted()}

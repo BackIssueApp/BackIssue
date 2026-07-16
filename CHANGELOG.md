@@ -9,6 +9,23 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 ## [Unreleased]
 
 ### Added
+- **Libraries own the storage locations.** The Root folders setting is gone —
+  each library's folder is where its comics are filed and scanned. Existing
+  root folders migrate automatically on first start: the default becomes a
+  **Comics** library (adopting every existing series), and extra scan folders
+  each become their own library. The sidebar's **Library** entry shows the
+  whole collection; each library entry below it shows just that library.
+- **Explicit libraries.** Split the collection into named libraries (e.g.
+  *Comics* and *Manga*), each with its own sidebar entry. A library has a
+  behavior type and an optional root folder — new downloads for its series
+  file there, and Import auto-assigns anything found under it. Move series
+  between libraries from the ⋯ menu; deleting a library keeps its series.
+  Managed in Settings → Library → Libraries. With no libraries defined, the
+  sidebar grows automatic per-type entries once a second type appears.
+  Libraries can also carry their own **folder pattern** (e.g. `{series}` for a
+  publisher-less manga tree) and a **Mature** flag that hides the whole
+  library — entry, name, and members — from roles without the mature-content
+  permission, riding the same enforcement as per-series restriction.
 - **Library types — first cut, starting with manga.** Every series now has a
   library type (comic by default). Mark a series as manga from its ⋯ menu, or
   let import infer it from ComicInfo's `Manga` tag. Manga series get

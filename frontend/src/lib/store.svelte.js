@@ -6,7 +6,7 @@ import { apiGet, apiPost } from './api.js';
 import { subscribe } from './events.svelte.js';
 import { notify } from './toasts.svelte.js';
 
-export const rail = $state({ rows: [], filter: 'all', sort: 'title', search: '', selecting: false, loaded: false });
+export const rail = $state({ rows: [], filter: 'all', sort: 'title', search: '', library: null, selecting: false, loaded: false });
 // Shell chrome state (mobile sidebar overlay).
 export const ui = $state({ sidebarOpen: false });
 // Multi-select on the rail (series ids) — only meaningful while rail.selecting.
@@ -53,7 +53,7 @@ export async function loadFlags() {
 
 export async function loadCollection() {
   try {
-    rail.rows = await apiGet('/api/collection?filter=' + rail.filter + '&search=' + encodeURIComponent(rail.search) + '&sort=' + rail.sort);
+    rail.rows = await apiGet('/api/collection?filter=' + rail.filter + '&search=' + encodeURIComponent(rail.search) + '&sort=' + rail.sort + (rail.library ? '&library=' + rail.library : ''));
     rail.loaded = true;
   } catch { /* keep the last good list */ }
 }

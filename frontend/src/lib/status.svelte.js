@@ -6,13 +6,15 @@ import { subscribe } from './events.svelte.js';
 import { BackIssue } from './plugins.svelte.js';
 import { detail, loadCollection, reloadDetail, refreshIssueStatuses } from './store.svelte.js';
 
-export const status = $state({ counts: {}, version: '', downloading: false });
+export const status = $state({ counts: {}, version: '', downloading: false, libraryTypes: [], libraries: [] });
 
 let wasDownloading = false;
 export async function pollStatus() {
   let s;
   try { s = await apiGet('/api/status'); } catch { return; }
   status.counts = s.counts || {};
+  status.libraryTypes = s.libraryTypes || [];
+  status.libraries = s.libraries || [];
   status.downloading = !!s.queue?.running;
   if (s.version) status.version = s.version;
 

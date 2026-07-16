@@ -1798,3 +1798,19 @@ textarea.dialog-input { resize: vertical; font-family: var(--font-mono); }
    to the base .srcbadge style. Plugins may ship their own .srcbadge--<id> rule. */
 .list-note--warn { color: var(--amber, #fbbf24); }
 .srcbadge--pack { background: rgba(244,114,182,.16); color: #f9a8d4; }
+
+/* Per-type library lanes under the main Library entry (Comics / Manga / …). */
+.sidenav__item--sub { padding-left: 26px; font-size: 13px; }
+
+/* Library cards in Settings — one card per library: identity row, folder list, extras. */
+.libcard { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin: 10px 0; display: flex; flex-direction: column; gap: 8px; }
+.libcard__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.libcard__icon { color: var(--muted); display: inline-flex; }
+.libcard__name { flex: 1 1 140px; min-width: 120px; padding: 6px 10px; background: var(--ink); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font-weight: 600; }
+.libcard__mature { margin: 0; }
+.libcard__count { margin-left: auto; white-space: nowrap; }
+.libcard__extras .field input { max-width: 260px; }
+.libcard__new { margin-top: 4px; }
+
+/* Bulk-bar library mover — compact select that acts like a menu. */
+.coll-bulkbar__lib { background: var(--ink); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font-size: 12.5px; }

@@ -6,7 +6,7 @@ import fsp from 'node:fs/promises';
 import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
-import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
+import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
 import { resolveSeriesDir, defaultRootedDir } from './paths.js';
 import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
@@ -15,7 +15,7 @@ import { testIndexer } from './newznab.js';
 import { testClient } from './nzbclients.js';
 import { testTorznabIndexer } from './torznab.js';
 import { testTorrentClient } from './torrentclients.js';
-import { pluginsDir, pluginCatalog, setPluginEnabled, registeredRoutes, registeredPermissions, registeredAuthProviders, registeredCredentialProviders } from './plugins.js';
+import { pluginsDir, pluginCatalog, setPluginEnabled, registeredRoutes, registeredPermissions, registeredAuthProviders, registeredCredentialProviders, pluginLibraryTypes } from './plugins.js';
 import { fetchCatalog, installPlugin, uninstallPlugin } from './plugincatalog.js';
 import * as users from './users.js';
 import * as lists from './lists.js';
@@ -254,7 +254,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     // pinned explicitly so they can never drift off the manage permission if the
     // fall-through default ever changes. $-anchored, so GET browse of the
     // collection stays library.view and downloads still route via DOWNLOAD_RULES.
-    [/^\/api\/collection\/\d+\/(delete|scan|refile|refresh|tag|cleanup|metadata|monitor|path|restricted|aliases|cv|type)$/, 'library.manage'],
+    [/^\/api\/collection\/\d+\/(delete|scan|refile|refresh|tag|cleanup|metadata|monitor|path|restricted|aliases|cv|type|library)$/, 'library.manage'],
     [/^\/api\/collection\/(bulk|add-cv)$/, 'library.manage'],
     [/^\/api\/cv\/match$/, 'library.manage'],
     [/^\/api\/issue\/\d+\/metadata$/, 'library.manage'],
@@ -810,7 +810,15 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
 
   app.get('/api/status', (req, res) => {
     const followedCount = db.prepare('SELECT COUNT(*) n FROM series WHERE followed=1').get().n;
-    res.json({ counts: countByStatus(db), followedCount, version: APP_VERSION, crawl: state.crawl, queue: state.queue, follow: state.follow || { running: false } });
+    // Library types in use (same membership rule as the collection view) — the
+    // sidebar shows one library entry per type once a second type appears.
+    const libraryTypes = db.prepare(`SELECT COALESCE(NULLIF(type,''),'comic') t, COUNT(*) n FROM series s
+      WHERE s.followed=1 OR EXISTS(SELECT 1 FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1)
+      GROUP BY t`).all().map((r) => ({ type: r.t, count: r.n }));
+    // A restricted library is invisible (name included) to roles without the
+    // mature-content permission — same rule its member series already follow.
+    const libs = listLibraries(db).filter((l) => !l.restricted || canRestricted(req));
+    res.json({ counts: countByStatus(db), followedCount, libraryTypes, libraries: libs, version: APP_VERSION, crawl: state.crawl, queue: state.queue, follow: state.follow || { running: false } });
   });
 
   // Live updates: one SSE stream tells the UI which domains changed so it can
@@ -1078,6 +1086,15 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       for (const id of ids) setUserFollow(db, req.user.id, id, action === 'follow');
       return res.json({ done: ids.length });
     }
+    if (action === 'move-library') {
+      // Bulk move into a library (or back to the default with libraryId null).
+      // Same semantics as the single-series move: the library's type (and
+      // restricted flag) ride along.
+      const libraryId = req.body?.libraryId ?? null;
+      try { for (const id of ids) assignSeriesLibrary(db, id, libraryId); }
+      catch (e) { return res.status(400).json({ error: String(e?.message || e) }); }
+      return res.json({ done: ids.length });
+    }
     if (action === 'remove') {
       let n = 0;
       for (const id of ids) { try { await deleteComic(id, { deleteFiles: false }); n++; } catch { /* skip */ } }
@@ -1138,7 +1155,43 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   app.post('/api/queue/resume', (req, res) => { state.queue.paused = false; res.json({ paused: false }); });
   app.post('/api/queue/clear', (req, res) => { res.json({ cleared: cancelQueued(db) }); });
 
-  app.get('/api/collection', (req, res) => res.json(collectionSeries(db, { filter: req.query.filter, search: req.query.search, sort: req.query.sort, includeRestricted: canRestricted(req), userId: req.user.id })));
+  app.get('/api/collection', (req, res) => res.json(collectionSeries(db, { filter: req.query.filter, search: req.query.search, sort: req.query.sort, includeRestricted: canRestricted(req), userId: req.user.id, library: req.query.library ? Number(req.query.library) : null })));
+
+  // ---- Explicit libraries (named containers with a behavior type) ----
+  // Viewing the list only needs library.view; mutations need library.manage
+  // (pinned in PERM_RULES). Deleting a library unassigns its series — files
+  // and series are never deleted here.
+  // Libraries OWN the storage locations: the legacy rootFolders setting is
+  // derived from their folders (first library = default filing target), so
+  // every scan/filing code path keeps working unchanged.
+  const syncRootsFromLibraries = () => {
+    const folders = listLibraries(db).flatMap((l) => libraryFolders(l.root_folder));
+    if (typeof saveSettings === 'function') saveSettings({ rootFolders: folders.join('\n') });
+  };
+  app.get('/api/libraries', (req, res) => res.json({
+    libraries: listLibraries(db).filter((l) => !l.restricted || canRestricted(req)),
+    // Assignable types: the core pair + anything a plugin registered — the
+    // Settings type selector is built from this, so a type only appears when
+    // something actually implements its behavior.
+    types: [
+      { id: 'comic', label: 'Comics' }, { id: 'manga', label: 'Manga' },
+      ...pluginLibraryTypes().map((t) => ({ id: t.id, label: t.label })),
+    ],
+  }));
+  app.post('/api/libraries', (req, res) => {
+    try { const id = createLibrary(db, { name: req.body?.name, type: req.body?.type || 'comic', rootFolder: req.body?.rootFolder }); syncRootsFromLibraries(); res.json({ id, libraries: listLibraries(db) }); }
+    catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
+  });
+  app.post('/api/libraries/:id', (req, res) => {
+    try { updateLibrary(db, Number(req.params.id), { name: req.body?.name, type: req.body?.type, rootFolder: req.body?.rootFolder, folderPattern: req.body?.folderPattern, restricted: req.body?.restricted, sortOrder: req.body?.sortOrder }); syncRootsFromLibraries(); res.json({ libraries: listLibraries(db) }); }
+    catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
+  });
+  app.delete('/api/libraries/:id', (req, res) => { const removed = deleteLibrary(db, Number(req.params.id)); syncRootsFromLibraries(); res.json({ removed, libraries: listLibraries(db) }); });
+  // Move a series into a library (null/absent = back to the default library).
+  app.post('/api/collection/:id/library', (req, res) => {
+    try { assignSeriesLibrary(db, Number(req.params.id), req.body?.libraryId ?? null); res.json({ ok: true }); }
+    catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
+  });
   app.get('/api/collection/:id', (req, res) => {
     // A restricted series is invisible to roles without the permission.
     if (!canRestricted(req) && isSeriesRestricted(db, Number(req.params.id))) return res.status(404).json({ error: 'not found' });

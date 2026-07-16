@@ -3,6 +3,7 @@
   // (list) for power flows. Replaces the old side rail as the main '/' view.
   import { navigate, route, setQuery } from '../lib/router.svelte.js';
   import { rail, railSelect, ops, loadCollection } from '../lib/store.svelte.js';
+  import { status } from '../lib/status.svelte.js';
   import { apiPost } from '../lib/api.js';
   import { notify } from '../lib/toasts.svelte.js';
   import { fmt, humanBytes, windowRange } from '../lib/util.js';
@@ -79,6 +80,18 @@
     const r = await apiPost('/api/collection/bulk', { ids: [...railSelect], action });
     if (r.error) return notify(r.error, 'error');
     notify(action === 'download-missing' ? `Queued ${fmt(r.queued)} issue(s).` : `Done — ${fmt(r.done)} series.`, 'ok');
+    railSelect.clear();
+    loadCollection();
+  }
+
+  // Bulk move into a library (or back to the default). The library's type —
+  // and its restricted flag — ride along, same as the single-series move.
+  async function moveSelected(libraryId) {
+    if (!railSelect.size) return notify('Select some series first.', 'info');
+    const lib = (status.libraries || []).find((l) => l.id === libraryId);
+    const r = await apiPost('/api/collection/bulk', { ids: [...railSelect], action: 'move-library', libraryId });
+    if (r.error) return notify(r.error, 'error');
+    notify(`Moved ${fmt(r.done)} series to ${lib ? lib.name : 'the default library'}.`, 'ok');
     railSelect.clear();
     loadCollection();
   }
@@ -210,6 +223,13 @@
       <button class="link-btn" onclick={() => bulk('follow')}><Icon name="star" fill /> Follow</button>
       <button class="link-btn" onclick={() => bulk('unfollow')}><Icon name="star" /> Unfollow</button>
       <button class="link-btn" onclick={() => bulk('download-missing')}><Icon name="download" /> Missing</button>
+      {#if (status.libraries || []).length}
+        <select class="coll-bulkbar__lib" title="Move the selected series into a library"
+          onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v !== '') moveSelected(v === 'default' ? null : Number(v)); }}>
+          <option value="">Move to…</option>
+          {#each status.libraries as lib (lib.id)}<option value={lib.id}>{lib.name}</option>{/each}
+        </select>
+      {/if}
       <button class="link-btn" onclick={() => bulk('remove')}>Remove</button>
     </div>
   {/if}

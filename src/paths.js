@@ -27,9 +27,9 @@ export function safeSegment(s) {
 
 // The on-disk folder (relative to a root) for a comic, from the admin's folder
 // pattern — blank falls back to the built-in "Publisher/Title (Year)" default.
-export function seriesFolderName(series) {
+export function seriesFolderName(series, pattern = null) {
   // Pattern uses "/" for sub-folders; return OS-native separators.
-  return seriesFolderFromPattern(series, config.folderPattern).split('/').join(path.sep);
+  return seriesFolderFromPattern(series, pattern || config.folderPattern).split('/').join(path.sep);
 }
 
 // Prefer ComicVine's clean name/publisher/start-year over the (possibly
@@ -58,6 +58,16 @@ export function resolveSeriesDir(db, series) {
   ).get(series.id);
   if (row && row.dir) return row.dir;
   const s = cvEnriched(db, series);
+  // A series in an explicit library files under THAT library's root folder
+  // (when it has one) — e.g. manga lands in the manga root, not the default —
+  // using the library's own folder pattern when set (manga trees often skip
+  // the publisher level).
+  if (series.library_id) {
+    const lib = db.prepare('SELECT root_folder, folder_pattern FROM libraries WHERE id=?').get(series.library_id);
+    // First folder = the library's default filing target (extras are scan-only).
+    const first = String(lib?.root_folder || '').split(/[\n,]+/).map((x) => x.trim()).find(Boolean);
+    if (first) return path.join(first, seriesFolderName(s, lib.folder_pattern));
+  }
   const roots = effectiveRoots();
   if (roots[0]) return path.join(roots[0], seriesFolderName(s));
   return path.join(config.downloadsDir, safeSegment(s.title));

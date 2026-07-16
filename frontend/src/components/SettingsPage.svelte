@@ -1,6 +1,6 @@
 <script>
   import { goBack, navigate } from '../lib/router.svelte.js';
-  import { apiGet, apiPost } from '../lib/api.js';
+  import { apiGet, apiPost, apiDelete } from '../lib/api.js';
   import { flags } from '../lib/store.svelte.js';
   import { BackIssue, plugins, bridgeRefs } from '../lib/plugins.svelte.js';
   import { parseIndexerString, serializeIndexers } from '../lib/util.js';
@@ -56,6 +56,51 @@
   const MODE_LISTS = { newznab: () => indexerList, torznab: () => torznabList };
   const MODE_ENDPOINTS = { newznab: '/api/indexers/test', torznab: '/api/torznab/test' };
 
+  // Explicit libraries (named containers with a behavior type, shown in the
+  // sidebar). CRUD applies immediately — not part of the settings Save cycle.
+  let libs = $state([]);
+  let newLib = $state({ name: '', type: 'comic', rootFolder: '' });
+  // Assignable types come from the server (core pair + plugin-registered), so
+  // a type appears here only when something implements its behavior.
+  let LIB_TYPES = $state([['comic', 'Comics'], ['manga', 'Manga']]);
+  // A library can hold several folders — first is the DEFAULT filing target,
+  // the rest are extra scan locations (stored newline-joined in root_folder).
+  const withFolders = (l) => ({ ...l, folders: parseRoots(l.root_folder).length ? parseRoots(l.root_folder) : [''] });
+  async function loadLibs() {
+    try {
+      const r = await apiGet('/api/libraries');
+      libs = (r.libraries || []).map(withFolders);
+      if (Array.isArray(r.types) && r.types.length) LIB_TYPES = r.types.map((t) => [t.id, t.label]);
+    } catch { /* offline */ }
+  }
+  $effect(() => { if (active) loadLibs(); });
+  async function addLib() {
+    if (!newLib.name.trim()) return notify('Give the library a name.', 'error');
+    const r = await apiPost('/api/libraries', { name: newLib.name.trim(), type: newLib.type, rootFolder: newLib.rootFolder.trim() || null });
+    if (r.error) return notify(r.error, 'error');
+    libs = r.libraries.map(withFolders); newLib = { name: '', type: 'comic', rootFolder: '' };
+    notify('Library created — it now shows in the sidebar.', 'ok');
+  }
+  async function saveLib(l) {
+    const rootFolder = (l.folders || []).map((s) => s.trim()).filter(Boolean).join('\n');
+    const r = await apiPost('/api/libraries/' + l.id, { name: l.name, type: l.type, rootFolder: rootFolder || null, folderPattern: l.folder_pattern || null, restricted: !!l.restricted });
+    if (r.error) return notify(r.error, 'error');
+    libs = r.libraries.map(withFolders); notify('Library updated.', 'ok');
+  }
+  const libAddFolder = (l) => { l.folders = [...l.folders, '']; };
+  const libRemoveFolder = (l, i) => { l.folders = l.folders.filter((_, k) => k !== i); if (!l.folders.length) l.folders = ['']; saveLib(l); };
+  const libMakeDefault = (l, i) => { if (i <= 0) return; const next = [...l.folders]; const [f] = next.splice(i, 1); l.folders = [f, ...next]; saveLib(l); };
+  async function removeLib(l) {
+    if (!(await confirmDialog({
+      title: `Delete “${l.name}”?`,
+      message: `Its ${l.series_count} series stay in your collection (moved to another library) — nothing is deleted from disk.`,
+      confirmLabel: 'Delete library', danger: true,
+    }))) return;
+    const r = await apiDelete('/api/libraries/' + l.id);
+    if (r.error) return notify(r.error, 'error');
+    libs = r.libraries.map(withFolders); notify('Library deleted — series kept.', 'ok');
+  }
+
   // Source priority (order enabled sources are tried), from /api/sources.
   let sourceOrder = $state([]);
 
@@ -93,7 +138,8 @@
     }
     body.newznabIndexers = serializeIndexers(indexerList);
     body.torznabIndexers = serializeIndexers(torznabList);
-    body.rootFolders = rootFolderList.map((s) => s.trim()).filter(Boolean).join('\n');
+    // rootFolders is DERIVED from the libraries' folders (server keeps it in
+    // sync on any library change) — never sent from the settings form.
     if (sourceOrder.length) body.sourcePriority = sourceOrder.map((s) => s.id).join(',');
     return body;
   }
@@ -382,28 +428,8 @@
           <h3 class="set-group__head">Library</h3>
           <p class="set-group__sub">Where comics live on disk and how the maintenance tools run.</p>
           <section class="settings-section">
-            <div class="field field--col">
-              <span>Root folders</span>
-              <div class="rootlist">
-                {#each rootFolderList as _root, i (i)}
-                  <div class="rootrow">
-                    <input class="rootrow__path" type="text" spellcheck="false" bind:value={rootFolderList[i]}
-                      placeholder={i === 0 ? 'D:\\Comics   or   \\\\NAS\\comics' : 'another folder to scan…'} />
-                    {#if i === 0}
-                      <span class="rootrow__badge" title="New comics are filed here by default">Default</span>
-                    {:else}
-                      <button class="link-btn rootrow__def" type="button" onclick={() => makeDefaultRoot(i)} title="Make this the default folder for new comics">Make default</button>
-                    {/if}
-                    {#if rootFolderList.length > 1}
-                      <button class="rootrow__x" type="button" title="Remove this folder" aria-label="Remove folder" onclick={() => removeRoot(i)}><Icon name="close" size={15} /></button>
-                    {/if}
-                  </div>
-                {/each}
-              </div>
-              <button class="link-btn rootlist__add" type="button" onclick={addRoot}><Icon name="plus" size={14} /> Add folder</button>
-            </div>
             <label class="field"><span>Downloads folder</span><input id="set-downloadsDir" type="text" spellcheck="false" /></label>
-            <p class="modal__note">Comics are filed as <b>root</b>/Publisher/Title (Year). New comics land in the <b>Default</b> folder. Add more folders so BackIssue also scans them for existing comics when you <b>Import</b> or run <b>Scan library</b> — reorder with <b>Make default</b> to change where new comics go. Changing this never moves files already on disk. The <b>downloads folder</b> below is only a fallback when no root folder is set.</p>
+            <p class="modal__note">Storage locations live on your <b>Libraries</b> below — each library's folder is where its comics are filed and scanned. The <b>downloads folder</b> is only a fallback when no library has a folder.</p>
             <label class="field"><span>Tool workers</span><input id="set-toolsConcurrency" type="number" min="1" max="16" /></label>
             <p class="modal__note">How many files the library tools (convert / verify / tag) process at once — higher overlaps I/O but uses more memory per in-flight file.</p>
 
@@ -413,6 +439,52 @@
             {#if namingPreview}<p class="modal__note">Example: <code class="mono">{namingPreview}</code></p>{/if}
             <label class="field field--check"><input id="set-renameDownloads" type="checkbox" /><span>Rename downloaded files to the file pattern (off = keep the source's original filename)</span></label>
             <p class="modal__note">Tokens: <code>{'{publisher}'}</code> <code>{'{series}'}</code> <code>{'{year}'}</code> <code>{'{issue}'}</code> (<code>{'{issue:2}'}</code> sets the pad width) <code>{'{issueTitle}'}</code> <code>{'{date}'}</code> <code>{'{edition}'}</code>. Blank uses the defaults shown above; empty tokens are dropped and spacing is tidied. Changing these affects <b>new</b> downloads — to apply to existing files, use <b>Reorganize library</b> on the Tools page, or a volume's <b>Rename files</b> action.</p>
+            <p class="modal__subhead modal__subhead--sub">Libraries</p>
+            <p class="modal__note">Split the collection into named libraries — each shows as its own entry in the sidebar. A library's <b>type</b> sets how its series behave (manga = chapter-style search, right-to-left reading); its optional <b>folder</b> is where new downloads for that library are filed (blank = the default root). Move series from a volume's ⋯ menu.</p>
+            {#each libs as l (l.id)}
+              <div class="libcard">
+                <div class="libcard__head">
+                  <span class="libcard__icon"><Icon name="book" /></span>
+                  <input class="libcard__name" type="text" spellcheck="false" bind:value={l.name} onchange={() => saveLib(l)} title="Library name" />
+                  <select bind:value={l.type} onchange={() => saveLib(l)} title="Library type — sets how its series behave">
+                    {#each LIB_TYPES as [v, label] (v)}<option value={v}>{label}</option>{/each}
+                  </select>
+                  <label class="field field--check libcard__mature" title="Hide this library (and everything in it) from roles without the “View mature content” permission">
+                    <input type="checkbox" checked={!!l.restricted} onchange={(e) => { l.restricted = e.currentTarget.checked ? 1 : 0; saveLib(l); }} /><span>Mature</span></label>
+                  <span class="scan-muted libcard__count">{l.series_count} series</span>
+                  <button class="rootrow__x" type="button" title="Delete this library (series are kept)" aria-label="Delete library" onclick={() => removeLib(l)}><Icon name="trash" size={15} /></button>
+                </div>
+                <div class="rootlist">
+                  {#each l.folders as _f, i (i)}
+                    <div class="rootrow">
+                      <input class="rootrow__path" type="text" spellcheck="false" bind:value={l.folders[i]} onchange={() => saveLib(l)}
+                        placeholder={i === 0 ? 'D:\\Comics   or   \\\\NAS\\comics' : 'another folder to scan…'} />
+                      {#if i === 0}
+                        <span class="rootrow__badge" title="New comics for this library are filed here">Default</span>
+                      {:else}
+                        <button class="link-btn rootrow__def" type="button" onclick={() => libMakeDefault(l, i)} title="Make this the default folder for new comics">Make default</button>
+                      {/if}
+                      {#if l.folders.length > 1}
+                        <button class="rootrow__x" type="button" title="Remove this folder (files stay on disk)" aria-label="Remove folder" onclick={() => libRemoveFolder(l, i)}><Icon name="close" size={15} /></button>
+                      {/if}
+                    </div>
+                  {/each}
+                  <button class="link-btn rootlist__add" type="button" onclick={() => libAddFolder(l)}><Icon name="plus" size={14} /> Add folder</button>
+                </div>
+                <div class="libcard__extras">
+                  <label class="field"><span>Folder pattern</span>
+                    <input type="text" spellcheck="false" placeholder="blank = global pattern" bind:value={l.folder_pattern} onchange={() => saveLib(l)} title="Per-library folder pattern, e.g. {'{series}'} for a tree without publisher folders" /></label>
+                </div>
+              </div>
+            {/each}
+            <div class="rootrow libcard__new">
+              <input class="rootrow__path" style="max-width:200px" type="text" spellcheck="false" placeholder="New library name…" bind:value={newLib.name} onkeydown={(e) => { if (e.key === 'Enter') addLib(); }} />
+              <select bind:value={newLib.type}>
+                {#each LIB_TYPES as [v, label] (v)}<option value={v}>{label}</option>{/each}
+              </select>
+              <button class="btn btn--ghost btn--sm" type="button" onclick={addLib}><Icon name="plus" size={14} /> Create library</button>
+            </div>
+
             <!-- Plugin library-behavior settings inject here (plain DOM — stays mounted). -->
             <div id="settings-plugin-library"></div>
           </section>

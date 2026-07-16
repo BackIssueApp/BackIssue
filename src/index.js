@@ -27,7 +27,7 @@ import { collectionStats } from './stats.js';
 import { installConsoleCapture, attachLogDb, listLogs, clearLogs, logInfo, logWarn, logError, logCounts, logCategories } from './logstore.js';
 import { runCvMatch as runCvMatchLib, cacheAndLink, addSeriesFromCv, refreshCvVolume, refreshAllIssueDetails, rankCandidates } from './cvmatch.js';
 import { getSeriesById, seriesCollectionDetail, untrackSeries, getCvIssue, upsertSeries, setSeriesPath,
-  ensureCvIssueRow, recordGrab, getGrab, setGrabStatus, setIssueStatus, setSeriesAliases, setSeriesType, seriesSearchNames,
+  ensureCvIssueRow, recordGrab, getGrab, setGrabStatus, setIssueStatus, setSeriesAliases, setSeriesType, listLibraries, libraryFolders, createLibrary, assignSeriesLibrary, seriesSearchNames,
   clearImportCandidates, upsertImportCandidate, listImportCandidates, getImportCandidate, setImportCandidateMatch, setImportCandidateStatus, readyImportCandidates, listWantedIssues, queueIssues, getCvSeries } from './db.js';
 import { parseIndexers, searchNewznab } from './newznab.js';
 import { makeNzbClient } from './nzbclients.js';
@@ -47,6 +47,38 @@ loadSettings(); // merge persisted settings over config defaults before anything
 
 const db = openDb(config.dbPath);
 attachLogDb(db); // persist logs (and flush anything captured before the db opened)
+
+// One-time migration: libraries own the storage locations now. Existing root
+// folders become libraries (the first — the old default filing target — is
+// "Comics"; extra scan roots keep their folder name), and every unassigned
+// series joins the first one, so the sidebar's per-library entries cover the
+// whole collection. Runs only while NO libraries exist, so it never fights
+// user-managed libraries. The legacy rootFolders setting stays as a DERIVED
+// value (rewritten on any library change) for the scan/filing code paths.
+{
+  const normRoot = (p) => String(p || '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  const owned = new Set(listLibraries(db).map((l) => normRoot(l.root_folder)).filter(Boolean));
+  const orphanRoots = parseRootFolders(config.rootFolders).filter((r) => !owned.has(normRoot(r)));
+  const hasComicLib = listLibraries(db).some((l) => l.type === 'comic');
+  for (let i = 0; i < orphanRoots.length; i++) {
+    const name = !hasComicLib && i === 0 ? 'Comics' : (nodePath.basename(orphanRoots[i]) || `Comics ${i + 1}`);
+    createLibrary(db, { name, type: 'comic', rootFolder: orphanRoots[i] });
+    logInfo(`Created the "${name}" library from root folder ${orphanRoots[i]}`, 'library');
+  }
+  // Only COLLECTION members join a library — the series table also carries
+  // catalog rows (looked-up/crawled, never added) that must stay unassigned.
+  const MEMBER = `(followed=1 OR EXISTS(SELECT 1 FROM library_files lf WHERE lf.series_id=series.id AND lf.valid=1))`;
+  // Corrective: an earlier migration adopted every row — strip non-members.
+  const stripped = db.prepare(`UPDATE series SET library_id=NULL WHERE library_id IS NOT NULL AND NOT ${MEMBER}`).run().changes;
+  if (stripped) logInfo(`Removed ${stripped} non-collection catalog rows from libraries (members only)`, 'library');
+  // Unassigned members join the first comic library so the per-library sidebar
+  // entries cover the whole collection.
+  const home = listLibraries(db).find((l) => l.type === 'comic') || listLibraries(db)[0];
+  if (home) {
+    const adopted = db.prepare(`UPDATE series SET library_id=? WHERE library_id IS NULL AND ${MEMBER}`).run(home.id).changes;
+    if (adopted) logInfo(`Migrated ${adopted} series into the "${home.name}" library`, 'library');
+  }
+}
 attachJobsDb(db); // persist job runs (and fail any left 'running' by a crashed session)
 // Capture HARD crashes (OOM, native/WASM aborts) that bypass the JS handlers —
 // Node writes a diagnostic report file we can point at. Uncaught JS exceptions
@@ -340,8 +372,16 @@ async function runImportScan({ fresh = false } = {}) {
   const job = startJob('import-scan', fresh ? 'Scan library for import (full)' : 'Scan library for new volumes');
   (async () => {
     try {
+      // Explicit libraries' root folders are scanned too, and every candidate
+      // found under one is auto-assigned to that library (typed accordingly).
+      const libs = listLibraries(db).filter((l) => l.root_folder);
+      const norm = (p) => String(p).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+      // A library may hold several folders (newline-joined; first = default) —
+      // a candidate under ANY of them belongs to that library.
+      const libraryFor = (dir) => libs.find((l) => libraryFolders(l.root_folder).some((f) => { const d = norm(dir), r = norm(f); return d === r || d.startsWith(r + '/'); }))?.id ?? null;
+      const allRoots = [...new Set([...roots, ...libs.flatMap((l) => libraryFolders(l.root_folder))])];
       let files = [];
-      for (const r of roots) files = files.concat(await findComicFiles(r));
+      for (const r of allRoots) files = files.concat(await findComicFiles(r));
       // File paths per folder, for the embedded-metadata sniff below.
       const filesByDir = new Map();
       for (const f of files) {
@@ -407,6 +447,7 @@ async function runImportScan({ fresh = false } = {}) {
           cv_id: cand?.id ?? null, cv_name: cand?.name ?? null, cv_year: cand?.start_year ?? null, cv_image: cand?.image_url ?? null,
           confidence, status: confidence === 'high' ? 'ready' : 'review',
           series_type: meta?.type ?? null,
+          library_id: libraryFor(g.dir),
         });
         state.import.done = ++done;
         job.progress({ done, total: groups.length, message: `${done}/${groups.length}` });
@@ -440,9 +481,11 @@ async function runImport() {
           if (c.year) db.prepare('UPDATE series SET year=? WHERE id=?').run(c.year, seriesId);
         }
         setSeriesPath(db, seriesId, c.folder);
-        // Library type inferred at scan time (ComicInfo's Manga tag) sticks to
-        // the created series — drives reading direction and library filters.
-        if (c.series_type) { try { setSeriesType(db, seriesId, c.series_type); } catch { /* unknown type — stay comic */ } }
+        // A candidate found under an explicit library's root joins that library
+        // (which also types it); otherwise the scan-time type inference
+        // (ComicInfo's Manga tag) sticks to the created series.
+        if (c.library_id) { try { assignSeriesLibrary(db, seriesId, c.library_id); } catch { /* library deleted since scan */ } }
+        else if (c.series_type) { try { setSeriesType(db, seriesId, c.series_type); } catch { /* unknown type — stay comic */ } }
         await indexFolderForSeries({ db, dir: c.folder, seriesId, cvId: c.cv_id || null });
         setImportCandidateStatus(db, c.id, 'imported');
         imported++;
