@@ -85,3 +85,16 @@ test('catalog: disabled plugins are listed but never imported; toggling flags a 
   assert.equal(pluginCatalog().find((p) => p.name === 'alpha').restartRequired, true);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('registerLibraryType whitelists a plugin type for setSeriesType', async () => {
+  const { pluginApi, pluginLibraryTypes } = await import('../src/plugins.js');
+  const { openDb, upsertSeries, setSeriesType, getSeriesById, SERIES_TYPES } = await import('../src/db.js');
+  pluginApi.registerLibraryType({ id: 'lightnovel', label: 'Light novels' });
+  assert.ok(SERIES_TYPES.includes('lightnovel'));
+  assert.ok(pluginLibraryTypes().some((t) => t.id === 'lightnovel'));
+  const db = openDb(':memory:');
+  const id = upsertSeries(db, { title: 'X', url: 'cv:9' });
+  setSeriesType(db, id, 'lightnovel'); // must not throw once registered
+  assert.equal(getSeriesById(db, id).type, 'lightnovel');
+  assert.throws(() => pluginApi.registerLibraryType({}), /needs an id/);
+});

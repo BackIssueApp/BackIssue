@@ -13,6 +13,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import config from './config.js';
+import { SERIES_TYPES } from './db.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PLUGINS_DIR = process.env.PLUGINS_DIR || path.join(root, 'plugins');
@@ -177,7 +178,21 @@ export const pluginApi = {
   registerNotifier(fn) {
     if (typeof fn === 'function') { notifiers.push(fn); bump('notifiers'); }
   },
+  // A new library type ({ id, label }) beyond the built-ins (comic/manga/
+  // magazine). Registration whitelists the id for setSeriesType and adds a
+  // library filter lane (?filter=<id>). The plugin owns the type's behavior —
+  // its parsing, sources, or issue generation; core only tracks and filters.
+  registerLibraryType({ id, label } = {}) {
+    const clean = String(id || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    if (!clean) throw new Error('registerLibraryType: a type needs an id');
+    if (!SERIES_TYPES.includes(clean)) SERIES_TYPES.push(clean);
+    libraryTypes.push({ id: clean, label: label || clean, plugin: currentLoadingPlugin });
+  },
 };
+
+// Library types added by plugins (beyond the built-ins) — for UI listings.
+const libraryTypes = [];
+export const pluginLibraryTypes = () => [...libraryTypes];
 
 // The plugin currently running its register() — so registerClientAsset can stamp
 // the owning plugin name without the plugin passing it explicitly.

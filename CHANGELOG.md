@@ -15,6 +15,10 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   chapter-aware searching (releases named `c1044`, `Ch. 105.5`, `Vol. 37` now
   match), an extra chapter-form indexer query, and a **Manga** library filter.
   The type field is extensible groundwork — magazines are planned next.
+- **Plugins can register library types** (`registerLibraryType({ id, label })`):
+  a registered type becomes settable on series and gets its own library filter
+  lane. Groundwork for type-defining plugins (e.g. a future magazines plugin
+  that generates date-based issues).
 
 ## [0.6.7] — 2026-07-15
 

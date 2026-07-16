@@ -666,11 +666,11 @@ export function collectionSeries(db, { filter = 'all', search = '', sort = 'titl
       : filter === 'unmonitored' ? !r.monitored
       : filter === 'problems' ? (r.untagged > 0 || r.corrupt > 0)
       : filter === 'unmatched' ? !r.cv_id
-      // Library-type lanes. Unknown/legacy values count as comics, so the
-      // comics lane never silently hides rows when new types appear.
-      : filter === 'manga' ? r.type === 'manga'
-      : filter === 'comics' ? r.type !== 'manga' && r.type !== 'magazine'
-      : filter === 'magazines' ? r.type === 'magazine'
+      // Library-type lanes. The comics lane means "not any other known type",
+      // so unknown/legacy values count as comics and are never silently hidden.
+      : filter === 'comics' ? !SERIES_TYPES.includes(r.type) || r.type === 'comic'
+      // Any whitelisted type (built-in or plugin-registered) is its own lane.
+      : SERIES_TYPES.includes(filter) ? r.type === filter
       : true);
 }
 
