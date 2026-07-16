@@ -1378,8 +1378,8 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       if (r?.seriesId != null) {
         try {
           if (req.body?.manga) {
-            const lib = listLibraries(db).find((l) => l.type === 'manga')
-              ?? { id: createLibrary(db, { name: 'Manga', type: 'manga' }) };
+            let lib = listLibraries(db).find((l) => l.type === 'manga');
+            if (!lib) { lib = { id: createLibrary(db, { name: 'Manga', type: 'manga' }) }; r.createdLibrary = 'Manga'; }
             assignSeriesLibrary(db, r.seriesId, lib.id);
           } else if (req.body?.libraryId) {
             assignSeriesLibrary(db, r.seriesId, Number(req.body.libraryId));

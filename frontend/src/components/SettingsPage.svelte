@@ -261,6 +261,13 @@
     if (enabledSourceCount === 0) attention.push({ tone: 'red', title: 'No download sources enabled', body: 'New comics can’t be downloaded until a source is turned on.', action: 'Enable', tab: 'sources' });
     else if (enabledSourceCount === 1) attention.push({ tone: 'amber', title: 'Only one download source enabled', body: 'A second source gives searches a fallback when the first misses.', action: 'Review', tab: 'sources' });
     if (libs.length && !libFolders) attention.push({ tone: 'amber', title: 'No library has a folder', body: 'Downloads fall back to the downloads folder until a library gets one.', action: 'Set folder', tab: 'library' });
+    // A populated library without its own folder files into another library's
+    // root — worth surfacing per library (e.g. the auto-created Manga library).
+    for (const l of libs) {
+      if (l.series_count > 0 && !(l.folders || []).some((f) => f.trim()) && libFolders) {
+        attention.push({ tone: 'amber', title: `The ${l.name} library has no folder`, body: 'Its downloads file into the first library that has one — set a folder to keep them separate.', action: 'Set folder', tab: 'library' });
+      }
+    }
     overview.attention = attention;
   }
 

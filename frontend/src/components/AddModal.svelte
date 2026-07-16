@@ -65,6 +65,9 @@
         r.noSources ? 'Added (no sources enabled)' :
         r.outcome === 'created' ? 'Added' : 'Already in library';
       if (r.noSources) notify('Added. Nothing was queued — no download sources are enabled (Settings → Download sources).', 'info');
+      // The first manga add materializes the Manga library — without a folder
+      // its downloads file into the comics root, so point at the fix.
+      if (r.createdLibrary) notify(`Created the ${r.createdLibrary} library — give it a folder in Settings → Library so its downloads file separately.`, 'info');
       loadCollection();
     } catch { notify('Add failed', 'error'); v._busy = false; v._label = 'Add'; }
   }
