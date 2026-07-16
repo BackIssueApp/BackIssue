@@ -13,46 +13,41 @@
 
   const DEFAULT_PORTS = { sabnzbd: '8080', nzbget: '6789' };
 
-  // The section groups, in scroll order. The index rail is built from this and
-  // scroll-spy highlights whichever one the reader is in.
-  const SECTIONS = [
-    { id: 'library', label: 'Library' },
-    { id: 'downloading', label: 'Downloading' },
-    { id: 'sources', label: 'Sources' },
-    { id: 'metadata', label: 'Metadata' },
-    { id: 'signin', label: 'Sign-in' },
-    { id: 'notifications', label: 'Notifications' },
+  // "Split detail" settings: a top tab rail shows ONE page at a time. Every
+  // page stays MOUNTED (CSS-hidden, never {#if}-removed) — the generic set-*
+  // form scan reads hidden fields fine, and plugin-injected DOM must survive
+  // tab switches.
+  const TABS = [
+    { id: 'overview', label: 'Overview', icon: 'bar-chart' },
+    { id: 'library', label: 'Library', icon: 'library' },
+    { id: 'downloading', label: 'Downloading', icon: 'download' },
+    { id: 'sources', label: 'Sources', icon: 'target' },
+    { id: 'metadata', label: 'Metadata', icon: 'tag' },
+    { id: 'signin', label: 'Sign-in', icon: 'shield' },
+    { id: 'notifications', label: 'Notifications', icon: 'bell' },
   ];
-  let activeSection = $state('library');
-  let anySourceOn = $state(false);          // drives the Sources dot + rail status
-  let dirtySections = $state(new Set());    // sections with unsaved edits (accent dot)
+  let activeTab = $state('overview');
+  let libPanel = $state('libraries');   // libraries | org | maint
+  let srcPanel = $state('usenet');      // usenet | torrent | priority
+  let libDrill = $state(false);         // mobile: rail list → panel detail
+  let srcDrill = $state(false);
+  let anySourceOn = $state(false);
+  let srcOn = $state({ usenet: false, torrent: false }); // live toggle state (pre-save)
+  let enabledSourceCount = $state(0);
+  let dirtySections = $state(new Set()); // tab ids with unsaved edits
   let filterQuery = $state('');
-  let emptySections = $state(new Set());    // sections with no filter matches (dimmed)
-  let noMatches = $state(false);
-  let contentEl = $state(null);             // the scroll container
+  let loadedSettings = $state({});       // last-loaded settings (Overview reads it)
+  let notifyChannels = $state(0);        // plugin-injected channel cards
+
+  function pickTab(id) {
+    activeTab = id;
+    libDrill = false; srcDrill = false; // mobile drill resets on tab switch
+    if (id === 'overview') refreshOverview();
+  }
 
   // Indexer lists ({ name, url, apiKey }) — shared row UI for both modes.
   let indexerList = $state([]);   // newznab (usenet)
   let torznabList = $state([]);   // torznab (torrent)
-
-  // Library root folders as editable rows. [0] is the DEFAULT — where new
-  // comics are filed; the rest are additional locations that get scanned on
-  // Import / Scan library. Stored as a newline-joined string in rootFolders.
-  let rootFolderList = $state(['']);
-  const parseRoots = (text) => String(text || '').split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
-  const addRoot = () => { rootFolderList = [...rootFolderList, '']; dirty = true; };
-  const removeRoot = (i) => {
-    rootFolderList = rootFolderList.filter((_, k) => k !== i);
-    if (!rootFolderList.length) rootFolderList = [''];
-    dirty = true;
-  };
-  const makeDefaultRoot = (i) => {
-    if (i <= 0) return;
-    const next = [...rootFolderList];
-    const [r] = next.splice(i, 1);
-    rootFolderList = [r, ...next];
-    dirty = true;
-  };
   const MODE_LISTS = { newznab: () => indexerList, torznab: () => torznabList };
   const MODE_ENDPOINTS = { newznab: '/api/indexers/test', torznab: '/api/torznab/test' };
 
@@ -60,11 +55,8 @@
   // sidebar). CRUD applies immediately — not part of the settings Save cycle.
   let libs = $state([]);
   let newLib = $state({ name: '', type: 'comic', rootFolder: '' });
-  // Assignable types come from the server (core pair + plugin-registered), so
-  // a type appears here only when something implements its behavior.
   let LIB_TYPES = $state([['comic', 'Comics'], ['manga', 'Manga']]);
-  // A library can hold several folders — first is the DEFAULT filing target,
-  // the rest are extra scan locations (stored newline-joined in root_folder).
+  const parseRoots = (text) => String(text || '').split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
   const withFolders = (l) => ({ ...l, folders: parseRoots(l.root_folder).length ? parseRoots(l.root_folder) : [''] });
   async function loadLibs() {
     try {
@@ -117,7 +109,6 @@
     }, 250);
   }
 
-
   let root = $state(null); // this page's DOM root, for the generic set-* field scan
 
   // Every settings field carries id="set-<configKey>"; core and plugin-injected
@@ -138,17 +129,13 @@
     }
     body.newznabIndexers = serializeIndexers(indexerList);
     body.torznabIndexers = serializeIndexers(torznabList);
-    // rootFolders is DERIVED from the libraries' folders (server keeps it in
-    // sync on any library change) — never sent from the settings form.
+    // rootFolders is DERIVED from the libraries' folders — never sent.
     if (sourceOrder.length) body.sourcePriority = sourceOrder.map((s) => s.id).join(',');
     return body;
   }
 
-  // Show/hide each source card's config, swap client credential fields to the
-  // selected client, hint its default port, and let plugins report whether their
-  // source is enabled (for the "no sources" status). Config VISIBILITY is driven
-  // by .src-block.is-open (see wireSourceCards) so a source can be expanded to
-  // configure it whether or not it's enabled — including plugin-injected ones.
+  // Swap client credential fields to the selected client, hint default ports,
+  // and let plugins report whether their source is enabled.
   function syncSourceUI() {
     if (!root) return;
     const usenet = root.querySelector('#set-usenetEnabled').checked;
@@ -163,15 +150,49 @@
     const qport = root.querySelector('#set-qbPort');
     qport.placeholder = '8080';
     if (!qport.value) qport.value = '8080';
+    srcOn = { usenet, torrent };
     const pluginEnabled = BackIssue._sourceSyncHooks.map((fn) => { try { return !!fn(); } catch { return false; } });
-    anySourceOn = usenet || torrent || pluginEnabled.some(Boolean);
+    enabledSourceCount = [usenet, torrent, ...pluginEnabled].filter(Boolean).length;
+    anySourceOn = enabledSourceCount > 0;
     wireSourceCards();
+    scanPluginBlocks();
   }
   bridgeRefs.refreshSourceUI = syncSourceUI;
 
-  // Make every source card (core + plugin-injected) collapsible: clicking the
-  // header row toggles it open; enabling a source auto-opens it to configure.
-  // Idempotent — safe to call on every sync as plugin blocks appear.
+  // Plugin source blocks, surfaced as rail entries. Each injected .src-block
+  // stays exactly where the plugin put it (mounts must never lose children —
+  // plugins guard against re-injecting); the rail just class-toggles which one
+  // is visible. Label/note/dot are read from the block's own header.
+  let pluginSrc = $state([]);
+  function scanPluginBlocks() {
+    const mount = document.getElementById('settings-plugin-sources');
+    if (!mount) return;
+    const out = [];
+    [...mount.querySelectorAll(':scope > .src-block')].forEach((block, i) => {
+      const key = 'plugin:' + (block.id || i);
+      block.dataset.setxKey = key;
+      const sw = block.querySelector('.switch input');
+      out.push({
+        key,
+        label: block.querySelector('.src-toggle b')?.textContent?.trim() || 'Plugin source',
+        note: block.querySelector('.src-toggle .modal__note')?.textContent?.trim().slice(0, 48) || 'Plugin source',
+        on: !!sw?.checked,
+      });
+      if (sw && !sw.dataset.setxWired) { sw.dataset.setxWired = '1'; sw.addEventListener('change', () => syncSourceUI()); }
+    });
+    pluginSrc = out;
+  }
+  // Reflect the selected panel onto the plugin blocks (in place, CSS only).
+  $effect(() => {
+    void srcPanel; void pluginSrc;
+    const mount = document.getElementById('settings-plugin-sources');
+    if (!mount) return;
+    for (const block of mount.querySelectorAll(':scope > .src-block')) {
+      block.classList.toggle('setx-active', block.dataset.setxKey === srcPanel);
+    }
+  });
+
+  // Make every source card (core + plugin-injected) collapsible. Idempotent.
   function wireSourceCards() {
     if (!root) return;
     for (const block of root.querySelectorAll('.src-block')) {
@@ -179,7 +200,7 @@
       block.dataset.wired = '1';
       const header = block.querySelector('.src-toggle');
       if (header) header.addEventListener('click', (e) => {
-        if (e.target.closest('.switch')) return; // the enable switch does its own thing
+        if (e.target.closest('.switch')) return;
         block.classList.toggle('is-open');
       });
       const sw = block.querySelector('.switch input');
@@ -189,94 +210,96 @@
 
   async function openSettings() {
     const s = await apiGet('/api/settings');
+    loadedSettings = s || {};
     applySettingsToForm(s);
     indexerList = parseIndexerString(s.newznabIndexers);
     torznabList = parseIndexerString(s.torznabIndexers);
-    rootFolderList = parseRoots(s.rootFolders);
-    if (!rootFolderList.length) rootFolderList = [''];
     try { sourceOrder = (await apiGet('/api/sources')).sources || []; } catch { sourceOrder = []; }
     for (const cb of BackIssue._settingsHooks) { try { cb(s); } catch { /* ignore */ } }
     syncSourceUI();
     previewNaming();
-    // Start each source expanded iff it's enabled — a tidy collapsed row when
-    // off. Only cards WITH an enable switch: switchless cards (notification
-    // channels) decide their own initial state in their onSettingsLoad hook.
     for (const b of root.querySelectorAll('.src-block')) {
       const sw = b.querySelector('.switch input');
       if (sw) b.classList.toggle('is-open', sw.checked);
     }
-    dirty = false;               // everything above was programmatic, not user edits
+    refreshOverview();
+    dirty = false;               // everything above was programmatic
     dirtySections = new Set();
   }
 
-  /* ---- Section navigation (index rail + scroll-spy) ----
-     Positions are measured relative to the scroll container with
-     getBoundingClientRect — offsetTop is relative to the nearest positioned
-     ancestor, not the pane, so it would overshoot past each section's title. */
-  function scrollToSection(id) {
-    const el = document.getElementById('sec-' + id);
-    if (!el || !contentEl) return;
-    const top = el.getBoundingClientRect().top - contentEl.getBoundingClientRect().top + contentEl.scrollTop;
-    contentEl.scrollTo({ top: Math.max(0, top - 12), behavior: 'smooth' });
+  /* ---- Overview (health) ---- */
+  let overview = $state({ cards: [], attention: [] });
+  function refreshOverview() {
+    const s = loadedSettings;
+    notifyChannels = document.getElementById('settings-plugin-notifications')?.children.length || 0;
+    const cvKeys = parseRoots(s.comicvineKeys || '');
+    const libFolders = libs.filter((l) => (l.folders || []).some((f) => f.trim())).length;
+    const totalSeries = libs.reduce((n, l) => n + (l.series_count || 0), 0);
+    const tone = (t) => t; // green | amber | red
+    overview.cards = [
+      { id: 'sources', tab: 'sources', icon: 'target', label: 'Sources',
+        value: `${enabledSourceCount} enabled`, note: enabledSourceCount >= 2 ? 'Fallback order applies' : enabledSourceCount === 1 ? 'No fallback if it misses' : 'Nothing can download',
+        tone: tone(enabledSourceCount >= 2 ? 'green' : enabledSourceCount === 1 ? 'amber' : 'red') },
+      { id: 'comicvine', tab: 'metadata', icon: 'tag', label: 'ComicVine',
+        value: cvKeys.length ? 'Configured' : 'No API key', note: cvKeys.length ? 'Metadata lookups active' : 'Search and matching need a key',
+        tone: tone(cvKeys.length ? 'green' : 'red') },
+      { id: 'libraries', tab: 'library', icon: 'library', label: 'Libraries',
+        value: `${libs.length} librar${libs.length === 1 ? 'y' : 'ies'}`, note: `${totalSeries} series in the collection`,
+        tone: tone(libs.length ? 'green' : 'amber') },
+      { id: 'storage', tab: 'library', icon: 'book', label: 'Storage',
+        value: libFolders ? `${libFolders} with folders` : 'No folders set', note: libFolders ? 'Downloads file into library folders' : 'Set a folder on a library',
+        tone: tone(libFolders ? 'green' : 'amber') },
+      { id: 'downloading', tab: 'downloading', icon: 'download', label: 'Downloading',
+        value: `${s.downloadConcurrency || 4} at once`, note: `Format: ${(s.format || 'cbz').toUpperCase()}${s.autoDownloadOnAdd ? ' · downloads on add' : ''}`,
+        tone: 'green' },
+      { id: 'notifications', tab: 'notifications', icon: 'bell', label: 'Notifications',
+        value: notifyChannels ? `${notifyChannels} channel${notifyChannels > 1 ? 's' : ''}` : 'None installed', note: notifyChannels ? 'Outbound alerts configured' : 'In-app bell only',
+        tone: tone(notifyChannels ? 'green' : 'amber') },
+    ];
+    const attention = [];
+    if (!cvKeys.length) attention.push({ tone: 'red', title: 'ComicVine API key is missing', body: 'Search, matching, and metadata need a key (free at comicvine.gamespot.com).', action: 'Add key', tab: 'metadata' });
+    if (enabledSourceCount === 0) attention.push({ tone: 'red', title: 'No download sources enabled', body: 'New comics can’t be downloaded until a source is turned on.', action: 'Enable', tab: 'sources' });
+    else if (enabledSourceCount === 1) attention.push({ tone: 'amber', title: 'Only one download source enabled', body: 'A second source gives searches a fallback when the first misses.', action: 'Review', tab: 'sources' });
+    if (libs.length && !libFolders) attention.push({ tone: 'amber', title: 'No library has a folder', body: 'Downloads fall back to the downloads folder until a library gets one.', action: 'Set folder', tab: 'library' });
+    overview.attention = attention;
   }
-  function onSpy() {
-    if (!contentEl) return;
-    const cTop = contentEl.getBoundingClientRect().top;
-    let best = SECTIONS[0].id;
-    for (const s of SECTIONS) {
-      const el = document.getElementById('sec-' + s.id);
-      if (el && el.getBoundingClientRect().top - cTop <= 80) best = s.id;
-    }
-    activeSection = best;
-  }
-  $effect(() => { if (contentEl && active) onSpy(); });
 
-  /* ---- Filter: hide non-matching rows, dim empty sections ---- */
+  /* ---- Cross-tab search: while typing, all pages show and non-matching
+     rows hide. Clearing restores the tab view. Never marks dirty. ---- */
   function applyFilter() {
     const q = filterQuery.trim().toLowerCase();
-    contentEl?.classList.toggle('is-filtering', !!q);
-    const empty = new Set();
-    let anyVisible = false;
-    for (const s of SECTIONS) {
-      const group = document.getElementById('sec-' + s.id);
-      if (!group) continue;
-      const headHit = group.querySelector('.set-group__head').textContent.toLowerCase().includes(q);
-      const rows = [...group.querySelectorAll('.field, .notify-cat')]
-        .filter((r) => !r.closest('.src-block'))
-        .concat([...group.querySelectorAll('.src-block')]);
+    root?.classList.toggle('is-searching', !!q);
+    if (!q) {
+      for (const el of root.querySelectorAll('.set-hidden')) el.classList.remove('set-hidden');
+      return;
+    }
+    for (const page of root.querySelectorAll('.setx-page')) {
+      if (page.dataset.tab === 'overview') { page.classList.add('set-hidden'); continue; }
+      const rows = [...page.querySelectorAll('.field, .setx-card, .src-block, .libcard, .notify-cat')];
       let shown = 0;
       for (const row of rows) {
-        const hit = !q || headHit || row.textContent.toLowerCase().includes(q);
+        if (row.parentElement.closest('.field, .setx-card, .src-block, .libcard')) continue; // only top-level rows
+        const hit = row.textContent.toLowerCase().includes(q);
         row.classList.toggle('set-hidden', !hit);
         if (hit) shown++;
       }
-      const visible = !q || headHit || shown > 0;
-      group.classList.toggle('set-hidden', !visible);
-      if (visible) anyVisible = true; else empty.add(s.id);
+      page.classList.toggle('set-hidden', shown === 0);
     }
-    emptySections = empty;
-    noMatches = !!q && !anyVisible;
   }
 
-  /* ---- Unsaved-changes guard ----
-     User edits fire input/change events (delegated on the page root); loading
-     saved values programmatically doesn't, so `dirty` means real edits. The
-     page stays mounted when navigated away, so "Keep editing" can return to it
-     with every edit intact. */
+  /* ---- Unsaved-changes guard ---- */
   let dirty = $state(false);
   function markDirty(e) {
-    if (e?.target?.closest?.('.settings-filter')) return; // the filter box isn't a setting
+    if (e?.target?.closest?.('.setx-search')) return; // searching isn't a setting
     dirty = true;
-    const g = e?.target?.closest?.('.set-group');
-    if (g) {
-      const id = g.id.replace('sec-', '');
-      if (!dirtySections.has(id)) dirtySections = new Set(dirtySections).add(id);
+    const page = e?.target?.closest?.('.setx-page');
+    if (page?.dataset.tab && !dirtySections.has(page.dataset.tab)) {
+      dirtySections = new Set(dirtySections).add(page.dataset.tab);
     }
   }
 
-  // Load when opened — and again if plugin assets finish loading while the page
-  // is already open (their injected fields need populating too). Never reload
-  // over unsaved edits (that's what makes "Keep editing" work).
+  // Load when opened — and again when plugin assets finish loading. Never
+  // reload over unsaved edits.
   $effect(() => {
     void plugins.ready;
     if (active && !dirty) openSettings();
@@ -295,7 +318,7 @@
         confirmLabel: 'Discard changes', danger: true,
       });
       if (discard) dirty = false;
-      else navigate('/settings'); // page never unmounted — the edits are still there
+      else navigate('/settings'); // page never unmounted — edits still there
     })();
   });
 
@@ -304,18 +327,23 @@
   }
 
   async function save() {
-    // A failed save must never look like a successful one.
     let r;
     try { r = await apiPost('/api/settings', collectSettingsFromForm()); }
     catch { return notify('Save failed — is the app reachable?', 'error'); }
     if (r?.error) return notify('Save failed: ' + r.error, 'error');
-    // keep the per-issue actions in sync
     flags.usenetEnabled = !!root.querySelector('#set-usenetEnabled')?.checked;
     flags.torrentEnabled = !!root.querySelector('#set-torrentEnabled')?.checked;
+    loadedSettings = { ...loadedSettings, ...collectSettingsFromForm() };
     dirty = false;
     dirtySections = new Set();
+    refreshOverview();
     notify('Settings saved.', 'ok');
-    goBack();
+  }
+  async function discardEdits() {
+    dirty = false;
+    dirtySections = new Set();
+    await openSettings();
+    notify('Changes discarded.', 'info');
   }
 
   /* ---- Indexer rows ---- */
@@ -332,7 +360,6 @@
   }
 
   /* ---- Connection tests (download clients + CV keys) ---- */
-  // THE Test-connection wiring — collect the form fields, POST, render ✓/✕.
   let tests = $state({ client: null, qb: null, cv: null });
   async function runTest(key, endpoint, collect) {
     tests[key] = { cls: 'is-testing', text: 'Testing…' };
@@ -368,10 +395,9 @@
   }
   const priorityLabel = (s) => (s.label || s.id).replace(/^./, (c) => c.toUpperCase());
 
-  // A chip's attention dot: amber on Sources when no source is enabled, accent
-  // on a section holding unsaved edits, nothing otherwise (quiet by default).
-  function chipDot(id) {
-    if (id === 'sources' && !anySourceOn) return 'is-warn';
+  // Tab dot: amber on Sources when <2 sources, accent when the tab holds edits.
+  function tabDot(id) {
+    if (id === 'sources' && enabledSourceCount < 2) return 'is-warn';
     return dirtySections.has(id) ? 'is-edit' : null;
   }
 </script>
@@ -391,63 +417,95 @@
   {/each}
 {/snippet}
 
+{#snippet railItem(kind, key, icon, label, note, dot)}
+  <button type="button" class="setx-rail__item"
+    class:is-active={(kind === 'lib' ? libPanel : srcPanel) === key}
+    onclick={() => { if (kind === 'lib') { libPanel = key; libDrill = true; } else { srcPanel = key; srcDrill = true; } }}>
+    <span class="setx-rail__icon"><Icon name={icon} size={15} /></span>
+    <span class="setx-rail__text"><b>{label}</b><span>{note}</span></span>
+    <span class="setx-dot setx-dot--{dot}"></span>
+  </button>
+{/snippet}
+
 <svelte:window onbeforeunload={onBeforeUnload} />
 
-<main id="settings-page" class="scan-page settings-page" bind:this={root} oninput={markDirty} onchange={markDirty}>
-  <div class="scan-page__bar">
-    <button id="settings-back" class="btn btn--ghost" onclick={goBack}><Icon name="arrow-left" /> Back</button>
-    <h2 class="scan-page__title">Settings</h2>
-    <label class="settings-filter">
+<main id="settings-page" class="setx-shell" bind:this={root} oninput={markDirty} onchange={markDirty}>
+  <!-- Header bar -->
+  <div class="setx-head">
+    <button id="settings-back" class="btn btn--ghost btn--sm" onclick={goBack}><Icon name="arrow-left" /> Back</button>
+    <h2 class="setx-head__title">Settings</h2>
+    <label class="setx-search">
       <Icon name="search" size={14} />
-      <input type="text" placeholder="Filter settings…" autocomplete="off" spellcheck="false" bind:value={filterQuery} oninput={applyFilter} />
+      <input type="text" placeholder="Search settings…" autocomplete="off" spellcheck="false" bind:value={filterQuery} oninput={applyFilter} />
     </label>
-    <button class="btn btn--ghost btn--sm" title="Walk through the first-run setup again (keys, folders, sources)" onclick={() => navigate('/?onboarding=1')}>Setup wizard</button>
+    <button class="btn btn--ghost btn--sm setx-head__wizard" title="Walk through the first-run setup again (keys, folders, sources)" onclick={() => navigate('/?onboarding=1')}>Setup wizard</button>
     <button id="settings-save" class="btn btn--primary" onclick={save}>Save</button>
   </div>
 
-  <!-- Section chips: the same filter-chip language as the Library page. Click
-       to jump; scroll-spy fills the chip you're in; a dot flags attention
-       (amber = no sources enabled, accent = unsaved edits in that section). -->
-  <nav class="settings-chips" aria-label="Settings sections">
-    {#each SECTIONS as s (s.id)}
-      <button type="button" class="coll-chip settings-chip" class:is-active={activeSection === s.id}
-        class:is-dim={!!filterQuery && emptySections.has(s.id)} onclick={() => scrollToSection(s.id)}>
-        {s.label}{#if chipDot(s.id)}<span class="settings-chip__dot {chipDot(s.id)}"></span>{/if}
+  <!-- Tab rail -->
+  <nav class="setx-tabs" aria-label="Settings pages">
+    {#each TABS as t (t.id)}
+      <button type="button" class="setx-tab" class:is-active={activeTab === t.id} onclick={() => pickTab(t.id)}>
+        <Icon name={t.icon} size={14} /> {t.label}
+        {#if tabDot(t.id)}<span class="setx-tab__dot {tabDot(t.id)}"></span>{/if}
       </button>
     {/each}
   </nav>
 
-  <div class="settings-shell">
-    <!-- Scrolling content -->
-    <div class="settings-content" bind:this={contentEl} onscroll={onSpy}>
-      <div class="settings-measure">
-        {#if noMatches}<p class="settings-nomatch">No settings match “{filterQuery}”.</p>{/if}
+  <div class="setx-body">
+    <!-- OVERVIEW -->
+    <div class="setx-page setx-page--narrow" data-tab="overview" class:is-active={activeTab === 'overview'}>
+      <p class="setx-intro">How BackIssue is configured at a glance — click a card to jump to its page.</p>
+      <div class="setx-cards">
+        {#each overview.cards as c (c.id)}
+          <button type="button" class="setx-scard setx-scard--{c.tone}" onclick={() => pickTab(c.tab)}>
+            <span class="setx-scard__top">
+              <span class="setx-scard__chip"><Icon name={c.icon} size={15} /></span>
+              <span class="setx-scard__label">{c.label}</span>
+              <span class="setx-dot setx-dot--{c.tone}"></span>
+            </span>
+            <span class="setx-scard__value">{c.value}</span>
+            <span class="setx-scard__note">{c.note}</span>
+          </button>
+        {/each}
+      </div>
+      <div class="setx-card setx-attention">
+        <h3 class="setx-card__head">Needs attention</h3>
+        {#if !overview.attention.length}
+          <div class="setx-attn"><span class="setx-attn__icon setx-attn__icon--green"><Icon name="check" size={15} /></span>
+            <span class="setx-attn__text"><b>All good</b><span>Nothing needs attention right now.</span></span></div>
+        {/if}
+        {#each overview.attention as a (a.title)}
+          <div class="setx-attn">
+            <span class="setx-attn__icon setx-attn__icon--{a.tone}"><Icon name="alert-triangle" size={15} /></span>
+            <span class="setx-attn__text"><b>{a.title}</b><span>{a.body}</span></span>
+            <button class="btn btn--ghost btn--sm" type="button" onclick={() => pickTab(a.tab)}>{a.action}</button>
+          </div>
+        {/each}
+      </div>
+    </div>
 
-        <!-- LIBRARY -->
-        <section class="set-group" id="sec-library">
-          <h3 class="set-group__head">Library</h3>
-          <p class="set-group__sub">Where comics live on disk and how the maintenance tools run.</p>
-          <section class="settings-section">
-            <label class="field"><span>Downloads folder</span><input id="set-downloadsDir" type="text" spellcheck="false" /></label>
-            <p class="modal__note">Storage locations live on your <b>Libraries</b> below — each library's folder is where its comics are filed and scanned. The <b>downloads folder</b> is only a fallback when no library has a folder.</p>
-            <label class="field"><span>Tool workers</span><input id="set-toolsConcurrency" type="number" min="1" max="16" /></label>
-            <p class="modal__note">How many files the library tools (convert / verify / tag) process at once — higher overlaps I/O but uses more memory per in-flight file.</p>
+    <!-- LIBRARY (master–detail) -->
+    <div class="setx-page" data-tab="library" class:is-active={activeTab === 'library'}>
+      <div class="setx-split" class:is-drilled={libDrill}>
+        <div class="setx-rail">
+          {@render railItem('lib', 'libraries', 'library', 'Libraries', `${libs.length} librar${libs.length === 1 ? 'y' : 'ies'}`, libs.length ? 'green' : 'amber')}
+          {@render railItem('lib', 'org', 'book', 'File organization', 'Naming patterns', 'green')}
+          {@render railItem('lib', 'maint', 'tag', 'Maintenance', 'Fallbacks & workers', 'green')}
+        </div>
+        <div class="setx-detail">
+          <button type="button" class="setx-backlink" onclick={() => { libDrill = false; }}><Icon name="arrow-left" size={14} /> Library</button>
 
-            <p class="modal__subhead modal__subhead--sub">File organization</p>
-            <label class="field"><span>Folder pattern</span><input id="set-folderPattern" type="text" spellcheck="false" placeholder={'{publisher}/{series} ({year})'} oninput={previewNaming} /></label>
-            <label class="field"><span>File pattern</span><input id="set-filePattern" type="text" spellcheck="false" placeholder={'{series} V{year} #{issue}'} oninput={previewNaming} /></label>
-            {#if namingPreview}<p class="modal__note">Example: <code class="mono">{namingPreview}</code></p>{/if}
-            <label class="field field--check"><input id="set-renameDownloads" type="checkbox" /><span>Rename downloaded files to the file pattern (off = keep the source's original filename)</span></label>
-            <p class="modal__note">Tokens: <code>{'{publisher}'}</code> <code>{'{series}'}</code> <code>{'{year}'}</code> <code>{'{issue}'}</code> (<code>{'{issue:2}'}</code> sets the pad width) <code>{'{issueTitle}'}</code> <code>{'{date}'}</code> <code>{'{edition}'}</code>. Blank uses the defaults shown above; empty tokens are dropped and spacing is tidied. Changing these affects <b>new</b> downloads — to apply to existing files, use <b>Reorganize library</b> on the Tools page, or a volume's <b>Rename files</b> action.</p>
-            <p class="modal__subhead modal__subhead--sub">Libraries</p>
-            <p class="modal__note">Split the collection into named libraries — each shows as its own entry in the sidebar. A library's <b>type</b> sets how its series behave (manga = chapter-style search, right-to-left reading); its optional <b>folder</b> is where new downloads for that library are filed (blank = the default root). Move series from a volume's ⋯ menu.</p>
+          <div class="setx-panel" class:is-active={libPanel === 'libraries'}>
+            <h3 class="setx-panel__title">Libraries</h3>
+            <p class="setx-panel__sub">Split the collection into named libraries — each shows as its own entry in the sidebar. A library's <b>type</b> sets how its series behave (manga = chapter-style search, right-to-left reading); its folders are where its comics are filed and scanned. Move series from a volume's ⋯ menu.</p>
             {#each libs as l (l.id)}
               <div class="libcard">
                 <div class="libcard__head">
                   <span class="libcard__icon"><Icon name="book" /></span>
                   <input class="libcard__name" type="text" spellcheck="false" bind:value={l.name} onchange={() => saveLib(l)} title="Library name" />
                   <select bind:value={l.type} onchange={() => saveLib(l)} title="Library type — sets how its series behave">
-                    {#each LIB_TYPES as [v, label] (v)}<option value={v}>{label}</option>{/each}
+                    {#each LIB_TYPES as [tv, label] (tv)}<option value={tv}>{label}</option>{/each}
                   </select>
                   <label class="field field--check libcard__mature" title="Hide this library (and everything in it) from roles without the “View mature content” permission">
                     <input type="checkbox" checked={!!l.restricted} onchange={(e) => { l.restricted = e.currentTarget.checked ? 1 : 0; saveLib(l); }} /><span>Mature</span></label>
@@ -480,204 +538,298 @@
             <div class="rootrow libcard__new">
               <input class="rootrow__path" style="max-width:200px" type="text" spellcheck="false" placeholder="New library name…" bind:value={newLib.name} onkeydown={(e) => { if (e.key === 'Enter') addLib(); }} />
               <select bind:value={newLib.type}>
-                {#each LIB_TYPES as [v, label] (v)}<option value={v}>{label}</option>{/each}
+                {#each LIB_TYPES as [tv, label] (tv)}<option value={tv}>{label}</option>{/each}
               </select>
               <button class="btn btn--ghost btn--sm" type="button" onclick={addLib}><Icon name="plus" size={14} /> Create library</button>
             </div>
-
             <!-- Plugin library-behavior settings inject here (plain DOM — stays mounted). -->
             <div id="settings-plugin-library"></div>
-          </section>
-        </section>
+          </div>
 
-        <!-- DOWNLOADING -->
-        <section class="set-group" id="sec-downloading">
-          <h3 class="set-group__head">Downloading</h3>
-          <p class="set-group__sub">What happens when you add a series, and how downloads run.</p>
-          <section class="settings-section">
-            <label class="field field--check">
-              <span>Download on add</span>
-              <span class="switch"><input id="set-autoDownloadOnAdd" type="checkbox" /><span class="switch__track"></span></span>
-            </label>
-            <p class="modal__note">Adding a series (Library, Discover, Releases, reading lists) immediately queues every issue for download. Off = series add empty and you press "Download missing" yourself.</p>
-            <label class="field">
-              <span>Download format</span>
-              <select id="set-format"><option value="cbz">CBZ (with metadata)</option><option value="pdf">PDF</option></select>
-            </label>
-            <label class="field"><span>Simultaneous downloads</span><input id="set-downloadConcurrency" type="number" min="1" max="16" /></label>
-            <p class="modal__note">How many issues download at once. Higher is faster but more likely to trip a source's rate limits. Applies to the next download.</p>
-          </section>
-        </section>
-
-        <!-- SOURCES -->
-        <section class="set-group" id="sec-sources">
-          <h3 class="set-group__head">Sources</h3>
-          <p class="set-group__sub">Turn on where BackIssue searches and downloads from. Open a source to configure it — enabling one expands it automatically.</p>
-
-          <!-- Plugin source blocks inject here (plain DOM — must stay mounted). -->
-          <div id="settings-plugin-sources"></div>
-
-          <div class="src-block">
-            <div class="src-toggle">
-              <label class="switch"><input id="set-usenetEnabled" type="checkbox" onchange={syncSourceUI} /><span class="switch__track"></span></label>
-              <div class="src-toggle__text">
-                <b>Usenet</b>
-                <span class="modal__note src-toggle__note">Search Newznab indexers and download via SABnzbd or NZBGet.</span>
-              </div>
-            </div>
-            <div id="usenet-config" class="src-config">
-              <p class="modal__subhead modal__subhead--sub">Indexers</p>
-              <div id="indexer-list" class="indexer-list">
-                {@render indexerRows('newznab', indexerList)}
-              </div>
-              <button id="add-indexer" class="btn btn--ghost btn--add" type="button" onclick={() => openIndexerModal(-1, 'newznab', null, saveIndexer)}>+ Add indexer</button>
-              <p class="modal__note">Newznab (the standard indexer API — e.g. NZBgeek) indexers, searched in order; results are merged.</p>
-
-              <p class="modal__subhead modal__subhead--sub">Download client</p>
-              <label class="field"><span>Client</span>
-                <select id="set-nzbClient" onchange={syncSourceUI}><option value="sabnzbd">SABnzbd</option><option value="nzbget">NZBGet</option></select>
+          <div class="setx-panel" class:is-active={libPanel === 'org'}>
+            <h3 class="setx-panel__title">File organization</h3>
+            <p class="setx-panel__sub">How downloaded comics are named and filed.</p>
+            <div class="setx-card">
+              <label class="field"><span>Folder pattern</span><input id="set-folderPattern" class="mono" type="text" spellcheck="false" placeholder={'{publisher}/{series} ({year})'} oninput={previewNaming} /></label>
+              <label class="field"><span>File pattern</span><input id="set-filePattern" class="mono" type="text" spellcheck="false" placeholder={'{series} V{year} #{issue}'} oninput={previewNaming} /></label>
+              {#if namingPreview}<p class="setx-preview mono">{namingPreview}</p>{/if}
+              <label class="field field--check">
+                <span class="switch"><input id="set-renameDownloads" type="checkbox" /><span class="switch__track"></span></span>
+                <span>Rename downloaded files to the file pattern (off = keep the source's original filename)</span>
               </label>
-              <label class="field"><span>Host</span><input id="set-nzbClientHost" type="text" spellcheck="false" placeholder="nas or 192.168.1.10" /></label>
-              <label class="field"><span>Port</span><input id="set-nzbClientPort" type="number" min="1" max="65535" placeholder="8080" /></label>
-              <label class="field field--check"><input id="set-nzbClientSsl" type="checkbox" /><span>Use HTTPS</span></label>
-              <div class="only-sabnzbd">
-                <label class="field"><span>API key</span><input id="set-nzbClientApiKey" type="text" spellcheck="false" /></label>
-              </div>
-              <div class="only-nzbget">
-                <label class="field"><span>Username</span><input id="set-nzbClientUser" type="text" spellcheck="false" /></label>
-                <label class="field"><span>Password</span><input id="set-nzbClientPass" type="password" spellcheck="false" /></label>
-              </div>
-              <label class="field"><span>Category</span><input id="set-nzbCategory" type="text" spellcheck="false" placeholder="backissue" /></label>
-              <div class="client-test">
-                <button id="client-test" class="btn btn--ghost" type="button" onclick={testClient}>Test connection</button>
-                {#if tests.client}<span id="client-test-result" class="client-status {tests.client.cls}">{#if tests.client.icon}<Icon name={tests.client.icon} /> {/if}{tests.client.text}</span>{/if}
-              </div>
-
-              <p class="modal__subhead modal__subhead--sub">Completed downloads</p>
-              <label class="field"><span>Folder (this app's view)</span><input id="set-usenetCompleteDir" type="text" spellcheck="false" placeholder="\\NAS\dl\complete" /></label>
-              <label class="field"><span>Folder (client's view)</span><input id="set-usenetCompleteDirRemote" type="text" spellcheck="false" placeholder="/downloads/complete" /></label>
-              <p class="modal__note">Only needed if the client runs on another machine. Map the folder it writes finished downloads to (client's view) onto the path this app reads it at over the network. <code>.cbr</code> releases are converted to <code>.cbz</code> so they can be tagged.</p>
-
-              <div class="fields-row">
-                <label class="field"><span>Poll every (s)</span><input id="set-usenetPollSeconds" type="number" min="5" max="600" /></label>
-                <label class="field"><span>Give up after (min)</span><input id="set-usenetTimeoutMinutes" type="number" min="1" max="1440" /></label>
-              </div>
-              <p class="modal__note">BackIssue hands the NZB to your client under the category you set above (default <code>backissue</code>), watches it, imports each download when it completes (tag + file), and removes it from the client. Downloads are tracked in the database, so an app restart resumes them; on boot it reconciles anything that finished while it was down.</p>
+              <p class="modal__note">Tokens: <code>{'{publisher}'}</code> <code>{'{series}'}</code> <code>{'{year}'}</code> <code>{'{issue}'}</code> (<code>{'{issue:2}'}</code> sets the pad width) <code>{'{issueTitle}'}</code> <code>{'{date}'}</code> <code>{'{edition}'}</code>. Changing these affects <b>new</b> downloads — for existing files use <b>Reorganize library</b> on the Tools page.</p>
             </div>
           </div>
 
-          <div class="src-block">
-            <div class="src-toggle">
-              <label class="switch"><input id="set-torrentEnabled" type="checkbox" onchange={syncSourceUI} /><span class="switch__track"></span></label>
-              <div class="src-toggle__text">
-                <b>Torrents</b>
-                <span class="modal__note src-toggle__note">Search Torznab indexers (Jackett/Prowlarr) and download via qBittorrent.</span>
-              </div>
-            </div>
-            <div id="torrent-config" class="src-config">
-              <p class="modal__subhead modal__subhead--sub">Torrent indexers (Torznab)</p>
-              <div id="torznab-list" class="indexer-list">
-                {@render indexerRows('torznab', torznabList)}
-              </div>
-              <button id="add-torznab" class="btn btn--ghost btn--add" type="button" onclick={() => openIndexerModal(-1, 'torznab', null, saveIndexer)}>+ Add indexer</button>
-              <p class="modal__note">Torznab (the standard indexer API — e.g. Jackett or Prowlarr) feeds, searched in order; results are merged and ranked by seeders.</p>
-
-              <p class="modal__subhead modal__subhead--sub">qBittorrent</p>
-              <label class="field"><span>Host</span><input id="set-qbHost" type="text" spellcheck="false" placeholder="nas or 192.168.1.10" /></label>
-              <label class="field"><span>Port</span><input id="set-qbPort" type="number" min="1" max="65535" placeholder="8080" /></label>
-              <label class="field field--check"><input id="set-qbSsl" type="checkbox" /><span>Use HTTPS</span></label>
-              <label class="field"><span>Username</span><input id="set-qbUser" type="text" spellcheck="false" /></label>
-              <label class="field"><span>Password</span><input id="set-qbPass" type="password" spellcheck="false" /></label>
-              <label class="field"><span>Category</span><input id="set-torrentCategory" type="text" spellcheck="false" placeholder="backissue" /></label>
-              <div class="client-test">
-                <button id="qb-test" class="btn btn--ghost" type="button" onclick={testQb}>Test connection</button>
-                {#if tests.qb}<span id="qb-test-result" class="client-status {tests.qb.cls}">{#if tests.qb.icon}<Icon name={tests.qb.icon} /> {/if}{tests.qb.text}</span>{/if}
-              </div>
-
-              <p class="modal__subhead modal__subhead--sub">Completed downloads</p>
-              <label class="field"><span>Folder (this app's view)</span><input id="set-torrentCompleteDir" type="text" spellcheck="false" placeholder="\\NAS\dl\complete" /></label>
-              <label class="field"><span>Folder (client's view)</span><input id="set-torrentCompleteDirRemote" type="text" spellcheck="false" placeholder="/downloads/complete" /></label>
-              <p class="modal__note">Only needed if qBittorrent runs on another machine. Map its content path onto the path this app reads over the network.</p>
-
-              <div class="fields-row">
-                <label class="field"><span>Poll every (s)</span><input id="set-torrentPollSeconds" type="number" min="5" max="600" /></label>
-                <label class="field"><span>Give up after (min)</span><input id="set-torrentTimeoutMinutes" type="number" min="1" max="1440" /></label>
-              </div>
-              <p class="modal__note">BackIssue hands the magnet/.torrent to qBittorrent under the category you set above (default <code>backissue</code>), watches it, and imports each torrent when it completes. After import the torrent is <b>left seeding</b> in qBittorrent — manage ratio and removal there.</p>
-
-              <p class="modal__subhead modal__subhead--sub">Weekly 0-Day pack</p>
-              <label class="field"><span>Search phrase</span><input id="set-zeroDayQuery" type="text" spellcheck="false" placeholder="0-Day Week" /></label>
-              <label class="field field--check"><input id="set-zeroDayAddNew" type="checkbox" /><span>Add new series I don't follow (confident ComicVine matches only)</span></label>
-              <p class="modal__note">A scheduled job finds the newest <b>0-Day Week of …</b> pack on your Torznab indexers, downloads it, and post-processes it — importing the <b>missing</b> issues of series already in your collection (the rest still seeds). With <b>Add new series</b> on, it also adds+follows any series it can confidently match to ComicVine, so brand-new series start being tracked. Turn the schedule on and set how often on the <b>Jobs</b> page (“Grab weekly 0-Day pack”), or Run it now from there.</p>
+          <div class="setx-panel" class:is-active={libPanel === 'maint'}>
+            <h3 class="setx-panel__title">Maintenance</h3>
+            <p class="setx-panel__sub">Fallback locations and how hard the library tools work.</p>
+            <div class="setx-card">
+              <label class="field"><span>Downloads folder (fallback)</span><input id="set-downloadsDir" class="mono" type="text" spellcheck="false" /></label>
+              <p class="modal__note">Only used when no library has a folder — normally every download files into its library.</p>
+              <label class="field"><span>Tool workers</span><input id="set-toolsConcurrency" type="number" min="1" max="16" /></label>
+              <p class="modal__note">How many files the library tools (convert / verify / tag) process at once — higher overlaps I/O but uses more memory per in-flight file.</p>
             </div>
           </div>
-
-          {#if !anySourceOn}
-            <p class="modal__note src-warning"><Icon name="alert-triangle" /> No download sources are enabled — new comics can't be downloaded until you turn one on.</p>
-          {/if}
-
-          {#if sourceOrder.length >= 2}
-            <section class="settings-section" id="source-priority">
-              <p class="modal__subhead modal__subhead--sub">Source priority</p>
-              <p class="modal__note">When more than one source can serve an issue, they're tried top-to-bottom — the first with a match wins.</p>
-              <div id="source-priority-list">
-                {#each sourceOrder as s, i (s.id)}
-                  <div class="srcpri-row">
-                    <span class="srcpri-rank">{i + 1}</span><span class="srcpri-name">{priorityLabel(s)}</span>
-                    <button class="srcpri-btn" type="button" disabled={i === 0} onclick={() => movePriority(i, -1)}><Icon name="arrow-up" /></button>
-                    <button class="srcpri-btn" type="button" disabled={i === sourceOrder.length - 1} onclick={() => movePriority(i, 1)}><Icon name="arrow-down" /></button>
-                  </div>
-                {/each}
-              </div>
-            </section>
-          {/if}
-          <!-- Plugin priority widgets inject here (plain DOM — must stay mounted). -->
-          <div id="settings-plugin-priority"></div>
-        </section>
-
-        <!-- METADATA -->
-        <section class="set-group" id="sec-metadata">
-          <h3 class="set-group__head">Metadata</h3>
-          <p class="set-group__sub">ComicVine keys and where release and tagging data come from.</p>
-          <section class="settings-section">
-            <label class="field">
-              <span>Tag on download</span>
-              <select id="set-tagOnDownload"><option value="off">Off</option><option value="on">On</option></select>
-            </label>
-            <label class="field"><span>API key</span><input id="set-comicvineKeys" type="text" spellcheck="false" autocomplete="off" /></label>
-            <div class="client-test"><button id="cv-test" class="btn btn--ghost" type="button" onclick={testCv}>Test key</button>
-              {#if tests.cv}<span id="cv-test-result" class="client-status {tests.cv.cls}">{#if tests.cv.icon}<Icon name={tests.cv.icon} /> {/if}{tests.cv.text}</span>{/if}</div>
-            <label class="field"><span>API base URL (optional)</span><input id="set-cvBaseUrl" type="text" spellcheck="false" placeholder="https://data.backissue.app/api" /></label>
-            <p class="modal__note">Point metadata lookups at a ComicVine-compatible server instead of the official API — no rate limits, and politeness delays are skipped automatically. Blank = official ComicVine.</p>
-            <label class="field field--check"><input id="set-cvEnrich" type="checkbox" /><span>Enrich metadata (content ratings, series status, issue extras)</span></label>
-            <p class="modal__note">When the metadata server supports it (a self-hosted CloneVine), adds Metron data — content ratings, series status and end year, and per-issue extras like price, UPC, and story titles. The official ComicVine API ignores the request, so it's safe either way.</p>
-            <label class="field"><span>Release provider URL</span><input id="set-releaseProviderUrl" type="text" spellcheck="false" placeholder="https://data.backissue.app" /></label>
-            <p class="modal__note">ComicInfo.xml is written straight into the CBZ from the metadata source. The release provider feeds "This week's releases".</p>
-          </section>
-        </section>
-
-        <!-- SIGN-IN -->
-        <section class="set-group" id="sec-signin">
-          <h3 class="set-group__head">Sign-in</h3>
-          <p class="set-group__sub">How people sign in. Password login always works for admins.</p>
-          <section class="settings-section">
-            <p class="modal__note">Add an SSO provider (e.g. OIDC) or another login backend from the <b>Plugins</b> page to let users sign in with an identity provider.</p>
-            <!-- Auth plugin config (e.g. OIDC/SSO, WHMCS) injects here (plain DOM — stays mounted). -->
-            <div id="settings-plugin-auth"></div>
-            <label class="field field--check"><input id="set-passwordLoginDisabled" type="checkbox" /><span>Disable password login (SSO only — admins keep a password fallback)</span></label>
-          </section>
-        </section>
-
-        <!-- NOTIFICATIONS -->
-        <section class="set-group" id="sec-notifications">
-          <h3 class="set-group__head">Notifications</h3>
-          <p class="set-group__sub">Where BackIssue sends alerts. The in-app bell always records everything regardless. Open a channel to configure it.</p>
-          <!-- Outbound channels are provided by plugins (the notifications hub
-               injects one collapsible card per channel, like the source cards). -->
-          <div id="settings-plugin-notifications"></div>
-          <p class="modal__note" id="notify-hub-empty-note">No outbound channels installed — add the <b>Notifications Hub</b> plugin from the Plugins page to send alerts to Discord, Telegram, Pushover, ntfy, or any webhook.</p>
-        </section>
+        </div>
       </div>
     </div>
+
+    <!-- DOWNLOADING -->
+    <div class="setx-page setx-page--narrow" data-tab="downloading" class:is-active={activeTab === 'downloading'}>
+      <h3 class="setx-panel__title">Downloading</h3>
+      <p class="setx-panel__sub">What happens when you add a series, and how downloads run.</p>
+      <div class="setx-card">
+        <label class="field field--check">
+          <span class="switch"><input id="set-autoDownloadOnAdd" type="checkbox" /><span class="switch__track"></span></span>
+          <span>Download on add</span>
+        </label>
+        <p class="modal__note">Adding a series (Library, Discover, Releases, reading lists) immediately queues every issue for download. Off = series add empty and you press "Download missing" yourself.</p>
+        <label class="field">
+          <span>Download format</span>
+          <select id="set-format"><option value="cbz">CBZ (with metadata)</option><option value="pdf">PDF</option></select>
+        </label>
+        <label class="field"><span>Simultaneous downloads</span><input id="set-downloadConcurrency" type="number" min="1" max="16" /></label>
+        <p class="modal__note">How many issues download at once. Higher is faster but more likely to trip a source's rate limits. Applies to the next download.</p>
+      </div>
+    </div>
+
+    <!-- SOURCES (master–detail) -->
+    <div class="setx-page" data-tab="sources" class:is-active={activeTab === 'sources'}>
+      <div class="setx-split" class:is-drilled={srcDrill}>
+        <div class="setx-rail">
+          {@render railItem('src', 'usenet', 'download', 'Usenet', 'Newznab + SABnzbd/NZBGet', srcOn.usenet ? 'green' : 'muted')}
+          {@render railItem('src', 'torrent', 'download', 'Torrents', 'Torznab + qBittorrent', srcOn.torrent ? 'green' : 'muted')}
+          {#each pluginSrc as pb (pb.key)}
+            {@render railItem('src', pb.key, 'download', pb.label, pb.note, pb.on ? 'green' : 'muted')}
+          {/each}
+          {#if sourceOrder.length >= 2}
+            {@render railItem('src', 'priority', 'arrow-up-down', 'Source priority', 'Which source tries first', 'green')}
+          {/if}
+          {#if !anySourceOn}
+            <p class="setx-railwarn"><Icon name="alert-triangle" size={14} /> No sources enabled — nothing can download.</p>
+          {/if}
+        </div>
+        <div class="setx-detail">
+          <button type="button" class="setx-backlink" onclick={() => { srcDrill = false; }}><Icon name="arrow-left" size={14} /> Sources</button>
+
+          <div class="setx-panel" class:is-active={srcPanel === 'usenet'}>
+            <div class="setx-card setx-srchead">
+              <label class="switch"><input id="set-usenetEnabled" type="checkbox" onchange={syncSourceUI} /><span class="switch__track"></span></label>
+              <div class="setx-srchead__text">
+                <b>Usenet</b>
+                <span>Search Newznab indexers and download via SABnzbd or NZBGet.</span>
+              </div>
+              <span class="setx-dot setx-dot--{srcOn.usenet ? 'green' : 'muted'}"></span>
+            </div>
+            <div id="usenet-config" class="src-config setx-srcbody">
+              <div class="setx-card">
+                <h4 class="setx-card__head">Indexers</h4>
+                <div id="indexer-list" class="indexer-list">
+                  {@render indexerRows('newznab', indexerList)}
+                </div>
+                <button id="add-indexer" class="btn btn--ghost btn--add" type="button" onclick={() => openIndexerModal(-1, 'newznab', null, saveIndexer)}>+ Add indexer</button>
+                <p class="modal__note">Newznab (the standard indexer API — e.g. NZBgeek) indexers, searched in order; results are merged.</p>
+              </div>
+
+              <div class="setx-card">
+                <h4 class="setx-card__head">Download client</h4>
+                <label class="field"><span>Client</span>
+                  <select id="set-nzbClient" onchange={syncSourceUI}><option value="sabnzbd">SABnzbd</option><option value="nzbget">NZBGet</option></select>
+                </label>
+                <label class="field"><span>Host</span><input id="set-nzbClientHost" class="mono" type="text" spellcheck="false" placeholder="nas or 192.168.1.10" /></label>
+                <label class="field"><span>Port</span><input id="set-nzbClientPort" class="mono" type="number" min="1" max="65535" placeholder="8080" /></label>
+                <label class="field field--check"><input id="set-nzbClientSsl" type="checkbox" /><span>Use HTTPS</span></label>
+                <div class="only-sabnzbd">
+                  <label class="field"><span>API key</span><input id="set-nzbClientApiKey" class="mono" type="text" spellcheck="false" /></label>
+                </div>
+                <div class="only-nzbget">
+                  <label class="field"><span>Username</span><input id="set-nzbClientUser" type="text" spellcheck="false" /></label>
+                  <label class="field"><span>Password</span><input id="set-nzbClientPass" type="password" spellcheck="false" /></label>
+                </div>
+                <label class="field"><span>Category</span><input id="set-nzbCategory" type="text" spellcheck="false" placeholder="backissue" /></label>
+                <div class="client-test">
+                  <button id="client-test" class="btn btn--ghost" type="button" onclick={testClient}>Test connection</button>
+                  {#if tests.client}<span id="client-test-result" class="client-status {tests.client.cls}">{#if tests.client.icon}<Icon name={tests.client.icon} /> {/if}{tests.client.text}</span>{/if}
+                </div>
+              </div>
+
+              <div class="setx-card">
+                <h4 class="setx-card__head">Completed downloads</h4>
+                <label class="field"><span>Folder (this app's view)</span><input id="set-usenetCompleteDir" class="mono" type="text" spellcheck="false" placeholder="\\NAS\dl\complete" /></label>
+                <label class="field"><span>Folder (client's view)</span><input id="set-usenetCompleteDirRemote" class="mono" type="text" spellcheck="false" placeholder="/downloads/complete" /></label>
+                <p class="modal__note">Only needed if the client runs on another machine. Map the folder it writes finished downloads to (client's view) onto the path this app reads it at over the network. <code>.cbr</code> releases are converted to <code>.cbz</code> so they can be tagged.</p>
+              </div>
+
+              <div class="setx-card">
+                <h4 class="setx-card__head">Polling</h4>
+                <div class="fields-row">
+                  <label class="field"><span>Poll every (s)</span><input id="set-usenetPollSeconds" type="number" min="5" max="600" /></label>
+                  <label class="field"><span>Give up after (min)</span><input id="set-usenetTimeoutMinutes" type="number" min="1" max="1440" /></label>
+                </div>
+                <p class="modal__note">BackIssue hands the NZB to your client under the category you set above (default <code>backissue</code>), watches it, imports each download when it completes (tag + file), and removes it from the client. Downloads are tracked in the database, so an app restart resumes them.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="setx-panel" class:is-active={srcPanel === 'torrent'}>
+            <div class="setx-card setx-srchead">
+              <label class="switch"><input id="set-torrentEnabled" type="checkbox" onchange={syncSourceUI} /><span class="switch__track"></span></label>
+              <div class="setx-srchead__text">
+                <b>Torrents</b>
+                <span>Search Torznab indexers (Jackett/Prowlarr) and download via qBittorrent.</span>
+              </div>
+              <span class="setx-dot setx-dot--{srcOn.torrent ? 'green' : 'muted'}"></span>
+            </div>
+            <div id="torrent-config" class="src-config setx-srcbody">
+              <div class="setx-card">
+                <h4 class="setx-card__head">Indexers (Torznab)</h4>
+                <div id="torznab-list" class="indexer-list">
+                  {@render indexerRows('torznab', torznabList)}
+                </div>
+                <button id="add-torznab" class="btn btn--ghost btn--add" type="button" onclick={() => openIndexerModal(-1, 'torznab', null, saveIndexer)}>+ Add indexer</button>
+                <p class="modal__note">Torznab (the standard indexer API — e.g. Jackett or Prowlarr) feeds, searched in order; results are merged and ranked by seeders.</p>
+              </div>
+
+              <div class="setx-card">
+                <h4 class="setx-card__head">qBittorrent</h4>
+                <label class="field"><span>Host</span><input id="set-qbHost" class="mono" type="text" spellcheck="false" placeholder="nas or 192.168.1.10" /></label>
+                <label class="field"><span>Port</span><input id="set-qbPort" class="mono" type="number" min="1" max="65535" placeholder="8080" /></label>
+                <label class="field field--check"><input id="set-qbSsl" type="checkbox" /><span>Use HTTPS</span></label>
+                <label class="field"><span>Username</span><input id="set-qbUser" type="text" spellcheck="false" /></label>
+                <label class="field"><span>Password</span><input id="set-qbPass" type="password" spellcheck="false" /></label>
+                <label class="field"><span>Category</span><input id="set-torrentCategory" type="text" spellcheck="false" placeholder="backissue" /></label>
+                <div class="client-test">
+                  <button id="qb-test" class="btn btn--ghost" type="button" onclick={testQb}>Test connection</button>
+                  {#if tests.qb}<span id="qb-test-result" class="client-status {tests.qb.cls}">{#if tests.qb.icon}<Icon name={tests.qb.icon} /> {/if}{tests.qb.text}</span>{/if}
+                </div>
+              </div>
+
+              <div class="setx-card">
+                <h4 class="setx-card__head">Completed downloads</h4>
+                <label class="field"><span>Folder (this app's view)</span><input id="set-torrentCompleteDir" class="mono" type="text" spellcheck="false" placeholder="\\NAS\dl\complete" /></label>
+                <label class="field"><span>Folder (client's view)</span><input id="set-torrentCompleteDirRemote" class="mono" type="text" spellcheck="false" placeholder="/downloads/complete" /></label>
+                <p class="modal__note">Only needed if qBittorrent runs on another machine. Map its content path onto the path this app reads over the network.</p>
+              </div>
+
+              <div class="setx-card">
+                <h4 class="setx-card__head">Polling</h4>
+                <div class="fields-row">
+                  <label class="field"><span>Poll every (s)</span><input id="set-torrentPollSeconds" type="number" min="5" max="600" /></label>
+                  <label class="field"><span>Give up after (min)</span><input id="set-torrentTimeoutMinutes" type="number" min="1" max="1440" /></label>
+                </div>
+                <p class="modal__note">BackIssue hands the magnet/.torrent to qBittorrent, watches it, and imports each torrent when it completes. After import the torrent is <b>left seeding</b> — manage ratio and removal in qBittorrent.</p>
+              </div>
+
+              <div class="setx-card">
+                <h4 class="setx-card__head">Weekly 0-Day pack</h4>
+                <label class="field"><span>Search phrase</span><input id="set-zeroDayQuery" type="text" spellcheck="false" placeholder="0-Day Week" /></label>
+                <label class="field field--check"><input id="set-zeroDayAddNew" type="checkbox" /><span>Add new series I don't follow (confident ComicVine matches only)</span></label>
+                <p class="modal__note">A scheduled job finds the newest <b>0-Day Week of …</b> pack on your Torznab indexers, downloads it, and imports the <b>missing</b> issues of series already in your collection. Turn the schedule on from the <b>Jobs</b> page.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="setx-panel" class:is-active={srcPanel === 'priority'}>
+            <h3 class="setx-panel__title">Source priority</h3>
+            <p class="setx-panel__sub">When more than one source can serve an issue, they're tried top-to-bottom — the first with a match wins.</p>
+            <div class="setx-card" id="source-priority-list">
+              {#each sourceOrder as s, i (s.id)}
+                <div class="srcpri-row">
+                  <span class="srcpri-rank">{i + 1}</span><span class="srcpri-name">{priorityLabel(s)}</span>
+                  <button class="srcpri-btn" type="button" disabled={i === 0} onclick={() => movePriority(i, -1)}><Icon name="arrow-up" /></button>
+                  <button class="srcpri-btn" type="button" disabled={i === sourceOrder.length - 1} onclick={() => movePriority(i, 1)}><Icon name="arrow-down" /></button>
+                </div>
+              {/each}
+            </div>
+            <!-- Plugin priority widgets inject here (plain DOM — must stay mounted). -->
+            <div id="settings-plugin-priority"></div>
+          </div>
+
+          <!-- Plugin source blocks inject here (plain DOM — must stay mounted; each
+               block is surfaced as its own rail entry and class-toggled in place,
+               never moved, so plugin re-injection guards keep working). -->
+          <div id="settings-plugin-sources"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- METADATA -->
+    <div class="setx-page setx-page--narrow" data-tab="metadata" class:is-active={activeTab === 'metadata'}>
+      <h3 class="setx-panel__title">Metadata</h3>
+      <p class="setx-panel__sub">ComicVine keys and where release and tagging data come from.</p>
+      <div class="setx-card">
+        <h4 class="setx-card__head">ComicVine API</h4>
+        <label class="field"><span>API key</span><input id="set-comicvineKeys" class="mono" type="text" spellcheck="false" autocomplete="off" placeholder="ComicVine API key…" /></label>
+        <p class="modal__note">Free at comicvine.gamespot.com — it identifies every series and issue.</p>
+        <div class="client-test"><button id="cv-test" class="btn btn--ghost" type="button" onclick={testCv}>Test key</button>
+          {#if tests.cv}<span id="cv-test-result" class="client-status {tests.cv.cls}">{#if tests.cv.icon}<Icon name={tests.cv.icon} /> {/if}{tests.cv.text}</span>{/if}</div>
+        <label class="field"><span>API base URL (optional)</span><input id="set-cvBaseUrl" class="mono" type="text" spellcheck="false" placeholder="https://data.backissue.app/api" /></label>
+        <p class="modal__note">Point metadata lookups at a ComicVine-compatible server instead of the official API — no rate limits, and politeness delays are skipped automatically. Blank = official ComicVine.</p>
+      </div>
+      <div class="setx-card">
+        <h4 class="setx-card__head">Tagging &amp; files</h4>
+        <label class="field">
+          <span>Tag on download</span>
+          <select id="set-tagOnDownload"><option value="off">Off</option><option value="on">On</option></select>
+        </label>
+        <p class="modal__note">ComicInfo.xml is written straight into the CBZ from the metadata source; <code>.cbr</code> downloads are converted to <code>.cbz</code> so they can be tagged.</p>
+      </div>
+      <div class="setx-card">
+        <h4 class="setx-card__head">Enrichment</h4>
+        <label class="field field--check">
+          <span class="switch"><input id="set-cvEnrich" type="checkbox" /><span class="switch__track"></span></span>
+          <span>Enrich metadata (content ratings, series status, issue extras)</span>
+        </label>
+        <p class="modal__note">When the metadata server supports it, adds Metron data — content ratings, series status and end year, and per-issue extras like price, UPC, and story titles. The official ComicVine API ignores the request, so it's safe either way.</p>
+      </div>
+      <div class="setx-card">
+        <h4 class="setx-card__head">Releases</h4>
+        <label class="field"><span>Release provider URL</span><input id="set-releaseProviderUrl" class="mono" type="text" spellcheck="false" placeholder="https://data.backissue.app" /></label>
+        <p class="modal__note">The release provider feeds "This week's releases".</p>
+      </div>
+    </div>
+
+    <!-- SIGN-IN -->
+    <div class="setx-page setx-page--narrow" data-tab="signin" class:is-active={activeTab === 'signin'}>
+      <h3 class="setx-panel__title">Sign-in</h3>
+      <p class="setx-panel__sub">How people sign in. Password login always works for admins.</p>
+      <div class="setx-card">
+        <p class="modal__note">Add an SSO provider (e.g. OIDC) or another login backend from the <b>Plugins</b> page to let users sign in with an identity provider.</p>
+        <!-- Auth plugin config (e.g. OIDC/SSO, WHMCS) injects here (plain DOM — stays mounted). -->
+        <div id="settings-plugin-auth"></div>
+        <label class="field field--check">
+          <span class="switch"><input id="set-passwordLoginDisabled" type="checkbox" /><span class="switch__track"></span></span>
+          <span>Disable password login (SSO only — admins keep a password fallback)</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- NOTIFICATIONS -->
+    <div class="setx-page setx-page--narrow" data-tab="notifications" class:is-active={activeTab === 'notifications'}>
+      <h3 class="setx-panel__title">Notifications</h3>
+      <p class="setx-panel__sub">Where BackIssue sends alerts. The in-app bell always records everything regardless. Open a channel to configure it.</p>
+      <!-- Outbound channels are provided by plugins (the notifications hub
+           injects one collapsible card per channel, like the source cards). -->
+      <div id="settings-plugin-notifications"></div>
+      {#if !notifyChannels}
+        <div class="setx-card setx-empty">
+          <span class="setx-empty__icon"><Icon name="bell" size={22} /></span>
+          <b>No outbound channels installed</b>
+          <p class="modal__note">Add the <b>Notifications Hub</b> plugin to send alerts to Discord, Telegram, Pushover, ntfy, or any webhook.</p>
+          <button class="btn btn--ghost btn--sm" type="button" onclick={() => navigate('/plugins')}>Browse plugins</button>
+        </div>
+      {/if}
+    </div>
   </div>
+
+  <!-- Unsaved-changes save bar -->
+  {#if dirty}
+    <div class="setx-savebar">
+      <span class="setx-savebar__dot"></span>
+      <span class="setx-savebar__text">You have unsaved changes.</span>
+      <button class="btn btn--ghost btn--sm" type="button" onclick={discardEdits}>Discard</button>
+      <button class="btn btn--primary btn--sm" type="button" onclick={save}>Save changes</button>
+    </div>
+  {/if}
 </main>
