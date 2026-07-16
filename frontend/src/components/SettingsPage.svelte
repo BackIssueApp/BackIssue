@@ -429,7 +429,7 @@
 
 <svelte:window onbeforeunload={onBeforeUnload} />
 
-<main id="settings-page" class="setx-shell" bind:this={root} oninput={markDirty} onchange={markDirty}>
+<main id="settings-page" class="scan-page settings-page setx-shell" bind:this={root} oninput={markDirty} onchange={markDirty}>
   <!-- Header bar -->
   <div class="setx-head">
     <button id="settings-back" class="btn btn--ghost btn--sm" onclick={goBack}><Icon name="arrow-left" /> Back</button>

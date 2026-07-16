@@ -1027,48 +1027,17 @@ body.settings .settings-page { display: flex; flex-direction: column; height: 10
 .settings-spacer { flex: 1; }
 
 /* Top-bar filter box */
-.settings-filter { margin-left: auto; position: relative; display: flex; align-items: center; }
-.settings-filter .bi-icon { position: absolute; left: 9px; color: var(--faint); pointer-events: none; }
-.settings-filter input { height: 32px; width: 200px; padding: 0 10px 0 30px; background: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--text); font: inherit; font-size: 13px; }
-.settings-filter input:focus { border-color: var(--accent); outline: none; }
-@media (max-width: 560px) { .settings-filter input { width: 132px; } }
 
 /* Section chips: the Library filter-chip pattern, applied to Settings sections.
    One horizontal strip below the bar — click to jump, scroll-spy fills the chip
    you're in. Scrolls sideways on narrow screens like the Library chips do. */
-.settings-chips { display: flex; gap: 6px; padding: 10px 18px; border-bottom: 1px solid var(--line); overflow-x: auto; flex-shrink: 0; scrollbar-width: none; }
-.settings-chips::-webkit-scrollbar { display: none; }
-.settings-chip { position: relative; font-size: 12px; padding: 5px 13px; white-space: nowrap; flex-shrink: 0; }
-.settings-chip:hover:not(.is-active) { color: var(--text); border-color: var(--muted); }
-.settings-chip.is-dim { opacity: .32; }
-.settings-chip__dot { position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--ink); }
-.settings-chip__dot.is-warn { background: var(--amber); }
-.settings-chip__dot.is-edit { background: var(--accent); }
-.settings-chip.is-active .settings-chip__dot { border-color: var(--accent); }
 
 /* The content pane is the only thing that scrolls, so scroll-spy has a stable
    container; the column centers with the full width the rail used to take. */
-.settings-shell { flex: 1; min-height: 0; display: flex; }
-.settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 22px 26px 55vh; scroll-behavior: smooth; }
-.settings-measure { max-width: 680px; margin: 0 auto; }
-.settings-nomatch { color: var(--faint); font-size: 13px; padding: 20px 2px; }
 
-.set-group { padding-top: 6px; margin-bottom: 30px; scroll-margin-top: 10px; }
-.set-group__head { font-family: var(--font-display); font-weight: 400; font-size: 19px; letter-spacing: .03em; margin: 0 0 3px; }
-.set-group__sub { color: var(--faint); font-size: 12.5px; margin: 0 0 14px; line-height: 1.5; }
 .set-hidden { display: none !important; }
 
-/* While filtering, flatten the cards to a plain list of the matching rows. */
-.settings-content.is-filtering .settings-section { border: none; padding: 0; background: none; }
-.settings-content.is-filtering .modal__note,
-.settings-content.is-filtering .modal__subhead,
-.settings-content.is-filtering .set-group__sub { display: none; }
 
-@media (max-width: 720px) {
-  .settings-chips { padding: 8px 12px; }
-  .settings-content { padding: 16px 16px 40vh; }
-}
-@media (prefers-reduced-motion: reduce) { .settings-content { scroll-behavior: auto; } }
 .settings-section {
   display: flex; flex-direction: column; gap: 14px;
   border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px;
@@ -1389,7 +1358,6 @@ body.import .import-page { display: flex; flex-direction: column; height: 100%; 
 }
 
 /* Momentum scrolling for older iPads (inert on modern browsers). */
-.librarypage__scroll, .detail, .tools-scroll, .lists-scroll, .settings-content,
 .profile-body, .jobs-scroll, .add-results, .scan-scroll, .queue-scroll,
 .drawer__scroll, .modal__panel, .notif__list {
   -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
@@ -1547,8 +1515,6 @@ body.import .import-page { display: flex; flex-direction: column; height: 100%; 
 @media (max-width: 640px) {
   .scan-page__bar { flex-wrap: wrap; row-gap: 8px; }
   .scan-page__title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .settings-filter { order: 5; flex: 1 1 100%; margin-left: 0; }
-  .settings-filter input { width: 100%; box-sizing: border-box; }
 
   /* Users page rows: wrap so the role picker / Disable / Delete stay on-screen
      (the body can't scroll sideways). */
@@ -1571,7 +1537,6 @@ body.import .import-page { display: flex; flex-direction: column; height: 100%; 
 }
 /* Comfortable tap targets for the small pill/chip controls on touch devices. */
 @media (hover: none) {
-  .filter__btn, .settings-chip { min-height: 34px; }
 }
 #scan-dir { flex: 1; min-width: 0; padding: 7px 11px; background: var(--ink); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font: 12px var(--font-mono); }
 .scan-page__sub { display: flex; align-items: center; gap: 16px; padding: 8px 18px; color: var(--muted); font-size: 12px; border-bottom: 1px solid var(--line); }
@@ -1818,7 +1783,7 @@ textarea.dialog-input { resize: vertical; font-family: var(--font-mono); }
 /* ===== Settings redesign ("Split detail") ================================
    Tabbed shell — one page visible at a time, but ALL pages stay in the DOM
    (plugin mounts + the generic set-* scan depend on it): visibility is CSS. */
-.setx-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.setx-shell { height: 100%; min-height: 0; } /* display comes from body.settings .settings-page (flex column) */
 .setx-head { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
 .setx-head__title { margin: 0; font: 400 22px/1 var(--font-display); letter-spacing: .02em; flex: 0 0 auto; }
 .setx-search { display: flex; align-items: center; gap: 7px; margin-left: auto; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; width: 220px; color: var(--muted); }

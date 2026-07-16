@@ -9,6 +9,18 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 ## [Unreleased]
 
 ### Added
+- **Settings, redesigned.** One page per tab instead of one long scroll:
+  a new **Overview** tab lands first with health cards (sources, ComicVine,
+  libraries, storage, downloading, notifications) and a "Needs attention"
+  list that deep-links to the fix. Library and Sources are master–detail —
+  a rail on the left (plugin sources included, each with a live enabled dot),
+  one panel at a time on the right, sectioned into cards. Roomier stacked
+  fields, a cross-tab search box, and an unsaved-changes bar with Discard.
+  On phones the rail becomes a drill-in list. All settings keys, connection
+  tests, and plugin-injected settings work exactly as before.
+- **Bulk "Move to library".** Select series on the Library page and move them
+  all into a library from the bulk bar — the library's type and visibility
+  ride along, same as the single-series move.
 - **Libraries own the storage locations.** The Root folders setting is gone —
   each library's folder is where its comics are filed and scanned. Existing
   root folders migrate automatically on first start: the default becomes a
@@ -17,9 +29,10 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   whole collection; each library entry below it shows just that library.
 - **Explicit libraries.** Split the collection into named libraries (e.g.
   *Comics* and *Manga*), each with its own sidebar entry. A library has a
-  behavior type and an optional root folder — new downloads for its series
-  file there, and Import auto-assigns anything found under it. Move series
-  between libraries from the ⋯ menu; deleting a library keeps its series.
+  behavior type and its own folders (the first is where new downloads file;
+  the rest are extra scan locations) — Import auto-assigns anything found
+  under any of them. Move series between libraries from the ⋯ menu; deleting
+  a library moves its series to a surviving one, never off disk.
   Managed in Settings → Library → Libraries. With no libraries defined, the
   sidebar grows automatic per-type entries once a second type appears.
   Libraries can also carry their own **folder pattern** (e.g. `{series}` for a
