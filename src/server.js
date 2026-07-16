@@ -1350,7 +1350,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   app.get('/api/cv', (req, res) => res.json(state.cv || { running: false }));
   app.get('/api/cv/search', async (req, res) => {
     try {
-      const results = await cvSearch(String(req.query.q || ''));
+      const results = await cvSearch(String(req.query.q || ''), { manga: req.query.manga === '1' });
       // Flag results already in the collection so the picker can gray them out
       // and link straight to the existing series (not just say so after an add).
       if (Array.isArray(results)) for (const v of results) {
@@ -1372,6 +1372,8 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     if (!comicvineId) return res.status(400).json({ error: 'comicvineId required' });
     try {
       const r = await addFromCv(comicvineId);
+      // Adding into a library (e.g. from the manga-lane search) files it there too.
+      if (req.body?.libraryId && r?.seriesId != null) { try { assignSeriesLibrary(db, r.seriesId, Number(req.body.libraryId)); } catch { /* library gone */ } }
       // Adding implies personal interest: the adder follows it automatically
       // (the add itself sets the global monitor flag for automation).
       if (r?.seriesId != null) setUserFollow(db, req.user.id, r.seriesId, true);

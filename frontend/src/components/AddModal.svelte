@@ -17,6 +17,12 @@
   import { notify } from '../lib/toasts.svelte.js';
   import { fmt } from '../lib/util.js';
   import { trapFocus } from '../lib/dom.js';
+  import { status } from '../lib/status.svelte.js';
+
+  // Manga lane: shown when a manga library exists. Searches the metadata
+  // server's manga catalog instead of ComicVine, and adds file into that library.
+  let mangaMode = $state(false);
+  const mangaLib = $derived((status.libraries || []).find((l) => l.type === 'manga'));
 
   const open = $derived(modals.stack.includes('add'));
 
@@ -37,7 +43,7 @@
     if (q.trim().length < 2) { m.results = null; m.error = ''; searching = false; return; }
     searching = true; m.error = ''; needsKey = false;
     let list;
-    try { list = await apiGet('/api/cv/search?q=' + encodeURIComponent(q)); }
+    try { list = await apiGet('/api/cv/search?q=' + encodeURIComponent(q) + (mangaMode ? '&manga=1' : '')); }
     catch { if (seq === searchSeq) { m.error = 'Search failed — is the app reachable?'; searching = false; } return; }
     if (seq !== searchSeq) return; // superseded by a newer search — drop this response
     searching = false;
@@ -52,7 +58,7 @@
   async function add(v) {
     v._busy = true; v._label = 'Adding…';
     try {
-      const r = await apiPost('/api/collection/add-cv', { comicvineId: v.id });
+      const r = await apiPost('/api/collection/add-cv', { comicvineId: v.id, ...(mangaMode && mangaLib ? { libraryId: mangaLib.id } : {}) });
       if (r.error) { notify('Add failed: ' + r.error, 'error'); v._busy = false; v._label = 'Add'; return; }
       // Say what actually happened: how many issues were queued, or why none.
       v._label = r.queued ? `Added — ${r.queued} queued` :
@@ -71,6 +77,10 @@
         <h3 style="margin:0;">Add a series from ComicVine</h3>
         <button id="add-modal-x" class="modal__x" aria-label="Close" onclick={() => closeModal('add')}><Icon name="close" /></button>
       </div>
+      {#if mangaLib}
+        <label class="field field--check" style="margin:6px 0 0;" title="Search the manga catalog instead of ComicVine — added series join the {mangaLib.name} library">
+          <input type="checkbox" bind:checked={mangaMode} onchange={() => search(m.query)} /><span>Search manga</span></label>
+      {/if}
       <input id="add-search" type="search" spellcheck="false" placeholder="Search ComicVine…" bind:this={searchEl} bind:value={m.query} oninput={onInput}
         style="width:100%;margin:10px 0;padding:8px 11px;background:var(--ink);border:1px solid var(--line);border-radius:6px;color:var(--text);" />
       <div id="add-results" class="add-results">

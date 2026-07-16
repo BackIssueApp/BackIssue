@@ -207,8 +207,8 @@ async function runCvMatchSweep() {
   } catch (e) { state.cv = { running: false, error: String(e?.message || e) }; job.fail(e); }
 }
 
-async function cvSearch(q) {
-  return cvClient().search(q);
+async function cvSearch(q, opts = {}) {
+  return cvClient().search(q, opts);
 }
 
 // Look up one ComicVine volume by id (for pasting a CV URL/id into the match
@@ -412,6 +412,9 @@ async function runImportScan({ fresh = false } = {}) {
         // year and publisher sharpen the ranking. Folder-derived values remain
         // the fallback for untagged files.
         const meta = await importMetaForFolder(filesByDir.get(g.dir) || []).catch(() => null);
+        // Folders in a manga library search the manga lane (MangaDex facade)
+        // instead of ComicVine — the comic matcher never sees manga and vice versa.
+        const mangaLane = libs.find((l) => l.id === libraryFor(g.dir))?.type === 'manga';
         const name = meta?.series || cleanVolumeName(g.seriesName);
         const year = extractYear(g.seriesName) || meta?.year || null;
         const publisher = meta?.publisher || g.publisher;
@@ -433,7 +436,7 @@ async function runImportScan({ fresh = false } = {}) {
         // "ComicVine has no such volume".
         for (let attempt = 1; attempt <= 3 && !cand; attempt++) {
           try {
-            const results = await client.search(name);
+            const results = await client.search(name, { manga: mangaLane });
             const { best } = rankCandidates({ title: name, year, publisher }, results);
             if (best) { cand = best.cand; confidence = best.confidence; }
             break;
