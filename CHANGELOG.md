@@ -8,7 +8,19 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-07-16
+
 ### Added
+- **Manga catalogs.** The Add dialog gains a **Search manga** toggle — a
+  dedicated manga catalog (served by the metadata server) instead of
+  ComicVine. The first manga add creates the Manga library automatically
+  (with a pointer to give it a folder); added series file into it typed
+  manga — chapter-aware search, right-to-left reading (Comic Reader ≥ 1.5.0),
+  chapter publication dates, and adult-rated titles arrive pre-flagged
+  mature. Import scans of manga-library folders match against the same
+  catalog. A **Manga content rating ceiling** (Settings → Metadata) controls
+  how far search reaches — Safe only up to Everything. Manga metadata and
+  covers are provided by [MangaDex](https://mangadex.org).
 - **Settings, redesigned.** One page per tab instead of one long scroll:
   a new **Overview** tab lands first with health cards (sources, ComicVine,
   libraries, storage, downloading, notifications) and a "Needs attention"
@@ -27,6 +39,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   **Comics** library (adopting every existing series), and extra scan folders
   each become their own library. The sidebar's **Library** entry shows the
   whole collection; each library entry below it shows just that library.
+- **New series land in a library immediately** — the first comic-type
+  library by default; the manga lane and import auto-assign override it.
+  (Previously an added series belonged to no library until the next restart.)
 - **Explicit libraries.** Split the collection into named libraries (e.g.
   *Comics* and *Manga*), each with its own sidebar entry. A library has a
   behavior type and its own folders (the first is where new downloads file;
