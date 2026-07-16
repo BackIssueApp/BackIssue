@@ -24,6 +24,8 @@ export const SETTING_FIELDS = {
   comicvineKeys:       { type: 'string' },
   cvBaseUrl:           { type: 'string', allowEmpty: true },
   cvEnrich:            { type: 'bool' },
+  // Manga search content ceiling (each level includes the ones below it).
+  mangaRating:         { type: 'enum', values: ['safe', 'suggestive', 'erotica', 'pornographic'] },
   disabledPlugins:     { type: 'string', allowEmpty: true }, // comma-separated plugin names skipped at boot
   allowRegistration:   { type: 'bool' }, // self-service signups (new accounts start as viewers)
   passwordLoginDisabled: { type: 'bool' }, // SSO-only: hide the password form (admins keep an escape hatch)

@@ -79,12 +79,13 @@ export function makeCvClient(config, { fetchImpl, key, politeMs } = {}) {
   // requests plugin needs it to spot collected editions from the blurb, but it
   // bloats the payload (100 results), so it's opt-in.
   async function search(query, { withDescription = false, manga = false } = {}) {
+    const mangaQ = manga ? '&manga=1&rating=' + encodeURIComponent(config.mangaRating || 'erotica') : '';
     const fields = 'id,name,publisher,start_year,count_of_issues,image,site_detail_url,deck'
       + (withDescription ? ',description' : '');
     // limit=100 (CV's max page): common names like "X-Men" have dozens of
     // volumes — at limit=20 the right one is often buried below the cutoff and
     // the matcher never even sees it.
-    const data = await call(`/search/?resources=volume&limit=100&field_list=${fields}&query=${encodeURIComponent(query)}${manga ? '&manga=1' : ''}`);
+    const data = await call(`/search/?resources=volume&limit=100&field_list=${fields}&query=${encodeURIComponent(query)}${mangaQ}`);
     await sleep(pace);
     return (data.results || []).map(normVolume);
   }

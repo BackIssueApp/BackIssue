@@ -67,6 +67,9 @@ const config = {
   // ratings, series status/end year. Supported by CloneVine; the real
   // ComicVine API ignores the parameter, so it's safe either way.
   cvEnrich: false,
+  // Manga search content ceiling: safe | suggestive | erotica (default) |
+  // pornographic — passed to the metadata server's manga lane.
+  mangaRating: 'erotica',
   // Plugin catalog manifest URL — the app fetches this to offer installable
   // first-party plugins on the Plugins page and during onboarding. Blank uses
   // the default hosted catalog.
