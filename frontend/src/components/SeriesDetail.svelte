@@ -268,6 +268,18 @@
     loadCollection();
   }
 
+  // Cycle the library type: comic → manga → comic. (Magazine joins the cycle
+  // when magazine support lands — the API already accepts it.)
+  async function toggleType() {
+    if (!det?.series) return;
+    const type = (det.series.type || 'comic') === 'manga' ? 'comic' : 'manga';
+    const r = await apiPost(`/api/collection/${s.id}/type`, { type });
+    if (r.error) return notify(r.error, 'error');
+    detail.det.series.type = type;
+    notify(type === 'manga' ? 'Marked as manga — chapter-style search and right-to-left reading defaults apply.' : 'Marked as comic.', 'ok');
+    loadCollection();
+  }
+
   async function toggleRestricted() {
     if (!det?.series) return;
     const restricted = !det.series.restricted;
@@ -546,6 +558,8 @@
                       {/if}
                     {/if}
                     {#if isTrusted()}
+                      <button id="series-type-btn" class="menu__item" role="menuitem" title="Library type — manga uses chapter-style search and right-to-left reading defaults"
+                        onclick={() => { moreOpen = false; toggleType(); }}><Icon name="book" /> {(det?.series?.type || 'comic') === 'manga' ? 'Mark as comic' : 'Mark as manga'}</button>
                       <button id="restrict-btn" class="menu__item" role="menuitem" title="Hide this series from roles without the “View mature content” permission"
                         onclick={() => { moreOpen = false; toggleRestricted(); }}><Icon name="shield" /> {det?.series?.restricted ? 'Remove mature flag' : 'Mark mature'}</button>
                       <div class="series-more__sep" role="separator"></div>

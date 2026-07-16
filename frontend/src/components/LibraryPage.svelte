@@ -19,6 +19,7 @@
     { key: 'unmonitored', label: 'Not monitored' },
     { key: 'problems', label: 'Problems' },
     { key: 'unmatched', label: 'Unmatched' },
+    { key: 'manga', label: 'Manga' },
   ];
 
   // Grid ⊞ / list ≣ — a device preference, not a URL one.

@@ -54,7 +54,9 @@ export function parseComicInfo(xml) {
       // Where taggers leave ComicVine breadcrumbs: Web is the CV detail URL,
       // Notes carries the id (ComicTagger's "[CVDB123]", Kapowarr/Mylar's
       // "Issue ID 123"). Used by the import scan's exact-match fast path.
-      web: g('Web'), notes: g('Notes') };
+      web: g('Web'), notes: g('Notes'),
+      // ComicRack's Manga tag: "Yes" / "YesAndRightToLeft" — types the series.
+      manga: g('Manga') };
   } catch { return null; }
 }
 

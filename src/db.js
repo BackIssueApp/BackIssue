@@ -116,6 +116,7 @@ export function initSchema(db) {
       name TEXT, year TEXT, publisher TEXT, file_count INTEGER,
       cv_id INTEGER, cv_name TEXT, cv_year TEXT, cv_image TEXT,
       confidence TEXT, status TEXT NOT NULL DEFAULT 'review',
+      series_type TEXT, -- inferred library type ('manga' from ComicInfo's Manga tag); null = comic
       scanned_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     -- Personal follows: each user's own pull list. Distinct from
@@ -161,6 +162,11 @@ function migrate(db) {
   // Mature/restricted flag. When 1, the series (and its issues, files, releases)
   // are hidden from any user whose role lacks the library.restricted permission.
   if (!cols.includes('restricted')) db.exec('ALTER TABLE series ADD COLUMN restricted INTEGER NOT NULL DEFAULT 0');
+  // Library type: 'comic' (default) | 'manga' | future types (e.g. 'magazine').
+  // Kept as free TEXT so new types don't need a migration; consumers treat
+  // unknown values as 'comic'. Drives parsing conventions (chapters vs issues),
+  // reader defaults (RTL), and library filtering.
+  if (!cols.includes('type')) db.exec("ALTER TABLE series ADD COLUMN type TEXT NOT NULL DEFAULT 'comic'");
   const cvcols = db.prepare('PRAGMA table_info(cv_series)').all().map((c) => c.name);
   if (cvcols.length && !cvcols.includes('site_detail_url')) db.exec('ALTER TABLE cv_series ADD COLUMN site_detail_url TEXT');
   // ComicVine-provided alternative names (its `aliases` field, newline-separated).
@@ -197,6 +203,9 @@ function migrate(db) {
   // Indexer guid of the grabbed release, so a failure can blacklist that exact
   // release (not just its title) and future searches skip it.
   if (grabCols.length && !grabCols.includes('release_guid')) db.exec('ALTER TABLE grabs ADD COLUMN release_guid TEXT');
+  // Library type inferred by the import scan (ComicInfo's Manga tag).
+  const icCols = db.prepare('PRAGMA table_info(import_candidates)').all().map((c) => c.name);
+  if (icCols.length && !icCols.includes('series_type')) db.exec('ALTER TABLE import_candidates ADD COLUMN series_type TEXT');
   // The Mylar integration is gone — BackIssue replaces it.
   db.exec('DROP TABLE IF EXISTS mylar_series_map');
   // The dedicated tag log was folded into the Logs page (category 'tag').
@@ -241,6 +250,14 @@ export function listSeries(db, { search, includeRestricted = true } = {}) {
 
 export function setSeriesRestricted(db, id, restricted) {
   db.prepare('UPDATE series SET restricted=? WHERE id=?').run(restricted ? 1 : 0, id);
+}
+// Library type ('comic' | 'manga' | future e.g. 'magazine'). Whitelisted here —
+// the single write path — so no surface can invent a type the rest of the app
+// (parsing, filters, reader defaults) doesn't understand.
+export const SERIES_TYPES = ['comic', 'manga', 'magazine'];
+export function setSeriesType(db, id, type) {
+  if (!SERIES_TYPES.includes(type)) throw new Error(`unknown series type "${type}"`);
+  db.prepare('UPDATE series SET type=? WHERE id=?').run(type, id);
 }
 export function isSeriesRestricted(db, id) {
   const r = db.prepare('SELECT restricted FROM series WHERE id=?').get(id);
@@ -591,7 +608,7 @@ export function collectionSeries(db, { filter = 'all', search = '', sort = 'titl
   };
   const orderBy = ORDERS[sort] || ORDERS.title;
   const rows = db.prepare(`
-    SELECT s.id, s.title, s.publisher, s.year, s.cover_url, s.followed, s.cv_id, s.cv_locked, s.url, s.restricted,
+    SELECT s.id, s.title, s.publisher, s.year, s.cover_url, s.followed, s.cv_id, s.cv_locked, s.url, s.restricted, s.type,
       EXISTS(SELECT 1 FROM user_follows uf WHERE uf.series_id=s.id AND uf.user_id=@uid) my_follow,
       cv.name cv_name, cv.publisher cv_publisher, cv.start_year cv_year, cv.image_url cv_image,
       (SELECT COUNT(*) FROM issues i WHERE i.series_id=s.id) bc_total,
@@ -628,7 +645,7 @@ export function collectionSeries(db, { filter = 'all', search = '', sort = 'titl
     if (!r.cv_id) {
       return {
         id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, cv_id: null, cv_locked: 0, sourced, matched: false, source: 'unmatched',
-        title: null, publisher: null, year: null, cover_url: null, restricted: !!r.restricted,
+        title: null, publisher: null, year: null, cover_url: null, restricted: !!r.restricted, type: r.type || 'comic',
         folder: dirBaseName(r.file_dir), files: r.file_count,
         total: 0, owned: 0, missing: 0, untagged: r.untagged, corrupt: r.corrupt,
         latest: null, active: r.active, size: r.size_bytes,
@@ -639,7 +656,7 @@ export function collectionSeries(db, { filter = 'all', search = '', sort = 'titl
     return {
       id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, cv_id: r.cv_id, cv_locked: r.cv_locked, sourced, matched: true, source: 'cv',
       title: r.cv_name || r.title, publisher: r.cv_publisher || null, year: r.cv_year || null, cover_url: r.cv_image || null,
-      cv_name: r.cv_name, cv_year: r.cv_year, restricted: !!r.restricted,
+      cv_name: r.cv_name, cv_year: r.cv_year, restricted: !!r.restricted, type: r.type || 'comic',
       total, owned, missing: Math.max(0, total - owned), untagged: r.untagged, corrupt: r.corrupt,
       latest: r.cv_latest, active: r.active, size: r.size_bytes,
     };
@@ -649,6 +666,11 @@ export function collectionSeries(db, { filter = 'all', search = '', sort = 'titl
       : filter === 'unmonitored' ? !r.monitored
       : filter === 'problems' ? (r.untagged > 0 || r.corrupt > 0)
       : filter === 'unmatched' ? !r.cv_id
+      // Library-type lanes. Unknown/legacy values count as comics, so the
+      // comics lane never silently hides rows when new types appear.
+      : filter === 'manga' ? r.type === 'manga'
+      : filter === 'comics' ? r.type !== 'manga' && r.type !== 'magazine'
+      : filter === 'magazines' ? r.type === 'magazine'
       : true);
 }
 
@@ -680,6 +702,7 @@ export function seriesCollectionDetail(db, id, userId = null) {
     monitored: series.followed,
     cv_id: series.cv_id, cv_locked: series.cv_locked, sourced, path: series.path,
     restricted: !!series.restricted,
+    type: series.type || 'comic',
     aliases: series.aliases || '',                 // user-added search names (editable)
     cv_aliases: parseAliases(cvRow && cvRow.aliases), // ComicVine's aliases (read-only hint)
   };
@@ -753,6 +776,7 @@ export function seriesCollectionDetail(db, id, userId = null) {
         : 0,
       monitored: series.followed,
       cv_id: null, cv_locked: 0, sourced, path: series.path,
+      type: series.type || 'comic',
       folder: dirBaseName(files[0]?.dir),
     },
     cv: null, source: 'unmatched', sourced, matched: false,
@@ -1063,12 +1087,12 @@ export function clearImportCandidates(db, { keepImported = true } = {}) {
 }
 export function upsertImportCandidate(db, c) {
   return db.prepare(`INSERT INTO import_candidates
-    (folder,name,year,publisher,file_count,cv_id,cv_name,cv_year,cv_image,confidence,status,scanned_at)
-    VALUES (@folder,@name,@year,@publisher,@file_count,@cv_id,@cv_name,@cv_year,@cv_image,@confidence,@status,datetime('now'))
+    (folder,name,year,publisher,file_count,cv_id,cv_name,cv_year,cv_image,confidence,status,series_type,scanned_at)
+    VALUES (@folder,@name,@year,@publisher,@file_count,@cv_id,@cv_name,@cv_year,@cv_image,@confidence,@status,@series_type,datetime('now'))
     ON CONFLICT(folder) DO UPDATE SET name=excluded.name,year=excluded.year,publisher=excluded.publisher,
       file_count=excluded.file_count,cv_id=excluded.cv_id,cv_name=excluded.cv_name,cv_year=excluded.cv_year,
-      cv_image=excluded.cv_image,confidence=excluded.confidence,status=excluded.status,scanned_at=datetime('now')`)
-    .run({ name: null, year: null, publisher: null, file_count: 0, cv_id: null, cv_name: null, cv_year: null, cv_image: null, confidence: 'none', status: 'review', ...c });
+      cv_image=excluded.cv_image,confidence=excluded.confidence,status=excluded.status,series_type=excluded.series_type,scanned_at=datetime('now')`)
+    .run({ name: null, year: null, publisher: null, file_count: 0, cv_id: null, cv_name: null, cv_year: null, cv_image: null, confidence: 'none', status: 'review', series_type: null, ...c });
 }
 export function listImportCandidates(db) {
   return db.prepare(`SELECT * FROM import_candidates ORDER BY

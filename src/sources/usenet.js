@@ -46,7 +46,20 @@ export function parseReleaseName(title) {
     const last = nums[nums.length - 1];
     number = normalizeNumber(last);   // "001" -> "1", "000.5" -> "0.5"
     series = cleaned.slice(0, cleaned.lastIndexOf(last));
+  } else {
+    // Manga forms glue the number to a chapter/volume marker ("c1044", "v03"),
+    // which the standalone-number rule above deliberately skips. Take it as the
+    // number — except a v-token whose digits read as a year, which is a comic
+    // volume marker ("Series V1999"), not something anyone collects by number.
+    const tok = cleaned.match(/(?<![a-z0-9])(c|ch|chapter|v|vol|volume)[\s.]*(\d+(?:\.\d+)?)(?!\d)/i);
+    if (tok && !(/^v/i.test(tok[1]) && /^(?:19|20)\d{2}$/.test(tok[2]))) {
+      number = normalizeNumber(tok[2]);
+      series = cleaned.slice(0, tok.index);
+    }
   }
+  // A marker word left dangling at the series tail ("naruto ch", "vagabond vol",
+  // "frieren … - chapter") is part of the number's notation, not the name.
+  series = series.replace(/[\s._-]*(?:c|ch|chapter|v|vol|volume)[\s.]*$/i, '');
   return { series: series.trim(), number, year };
 }
 
@@ -211,10 +224,15 @@ export const usenet = {
     const token = issueToken(ctx.issue);
     const byUrl = new Map();
     for (const name of names) {
-      const query = [name, token].filter(Boolean).join(' ').trim();
-      if (!query) continue;
-      const results = await searchNewznab(indexers, query, {});
-      for (const r of results) if (r.nzbUrl && !byUrl.has(r.nzbUrl)) byUrl.set(r.nzbUrl, r);
+      const queries = [[name, token].filter(Boolean).join(' ').trim()];
+      // Manga releases usually carry a chapter marker ("c1044"), which a plain
+      // number query won't text-match on most indexers — search that form too.
+      if (ctx.series?.type === 'manga' && token) queries.push(`${name} c${token}`);
+      for (const query of queries) {
+        if (!query) continue;
+        const results = await searchNewznab(indexers, query, {});
+        for (const r of results) if (r.nzbUrl && !byUrl.has(r.nzbUrl)) byUrl.set(r.nzbUrl, r);
+      }
     }
     const target = { series: ctx.seriesTitle, names, number: ctx.issue?.issue_number, year: ctx.seriesYear };
     // Drop releases that previously failed to download — a broken post is very

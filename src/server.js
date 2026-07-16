@@ -6,7 +6,7 @@ import fsp from 'node:fs/promises';
 import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
-import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, restrictedSeriesIds, isCvIssueRestricted, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
+import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
 import { resolveSeriesDir, defaultRootedDir } from './paths.js';
 import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
@@ -254,7 +254,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     // pinned explicitly so they can never drift off the manage permission if the
     // fall-through default ever changes. $-anchored, so GET browse of the
     // collection stays library.view and downloads still route via DOWNLOAD_RULES.
-    [/^\/api\/collection\/\d+\/(delete|scan|refile|refresh|tag|cleanup|metadata|monitor|path|restricted|aliases|cv)$/, 'library.manage'],
+    [/^\/api\/collection\/\d+\/(delete|scan|refile|refresh|tag|cleanup|metadata|monitor|path|restricted|aliases|cv|type)$/, 'library.manage'],
     [/^\/api\/collection\/(bulk|add-cv)$/, 'library.manage'],
     [/^\/api\/cv\/match$/, 'library.manage'],
     [/^\/api\/issue\/\d+\/metadata$/, 'library.manage'],
@@ -1158,6 +1158,13 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   app.post('/api/collection/:id/restricted', (req, res) => {
     setSeriesRestricted(db, Number(req.params.id), !!(req.body || {}).restricted);
     res.json({ restricted: isSeriesRestricted(db, Number(req.params.id)) });
+  });
+  // Set the series' library type (comic / manga / …) — library.manage via the
+  // default POST rule, pinned explicitly in PERM_RULES.
+  app.post('/api/collection/:id/type', (req, res) => {
+    const type = String((req.body || {}).type || '');
+    try { setSeriesType(db, Number(req.params.id), type); } catch (e) { return res.status(400).json({ error: String(e?.message || e) }); }
+    res.json({ type });
   });
   // Metadata editor (library.manage via the default POST rule). Edits write
   // to the display columns and lock those fields against refreshes; reset

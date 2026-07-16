@@ -98,3 +98,13 @@ test('listBlacklist paginates newest-first; delete and clear remove entries', ()
   assert.equal(clearBlacklist(db), 1);
   assert.equal(listBlacklist(db, {}).total, 0);
 });
+
+test('setSeriesType whitelists types and persists; unknown types throw', async () => {
+  const { setSeriesType, upsertSeries, getSeriesById } = await import('../src/db.js');
+  const db = openDb(':memory:');
+  const id = upsertSeries(db, { title: 'Berserk', url: 'cv:1', publisher: 'Dark Horse' });
+  assert.equal(getSeriesById(db, id).type, 'comic'); // default
+  setSeriesType(db, id, 'manga');
+  assert.equal(getSeriesById(db, id).type, 'manga');
+  assert.throws(() => setSeriesType(db, id, 'novel'), /unknown series type/);
+});

@@ -257,7 +257,7 @@ test('importMetaForFolder reads series/year/publisher from a tagged CBZ', async 
   const cbz = path.join(dir, 'X-Men 001.cbz');
   await writeCbz(cbz, { 'ComicInfo.xml': CI_XML('X-Men', '2004', 'Marvel'), '001.jpg': 'x' });
   const meta = await importMetaForFolder([cbz]);
-  assert.deepEqual(meta, { series: 'X-Men', year: '2004', publisher: 'Marvel' });
+  assert.deepEqual(meta, { series: 'X-Men', year: '2004', publisher: 'Marvel', type: null });
   await fs.rm(dir, { recursive: true, force: true });
 });
 
@@ -310,5 +310,15 @@ test('importMetaForFolder extracts ComicVine ids from Web and Notes tags', async
   assert.equal(plain.series, 'S');
   assert.equal(plain.cvVolumeId, undefined);
   assert.equal(plain.cvIssueId, undefined);
+  await fs.rm(dir, { recursive: true, force: true });
+});
+
+test('importMetaForFolder types a series from ComicInfo Manga tag', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'imeta-'));
+  const cbz = path.join(dir, 'Berserk v03.cbz');
+  await writeCbz(cbz, { 'ComicInfo.xml': '<?xml version="1.0"?><ComicInfo><Series>Berserk</Series><Manga>YesAndRightToLeft</Manga></ComicInfo>', '001.jpg': 'x' });
+  const meta = await importMetaForFolder([cbz]);
+  assert.equal(meta.series, 'Berserk');
+  assert.equal(meta.type, 'manga');
   await fs.rm(dir, { recursive: true, force: true });
 });

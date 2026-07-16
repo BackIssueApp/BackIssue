@@ -117,7 +117,9 @@ export async function importMetaForFolder(filePaths, { readInfo = readArchiveInf
       const ci = (await readInfo(p))?.comicInfo;
       if (!ci?.series) continue; // untagged or corrupt — try the next file
       const volYear = /^(?:19|20)\d{2}$/.test(String(ci.volume || '').trim()) ? String(ci.volume).trim() : null;
-      return { series: ci.series, year: volYear, publisher: ci.publisher || null, ...comicVineIds(ci) };
+      // ComicRack's Manga tag ("Yes" / "YesAndRightToLeft") types the series.
+      const type = /^yes/i.test(String(ci.manga || '').trim()) ? 'manga' : null;
+      return { series: ci.series, year: volYear, publisher: ci.publisher || null, type, ...comicVineIds(ci) };
     } catch { /* unreadable file — try the next */ }
   }
   return null;

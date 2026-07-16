@@ -8,6 +8,14 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+- **Library types — first cut, starting with manga.** Every series now has a
+  library type (comic by default). Mark a series as manga from its ⋯ menu, or
+  let import infer it from ComicInfo's `Manga` tag. Manga series get
+  chapter-aware searching (releases named `c1044`, `Ch. 105.5`, `Vol. 37` now
+  match), an extra chapter-form indexer query, and a **Manga** library filter.
+  The type field is extensible groundwork — magazines are planned next.
+
 ## [0.6.7] — 2026-07-15
 
 ### Fixed

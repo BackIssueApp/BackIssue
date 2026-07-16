@@ -27,7 +27,7 @@ import { collectionStats } from './stats.js';
 import { installConsoleCapture, attachLogDb, listLogs, clearLogs, logInfo, logWarn, logError, logCounts, logCategories } from './logstore.js';
 import { runCvMatch as runCvMatchLib, cacheAndLink, addSeriesFromCv, refreshCvVolume, refreshAllIssueDetails, rankCandidates } from './cvmatch.js';
 import { getSeriesById, seriesCollectionDetail, untrackSeries, getCvIssue, upsertSeries, setSeriesPath,
-  ensureCvIssueRow, recordGrab, getGrab, setGrabStatus, setIssueStatus, setSeriesAliases, seriesSearchNames,
+  ensureCvIssueRow, recordGrab, getGrab, setGrabStatus, setIssueStatus, setSeriesAliases, setSeriesType, seriesSearchNames,
   clearImportCandidates, upsertImportCandidate, listImportCandidates, getImportCandidate, setImportCandidateMatch, setImportCandidateStatus, readyImportCandidates, listWantedIssues, queueIssues, getCvSeries } from './db.js';
 import { parseIndexers, searchNewznab } from './newznab.js';
 import { makeNzbClient } from './nzbclients.js';
@@ -406,6 +406,7 @@ async function runImportScan({ fresh = false } = {}) {
           folder: g.dir, name, year, publisher, file_count: g.present.size,
           cv_id: cand?.id ?? null, cv_name: cand?.name ?? null, cv_year: cand?.start_year ?? null, cv_image: cand?.image_url ?? null,
           confidence, status: confidence === 'high' ? 'ready' : 'review',
+          series_type: meta?.type ?? null,
         });
         state.import.done = ++done;
         job.progress({ done, total: groups.length, message: `${done}/${groups.length}` });
@@ -439,6 +440,9 @@ async function runImport() {
           if (c.year) db.prepare('UPDATE series SET year=? WHERE id=?').run(c.year, seriesId);
         }
         setSeriesPath(db, seriesId, c.folder);
+        // Library type inferred at scan time (ComicInfo's Manga tag) sticks to
+        // the created series — drives reading direction and library filters.
+        if (c.series_type) { try { setSeriesType(db, seriesId, c.series_type); } catch { /* unknown type — stay comic */ } }
         await indexFolderForSeries({ db, dir: c.folder, seriesId, cvId: c.cv_id || null });
         setImportCandidateStatus(db, c.id, 'imported');
         imported++;

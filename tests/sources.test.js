@@ -207,3 +207,17 @@ test('suspiciouslySmall: tiny known sizes rejected, unknown and real sizes pass'
   assert.equal(suspiciouslySmall(0), false);             // unknown ≠ fake
   assert.equal(suspiciouslySmall(undefined), false);
 });
+
+test('release matching understands manga chapter/volume tokens', () => {
+  // Attached tokens ("c1044", "v03") and marker words before the number.
+  assert.equal(matchesIssue('One Piece c1044 (2022) (digital)', 'One Piece', '1044'), true);
+  assert.equal(matchesIssue('Berserk v03 (2004) (Digital) (LuCaZ)', 'Berserk', '3'), true);
+  assert.equal(matchesIssue('Naruto Ch.105.5', 'Naruto', '105.5'), true);
+  assert.equal(matchesIssue('Vagabond Vol. 37', 'Vagabond', '37'), true);
+  assert.equal(matchesIssue('Frieren Beyond Journeys End - Chapter 105', 'Frieren Beyond Journeys End', '105'), true);
+  // Comic guards: a V-year marker is not a collectible number, and plain
+  // western numbering is unchanged.
+  assert.equal(matchesIssue('Saga V (2020)', 'Saga', '5'), false);
+  assert.equal(matchesIssue('Invincible 012 (2004)', 'Invincible', '12'), true);
+  assert.equal(matchesIssue('Invincible 012 (2004)', 'Invincible', '1'), false);
+});
