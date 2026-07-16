@@ -175,7 +175,7 @@ async function importCompleted(srcPath, name) {
   // BYTES, not its extension (a ZIP posted as ".cbr" fed to the RAR extractor is
   // a guaranteed "damaged archive" error).
   let lastErr = null;
-  for (const comic of candidates) {
+  for (const [ci, comic] of candidates.entries()) {
     try {
       const ext = path.extname(comic).toLowerCase();
       const fmt = (await sniffFormat(comic))
@@ -186,7 +186,7 @@ async function importCompleted(srcPath, name) {
       return { buffer: await cbrBufferToCbz(await fs.readFile(comic)), format: 'cbz' };
     } catch (e) {
       lastErr = e;
-      console.warn(`usenet import: "${path.basename(comic)}" unusable (${e?.message || e}) — trying the next candidate`);
+      console.warn(`usenet import: "${path.basename(comic)}" unusable (${e?.message || e})${ci < candidates.length - 1 ? ' — trying the next candidate' : ' — no other candidates'}`);
     }
   }
 

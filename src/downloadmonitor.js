@@ -6,7 +6,7 @@
 // `grabs` table + each client's own state, it survives restarts — on boot it
 // reconciles whatever finished while we were down.
 import config from './config.js';
-import { activeGrabs, setGrabStatus, setIssueStatus, getIssueById, blacklistRelease } from './db.js';
+import { activeGrabs, setGrabStatus, setIssueStatus, getIssueById, blacklistRelease, isCorruptContentError } from './db.js';
 import { makeNzbClient } from './nzbclients.js';
 import { makeTorrentClient } from './torrentclients.js';
 import { importCompleted } from './sources/usenet.js';
@@ -214,6 +214,15 @@ export function createDownloadMonitor({ db, onProgress = () => {}, now = () => D
             }
           } catch (e) {
             console.warn('download monitor: import failed for grab', grab.id, e?.stack || e?.message || e);
+            // A damaged archive is the RELEASE's fault and fails identically
+            // on every retry — blacklist it so retry grabs the next-best
+            // release. Transient import errors still don't blacklist.
+            if (source === 'usenet' && isCorruptContentError(e)) {
+              try {
+                blacklistRelease(db, { source, guid: grab.release_guid, title: grab.title, issueId: grab.issue_id, reason: String(e?.message || e).slice(0, 200) });
+                console.warn(`download monitor: blacklisted corrupt usenet release "${grab.title}"`);
+              } catch (be) { console.warn('download monitor: blacklisting failed:', be?.message || be); }
+            }
             setGrabStatus(db, grab.id, 'failed', { error: String(e?.message || e) });
             setIssueStatus(db, issue.id, 'failed', { error: `${source} import: ${e?.message || e}` });
             onProgress({ event: 'failed', issue, source, error: String(e?.message || e) });

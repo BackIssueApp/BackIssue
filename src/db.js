@@ -449,6 +449,15 @@ export function normReleaseTitle(title) {
     .trim();
 }
 
+// Does this import error mean the downloaded CONTENT is bad (damaged archive,
+// wrong bytes) — as opposed to a transient problem (paths, permissions, an
+// unreachable client)? Content failures are deterministic: the same release
+// fails the same way every retry, so it belongs on the blacklist.
+export function isCorruptContentError(e) {
+  return /archive header|data are damaged|not RAR archive|corrupt|invalid zip|end of central directory/i
+    .test(String(e?.message || e || ''));
+}
+
 // Record a release that failed to download so it isn't auto-grabbed again.
 // Deduplicated on (source, guid, title_norm) so the same dud failing twice
 // doesn't pile up rows.

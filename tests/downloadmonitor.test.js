@@ -108,3 +108,11 @@ test('setSeriesType whitelists types and persists; unknown types throw', async (
   assert.equal(getSeriesById(db, id).type, 'manga');
   assert.throws(() => setSeriesType(db, id, 'novel'), /unknown series type/);
 });
+
+test('isCorruptContentError: damaged-archive errors classify as content failures', async () => {
+  const { isCorruptContentError } = await import('../src/db.js');
+  assert.equal(isCorruptContentError(new Error('Archive header or data are damaged')), true);
+  assert.equal(isCorruptContentError(new Error('File is not RAR archive')), true);
+  assert.equal(isCorruptContentError(new Error('EACCES: permission denied')), false);
+  assert.equal(isCorruptContentError(new Error('client unreachable')), false);
+});
