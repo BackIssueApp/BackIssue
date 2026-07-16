@@ -784,6 +784,19 @@
         <p class="modal__note">When the metadata server supports it, adds Metron data — content ratings, series status and end year, and per-issue extras like price, UPC, and story titles. The official ComicVine API ignores the request, so it's safe either way.</p>
       </div>
       <div class="setx-card">
+        <h4 class="setx-card__head">Manga</h4>
+        <label class="field">
+          <span>Content rating ceiling</span>
+          <select id="set-mangaRating">
+            <option value="safe">Safe only</option>
+            <option value="suggestive">Up to Suggestive</option>
+            <option value="erotica">Up to Erotica (default)</option>
+            <option value="pornographic">Everything</option>
+          </select>
+        </label>
+        <p class="modal__note">How far manga search reaches into MangaDex's content ratings — each level includes the ones below it. Applies to the Add dialog's manga lane and manga-library imports.</p>
+      </div>
+      <div class="setx-card">
         <h4 class="setx-card__head">Releases</h4>
         <label class="field"><span>Release provider URL</span><input id="set-releaseProviderUrl" class="mono" type="text" spellcheck="false" placeholder="https://data.backissue.app" /></label>
         <p class="modal__note">The release provider feeds "This week's releases".</p>
