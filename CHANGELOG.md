@@ -8,6 +8,21 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+- **Bulk read status** (with Comic Reader ≥ 1.5.1): **Mark read** / **Mark
+  unread** buttons on the series page act on the checked issues — or the whole
+  series when nothing is checked. Under the hood, plugin series actions can
+  now read the issue selection (`BackIssue.selectedIssues()`).
+
+### Fixed
+- **Corrupt downloads stop looping.** A usenet release whose archive turns out
+  damaged at import (the client reported the download complete, but the file
+  itself is broken) is now blacklisted like a failed download — retrying grabs
+  the next-best release instead of re-fetching the same broken file forever.
+  Transient import errors (permissions, unreachable paths) still never
+  blacklist. The import log also says honestly when there was no alternative
+  file to try.
+
 ## [0.7.0] — 2026-07-16
 
 ### Added
