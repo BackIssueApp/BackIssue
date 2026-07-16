@@ -15,6 +15,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   now read the issue selection (`BackIssue.selectedIssues()`).
 
 ### Fixed
+- **Downloaded issues can be multi-selected.** The series-page checkboxes
+  only rendered on missing issues (they were built for bulk downloading) —
+  now every issue is selectable, so Mark read/unread and Add to list work on
+  owned issues too. The Download button acts on the downloadable subset of
+  the selection.
 - **Corrupt downloads stop looping.** A usenet release whose archive turns out
   damaged at import (the client reported the download complete, but the file
   itself is broken) is now blacklisted like a failed download — retrying grabs

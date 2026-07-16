@@ -169,7 +169,10 @@
   });
 
   /* ---- Selection + summary ---- */
-  const rowDisabled = (i) => (i.owned && !i.corrupt) || issueState(i) === 'done';
+  // Selection is universal — owned issues are selectable too (read status,
+  // reading lists). Downloads filter to what's actually downloadable instead.
+  const rowDisabled = () => false;
+  const downloadable = (i) => !(i.owned && !i.corrupt) && issueState(i) !== 'done';
   let lastToggled = $state(null); // index into visibleIssues, for shift-click ranges
   $effect(() => {
     void currentFilter; void findText;
@@ -510,9 +513,13 @@
               {/if}
             {/if}
             {#if can('downloads.grab')}
-              <button id="download" class="btn btn--secondary" disabled={detailSelected.size === 0}
-                onclick={() => { downloadCvIssues([...detailSelected]); detailSelected.clear(); }}>
-                {detailSelected.size ? `Download selected (${detailSelected.size})` : 'Download selected'}</button>
+              <!-- Selection now includes owned issues (read status, lists) — the
+                   download acts on the downloadable subset only. -->
+              {@const dlIds = issues.filter((i) => detailSelected.has(i.cv_issue_id) && downloadable(i)).map((i) => i.cv_issue_id)}
+              <button id="download" class="btn btn--secondary" disabled={dlIds.length === 0}
+                title={detailSelected.size && !dlIds.length ? 'Everything selected is already downloaded' : ''}
+                onclick={() => { downloadCvIssues(dlIds); detailSelected.clear(); }}>
+                {dlIds.length ? `Download selected (${dlIds.length})` : 'Download selected'}</button>
             {/if}
             {#if isCv}
               <button id="add-to-list" class="btn btn--ghost" title="Add these issues to a reading list" onclick={addToList}><Icon name="menu" /> Add to list{detailSelected.size ? ` (${detailSelected.size})` : ''}</button>
