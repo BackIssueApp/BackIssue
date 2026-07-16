@@ -9,6 +9,7 @@ import { escapeHtml, fmt, safeUrl } from './util.js';
 import { iconSvg } from './icons.js';
 import { notify } from './toasts.svelte.js';
 import { auth } from './auth.svelte.js';
+import { detailSelected } from './store.svelte.js';
 
 // Flips when plugin assets have loaded — the Settings page watches it so
 // plugin-injected fields get populated even if Settings was opened first.
@@ -85,6 +86,9 @@ const bi = {
     },
     // Re-render issue/series action buttons (e.g. after reading progress changed).
     refreshIssueActions() { issueActionsTick.n++; },
+    // The cv_issue_ids currently checked in the open series (empty = none) —
+    // lets a plugin's series action operate on the selection.
+    selectedIssues() { return [...detailSelected]; },
     // Add a button to the sidebar menu's plugin area, rendered like a core
     // nav item: a fixed-width icon column + label. `icon` is a single glyph;
     // without one, a leading symbol in the label (legacy "✨ Discover" style)
