@@ -343,6 +343,14 @@ export function deleteLibrary(db, id) {
   }
   return db.prepare('DELETE FROM libraries WHERE id=?').run(id).changes;
 }
+// The library new series land in by default: the first comic-typed one (the
+// migration's "Comics"), else the first library at all, else none (pre-library
+// installs — the startup migration adopts later).
+export function defaultLibrary(db) {
+  const libs = db.prepare('SELECT * FROM libraries ORDER BY sort_order, id').all();
+  return libs.find((l) => l.type === 'comic') || libs[0] || null;
+}
+
 // Move a series into a library (typing it accordingly), or out (null). A
 // restricted library also flags the member restricted; moving OUT clears only
 // the library-inherited flag (a restricted library → default move unhides —

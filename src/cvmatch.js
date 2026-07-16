@@ -1,5 +1,5 @@
 import { normalizeTitle, extractYear, normalizeNumber } from './matcher.js';
-import { upsertCvSeries, upsertCvIssue, setSeriesCv, seriesNeedingCvMatch, listCvIssues, linkFileCvIssue, getSeriesByCvId, createCvSeries, setFollowed, getSeriesById, getCvSeries, setSeriesPath } from './db.js';
+import { upsertCvSeries, upsertCvIssue, setSeriesCv, seriesNeedingCvMatch, listCvIssues, linkFileCvIssue, getSeriesByCvId, createCvSeries, setFollowed, defaultLibrary, assignSeriesLibrary, getSeriesById, getCvSeries, setSeriesPath } from './db.js';
 import { parseIssueFromFilename } from './scanner.js';
 import { poolWithResource } from './pool.js';
 
@@ -140,6 +140,11 @@ export async function addSeriesFromCv(db, client, comicvineId) {
     // never the collection identity — so we never adopt/merge a catalog volume
     // here (that legacy behavior misfiled comics onto fuzzy name matches).
     seriesId = createCvSeries(db, { cvId: v.id, title: v.name, publisher: v.publisher, year, coverUrl: v.image_url });
+    // Every new series gets a home immediately (first comic library) — callers
+    // with a specific destination (the manga lane, import auto-assign)
+    // re-assign right after, which overrides this default.
+    const home = defaultLibrary(db);
+    if (home) { try { assignSeriesLibrary(db, seriesId, home.id); } catch { /* races a delete — boot migration re-homes */ } }
     outcome = 'created';
   }
   linkFilesToCv(db, seriesId, v.id);
