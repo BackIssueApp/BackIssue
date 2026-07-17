@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-07-17
+
 ### Added
 - **Download queue, redesigned as a full page.** A stat strip (active /
   queued / failed / down-speed) reads the pipeline at a glance, filter tabs
