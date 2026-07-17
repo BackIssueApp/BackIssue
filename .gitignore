@@ -10,6 +10,7 @@ downloads/
 fixtures/
 .superpowers/
 .staging/
+debug/
 settings.json
 # External plugins (private download sources) live here, each its own repo.
 plugins/
