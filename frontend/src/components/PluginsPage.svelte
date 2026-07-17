@@ -175,8 +175,11 @@
 
   // Match an installed plugin to its catalog entry (by name) so an available
   // update can be offered right on the Installed card.
-  const catalogByName = $derived(new Map(catalog.map((c) => [String(c.name).toLowerCase(), c])));
-  const updateFor = (p) => { const c = catalogByName.get(String(p.name).toLowerCase()); return c?.updateAvailable ? c : null; };
+  // Match by the folder id, not the display name: an installed plugin's `name`
+  // IS its folder id, which the catalog exposes as `id` (its `name` is the
+  // human label and usually differs), so keying on `id` is what lines them up.
+  const catalogById = $derived(new Map(catalog.map((c) => [String(c.id).toLowerCase(), c])));
+  const updateFor = (p) => { const c = catalogById.get(String(p.name).toLowerCase()); return c?.updateAvailable ? c : null; };
 
   // Configure deep-links to the settings tab a plugin's category maps to (its
   // settings mount lives there) rather than dumping the user on the overview.
