@@ -19,6 +19,10 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   unread** buttons on the series page act on the checked issues — or the whole
   series when nothing is checked. Under the hood, plugin series actions can
   now read the issue selection (`BackIssue.selectedIssues()`).
+- **Queue rows name their source.** The live progress line carries a source
+  badge (and, for in-app downloads, the mirror the bytes come from — e.g.
+  "via PixelDrain"), so you can see at a glance which source is serving each
+  download while it runs.
 
 ### Fixed
 - **Downloaded issues can be multi-selected.** The series-page checkboxes

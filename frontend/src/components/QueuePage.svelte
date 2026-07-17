@@ -44,10 +44,13 @@
     const indeterminate = INDETERMINATE.has(live.phase) && !hasPages && live.progress == null;
     let meta = '';
     if (indeterminate) {
-      meta = live.phase === 'searching' ? 'looking for a source…' : '';
+      meta = live.phase === 'searching' ? (live.source ? 'looking for a match…' : 'looking for a source…') : '';
     } else if (bytes) {
       const size = hasPages ? `${humanBytes(live.page || 0)} / ${humanBytes(live.pages)}` : humanBytes(live.page || 0);
       meta = size + (live.bps ? ` · ${humanBytes(live.bps)}/s` : '') + (hasPages ? ` · ${pct}%` : '');
+      // Which mirror the bytes come from (e.g. "PixelDrain") — but only when it
+      // says more than the source badge already does.
+      if (live.detail && live.detail.toLowerCase() !== String(live.source || '').toLowerCase()) meta += ` · via ${live.detail}`;
     } else if (hasPages) {
       meta = `page ${fmt(live.page || 0)} / ${fmt(live.pages)}`;
     } else {
@@ -164,7 +167,7 @@
           <div class="qx__fill" class:qx__fill--green={green} style="width:{info.pct}%"></div>
         {/if}
       </div>
-      <span class="qx__livemeta">{#if info.torrent}<Icon name="arrow-up-down" size={13} /> {/if}<b>{info.label}</b>{info.meta ? ` · ${info.meta}` : ''}</span>
+      <span class="qx__livemeta">{#if live.source}<span class="srcbadge srcbadge--{live.source}">{live.source}</span>{/if}{#if info.torrent}<Icon name="arrow-up-down" size={13} /> {/if}<b>{info.label}</b>{info.meta ? ` · ${info.meta}` : ''}</span>
     </div>
   {/if}
 {/snippet}
