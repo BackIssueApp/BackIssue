@@ -221,12 +221,13 @@ body {
 .sidenav__item {
   display: flex; align-items: center; gap: 11px;
   width: 100%; padding: 9px 12px;
-  background: none; border: none; border-radius: 8px;
-  color: var(--muted); font: 500 13.5px/1 var(--font-body);
+  background: none; border: none; border-radius: 0 8px 8px 0;
+  color: var(--muted); font: 600 13.5px/1 var(--font-body);
   cursor: pointer; text-align: left;
-  border-left: 3px solid transparent;
+  border-left: 3px solid transparent; transition: background .1s, color .1s;
 }
 .sidenav__item:hover { background: var(--panel); color: var(--text); }
+.sidenav__item:hover .sidenav__icon { color: var(--text); }
 .sidenav__item.is-active { background: var(--panel); color: var(--text); border-left-color: var(--accent); }
 .sidenav__icon { width: 18px; text-align: center; font-size: 14px; color: var(--faint); flex-shrink: 0; }
 .sidenav__item.is-active .sidenav__icon { color: var(--accent); }
@@ -235,7 +236,8 @@ body {
   background: var(--panel-2); color: var(--cyan);
   border-radius: 999px; padding: 2px 8px;
 }
-.sidenav__count--bad { color: var(--red); margin-left: 4px; }
+/* Failed queue count sits beside the active count as a distinct red pill. */
+.sidenav__count--bad { color: var(--red); background: rgba(255,90,82,.15); margin-left: 4px; }
 .sidenav__head {
   padding: 14px 12px 5px;
   font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint);
@@ -245,8 +247,8 @@ body {
 .sidenav__plugins .menu__item {
   display: flex; align-items: center; gap: 11px;
   width: 100%; padding: 9px 12px;
-  background: none; border: none; border-radius: 8px;
-  color: var(--muted); font: 500 13.5px/1 var(--font-body);
+  background: none; border: none; border-radius: 0 8px 8px 0;
+  color: var(--muted); font: 600 13.5px/1 var(--font-body);
   cursor: pointer; white-space: normal; text-align: left;
   border-left: 3px solid transparent;
 }
@@ -571,7 +573,9 @@ button .bi-icon, a .bi-icon { pointer-events: none; }
   padding: 8px 10px; background: none; border: none; border-radius: 8px;
   color: var(--text); cursor: pointer; font: inherit; text-align: left;
 }
-.sideuser__chip:hover { background: var(--panel); }
+.sideuser__chip:hover, .sideuser__chip.is-open { background: var(--panel); border: 1px solid var(--line); padding: 7px 9px; }
+.sideuser__caret { display: flex; flex: none; color: var(--faint); transition: transform .15s; }
+.sideuser__caret.is-open { transform: rotate(180deg); }
 .sideuser__avatar {
   width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
   display: grid; place-items: center;

@@ -50,6 +50,7 @@ export const ICON_PATHS = {
   'arrow-up-down': '<path d="M8 3v18M4 7l4-4 4 4M16 21V3M20 17l-4 4-4-4"/>',
   'chevron-left': '<path d="m15 18-6-6 6-6"/>',
   'chevron-right': '<path d="m9 18 6-6-6-6"/>',
+  'chevron-down': '<path d="m6 9 6 6 6-6"/>',
   // views / layout
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
   list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',

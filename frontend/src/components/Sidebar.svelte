@@ -109,10 +109,11 @@
        the sidebar in open mode — first run forces admin creation instead.) -->
   <div class="sideuser">
     {#if auth.user}
-      <button class="sideuser__chip" onclick={() => { userMenuOpen = !userMenuOpen; }}>
+      <button class="sideuser__chip" class:is-open={userMenuOpen} aria-haspopup="menu" aria-expanded={userMenuOpen} onclick={() => { userMenuOpen = !userMenuOpen; }}>
         <span class="sideuser__avatar">{auth.user.username.slice(0, 1).toUpperCase()}</span>
         <span class="sideuser__name">{auth.user.username}</span>
         <span class="sideuser__role sideuser__role--{auth.user.role}">{auth.user.role}</span>
+        <span class="sideuser__caret" class:is-open={userMenuOpen}><Icon name="chevron-down" size={15} /></span>
       </button>
       {#if userMenuOpen}
         <div class="sideuser__menu">
