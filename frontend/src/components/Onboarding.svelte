@@ -1,9 +1,9 @@
 <script>
   import { trapFocus } from '../lib/dom.js';
-  // First-run wizard: shown once, when the app has never been onboarded and has
-  // no ComicVine key. Collects just enough to be useful — CV keys, root
-  // folders, optionally one download source — and points at Settings for the
-  // rest. Skippable at every step; skipping only sets the onboardingDone flag.
+  // First-run wizard: a full-screen, step-railed setup. Collects just enough to
+  // be useful — a ComicVine key, one or more named libraries, optionally one
+  // download source, optional plugins — and points at Settings for the rest.
+  // Skippable at every step; skipping only sets the onboardingDone flag.
   import { apiGet, apiPost } from '../lib/api.js';
   import { route, setQuery } from '../lib/router.svelte.js';
   import { flags, loadFlags, loadCollection } from '../lib/store.svelte.js';
@@ -17,10 +17,10 @@
 
   let step = $state(0);
   const STEPS = ['Welcome', 'ComicVine', 'Library', 'Downloads', 'Plugins', 'Finish'];
+  const EYEBROWS = ['', 'Step 2 · Metadata', 'Step 3 · Storage', 'Step 4 · Sources', 'Step 5 · Extend', ''];
 
   // Collected values
-  let cvKeys = $state('');
-  let rootFolders = $state('');
+  let cvKey = $state(''); // the app uses a single ComicVine key now
   let source = $state('none'); // 'none' | 'usenet' | 'torrent'
   // usenet
   let ixName = $state(''), ixUrl = $state(''), ixKey = $state('');
@@ -28,6 +28,18 @@
   // torrent
   let tzName = $state(''), tzUrl = $state(''), tzKey = $state('');
   let qbHost = $state(''), qbPort = $state('8080'), qbUser = $state(''), qbPass = $state('');
+
+  // Named libraries (the new model — no rootFolders). Seed one Comics library.
+  let libs = $state([{ id: 1, name: 'Comics', type: 'comic', folder: '' }]);
+  let libTypes = $state([{ id: 'comic', label: 'Comics' }, { id: 'manga', label: 'Manga' }]);
+  let libTypesFetched = false;
+  async function loadLibTypes() {
+    if (libTypesFetched) return; libTypesFetched = true;
+    try { const r = await apiGet('/api/libraries'); if (Array.isArray(r.types) && r.types.length) libTypes = r.types; } catch { /* keep defaults */ }
+  }
+  $effect(() => { if (step === 2) loadLibTypes(); });
+  function addLib() { libs = [...libs, { id: Date.now(), name: '', type: 'comic', folder: '' }]; }
+  function removeLib(id) { libs = libs.filter((l) => l.id !== id); }
 
   // Plugin catalog — fetched when the Plugins step is reached; installed at finish.
   let catalogPlugins = $state([]);
@@ -52,9 +64,9 @@
     let r;
     try { r = await apiPost(endpoint, body); }
     catch (e) { r = { ok: false, message: String(e) }; }
-    tests[slot] = { cls: r.ok ? 'is-ok' : 'is-bad', icon: r.ok ? 'check' : 'close', text: r.message };
+    tests[slot] = { cls: r.ok ? 'is-ok' : 'is-bad', icon: r.ok ? 'check' : 'close', text: r.message, ok: !!r.ok };
   }
-  const testCv = () => runTest('cv', '/api/cv/test', { keys: cvKeys });
+  const testCv = () => runTest('cv', '/api/cv/test', { keys: cvKey });
   const testIx = () => runTest('ix', source === 'torrent' ? '/api/torznab/test' : '/api/indexers/test',
     source === 'torrent' ? { name: tzName, url: tzUrl.trim(), apiKey: tzKey.trim() } : { name: ixName, url: ixUrl.trim(), apiKey: ixKey.trim() });
   const testClient = () => runTest('client',
@@ -63,13 +75,17 @@
       ? { qbHost: qbHost.trim(), qbPort: qbPort.trim(), qbSsl: false, qbUser: qbUser.trim(), qbPass }
       : { nzbClient, nzbClientHost: nzbHost.trim(), nzbClientPort: nzbPort.trim(), nzbClientSsl: false, nzbClientApiKey: nzbApiKey.trim(), nzbClientUser: nzbUser.trim(), nzbClientPass: nzbPass });
 
+  const cvTone = $derived(tests.cv?.ok ? 'var(--green)' : tests.cv?.cls === 'is-bad' ? 'var(--red)' : 'var(--muted)');
+  const namedLibs = $derived(libs.filter((l) => l.name.trim()));
+
   let saving = $state(false);
   async function finish() {
     saving = true;
     // Only send what the user actually filled in — defaults stay untouched.
+    // Libraries are created via /api/libraries (they OWN the storage paths now),
+    // so no rootFolders here.
     const body = { onboardingDone: true };
-    if (cvKeys.trim()) body.comicvineKeys = cvKeys.trim();
-    if (rootFolders.trim()) body.rootFolders = rootFolders.trim();
+    if (cvKey.trim()) body.comicvineKeys = cvKey.trim();
     if (source === 'usenet') {
       body.usenetEnabled = true;
       if (ixUrl.trim()) body.newznabIndexers = [ixName.trim() || ixUrl.trim(), ixUrl.trim().replace(/\/+$/, ''), ixKey.trim()].join(' | ');
@@ -89,6 +105,13 @@
     }
     try {
       await apiPost('/api/settings', body);
+      // Create the named libraries the user defined (skip empty-name rows). A
+      // blank folder is allowed — the library exists as a container and its
+      // folder can be set later.
+      for (const l of namedLibs) {
+        try { await apiPost('/api/libraries', { name: l.name.trim(), type: l.type, rootFolder: l.folder.trim() }); }
+        catch { /* skip a failed one — the rest still land */ }
+      }
       // Install any plugins the user ticked, then restart to load them.
       const chosen = catalogPlugins.filter((p) => pluginSel[p.id]);
       if (chosen.length) {
@@ -120,129 +143,293 @@
     flags.needsOnboarding = false;
     if (forced) setQuery({ onboarding: null });
   }
+
+  const nextLabel = $derived(step === STEPS.length - 1 ? (installing ? 'Installing plugins…' : saving ? 'Saving…' : 'Finish setup') : step === 0 ? 'Get started' : 'Continue');
+  const summaryRows = $derived([
+    { label: 'ComicVine key', value: cvKey.trim() ? (tests.cv?.ok ? 'Verified' : 'Added') : 'Skipped', tone: cvKey.trim() ? 'var(--green)' : 'var(--muted)', icon: 'tag' },
+    { label: 'Libraries', value: namedLibs.length ? `${namedLibs.length} ${namedLibs.length === 1 ? 'library' : 'libraries'}` : 'None', tone: namedLibs.length ? 'var(--green)' : 'var(--muted)', icon: 'book' },
+    { label: 'Download source', value: source === 'usenet' ? 'Usenet' : source === 'torrent' ? 'Torrents' : 'None yet', tone: source === 'none' ? 'var(--muted)' : 'var(--green)', icon: 'download' },
+    { label: 'Plugins', value: `${catalogPlugins.filter((p) => pluginSel[p.id]).length} selected`, tone: 'var(--green)', icon: 'puzzle' },
+  ]);
 </script>
 
 {#if open}
-  <div class="onboard">
-    <div class="onboard__card" use:trapFocus role="dialog" aria-label="First-run setup">
-      <div class="onboard__steps">
+  <div class="obx">
+    <aside class="obx__rail">
+      <div class="obx__brand"><span class="obx__logo">BackIssue</span></div>
+      <div class="obx__steps">
         {#each STEPS as label, i (label)}
-          <span class="onboard__step" class:is-active={i === step} class:is-done={i < step}>{label}</span>
+          <button class="obx__step" class:is-active={i === step} class:is-done={i < step} onclick={() => { step = i; }}>
+            <span class="obx__dot">{#if i < step}<Icon name="check" size={13} />{:else}{i + 1}{/if}</span>
+            <span class="obx__step-label">{label}</span>
+          </button>
         {/each}
       </div>
+      <div class="obx__progress">
+        <div class="obx__progress-track"><div class="obx__progress-fill" style="width:{Math.round((step / (STEPS.length - 1)) * 100)}%"></div></div>
+        <div class="obx__progress-text">Step {step + 1} of {STEPS.length} · about two minutes</div>
+      </div>
+    </aside>
 
-      {#if step === 0}
-        <h2 class="onboard__title">Welcome to BackIssue</h2>
-        <p class="onboard__text">A self-hosted manager for your comic collection — track the series you want, download new issues as they release, and keep everything tagged and organized on disk.</p>
-        <p class="onboard__text">Setup takes about two minutes: a ComicVine API key (comic metadata), where your comics live, and optionally a download source. Everything can be changed later in <b>Settings</b>.</p>
-      {:else if step === 1}
-        <h2 class="onboard__title">ComicVine API key</h2>
-        <p class="onboard__text">ComicVine provides every comic's identity — series, issues, covers, credits. Keys are free: <a href="https://comicvine.gamespot.com/api/" target="_blank" rel="noreferrer">comicvine.gamespot.com/api <Icon name="external-link" size={14} /></a>. </p>
-        <input class="dialog-input" type="text" spellcheck="false" autocomplete="off" placeholder="Your API key…" bind:value={cvKeys} />
-        <div class="client-test">
-          <button class="btn btn--ghost" type="button" disabled={!cvKeys.trim()} onclick={testCv}>Test key</button>
-          {#if tests.cv}<span class="client-status {tests.cv.cls}">{#if tests.cv.icon}<Icon name={tests.cv.icon} /> {/if}{tests.cv.text}</span>{/if}
-        </div>
-      {:else if step === 2}
-        <h2 class="onboard__title">Where do your comics live?</h2>
-        <p class="onboard__text">Root folders on disk (one per line or comma-separated) — comics are organized into <b>root</b>/Publisher/Title (Year). Network shares work fine. Leave blank to decide later.</p>
-        <textarea class="dialog-input" rows="2" spellcheck="false" placeholder={'\\\\NAS\\main\\comics\nD:\\Comics'} bind:value={rootFolders}></textarea>
-        <p class="onboard__note">Already have comics in these folders? After setup, use <b>Import</b> in the sidebar to match them to ComicVine and pull them into the collection.</p>
-      {:else if step === 3}
-        <h2 class="onboard__title">Download source</h2>
-        <p class="onboard__text">How should BackIssue download issues? Pick one to configure now — you can enable more (or fine-tune folder mappings for remote clients) in Settings.</p>
-        <div class="onboard__choices">
-          <button class="onboard__choice" class:is-active={source === 'usenet'} onclick={() => { source = 'usenet'; tests.ix = tests.client = null; }}>
-            <b>Usenet</b><span>Newznab indexers → SABnzbd / NZBGet</span></button>
-          <button class="onboard__choice" class:is-active={source === 'torrent'} onclick={() => { source = 'torrent'; tests.ix = tests.client = null; }}>
-            <b>Torrents</b><span>Torznab (Jackett/Prowlarr) → qBittorrent</span></button>
-          <button class="onboard__choice" class:is-active={source === 'none'} onclick={() => { source = 'none'; }}>
-            <b>Skip for now</b><span>Browse + import only</span></button>
-        </div>
-        <p class="onboard__note">No usenet or torrent setup? Plugins can add other download sources later — see the Plugins page once you're in.</p>
-        {#if source === 'usenet'}
-          <p class="onboard__sub">Indexer (Newznab)</p>
-          <div class="onboard__row">
-            <input class="dialog-input" type="text" spellcheck="false" placeholder="Name (NZBgeek)" bind:value={ixName} />
-            <input class="dialog-input" type="text" spellcheck="false" placeholder="https://api.nzbgeek.info" bind:value={ixUrl} />
-            <input class="dialog-input" type="text" spellcheck="false" placeholder="API key" bind:value={ixKey} />
-            <button class="btn btn--ghost btn--sm" type="button" disabled={!ixUrl.trim()} onclick={testIx}>Test</button>
-          </div>
-          {#if tests.ix}<span class="client-status {tests.ix.cls}">{#if tests.ix.icon}<Icon name={tests.ix.icon} /> {/if}{tests.ix.text}</span>{/if}
-          <p class="onboard__sub">Download client</p>
-          <div class="onboard__row">
-            <select class="dialog-input" bind:value={nzbClient}><option value="sabnzbd">SABnzbd</option><option value="nzbget">NZBGet</option></select>
-            <input class="dialog-input" type="text" spellcheck="false" placeholder="Host" bind:value={nzbHost} />
-            <input class="dialog-input" type="text" spellcheck="false" placeholder="Port" bind:value={nzbPort} />
-            {#if nzbClient === 'sabnzbd'}
-              <input class="dialog-input" type="text" spellcheck="false" placeholder="API key" bind:value={nzbApiKey} />
+    <div class="obx__main" use:trapFocus role="dialog" aria-label="First-run setup">
+      <div class="obx__content">
+        <div class="obx__inner">
+          {#if EYEBROWS[step]}<div class="obx__eyebrow">{EYEBROWS[step]}</div>{/if}
+
+          {#if step === 0}
+            <div class="obx__hero obx__hero--brand"><Icon name="book" size={30} /></div>
+            <h1 class="obx__h1 obx__h1--big">Welcome to BackIssue</h1>
+            <p class="obx__lead">A self-hosted manager for your comic collection — track the series you want, download new issues as they release, and keep everything tagged and organized on disk.</p>
+            <p class="obx__sub">Setup takes about two minutes: a ComicVine API key, where your comics live, and optionally a download source. Everything can be changed later in <b>Settings</b>.</p>
+            <div class="obx__bullets">
+              <div class="obx__bullet"><span class="obx__bullet-ico"><Icon name="tag" size={16} /></span><div><div class="obx__bullet-t">Rich metadata</div><div class="obx__bullet-b">Covers, credits and issue lists from ComicVine.</div></div></div>
+              <div class="obx__bullet"><span class="obx__bullet-ico"><Icon name="download" size={16} /></span><div><div class="obx__bullet-t">Automatic downloads</div><div class="obx__bullet-b">New issues grabbed as they release.</div></div></div>
+              <div class="obx__bullet"><span class="obx__bullet-ico"><Icon name="folder" size={16} /></span><div><div class="obx__bullet-t">Organized on disk</div><div class="obx__bullet-b">Tagged and filed into a clean folder tree.</div></div></div>
+            </div>
+          {:else if step === 1}
+            <h1 class="obx__h1">ComicVine API key</h1>
+            <p class="obx__lead">ComicVine provides every comic's identity — series, issues, covers, credits. A key is free from <a href="https://comicvine.gamespot.com/api/" target="_blank" rel="noreferrer">comicvine.gamespot.com/api <Icon name="external-link" size={13} /></a>.</p>
+            <label class="obx__label">API key</label>
+            <input class="obx__input obx__input--mono" type="text" spellcheck="false" autocomplete="off" placeholder="paste your key…" bind:value={cvKey} />
+            <div class="obx__testrow">
+              <button class="obx__test" type="button" disabled={!cvKey.trim()} onclick={testCv}>Test key</button>
+              {#if tests.cv}<span class="obx__teststatus" style="color:{cvTone};">{#if tests.cv.icon}<Icon name={tests.cv.icon} size={14} /> {/if}{tests.cv.text}</span>{/if}
+            </div>
+            <div class="obx__note obx__note--cyan">You can skip this and add a key later in <b>Settings → Metadata</b>, but search and matching won't work until you do.</div>
+          {:else if step === 2}
+            <h1 class="obx__h1">Set up your libraries</h1>
+            <p class="obx__lead">A library is a named collection with a type and a folder on disk. Create one to start — add more here or in <b>Settings</b> later. Files are organized into <b>folder</b>/Publisher/Title (Year).</p>
+            <div class="obx__libs">
+              {#each libs as l (l.id)}
+                <div class="obx__lib">
+                  <div class="obx__lib-top">
+                    <span class="obx__lib-ico"><Icon name="book" size={16} /></span>
+                    <input class="obx__lib-name" placeholder="Library name" bind:value={l.name} />
+                    <select class="obx__lib-type" bind:value={l.type}>
+                      {#each libTypes as t (t.id)}<option value={t.id}>{t.label}</option>{/each}
+                    </select>
+                    {#if libs.length > 1}<button class="obx__lib-rm" aria-label="Remove library" onclick={() => removeLib(l.id)}><Icon name="close" size={14} /></button>{/if}
+                  </div>
+                  <div class="obx__lib-folder">
+                    <span class="obx__lib-fico"><Icon name="folder" size={16} /></span>
+                    <input class="obx__input--mono obx__lib-path" placeholder={'D:\\Comics  or  \\\\NAS\\comics'} spellcheck="false" bind:value={l.folder} />
+                  </div>
+                </div>
+              {/each}
+            </div>
+            <button class="obx__addlib" onclick={addLib}><Icon name="plus" size={14} /> Add another library</button>
+            <div class="obx__note obx__note--amber"><span class="obx__note-ico"><Icon name="info" size={16} /></span><p>Already have comics in these folders? After setup, use <b>Import</b> in the sidebar to match them to ComicVine and pull them into the collection. Leave a folder blank to decide later.</p></div>
+          {:else if step === 3}
+            <h1 class="obx__h1">Download source</h1>
+            <p class="obx__lead">How should BackIssue download issues? Pick one to configure now — enable more or fine-tune later in Settings.</p>
+            <div class="obx__sources">
+              <button class="obx__source" class:is-active={source === 'usenet'} onclick={() => { source = 'usenet'; tests.ix = tests.client = null; }}>
+                <span class="obx__source-ico"><Icon name="download" size={16} /></span><span class="obx__source-label">Usenet</span><span class="obx__source-desc">SABnzbd / NZBGet</span></button>
+              <button class="obx__source" class:is-active={source === 'torrent'} onclick={() => { source = 'torrent'; tests.ix = tests.client = null; }}>
+                <span class="obx__source-ico"><Icon name="globe" size={16} /></span><span class="obx__source-label">Torrents</span><span class="obx__source-desc">qBittorrent</span></button>
+              <button class="obx__source" class:is-active={source === 'none'} onclick={() => { source = 'none'; }}>
+                <span class="obx__source-ico"><Icon name="info" size={16} /></span><span class="obx__source-label">Decide later</span><span class="obx__source-desc">Skip for now</span></button>
+            </div>
+            {#if source === 'usenet'}
+              <div class="obx__cfg">
+                <div>
+                  <div class="obx__cfg-h">Indexer (Newznab)</div>
+                  <div class="obx__grid2"><input class="obx__input" placeholder="Name (NZBgeek)" bind:value={ixName} /><input class="obx__input obx__input--mono" placeholder="https://api.nzbgeek.info" bind:value={ixUrl} /></div>
+                  <input class="obx__input obx__input--mono obx__mt" placeholder="API key" bind:value={ixKey} />
+                  <div class="obx__testrow obx__mt"><button class="obx__test" type="button" disabled={!ixUrl.trim()} onclick={testIx}>Test indexer</button>{#if tests.ix}<span class="obx__teststatus obx__ts--{tests.ix.cls}">{#if tests.ix.icon}<Icon name={tests.ix.icon} size={14} /> {/if}{tests.ix.text}</span>{/if}</div>
+                </div>
+                <div>
+                  <div class="obx__cfg-h">Download client</div>
+                  <select class="obx__input" bind:value={nzbClient}><option value="sabnzbd">SABnzbd</option><option value="nzbget">NZBGet</option></select>
+                  <div class="obx__grid-hp obx__mt"><input class="obx__input" placeholder="Host" bind:value={nzbHost} /><input class="obx__input" placeholder="Port" bind:value={nzbPort} /></div>
+                  {#if nzbClient === 'sabnzbd'}
+                    <input class="obx__input obx__input--mono obx__mt" placeholder="API key" bind:value={nzbApiKey} />
+                  {:else}
+                    <div class="obx__grid2 obx__mt"><input class="obx__input" placeholder="Username" bind:value={nzbUser} /><input class="obx__input" type="password" placeholder="Password" bind:value={nzbPass} /></div>
+                  {/if}
+                  <div class="obx__testrow obx__mt"><button class="obx__test" type="button" disabled={!nzbHost.trim()} onclick={testClient}>Test connection</button>{#if tests.client}<span class="obx__teststatus obx__ts--{tests.client.cls}">{#if tests.client.icon}<Icon name={tests.client.icon} size={14} /> {/if}{tests.client.text}</span>{/if}</div>
+                </div>
+              </div>
+            {:else if source === 'torrent'}
+              <div class="obx__cfg">
+                <div>
+                  <div class="obx__cfg-h">Indexer (Torznab — Jackett/Prowlarr)</div>
+                  <div class="obx__grid2"><input class="obx__input" placeholder="Name" bind:value={tzName} /><input class="obx__input obx__input--mono" placeholder="http://prowlarr:9696/1/api" bind:value={tzUrl} /></div>
+                  <input class="obx__input obx__input--mono obx__mt" placeholder="API key" bind:value={tzKey} />
+                  <div class="obx__testrow obx__mt"><button class="obx__test" type="button" disabled={!tzUrl.trim()} onclick={testIx}>Test indexer</button>{#if tests.ix}<span class="obx__teststatus obx__ts--{tests.ix.cls}">{#if tests.ix.icon}<Icon name={tests.ix.icon} size={14} /> {/if}{tests.ix.text}</span>{/if}</div>
+                </div>
+                <div>
+                  <div class="obx__cfg-h">qBittorrent</div>
+                  <div class="obx__grid-hp"><input class="obx__input" placeholder="Host" bind:value={qbHost} /><input class="obx__input" placeholder="8080" bind:value={qbPort} /></div>
+                  <div class="obx__grid2 obx__mt"><input class="obx__input" placeholder="Username" bind:value={qbUser} /><input class="obx__input" type="password" placeholder="Password" bind:value={qbPass} /></div>
+                  <div class="obx__testrow obx__mt"><button class="obx__test" type="button" disabled={!qbHost.trim()} onclick={testClient}>Test connection</button>{#if tests.client}<span class="obx__teststatus obx__ts--{tests.client.cls}">{#if tests.client.icon}<Icon name={tests.client.icon} size={14} /> {/if}{tests.client.text}</span>{/if}</div>
+                </div>
+              </div>
             {:else}
-              <input class="dialog-input" type="text" spellcheck="false" placeholder="Username" bind:value={nzbUser} />
-              <input class="dialog-input" type="password" spellcheck="false" placeholder="Password" bind:value={nzbPass} />
+              <div class="obx__note">No usenet or torrent setup? That's fine — plugins can add other download sources later from the <b>Plugins</b> page. You can still track series and import files you already have.</div>
             {/if}
-            <button class="btn btn--ghost btn--sm" type="button" disabled={!nzbHost.trim()} onclick={testClient}>Test</button>
-          </div>
-          {#if tests.client}<span class="client-status {tests.client.cls}">{#if tests.client.icon}<Icon name={tests.client.icon} /> {/if}{tests.client.text}</span>{/if}
-        {:else if source === 'torrent'}
-          <p class="onboard__sub">Indexer (Torznab — Jackett/Prowlarr feed)</p>
-          <div class="onboard__row">
-            <input class="dialog-input" type="text" spellcheck="false" placeholder="Name" bind:value={tzName} />
-            <input class="dialog-input" type="text" spellcheck="false" placeholder="http://localhost:9696/1/api" bind:value={tzUrl} />
-            <input class="dialog-input" type="text" spellcheck="false" placeholder="API key" bind:value={tzKey} />
-            <button class="btn btn--ghost btn--sm" type="button" disabled={!tzUrl.trim()} onclick={testIx}>Test</button>
-          </div>
-          <p class="onboard__note">Copy it from Prowlarr → indexer → Torznab feed.</p>
-          {#if tests.ix}<span class="client-status {tests.ix.cls}">{#if tests.ix.icon}<Icon name={tests.ix.icon} /> {/if}{tests.ix.text}</span>{/if}
-          <p class="onboard__sub">qBittorrent</p>
-          <div class="onboard__row">
-            <input class="dialog-input" type="text" spellcheck="false" placeholder="Host" bind:value={qbHost} />
-            <input class="dialog-input" type="text" spellcheck="false" placeholder="Port" bind:value={qbPort} />
-            <input class="dialog-input" type="text" spellcheck="false" placeholder="Username" bind:value={qbUser} />
-            <input class="dialog-input" type="password" spellcheck="false" placeholder="Password" bind:value={qbPass} />
-            <button class="btn btn--ghost btn--sm" type="button" disabled={!qbHost.trim()} onclick={testClient}>Test</button>
-          </div>
-          {#if tests.client}<span class="client-status {tests.client.cls}">{#if tests.client.icon}<Icon name={tests.client.icon} /> {/if}{tests.client.text}</span>{/if}
-        {/if}
-      {:else if step === 4}
-        <h2 class="onboard__title">Add plugins</h2>
-        <p class="onboard__text">BackIssue is modular — pick the plugins to install now. You can add or remove more anytime from the <b>Plugins</b> page. Selected plugins download and activate when you finish setup.</p>
-        {#if !pluginsFetched}
-          <p class="onboard__note">Loading catalog…</p>
-        {:else if !catalogPlugins.length}
-          <p class="onboard__note">No plugins available right now — you can add them later from the Plugins page.</p>
-        {:else}
-          <div class="onboard__plugins">
-            {#each catalogPlugins as p (p.id)}
-              <label class="onboard__plugin">
-                <input type="checkbox" bind:checked={pluginSel[p.id]} />
-                <span class="onboard__plugin-info">
-                  <b>{p.name}</b>{#if p.version}<span class="onboard__plugin-ver">v{p.version}</span>{/if}
-                  <span class="onboard__plugin-desc">{p.description}</span>
-                </span>
-              </label>
-            {/each}
-          </div>
-        {/if}
-      {:else}
-        <h2 class="onboard__title">Ready to go</h2>
-        <p class="onboard__text">
-          {#if cvKeys.trim()}<Icon name="check" /> ComicVine key set{:else}· No ComicVine key yet (add one in Settings → Metadata){/if}<br />
-          {#if rootFolders.trim()}<Icon name="check" /> Root folders set{:else}· No root folders yet (Settings → Library){/if}<br />
-          {#if source === 'none'}· No download source yet (Settings → Download sources){:else}<Icon name="check" /> {source === 'usenet' ? 'Usenet' : 'Torrents'} configured{/if}
-        </p>
-        <p class="onboard__text">Next: add a series with <b>+ Add</b> (searches ComicVine), or pull in an existing library via <b>Import</b> in the sidebar.</p>
-      {/if}
+          {:else if step === 4}
+            <h1 class="obx__h1">Add plugins</h1>
+            <p class="obx__lead">BackIssue is modular — pick plugins to install now, or add them anytime from the <b>Plugins</b> page. Selected plugins activate when you finish.</p>
+            {#if !pluginsFetched}
+              <div class="obx__note">Loading catalog…</div>
+            {:else if !catalogPlugins.length}
+              <div class="obx__note">No plugins available right now — you can add them later from the Plugins page.</div>
+            {:else}
+              <div class="obx__plugins">
+                {#each catalogPlugins as p (p.id)}
+                  <label class="obx__plugin" class:is-on={pluginSel[p.id]}>
+                    <span class="obx__plugin-check">{#if pluginSel[p.id]}<Icon name="check" size={13} />{/if}</span>
+                    <input type="checkbox" bind:checked={pluginSel[p.id]} hidden />
+                    <span class="obx__plugin-info">
+                      <span class="obx__plugin-top"><b>{p.name}</b>{#if p.version}<span class="obx__plugin-ver">v{p.version}</span>{/if}</span>
+                      <span class="obx__plugin-desc">{p.description}</span>
+                    </span>
+                  </label>
+                {/each}
+              </div>
+            {/if}
+          {:else}
+            <div class="obx__hero obx__hero--done"><Icon name="check" size={30} /></div>
+            <h1 class="obx__h1 obx__h1--big">Ready to go</h1>
+            <p class="obx__lead">Your setup is complete. Here's what you configured:</p>
+            <div class="obx__summary">
+              {#each summaryRows as r (r.label)}
+                <div class="obx__srow"><span class="obx__sico" style="color:{r.tone}; background:color-mix(in srgb, {r.tone} 12%, transparent);"><Icon name={r.icon} size={14} /></span><span class="obx__slabel">{r.label}</span><span class="obx__svalue" style="color:{r.tone};">{r.value}</span></div>
+              {/each}
+            </div>
+            <p class="obx__sub">Next: add a series with <b>+ Add</b> (searches ComicVine), or pull in an existing library via <b>Import</b> in the sidebar.</p>
+          {/if}
+        </div>
+      </div>
 
-      <div class="onboard__foot">
-        <button class="btn btn--ghost" onclick={skip}>Skip setup</button>
-        <span class="modal__foot-spacer"></span>
-        {#if step > 0}<button class="btn btn--ghost" onclick={() => { step -= 1; }}>Back</button>{/if}
-        {#if step < STEPS.length - 1}
-          <button class="btn btn--primary" onclick={() => { step += 1; }}>Next</button>
-        {:else}
-          <button class="btn btn--primary" disabled={saving} onclick={finish}>{installing ? 'Installing plugins…' : saving ? 'Saving…' : 'Finish setup'}</button>
-        {/if}
+      <div class="obx__foot">
+        <button class="obx__skip" onclick={skip}>Skip setup</button>
+        <div class="obx__foot-right">
+          {#if step > 0}<button class="obx__back" onclick={() => { step -= 1; }}>Back</button>{/if}
+          {#if step < STEPS.length - 1}
+            <button class="obx__next" onclick={() => { step += 1; }}>{nextLabel} <Icon name="arrow-right" size={16} /></button>
+          {:else}
+            <button class="obx__next" disabled={saving} onclick={finish}>{nextLabel}</button>
+          {/if}
+        </div>
       </div>
     </div>
   </div>
 {/if}
+
+<style>
+  .obx { position: fixed; inset: 0; z-index: 200; display: flex; overflow: hidden;
+    background: radial-gradient(1100px 700px at 18% -10%, rgba(255,45,111,.14), transparent 60%), #0f0d15; color: var(--text); }
+  .obx__rail { width: 236px; flex: none; background: rgba(13,11,18,.55); border-right: 1px solid #221e2c; padding: 26px 18px; display: flex; flex-direction: column; }
+  .obx__brand { padding: 4px 6px 26px; }
+  .obx__logo { font-family: var(--font-display); font-size: 24px; letter-spacing: .04em; position: relative; padding-right: 12px; }
+  .obx__logo::after { content: ''; position: absolute; right: 0; top: 2px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px rgba(255,45,111,.7); }
+  .obx__steps { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+  .obx__step { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 9px; border: none; background: transparent; color: var(--faint); font: 600 13px var(--font-body); cursor: pointer; text-align: left; }
+  .obx__step.is-done { color: #b3adc4; }
+  .obx__step.is-active { background: rgba(255,45,111,.1); color: var(--text); }
+  .obx__dot { width: 24px; height: 24px; border-radius: 50%; flex: none; display: grid; place-items: center; font: 600 11px var(--font-mono); background: var(--panel-2); color: var(--faint); }
+  .obx__step.is-active .obx__dot { background: var(--accent); color: #fff; }
+  .obx__step.is-done .obx__dot { background: var(--green); color: #0f0d15; }
+  .obx__step-label { flex: 1; }
+  .obx__progress { padding-top: 16px; }
+  .obx__progress-track { height: 5px; border-radius: 3px; background: #221e2c; overflow: hidden; }
+  .obx__progress-fill { height: 100%; background: var(--accent); transition: width .3s; }
+  .obx__progress-text { font-size: 11px; color: #6f6885; margin-top: 8px; }
+
+  .obx__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .obx__content { flex: 1; overflow-y: auto; padding: 56px 48px; }
+  .obx__inner { max-width: 560px; margin: 0 auto; }
+  .obx__eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .09em; color: var(--accent); margin-bottom: 10px; }
+  .obx__hero { width: 60px; height: 60px; border-radius: 16px; display: grid; place-items: center; margin-bottom: 26px; }
+  .obx__hero--brand { background: linear-gradient(150deg, var(--accent), #b3164e); color: #fff; box-shadow: 0 12px 34px rgba(255,45,111,.34); }
+  .obx__hero--done { background: linear-gradient(150deg, var(--green), #2f9c5e); color: #0f0d15; box-shadow: 0 12px 34px rgba(95,211,138,.28); }
+  .obx__h1 { font-family: var(--font-display); font-size: 30px; letter-spacing: .02em; margin: 0 0 14px; font-weight: 400; }
+  .obx__h1--big { font-size: 36px; }
+  .obx__lead { font-size: 14px; color: #b3adc4; line-height: 1.6; margin: 0 0 22px; }
+  .obx__sub { font-size: 13.5px; color: var(--faint); line-height: 1.65; margin: 0; }
+  .obx__lead b, .obx__sub b { color: var(--text); }
+
+  .obx__bullets { display: flex; flex-direction: column; gap: 12px; }
+  .obx__bullet { display: flex; align-items: center; gap: 13px; padding: 13px 15px; background: rgba(255,255,255,.02); border: 1px solid #2a2536; border-radius: 11px; }
+  .obx__bullet-ico { width: 34px; height: 34px; border-radius: 9px; background: var(--panel-2); display: grid; place-items: center; color: var(--accent); flex: none; }
+  .obx__bullet-t { font-size: 13.5px; font-weight: 600; }
+  .obx__bullet-b { font-size: 12px; color: var(--faint); margin-top: 2px; }
+
+  .obx__label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 6px; display: block; }
+  .obx__input { width: 100%; height: 40px; padding: 0 12px; background: var(--ink); border: 1px solid var(--line); border-radius: 9px; color: var(--text); font: 14px var(--font-body); }
+  .obx__input:focus { outline: none; border-color: var(--accent); }
+  .obx__input--mono { font-family: var(--font-mono); font-size: 13px; }
+  .obx__mt { margin-top: 10px; }
+  .obx__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .obx__grid-hp { display: grid; grid-template-columns: 1fr 90px; gap: 10px; }
+  .obx__testrow { display: flex; align-items: center; gap: 12px; }
+  .obx__test { height: 38px; padding: 0 16px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 9px; font: 600 12.5px var(--font-body); cursor: pointer; }
+  .obx__test:disabled { opacity: .5; cursor: default; }
+  .obx__teststatus { font-size: 12.5px; display: inline-flex; align-items: center; gap: 5px; }
+  .obx__ts--is-ok { color: var(--green); }
+  .obx__ts--is-bad { color: var(--red); }
+  .obx__ts--is-testing { color: var(--muted); }
+  .obx__note { margin-top: 22px; padding: 13px 15px; border: 1px solid #2a2536; background: rgba(255,255,255,.02); border-radius: 11px; font-size: 12.5px; color: var(--muted); line-height: 1.55; display: flex; gap: 11px; align-items: flex-start; }
+  .obx__note b { color: var(--text); }
+  .obx__note p { margin: 0; }
+  .obx__note--cyan { border-color: rgba(43,212,217,.25); background: rgba(43,212,217,.05); color: #9fd9dc; }
+  .obx__note--amber .obx__note-ico { color: var(--amber); flex: none; display: flex; margin-top: 1px; }
+  .obx__note-ico { flex: none; }
+
+  .obx__libs { display: flex; flex-direction: column; gap: 12px; }
+  .obx__lib { border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: rgba(255,255,255,.015); }
+  .obx__lib-top { display: flex; align-items: center; gap: 10px; margin-bottom: 11px; }
+  .obx__lib-ico { color: var(--accent); display: flex; flex: none; }
+  .obx__lib-name { flex: 1 1 120px; min-width: 100px; height: 36px; padding: 0 10px; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; color: var(--text); font: 600 13px var(--font-body); }
+  .obx__lib-name:focus, .obx__lib-type:focus, .obx__lib-path:focus { outline: none; border-color: var(--accent); }
+  .obx__lib-type { height: 36px; padding: 0 8px; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; color: var(--text); font: 13px var(--font-body); }
+  .obx__lib-rm { flex: none; width: 32px; height: 32px; display: grid; place-items: center; background: none; border: none; color: var(--faint); cursor: pointer; border-radius: 6px; }
+  .obx__lib-rm:hover { color: var(--text); }
+  .obx__lib-folder { display: flex; align-items: center; gap: 8px; }
+  .obx__lib-fico { color: var(--faint); display: flex; flex: none; }
+  .obx__lib-path { flex: 1; min-width: 0; height: 36px; padding: 0 10px; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; color: var(--text); }
+  .obx__addlib { margin-top: 12px; height: 38px; padding: 0 14px; border: 1px dashed var(--line); background: transparent; color: var(--muted); border-radius: 9px; font: 600 12.5px var(--font-body); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+
+  .obx__sources { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 22px; }
+  .obx__source { display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 15px 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.015); color: var(--text); cursor: pointer; }
+  .obx__source.is-active { border-color: var(--accent); background: rgba(255,45,111,.08); }
+  .obx__source-ico { display: flex; margin-bottom: 9px; color: var(--faint); }
+  .obx__source.is-active .obx__source-ico { color: var(--accent); }
+  .obx__source-label { font-size: 13.5px; font-weight: 600; }
+  .obx__source-desc { font-size: 11.5px; color: var(--faint); margin-top: 3px; line-height: 1.4; }
+  .obx__cfg { display: flex; flex-direction: column; gap: 16px; }
+  .obx__cfg-h { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); margin-bottom: 10px; }
+
+  .obx__plugins { display: flex; flex-direction: column; gap: 10px; }
+  .obx__plugin { display: flex; align-items: flex-start; gap: 12px; padding: 13px 15px; border-radius: 11px; border: 1px solid var(--line); background: rgba(255,255,255,.015); cursor: pointer; }
+  .obx__plugin.is-on { border-color: var(--accent); background: rgba(255,45,111,.06); }
+  .obx__plugin-check { width: 20px; height: 20px; border-radius: 6px; flex: none; margin-top: 1px; display: grid; place-items: center; color: #fff; border: 1px solid var(--line); }
+  .obx__plugin.is-on .obx__plugin-check { border-color: var(--accent); background: var(--accent); }
+  .obx__plugin-info { flex: 1; min-width: 0; }
+  .obx__plugin-top { display: flex; align-items: center; gap: 8px; }
+  .obx__plugin-top b { font-size: 13.5px; }
+  .obx__plugin-ver { font: 10.5px var(--font-mono); color: #6f6885; }
+  .obx__plugin-desc { display: block; font-size: 12px; color: var(--faint); margin-top: 3px; line-height: 1.45; }
+
+  .obx__summary { display: flex; flex-direction: column; gap: 10px; margin-bottom: 26px; }
+  .obx__srow { display: flex; align-items: center; gap: 12px; padding: 12px 15px; background: rgba(255,255,255,.02); border: 1px solid #2a2536; border-radius: 11px; }
+  .obx__sico { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; flex: none; }
+  .obx__slabel { flex: 1; font-size: 13px; color: var(--muted); }
+  .obx__svalue { font-size: 13px; font-weight: 600; }
+
+  .obx__foot { flex: none; display: flex; align-items: center; gap: 12px; padding: 16px 48px; border-top: 1px solid #221e2c; }
+  .obx__skip { height: 40px; padding: 0 16px; border: none; background: none; color: var(--faint); font: 600 13px var(--font-body); cursor: pointer; }
+  .obx__foot-right { margin-left: auto; display: flex; gap: 10px; }
+  .obx__back { height: 40px; padding: 0 20px; border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 9px; font: 600 13.5px var(--font-body); cursor: pointer; }
+  .obx__next { height: 40px; padding: 0 24px; border: none; background: var(--accent); color: #fff; border-radius: 9px; font: 600 13.5px var(--font-body); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+  .obx__next:disabled { opacity: .7; cursor: default; }
+
+  @media (max-width: 720px) {
+    .obx__rail { display: none; }
+    .obx__content { padding: 32px 22px; }
+    .obx__foot { padding: 14px 22px; }
+    .obx__sources { grid-template-columns: 1fr; }
+  }
+</style>
