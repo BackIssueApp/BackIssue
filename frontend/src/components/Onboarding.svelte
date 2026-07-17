@@ -189,7 +189,7 @@
           {:else if step === 1}
             <h1 class="obx__h1">ComicVine API key</h1>
             <p class="obx__lead">ComicVine provides every comic's identity — series, issues, covers, credits. A key is free from <a href="https://comicvine.gamespot.com/api/" target="_blank" rel="noreferrer">comicvine.gamespot.com/api <Icon name="external-link" size={13} /></a>.</p>
-            <label class="obx__label">API key</label>
+            <span class="obx__label">API key</span>
             <input class="obx__input obx__input--mono" type="text" spellcheck="false" autocomplete="off" placeholder="paste your key…" bind:value={cvKey} />
             <div class="obx__testrow">
               <button class="obx__test" type="button" disabled={!cvKey.trim()} onclick={testCv}>Test key</button>
