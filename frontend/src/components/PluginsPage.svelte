@@ -6,6 +6,7 @@
   import { navigate } from '../lib/router.svelte.js';
   import { apiGet, apiPost } from '../lib/api.js';
   import { notify } from '../lib/toasts.svelte.js';
+  import { confirmDialog } from './DialogModal.svelte';
   import Icon from '../lib/Icon.svelte';
 
   let { active = false } = $props();
@@ -57,6 +58,19 @@
     } finally {
       busy = { ...busy, [entry.id]: false };
     }
+  }
+
+  // Remove an INSTALLED plugin from its card. A plugin's on-disk folder name is
+  // its uninstall id (that's also the enable/disable key), so `name` works for
+  // catalog-installed and hand-dropped plugins alike. Deleting the folder is
+  // destructive, so confirm first.
+  async function removeInstalled(p) {
+    if (!(await confirmDialog({
+      title: `Remove ${p.name}?`,
+      message: 'The plugin’s folder is deleted from disk. Restart BackIssue to finish removing it — its saved settings are kept in case you reinstall.',
+      confirmLabel: 'Remove', danger: true,
+    }))) return;
+    await uninstall({ id: p.name, name: p.name });
   }
 
   async function uninstall(entry) {
@@ -274,6 +288,7 @@
                   {#if p.counts?.settings && !p.error}
                     <button class="plx__configure" onclick={() => navigate('/settings?tab=' + settingsTabFor(p))}>Configure</button>
                   {/if}
+                  <button class="plx__uninstall" disabled={busy[p.name]} onclick={() => removeInstalled(p)}>{busy[p.name] ? 'Removing…' : 'Remove'}</button>
                 </div>
               </div>
             </div>
@@ -389,6 +404,9 @@
   .plx__configure { height: 30px; padding: 0 12px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 7px; font: 600 12px var(--font-body); cursor: pointer; }
   .plx__configure:hover { color: var(--text); border-color: var(--muted); }
   .plx__install--sm { height: 30px; padding: 0 12px; font-size: 12px; }
+  .plx__uninstall { height: 30px; padding: 0 12px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 7px; font: 600 12px var(--font-body); cursor: pointer; }
+  .plx__uninstall:hover:not(:disabled) { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, var(--line)); }
+  .plx__uninstall:disabled { opacity: .6; cursor: default; }
 
   .plx__card-actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
   .plx__install { height: 34px; padding: 0 16px; border: none; background: var(--accent); color: #fff; border-radius: 8px; font: 600 12.5px var(--font-body); cursor: pointer; }
