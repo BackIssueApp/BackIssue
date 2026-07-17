@@ -9,6 +9,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 ## [Unreleased]
 
 ### Added
+- **Download queue, redesigned as a full page.** A stat strip (active /
+  queued / failed / down-speed) reads the pipeline at a glance, filter tabs
+  (All · Active · Queued · Failed, with live counts) cut through big queues,
+  rows carry a cover cell and the failure reason inline, and packs stand out
+  with an amber pack badge. Same data, same actions — pause/resume, retry,
+  clear, per-row cancel — same permissions.
 - **Bulk read status** (with Comic Reader ≥ 1.5.1): **Mark read** / **Mark
   unread** buttons on the series page act on the checked issues — or the whole
   series when nothing is checked. Under the hood, plugin series actions can

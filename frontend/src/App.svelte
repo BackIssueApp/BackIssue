@@ -27,7 +27,7 @@
   import AccountModal from './components/AccountModal.svelte';
   import HelpModal from './components/HelpModal.svelte';
   import { auth, loadMe, can } from './lib/auth.svelte.js';
-  import QueueDrawer from './components/QueueDrawer.svelte';
+  import QueuePage from './components/QueuePage.svelte';
   import ReleasesDrawer from './components/ReleasesDrawer.svelte';
   import AddModal from './components/AddModal.svelte';
   import CvPickerModal from './components/CvPickerModal.svelte';
@@ -177,7 +177,7 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
       <ImportPage active={route.path === '/import'} />
       <PluginsPage active={route.path === '/plugins'} />
 
-      <QueueDrawer active={route.path === '/queue'} />
+      <QueuePage active={route.path === '/queue'} />
       <ReleasesDrawer active={route.path === '/releases'} />
       <UsersPage active={route.path === '/users'} />
       <ListsPage active={route.path === '/lists'} />

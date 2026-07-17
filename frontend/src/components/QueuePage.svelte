@@ -1,4 +1,6 @@
 <script>
+  // The download queue as a FULL PAGE (was a slim drawer): stat strip, state
+  // filters, and per-row failure reasons — same /api/queue data, same actions.
   import { navigate } from '../lib/router.svelte.js';
   import { apiGet, apiPost } from '../lib/api.js';
   import { subscribe } from '../lib/events.svelte.js';
@@ -14,6 +16,7 @@
   let { active = false } = $props();
 
   let q = $state(null);
+  let filter = $state('all'); // all | active | queued | failed
 
   async function renderQueue() {
     try { q = await apiGet('/api/queue'); } catch { /* keep last */ }
@@ -53,13 +56,52 @@
     return { pct, label, meta, indeterminate, torrent: live.source === 'torrent' };
   }
 
+  /* ---- Stats + filters ---- */
+  const ACTIVE_SET = new Set(['downloading', 'grabbed', 'tagging', 'done', 'sent', 'importing']);
+  const items = $derived(q?.items || []);
+  const packs = $derived(q?.packs || []);
+  const counts = $derived.by(() => {
+    const c = { all: items.length + packs.length, active: packs.length, queued: 0, failed: 0 };
+    for (const it of items) {
+      if (it.status === 'failed') c.failed++;
+      else if (it.status === 'queued') c.queued++;
+      else if (ACTIVE_SET.has(it.status)) c.active++;
+    }
+    return c;
+  });
+  const downSpeed = $derived.by(() => {
+    let bps = 0;
+    for (const it of items) bps += it.live?.bps || 0;
+    for (const pk of packs) bps += pk.live?.bps || 0;
+    return bps;
+  });
+  const FILTERS = [
+    { key: 'all', label: 'All' },
+    { key: 'active', label: 'Active' },
+    { key: 'queued', label: 'Queued' },
+    { key: 'failed', label: 'Failed' },
+  ];
+  const inFilter = (it) => filter === 'all'
+    || (filter === 'failed' && it.status === 'failed')
+    || (filter === 'queued' && it.status === 'queued')
+    || (filter === 'active' && ACTIVE_SET.has(it.status));
+  const visibleItems = $derived(items.filter(inFilter));
+  const visiblePacks = $derived(filter === 'all' || filter === 'active' ? packs : []);
+  const EMPTY = {
+    all: 'Queue is empty.', active: 'Nothing downloading right now.',
+    queued: 'Nothing waiting in the queue.', failed: 'No failed downloads.',
+  };
+
+  // The row's cover cell shows the issue number when the title carries one.
+  const rowNum = (it) => (String(it.title || '').match(/#\s*([\d.½-]+)/) || [])[1] || null;
+
+  /* ---- Actions (same endpoints + gates as the old drawer) ---- */
   async function togglePause() {
     const cur = await apiGet('/api/queue');
     await apiPost(cur.paused ? '/api/queue/resume' : '/api/queue/pause');
     renderQueue();
   }
   async function clearQueued() {
-    // Empties the whole queue — same confirmation bar as cancelling one item.
     const n = status.counts.queued || 0;
     if (!(await confirmDialog({
       title: `Clear ${fmt(n)} queued download${n === 1 ? '' : 's'}?`,
@@ -121,32 +163,55 @@
 {/snippet}
 
 {#if active}
-  <section id="queue-drawer" class="page">
+  <section id="queue-drawer" class="page qx">
     <div class="page__inner">
-      <div class="page__head">
-        <h3>Download queue</h3>
+      <!-- Header: title + paused chip + global actions -->
+      <div class="qx__head">
+        <h3 class="qx__title">Download queue</h3>
+        {#if q?.paused}<span class="qx__paused">Paused</span>{/if}
+        {#if isTrusted()}
+          <div class="qx__actions">
+            <button id="queue-pause" class="btn btn--ghost btn--sm" onclick={togglePause}>{q?.paused ? 'Resume' : 'Pause'}</button>
+            {#if status.counts.failed > 0}
+              <button id="retry-failed" class="btn btn--ghost btn--sm" onclick={retryFailed}>Retry failed ({fmt(status.counts.failed)})</button>
+            {/if}
+            <button id="queue-clear" class="btn btn--ghost btn--sm" onclick={clearQueued}>Clear queued</button>
+          </div>
+        {/if}
       </div>
-      {#if isTrusted()}
-        <div class="drawer__controls">
-          <button id="queue-pause" class="btn btn--ghost" onclick={togglePause}>{q?.paused ? 'Resume' : 'Pause'}</button>
-          <button id="queue-clear" class="btn btn--ghost" onclick={clearQueued}>Clear queued</button>
-          {#if status.counts.failed > 0}
-            <button id="retry-failed" class="btn btn--ghost" onclick={retryFailed}>Retry failed ({fmt(status.counts.failed)})</button>
-            <button id="clear-failed" class="btn btn--ghost" onclick={clearFailed}>Clear failed ({fmt(status.counts.failed)})</button>
-          {/if}
-        </div>
-      {/if}
+
+      <!-- Stat strip -->
+      <div class="qx__stats">
+        <div class="qx__stat"><span class="qx__statlabel">Active</span><span class="qx__statvalue">{fmt(counts.active)}</span></div>
+        <div class="qx__stat"><span class="qx__statlabel">Queued</span><span class="qx__statvalue">{fmt(counts.queued)}</span></div>
+        <div class="qx__stat" class:qx__stat--bad={counts.failed > 0}><span class="qx__statlabel">Failed</span><span class="qx__statvalue">{fmt(counts.failed)}</span></div>
+        <div class="qx__stat"><span class="qx__statlabel">Down speed</span><span class="qx__statvalue">{downSpeed ? humanBytes(downSpeed) + '/s' : '—'}</span></div>
+      </div>
+
+      <!-- Filter tabs -->
+      <div class="qx__filters">
+        {#each FILTERS as f (f.key)}
+          <button class="coll-chip" class:is-active={filter === f.key} onclick={() => { filter = f.key; }}>
+            {f.label} ({fmt(f.key === 'all' ? counts.all : counts[f.key])})</button>
+        {/each}
+        {#if counts.failed > 0 && isTrusted()}
+          <button id="clear-failed" class="link-btn qx__clearfailed" onclick={clearFailed}>Clear failed</button>
+        {/if}
+      </div>
+
       <div id="queue-list" class="queue-list">
-        {#if q && !q.items.length && !(q.packs || []).length}
-          <div class="queue-empty">Queue is empty.</div>
+        {#if q && !visibleItems.length && !visiblePacks.length}
+          <div class="queue-empty">{EMPTY[filter]}</div>
         {/if}
         <!-- Pack downloads first (0-day / per-series) — big, and easy to miss. -->
-        {#each q?.packs || [] as pk (pk.id)}
-          <div class="queue-item queue-item--pack">
+        {#each visiblePacks as pk (pk.id)}
+          <div class="queue-item queue-item--pack qx__row">
+            <div class="qx__cover qx__cover--pack"><Icon name="package" /></div>
             <div class="queue-item__main">
+              <span class="qx__packbadge">Pack</span>
               <div class="queue-item__series" style={pk.series_id ? 'cursor:pointer' : ''}
                 onclick={() => { if (pk.series_id) navigate('/volume/' + pk.series_id); }} role="button" tabindex="0"
-                onkeydown={(e) => { if (e.key === 'Enter' && pk.series_id) navigate('/volume/' + pk.series_id); }}><Icon name="package" /> {pk.series_title || 'Collection pack'}</div>
+                onkeydown={(e) => { if (e.key === 'Enter' && pk.series_id) navigate('/volume/' + pk.series_id); }}>{pk.series_title || 'Collection pack'}</div>
               <div class="queue-item__title">{pk.title || ''}</div>
               {@render liveBar(pk.live ? { ...pk.live, source: pk.source } : null)}
             </div>
@@ -159,8 +224,9 @@
             {/if}
           </div>
         {/each}
-        {#each q?.items || [] as it (it.id)}
-          <div class="queue-item">
+        {#each visibleItems as it (it.id)}
+          <div class="queue-item qx__row">
+            <div class="qx__cover">{#if rowNum(it)}<span class="qx__num">#{rowNum(it)}</span>{:else}<Icon name="download" />{/if}</div>
             <div class="queue-item__main">
               <div class="queue-item__series" style={it.series_id ? 'cursor:pointer' : ''}
                 onclick={() => { if (it.series_id) navigate('/volume/' + it.series_id); }} role="button" tabindex="0"
