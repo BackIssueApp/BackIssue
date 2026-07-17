@@ -8,6 +8,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+- **Oversized CBR downloads no longer fail.** A collected edition delivered as
+  a RAR too large to repack in memory (the WASM-heap ceiling, ~400MB+) used to
+  error out with "too large to convert safely"; it's now filed as-is as a
+  `.cbr` — readable natively — instead of being lost. Smaller CBRs still
+  convert to tagged CBZ as before.
+
 ## [0.7.1] — 2026-07-17
 
 ### Added

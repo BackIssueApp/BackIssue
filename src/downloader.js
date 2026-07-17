@@ -54,7 +54,7 @@ export function comicFileName(seriesTitle, number, issueDate, issueTitle, year) 
 
 export function targetPath(seriesTitle, issue, format = 'cbz', year, baseDir) {
   const folder = safeName(seriesTitle);
-  const ext = format === 'pdf' ? 'pdf' : 'cbz';
+  const ext = format === 'pdf' ? 'pdf' : format === 'cbr' ? 'cbr' : 'cbz';
   const hasNum = issue.issue_number != null && /[\d½¼¾⅓⅔⅛]/.test(String(issue.issue_number));
   const ed = detectEdition(issue.title);
   const stem = (hasNum || ed)
@@ -129,7 +129,16 @@ export async function finalizeComic({ buffer, srcPath, format = 'cbz', issue, se
   // .cbz; otherwise JSZip throws "Can't find end of central directory". This is
   // the download-import conversion path cbrBufferToCbz is meant to own.
   if (buf[0] === 0x50 && buf[1] === 0x4b) format = 'cbz';                     // "PK" → ZIP
-  else if (buf.toString('latin1', 0, 4) === 'Rar!') { buf = await cbrBufferToCbz(buf); format = 'cbz'; } // "Rar!" → repack
+  else if (buf.toString('latin1', 0, 4) === 'Rar!') {                         // "Rar!" → repack
+    // Repack RAR → CBZ so it can be tagged and read as a zip. A RAR too large
+    // to extract in memory (the WASM-heap ceiling) is filed AS-IS: the app
+    // reads CBR natively — it just can't be repacked or ComicInfo-tagged.
+    try { buf = await cbrBufferToCbz(buf); format = 'cbz'; }
+    catch (e) {
+      if (!/too large to convert/i.test(String(e?.message))) throw e;
+      format = 'cbr'; // keep the raw RAR bytes; file it as .cbr
+    }
+  }
   else if (buf.toString('latin1', 0, 4) === '%PDF') format = 'pdf';          // "%PDF"
   else {
     // Unrecognizable container = a corrupt/bogus download (truncated file, an
@@ -146,13 +155,13 @@ export async function finalizeComic({ buffer, srcPath, format = 'cbz', issue, se
   if (!config.renameDownloads && srcPath) {
     const stem = safeName(path.basename(srcPath).replace(/\.[^.]+$/, ''));
     const dir = seriesPath || path.join(config.downloadsDir, safeName(seriesTitle));
-    dest = path.join(dir, `${stem}.${format === 'pdf' ? 'pdf' : 'cbz'}`);
+    dest = path.join(dir, `${stem}.${format === 'pdf' ? 'pdf' : format === 'cbr' ? 'cbr' : 'cbz'}`);
   } else {
     dest = targetPath(seriesTitle, issue, format, seriesYear, seriesPath);
   }
   if (existsSync(dest)) {
     const cid = trailingIdFromUrl(issue.url); // stable source id when present
-    dest = cid ? dest.replace(/(\.(?:cbz|pdf))$/i, ` (${cid})$1`) : uniquePath(dest);
+    dest = cid ? dest.replace(/(\.(?:cbz|cbr|pdf))$/i, ` (${cid})$1`) : uniquePath(dest);
   }
   let tagged = false;
   if (format === 'cbz' && comicInfoXml) { buf = await tagCbzBuffer(buf, comicInfoXml); tagged = true; }
