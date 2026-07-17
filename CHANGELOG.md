@@ -8,6 +8,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+- The **Queue** badge (sidebar) and the header status pills now match the queue
+  view. They were counting only *queued* and *downloading* items, so issues
+  handed off to the download client or being tagged — plus active pack grabs —
+  were left out, and the badge read lower than the number of rows actually on
+  the Queue page. All in-flight work is now counted.
+
 ## [0.7.2] — 2026-07-17
 
 ### Added

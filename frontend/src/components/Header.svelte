@@ -15,6 +15,11 @@
 
   let searchValue = $state('');
 
+  // In-flight downloads = actively fetching + handed to the client (grabbed) +
+  // post-processing (tagging). The bare 'downloading' count hid grabbed/tagging
+  // items that the queue view shows, so the pill undercounted.
+  const inFlight = $derived((status.counts.downloading || 0) + (status.counts.grabbed || 0) + (status.counts.tagging || 0));
+
   // "Reconnecting" pill: only after the live stream has been down for a few
   // seconds (EventSource auto-reconnects; brief blips shouldn't flash chrome).
   // Without it a dead server is indistinguishable from a healthy idle app.
@@ -81,8 +86,8 @@
         {#if status.counts.failed}
           <span class="pill pill--failed"><span class="dot"></span>failed <b>{fmt(status.counts.failed)}</b></span>
         {/if}
-        {#if status.downloading}
-          <span class="pill pill--busy"><span class="dot"></span>downloading <b>{fmt(status.counts.downloading || 0)}</b></span>
+        {#if status.downloading || inFlight}
+          <span class="pill pill--busy"><span class="dot"></span>downloading <b>{fmt(inFlight)}</b></span>
         {/if}
       </div>
     {/if}

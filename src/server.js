@@ -818,7 +818,12 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     // A restricted library is invisible (name included) to roles without the
     // mature-content permission — same rule its member series already follow.
     const libs = listLibraries(db).filter((l) => !l.restricted || canRestricted(req));
-    res.json({ counts: countByStatus(db), followedCount, libraryTypes, libraries: libs, version: APP_VERSION, crawl: state.crawl, queue: state.queue, follow: state.follow || { running: false } });
+    // Active pack grabs are queue rows too (0-day / per-series), so the sidebar
+    // badge counts them alongside in-flight issues — same restricted filter the
+    // queue list uses, so the badge matches what this user actually sees there.
+    const rset = canRestricted(req) ? null : restrictedSeriesIds(db);
+    const packsActive = activePackGrabs(db).filter((p) => !rset || p.series_id == null || !rset.has(p.series_id)).length;
+    res.json({ counts: countByStatus(db), packsActive, followedCount, libraryTypes, libraries: libs, version: APP_VERSION, crawl: state.crawl, queue: state.queue, follow: state.follow || { running: false } });
   });
 
   // Live updates: one SSE stream tells the UI which domains changed so it can
