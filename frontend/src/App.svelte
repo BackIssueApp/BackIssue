@@ -12,9 +12,7 @@
   import LibraryPage from './components/LibraryPage.svelte';
   import SeriesDetail from './components/SeriesDetail.svelte';
   import SettingsPage from './components/SettingsPage.svelte';
-  import JobsPage from './components/JobsPage.svelte';
-  import ToolsPage from './components/ToolsPage.svelte';
-  import LogsPage from './components/LogsPage.svelte';
+  import SystemPage from './components/SystemPage.svelte';
   import WantedPage from './components/WantedPage.svelte';
   import HistoryPage from './components/HistoryPage.svelte';
   import StatsPage from './components/StatsPage.svelte';
@@ -43,7 +41,7 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
   // Section pages are always mounted (plugin slots inject into them) —
   // a body class picks which one is visible (app.css hides .home under it).
   const PAGE_CLASSES = {
-    '/settings': 'settings', '/jobs': 'jobs', '/tools': 'tools', '/logs': 'logs',
+    '/settings': 'settings', '/system': 'systempage',
     '/wanted': 'wanted', '/history': 'history', '/stats': 'stats', '/import': 'import',
     '/queue': 'queuepage', '/releases': 'releasespage', '/plugins': 'pluginspage',
     '/users': 'userspage', '/lists': 'listspage', '/profile': 'profilepage',
@@ -55,13 +53,18 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
   // bouncing anyone who lacks the page's permission back to the library.
   const PAGE_PERMS = {
     '/settings': 'settings.manage', '/users': 'users.manage', '/plugins': 'plugins.manage',
-    '/jobs': 'system.jobs', '/tools': 'system.jobs', '/logs': 'system.logs',
     '/import': 'library.manage',
     '/wanted': 'downloads.grab', '/queue': 'downloads.grab',
     '/releases': 'downloads.grab', '/history': 'downloads.grab',
   };
   $effect(() => {
     if (!authed) return;
+    // System bundles Jobs/Tools (system.jobs) and Logs (system.logs) — either
+    // grants access; the page hides the tabs the user can't see.
+    if (route.path === '/system') {
+      if (!can('system.jobs') && !can('system.logs')) navigate('/', { replace: true });
+      return;
+    }
     const need = PAGE_PERMS[route.path];
     if (need && !can(need)) navigate('/', { replace: true });
   });
@@ -76,6 +79,13 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
   $effect(() => {
     const d = activeDrawer(route.search);
     if (d === 'queue' || d === 'releases') navigate('/' + d, { replace: true });
+  });
+
+  // Jobs/Tools/Logs merged into the System page — keep old links/bookmarks
+  // working by redirecting to the matching System tab.
+  $effect(() => {
+    const tab = { '/jobs': 'jobs', '/tools': 'tools', '/logs': 'logs' }[route.path];
+    if (tab) navigate('/system?tab=' + tab, { replace: true });
   });
 
   $effect(() => {
@@ -168,9 +178,7 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
       </div>
 
       <SettingsPage active={route.path === '/settings'} />
-      <JobsPage active={route.path === '/jobs'} />
-      <ToolsPage active={route.path === '/tools'} />
-      <LogsPage active={route.path === '/logs'} />
+      <SystemPage active={route.path === '/system'} />
       <WantedPage active={route.path === '/wanted'} />
       <HistoryPage active={route.path === '/history'} />
       <StatsPage active={route.path === '/stats'} />

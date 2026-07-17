@@ -94,15 +94,9 @@
         <button id="plugins-btn" class="sidenav__item" class:is-active={isActive('/plugins')} onclick={() => go('/plugins')}>
           <span class="sidenav__icon"><Icon name="puzzle" /></span> Plugins</button>
       {/if}
-      {#if can('system.jobs')}
-        <button id="jobs-btn" class="sidenav__item" class:is-active={isActive('/jobs')} onclick={() => go('/jobs')}>
-          <span class="sidenav__icon"><Icon name="clock" /></span> Jobs</button>
-        <button id="tools-btn" class="sidenav__item" class:is-active={isActive('/tools')} onclick={() => go('/tools')}>
-          <span class="sidenav__icon"><Icon name="tools" /></span> Tools</button>
-      {/if}
-      {#if can('system.logs')}
-        <button id="logs-btn" class="sidenav__item" class:is-active={isActive('/logs')} onclick={() => go('/logs')}>
-          <span class="sidenav__icon"><Icon name="file-text" /></span> Logs</button>
+      {#if can('system.jobs') || can('system.logs')}
+        <button id="system-btn" class="sidenav__item" class:is-active={isActive('/system')} onclick={() => go('/system')}>
+          <span class="sidenav__icon"><Icon name="tools" /></span> System</button>
       {/if}
       {#if can('settings.manage')}
         <button id="settings-btn" class="sidenav__item" class:is-active={isActive('/settings')} onclick={() => go('/settings')}>

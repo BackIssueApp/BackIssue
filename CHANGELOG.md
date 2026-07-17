@@ -25,6 +25,18 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   download while it runs. A slow pre-download step (connecting, or getting past
   a host's bot protection) shows a live "Connecting…" / "Solving challenge…"
   phase with a pulsing bar instead of a stuck "Downloading · 0 B".
+- **Plugins, redesigned as a catalog page.** Category tabs (Notifications ·
+  Sources · Metadata · Auth · Utility) with live counts and a search box, a
+  two-column card grid split into Installed and Available, capability chips
+  (what each plugin registers — download sources, API routes, jobs, UI,
+  settings, startup tasks), a per-card enable/disable toggle and a Configure
+  shortcut, and the restart banner. Same endpoints and restart flow.
+- **System page unifies Jobs, Tools and Logs.** The three admin pages are now
+  one tabbed **System** page. Jobs keeps the scheduled-task table and recent-run
+  cards; Tools keeps the featured Reorganize-library flow and the maintenance
+  grid; Logs gains **expandable detail rows**, **search-term highlighting**,
+  **per-line copy**, a **live-tail toggle**, and **export to a text file**.
+  Old `/jobs`, `/tools` and `/logs` links redirect to the matching tab.
 
 ### Fixed
 - **Downloaded issues can be multi-selected.** The series-page checkboxes
