@@ -8,6 +8,22 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.7.2] — 2026-07-17
+
+### Added
+- **The interface redesign now spans the whole app.** Building on the queue,
+  plugins and System refresh, this release restyles the **Library** (filter chips
+  with live counts, a unified status-badge vocabulary, progress that turns green
+  at 100%), the **Series** page (a hero completion overview and per-filter issue
+  counts), the **Add** and **Source-search** dialogs (a Comics/Manga switch,
+  color-coded source badges and seeder counts, a guided "ComicVine key required"
+  state), the **Stats** dashboard (completion ring, KPI tiles, and format/
+  publisher/downloads panels with a 14-day sparkline), **History** (day-grouped,
+  mode-aware rows with a stat strip), **Wanted** (collapsible per-series cards),
+  **Reading lists** (a two-pane master–detail), the first-run **Onboarding**
+  wizard, the **Profile** page, the **sidebar**, and **Users** (split into
+  Accounts and Roles tabs). Same features, endpoints and data throughout.
+
 ### Changed
 - **The CBR→CBZ conversion ceiling now scales up with your host's memory** instead
   of a fixed 400MB, so a big server converts (and tags) much larger collected
@@ -15,12 +31,18 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   memory limit (cgroup) rather than the host's total RAM. Roughly a 1GB ceiling on
   a 32GB box, ~400MB on 8GB or less. Override it with the `MAX_RAR_MB` environment
   variable.
+- **First-run setup builds named libraries.** The Onboarding wizard's Library
+  step now creates one or more named libraries (each with a type and folder)
+  through the library model instead of a plain root-folders box.
 
 ### Fixed
 - **Oversized CBR downloads no longer fail.** A collected edition delivered as
   a RAR too large to repack in memory used to error out with "too large to
   convert safely"; it's now filed as-is as a `.cbr` — readable natively —
   instead of being lost. Smaller CBRs still convert to tagged CBZ as before.
+- **Installed plugins show available updates.** A plugin with a newer catalog
+  version now surfaces an "Update → v…" button on its Installed card — the match
+  keyed on the wrong field before, so updates never appeared.
 
 ## [0.7.1] — 2026-07-17
 
