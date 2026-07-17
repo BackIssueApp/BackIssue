@@ -88,8 +88,10 @@
   const visibleItems = $derived(items.filter(inFilter));
   const visiblePacks = $derived(filter === 'all' || filter === 'active' ? packs : []);
   const EMPTY = {
-    all: 'Queue is empty.', active: 'Nothing downloading right now.',
-    queued: 'Nothing waiting in the queue.', failed: 'No failed downloads.',
+    all: { title: 'Queue is empty', body: 'New downloads appear here as you add series or issues. Active downloads keep running even while paused items wait.' },
+    active: { title: 'Nothing downloading', body: 'No active downloads right now. Queued items start automatically as slots free up.' },
+    queued: { title: 'Nothing queued', body: 'Everything queued has started or finished.' },
+    failed: { title: 'No failures', body: 'Nothing has failed — every download completed or is still in progress.' },
   };
 
   // The row's cover cell shows the issue number when the title carries one.
@@ -150,105 +152,124 @@
   }
 </script>
 
-{#snippet liveBar(live)}
+{#snippet liveBar(live, rowStatus)}
   {#if live}
     {@const info = liveInfo(live)}
-    <div class="queue-item__live">
-      <div class="queue-item__track" class:is-indeterminate={info.indeterminate}>
-        <div class="queue-item__fill" style="width:{info.indeterminate ? 100 : info.pct}%"></div>
+    {@const green = rowStatus === 'tagging' || rowStatus === 'done' || live.phase === 'tagging' || live.phase === 'done'}
+    <div class="qx__live">
+      <div class="qx__track">
+        {#if info.indeterminate}
+          <div class="qx__fill qx__fill--indet" class:qx__fill--green={green}></div>
+        {:else}
+          <div class="qx__fill" class:qx__fill--green={green} style="width:{info.pct}%"></div>
+        {/if}
       </div>
-      <span class="queue-item__livemeta">{#if info.torrent}<Icon name="arrow-up-down" /> {/if}<b>{info.label}</b>{info.meta ? ` · ${info.meta}` : ''}</span>
+      <span class="qx__livemeta">{#if info.torrent}<Icon name="arrow-up-down" size={13} /> {/if}<b>{info.label}</b>{info.meta ? ` · ${info.meta}` : ''}</span>
     </div>
   {/if}
 {/snippet}
 
 {#if active}
   <section id="queue-drawer" class="page qx">
-    <div class="page__inner">
-      <!-- Header: title + paused chip + global actions -->
-      <div class="qx__head">
-        <h3 class="qx__title">Download queue</h3>
-        {#if q?.paused}<span class="qx__paused">Paused</span>{/if}
-        {#if isTrusted()}
-          <div class="qx__actions">
-            <button id="queue-pause" class="btn btn--ghost btn--sm" onclick={togglePause}>{q?.paused ? 'Resume' : 'Pause'}</button>
-            {#if status.counts.failed > 0}
-              <button id="retry-failed" class="btn btn--ghost btn--sm" onclick={retryFailed}>Retry failed ({fmt(status.counts.failed)})</button>
-            {/if}
-            <button id="queue-clear" class="btn btn--ghost btn--sm" onclick={clearQueued}>Clear queued</button>
-          </div>
-        {/if}
-      </div>
+    <!-- Header band -->
+    <div class="qx__band qx__head">
+      <h3 class="qx__title">Download queue</h3>
+      {#if q?.paused}<span class="qx__paused"><Icon name="pause" size={13} /> Paused</span>{/if}
+      {#if isTrusted()}
+        <div class="qx__actions">
+          <button id="queue-pause" class="qx__pausebtn" class:is-paused={q?.paused} onclick={togglePause}>
+            <Icon name={q?.paused ? 'play' : 'pause'} size={14} /> {q?.paused ? 'Resume' : 'Pause'}</button>
+          {#if status.counts.failed > 0}
+            <button id="retry-failed" class="btn btn--ghost" onclick={retryFailed}><Icon name="refresh" size={14} /> Retry failed</button>
+          {/if}
+          <button id="queue-clear" class="btn btn--ghost" onclick={clearQueued}>Clear queued</button>
+        </div>
+      {/if}
+    </div>
 
-      <!-- Stat strip -->
-      <div class="qx__stats">
-        <div class="qx__stat"><span class="qx__statlabel">Active</span><span class="qx__statvalue">{fmt(counts.active)}</span></div>
-        <div class="qx__stat"><span class="qx__statlabel">Queued</span><span class="qx__statvalue">{fmt(counts.queued)}</span></div>
-        <div class="qx__stat" class:qx__stat--bad={counts.failed > 0}><span class="qx__statlabel">Failed</span><span class="qx__statvalue">{fmt(counts.failed)}</span></div>
-        <div class="qx__stat"><span class="qx__statlabel">Down speed</span><span class="qx__statvalue">{downSpeed ? humanBytes(downSpeed) + '/s' : '—'}</span></div>
-      </div>
+    <!-- Stat strip band -->
+    <div class="qx__band qx__stats">
+      <div class="qx__stat"><span class="qx__statchip qx__tone--cyan"><Icon name="zap" size={16} /></span>
+        <div><div class="qx__statvalue">{fmt(counts.active)}</div><div class="qx__statlabel">Active</div></div></div>
+      <div class="qx__stat"><span class="qx__statchip"><Icon name="clock" size={16} /></span>
+        <div><div class="qx__statvalue">{fmt(counts.queued)}</div><div class="qx__statlabel">Queued</div></div></div>
+      <div class="qx__stat"><span class="qx__statchip" class:qx__tone--red={counts.failed > 0}><Icon name="alert-triangle" size={16} /></span>
+        <div><div class="qx__statvalue" class:qx__value--red={counts.failed > 0}>{fmt(counts.failed)}</div><div class="qx__statlabel">Failed</div></div></div>
+      <div class="qx__stat"><span class="qx__statchip qx__tone--green"><Icon name="speed" size={16} /></span>
+        <div><div class="qx__statvalue">{downSpeed ? humanBytes(downSpeed) + '/s' : '—'}</div><div class="qx__statlabel">Down speed</div></div></div>
+    </div>
 
-      <!-- Filter tabs -->
-      <div class="qx__filters">
-        {#each FILTERS as f (f.key)}
-          <button class="coll-chip" class:is-active={filter === f.key} onclick={() => { filter = f.key; }}>
-            {f.label} ({fmt(f.key === 'all' ? counts.all : counts[f.key])})</button>
-        {/each}
-        {#if counts.failed > 0 && isTrusted()}
-          <button id="clear-failed" class="link-btn qx__clearfailed" onclick={clearFailed}>Clear failed</button>
-        {/if}
-      </div>
+    <!-- Filter band -->
+    <div class="qx__band qx__filters">
+      {#each FILTERS as f (f.key)}
+        {@const n = f.key === 'all' ? counts.all : counts[f.key]}
+        <button class="qx__tab" class:is-active={filter === f.key} onclick={() => { filter = f.key; }}>
+          {f.label}{#if n}<span class="qx__tabcount">{fmt(n)}</span>{/if}</button>
+      {/each}
+      {#if counts.failed > 0 && isTrusted()}
+        <button id="clear-failed" class="qx__clearfailed" onclick={clearFailed}>Clear failed</button>
+      {/if}
+    </div>
 
-      <div id="queue-list" class="queue-list">
+    <!-- Scrolling list -->
+    <div class="qx__scroll">
+      <div class="qx__list">
         {#if q && !visibleItems.length && !visiblePacks.length}
-          <div class="queue-empty">{EMPTY[filter]}</div>
+          <div class="qx__empty">
+            <span class="qx__emptychip"><Icon name="download" size={20} /></span>
+            <b>{EMPTY[filter].title}</b>
+            <p>{EMPTY[filter].body}</p>
+          </div>
         {/if}
         <!-- Pack downloads first (0-day / per-series) — big, and easy to miss. -->
         {#each visiblePacks as pk (pk.id)}
-          <div class="queue-item queue-item--pack qx__row">
-            <div class="qx__cover qx__cover--pack"><Icon name="package" /></div>
-            <div class="queue-item__main">
-              <span class="qx__packbadge">Pack</span>
-              <div class="queue-item__series" style={pk.series_id ? 'cursor:pointer' : ''}
-                onclick={() => { if (pk.series_id) navigate('/volume/' + pk.series_id); }} role="button" tabindex="0"
-                onkeydown={(e) => { if (e.key === 'Enter' && pk.series_id) navigate('/volume/' + pk.series_id); }}>{pk.series_title || 'Collection pack'}</div>
-              <div class="queue-item__title">{pk.title || ''}</div>
-              {@render liveBar(pk.live ? { ...pk.live, source: pk.source } : null)}
+          <div class="qx__row">
+            <div class="qx__cover qx__cover--pack"><Icon name="package" size={17} /></div>
+            <div class="qx__main">
+              <div class="qx__toprow">
+                <span class="qx__packbadge">Pack</span>
+                <span class="qx__series" role="button" tabindex="0" style={pk.series_id ? '' : 'cursor:default'}
+                  onclick={() => { if (pk.series_id) navigate('/volume/' + pk.series_id); }}
+                  onkeydown={(e) => { if (e.key === 'Enter' && pk.series_id) navigate('/volume/' + pk.series_id); }}>{pk.series_title || 'Collection pack'}</span>
+              </div>
+              <div class="qx__release">{pk.title || ''}</div>
+              {@render liveBar(pk.live ? { ...pk.live, source: pk.source } : null, 'downloading')}
             </div>
-            <span>
-              {#if pk.live}<span class="badge badge--downloading"><span class="dot"></span>downloading</span>
-              {:else}<span class="badge badge--queued"><span class="dot"></span>sent</span>{/if}
-            </span>
-            {#if can('downloads.grab')}
-              <button class="queue-item__x" title="Cancel — removes the download from the client" onclick={() => cancelGrab(pk.id)}><Icon name="close" /></button>
-            {/if}
+            <div class="qx__end">
+              <Badge status={pk.live ? 'downloading' : 'sent'} />
+              {#if can('downloads.grab')}
+                <button class="qx__act" title="Cancel — removes the download from the client" onclick={() => cancelGrab(pk.id)}><Icon name="close" size={15} /></button>
+              {/if}
+            </div>
           </div>
         {/each}
         {#each visibleItems as it (it.id)}
-          <div class="queue-item qx__row">
-            <div class="qx__cover">{#if rowNum(it)}<span class="qx__num">#{rowNum(it)}</span>{:else}<Icon name="download" />{/if}</div>
-            <div class="queue-item__main">
-              <div class="queue-item__series" style={it.series_id ? 'cursor:pointer' : ''}
-                onclick={() => { if (it.series_id) navigate('/volume/' + it.series_id); }} role="button" tabindex="0"
-                onkeydown={(e) => { if (e.key === 'Enter' && it.series_id) navigate('/volume/' + it.series_id); }}>{it.series_title}</div>
-              <div class="queue-item__title">{it.title}</div>
+          <div class="qx__row" class:qx__row--failed={it.status === 'failed'}>
+            <div class="qx__cover">{#if rowNum(it)}<span class="qx__num">#{rowNum(it)}</span>{:else}<Icon name="download" size={16} />{/if}</div>
+            <div class="qx__main">
+              <div class="qx__toprow">
+                <span class="qx__series" role="button" tabindex="0" style={it.series_id ? '' : 'cursor:default'}
+                  onclick={() => { if (it.series_id) navigate('/volume/' + it.series_id); }}
+                  onkeydown={(e) => { if (e.key === 'Enter' && it.series_id) navigate('/volume/' + it.series_id); }}>{it.series_title}</span>
+              </div>
+              <div class="qx__release">{it.title}</div>
               {#if it.status === 'failed' && it.error}
                 <!-- The answer to "why did it fail?" belongs on the row itself. -->
-                <div class="queue-item__err">{it.error}</div>
+                <div class="qx__err">{it.error}</div>
               {/if}
-              {@render liveBar(it.live)}
+              {@render liveBar(it.live, it.status)}
             </div>
-            <Badge status={it.status} />
-            {#if it.status === 'queued' && can('downloads.grab')}
-              <button class="queue-item__x" title="Remove from queue" onclick={() => cancelQueued(it.id)}><Icon name="close" /></button>
-            {:else if it.status === 'failed' && can('downloads.grab')}
-              <button class="queue-item__x" title="Retry this download" onclick={() => retryOne(it.id)}><Icon name="refresh" /></button>
-            {:else if it.grab_id && ['grabbed', 'downloading'].includes(it.status) && can('downloads.grab')}
-              <!-- in-flight: cancel on the client too -->
-              <button class="queue-item__x" title="Cancel — removes the download from the client" onclick={() => cancelGrab(it.grab_id)}><Icon name="close" /></button>
-            {:else}
-              <span></span>
-            {/if}
+            <div class="qx__end">
+              <Badge status={it.status} />
+              {#if it.status === 'queued' && can('downloads.grab')}
+                <button class="qx__act" title="Remove from queue" onclick={() => cancelQueued(it.id)}><Icon name="close" size={15} /></button>
+              {:else if it.status === 'failed' && can('downloads.grab')}
+                <button class="qx__act" title="Retry this download" onclick={() => retryOne(it.id)}><Icon name="refresh" size={15} /></button>
+              {:else if it.grab_id && ['grabbed', 'downloading'].includes(it.status) && can('downloads.grab')}
+                <!-- in-flight: cancel on the client too -->
+                <button class="qx__act" title="Cancel — removes the download from the client" onclick={() => cancelGrab(it.grab_id)}><Icon name="close" size={15} /></button>
+              {/if}
+            </div>
           </div>
         {/each}
       </div>
