@@ -6,7 +6,7 @@ import fsp from 'node:fs/promises';
 import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
-import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
+import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
 import { resolveSeriesDir, defaultRootedDir } from './paths.js';
 import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
@@ -1156,6 +1156,13 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   app.post('/api/queue/clear', (req, res) => { res.json({ cleared: cancelQueued(db) }); });
 
   app.get('/api/collection', (req, res) => res.json(collectionSeries(db, { filter: req.query.filter, search: req.query.search, sort: req.query.sort, includeRestricted: canRestricted(req), userId: req.user.id, library: req.query.library ? Number(req.query.library) : null })));
+  // Per-filter counts for the library filter chips (independent of the active
+  // filter, so switching chips doesn't change the badges).
+  app.get('/api/collection/counts', (req, res) => res.json(collectionCounts(db, {
+    keys: ['all', 'incomplete', 'followed', 'unmonitored', 'problems', 'unmatched', 'manga'],
+    search: req.query.search, includeRestricted: canRestricted(req), userId: req.user.id,
+    library: req.query.library ? Number(req.query.library) : null,
+  })));
 
   // ---- Explicit libraries (named containers with a behavior type) ----
   // Viewing the list only needs library.view; mutations need library.manage

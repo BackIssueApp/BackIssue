@@ -785,17 +785,33 @@ export function collectionSeries(db, { filter = 'all', search = '', sort = 'titl
       latest: r.cv_latest, active: r.active, size: r.size_bytes,
     };
   })
-    .filter((r) => filter === 'incomplete' ? r.missing > 0
-      : filter === 'followed' ? !!r.followed
-      : filter === 'unmonitored' ? !r.monitored
-      : filter === 'problems' ? (r.untagged > 0 || r.corrupt > 0)
-      : filter === 'unmatched' ? !r.cv_id
-      // Library-type lanes. The comics lane means "not any other known type",
-      // so unknown/legacy values count as comics and are never silently hidden.
-      : filter === 'comics' ? !SERIES_TYPES.includes(r.type) || r.type === 'comic'
-      // Any whitelisted type (built-in or plugin-registered) is its own lane.
-      : SERIES_TYPES.includes(filter) ? r.type === filter
-      : true);
+    .filter((r) => seriesMatchesFilter(r, filter));
+}
+
+// Does a mapped collection row belong to a given filter chip? Shared by the
+// list query and the per-filter counts so the two can never disagree.
+export function seriesMatchesFilter(r, filter) {
+  return filter === 'incomplete' ? r.missing > 0
+    : filter === 'followed' ? !!r.followed
+    : filter === 'unmonitored' ? !r.monitored
+    : filter === 'problems' ? (r.untagged > 0 || r.corrupt > 0)
+    : filter === 'unmatched' ? !r.cv_id
+    // Library-type lanes. The comics lane means "not any other known type",
+    // so unknown/legacy values count as comics and are never silently hidden.
+    : filter === 'comics' ? !SERIES_TYPES.includes(r.type) || r.type === 'comic'
+    // Any whitelisted type (built-in or plugin-registered) is its own lane.
+    : SERIES_TYPES.includes(filter) ? r.type === filter
+    : true;
+}
+
+// Per-filter counts over the current search set (filter-independent), for the
+// filter-chip badges. Reuses collectionSeries with filter='all' — no extra
+// query shape to keep in sync — and tallies each chip in JS.
+export function collectionCounts(db, { keys = [], ...opts } = {}) {
+  const all = collectionSeries(db, { ...opts, filter: 'all' });
+  const counts = {};
+  for (const k of keys) counts[k] = k === 'all' ? all.length : all.filter((r) => seriesMatchesFilter(r, k)).length;
+  return counts;
 }
 
 export function seriesCollectionDetail(db, id, userId = null) {

@@ -6,7 +6,7 @@ import { apiGet, apiPost } from './api.js';
 import { subscribe } from './events.svelte.js';
 import { notify } from './toasts.svelte.js';
 
-export const rail = $state({ rows: [], filter: 'all', sort: 'title', search: '', library: null, selecting: false, loaded: false });
+export const rail = $state({ rows: [], counts: {}, filter: 'all', sort: 'title', search: '', library: null, selecting: false, loaded: false });
 // Shell chrome state (mobile sidebar overlay).
 export const ui = $state({ sidebarOpen: false });
 // Multi-select on the rail (series ids) — only meaningful while rail.selecting.
@@ -52,10 +52,14 @@ export async function loadFlags() {
 }
 
 export async function loadCollection() {
+  const scope = 'search=' + encodeURIComponent(rail.search) + (rail.library ? '&library=' + rail.library : '');
   try {
-    rail.rows = await apiGet('/api/collection?filter=' + rail.filter + '&search=' + encodeURIComponent(rail.search) + '&sort=' + rail.sort + (rail.library ? '&library=' + rail.library : ''));
+    rail.rows = await apiGet('/api/collection?filter=' + rail.filter + '&' + scope + '&sort=' + rail.sort);
     rail.loaded = true;
   } catch { /* keep the last good list */ }
+  // Filter-chip counts — independent of the active filter, so they don't change
+  // as you click chips. Best-effort; the chips just omit the badge on failure.
+  try { rail.counts = await apiGet('/api/collection/counts?' + scope); } catch { /* keep last */ }
 }
 
 // Open a series by id: fetch the ComicVine-authoritative detail and derive the

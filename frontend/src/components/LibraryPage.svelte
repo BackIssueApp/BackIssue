@@ -100,7 +100,7 @@
   // server's op state (ops store, fed by SSE).
   const cvBusy = $derived(!!ops.cv.running);
   const cvText = $derived(ops.cv.running
-    ? fmt(ops.cv.done || 0) + (ops.cv.total ? '/' + fmt(ops.cv.total) : '') + (ops.cv.matched != null ? ' (' + fmt(ops.cv.matched) + ' matched)' : '')
+    ? 'Matching… ' + fmt(ops.cv.done || 0) + (ops.cv.total ? '/' + fmt(ops.cv.total) : '')
     : 'Match ComicVine');
   let cvTitle = $state('Match owned & followed series to ComicVine');
   async function startCvMatch() {
@@ -123,13 +123,14 @@
   });
 
   const pct = (s) => (s.total ? Math.min(100, Math.round((s.owned / s.total) * 100)) : 0);
+  const isDone = (s) => s.total > 0 && s.missing === 0;
 
   /* ---- Virtualized posters & rows ----
      Same windowing as the volume page (see SeriesDetail): a big library must
      not render a card per series. Above the threshold, only the rows in view
      (+overscan) mount; spacers keep the scrollbar honest. */
   const VIRTUAL_MIN = 200;
-  let scroller = $state(null);   // .librarypage__scroll
+  let scroller = $state(null);
   let scrollTop = $state(0);
   let viewH = $state(800);
   let stride = $state(260);      // row height incl. gap, measured
@@ -151,7 +152,7 @@
   function measure() {
     if (!scroller) return;
     viewH = scroller.clientHeight || viewH;
-    const items = scroller.querySelectorAll(view === 'grid' ? '.poster' : '.series-row');
+    const items = scroller.querySelectorAll(view === 'grid' ? '.libx-card' : '.libx-row');
     if (items.length >= 2) {
       const top0 = items[0].offsetTop;
       let c = 1;
@@ -161,9 +162,7 @@
       const d = next.offsetTop - top0;
       if (d > 10) stride = d;
     }
-    // Offset of the grid/list from the scroll top — i.e. the home rail's height.
-    // (scroller is position:relative, so offsetTop is measured against it.)
-    const listEl = scroller.querySelector('.poster-grid, .series-list');
+    const listEl = scroller.querySelector('.libx-grid, .libx-list');
     listTop = listEl ? listEl.offsetTop : 0;
   }
   $effect(() => { void rail.rows; void view; measure(); });
@@ -190,146 +189,131 @@
   });
 </script>
 
-<section class="librarypage">
-  <div class="librarypage__bar">
-    <span class="librarypage__count">Library <span id="series-count">{rail.loaded ? fmt(rail.rows.length) : ''}</span></span>
-    <div class="coll-filters">
+<section class="librarypage libx">
+  <!-- toolbar: count · filters (with counts) · sort · view · actions -->
+  <div class="libx__bar">
+    <span class="libx__count">Library <span id="series-count">{rail.loaded ? fmt(rail.rows.length) : ''}</span></span>
+    <div class="libx__filters">
       {#each FILTERS as f (f.key)}
-        <button class="coll-chip" class:is-active={rail.filter === f.key} onclick={() => pickFilter(f.key)}>{f.label}</button>
+        {@const n = rail.counts?.[f.key]}
+        <button class="libx__chip" class:is-active={rail.filter === f.key} onclick={() => pickFilter(f.key)}>
+          {f.label}{#if n}<span class="libx__chip-count">{fmt(n)}</span>{/if}
+        </button>
       {/each}
     </div>
-    <select id="coll-sort" class="coll-sort" title="Sort the collection" value={rail.sort}
+    <div class="libx__spacer"></div>
+    <select id="coll-sort" class="libx__sort" title="Sort the collection" value={rail.sort}
       onchange={(e) => setQuery({ sort: e.currentTarget.value === 'title' ? null : e.currentTarget.value })}>
       <option value="title">A–Z</option>
       <option value="added">Recently added</option>
       <option value="missing">Most missing</option>
     </select>
-    <div class="viewtoggle" role="group" aria-label="View">
-      <button class="viewtoggle__btn" class:is-active={view === 'grid'} title="Poster grid" onclick={() => setView('grid')}><Icon name="grid" /></button>
-      <button class="viewtoggle__btn" class:is-active={view === 'list'} title="List" onclick={() => setView('list')}><Icon name="list" /></button>
+    <div class="libx__view" role="group" aria-label="View">
+      <button class="libx__viewbtn" class:is-active={view === 'grid'} title="Poster grid" onclick={() => setView('grid')}><Icon name="grid" size={15} /></button>
+      <button class="libx__viewbtn" class:is-active={view === 'list'} title="List" onclick={() => setView('list')}><Icon name="list" size={15} /></button>
     </div>
-    <span class="librarypage__actions">
-      {#if isTrusted()}
-        <button id="coll-select-btn" class="btn btn--ghost btn--sm" class:is-active={rail.selecting} title="Select multiple series for bulk actions" onclick={toggleSelecting}><Icon name="check-square" /> Select</button>
-        <button id="cvmatch-btn" class="btn btn--ghost btn--sm" title={cvTitle} disabled={cvBusy} onclick={startCvMatch}><Icon name="diamond" /> {cvText}</button>
-        <button id="add-series-btn" class="btn btn--primary btn--sm" onclick={() => openAddModal()}><Icon name="plus" /> Add</button>
-      {/if}
-    </span>
+    {#if isTrusted()}
+      <button id="coll-select-btn" class="libx__act" class:is-active={rail.selecting} title="Select multiple series for bulk actions" onclick={toggleSelecting}><Icon name="check-square" size={14} /> Select</button>
+      <button id="cvmatch-btn" class="libx__act" title={cvTitle} disabled={cvBusy} onclick={startCvMatch}><span class="libx__cvicon"><Icon name="diamond" size={14} /></span>{cvText}</button>
+      <button id="add-series-btn" class="libx__add" onclick={() => openAddModal()}><Icon name="plus" size={15} /> Add</button>
+    {/if}
   </div>
 
   {#if rail.selecting}
-    <div id="coll-bulkbar" class="coll-bulkbar">
-      <span id="coll-bulk-count" class="muted">{railSelect.size} selected</span>
-      <button class="link-btn" onclick={() => bulk('follow')}><Icon name="star" fill /> Follow</button>
-      <button class="link-btn" onclick={() => bulk('unfollow')}><Icon name="star" /> Unfollow</button>
-      <button class="link-btn" onclick={() => bulk('download-missing')}><Icon name="download" /> Missing</button>
+    <div id="coll-bulkbar" class="libx__bulk">
+      <span id="coll-bulk-count" class="libx__bulk-count">{railSelect.size} selected</span>
+      <button class="libx__link" onclick={() => bulk('follow')}><Icon name="star" fill size={14} /> Follow</button>
+      <button class="libx__link" onclick={() => bulk('unfollow')}><Icon name="star" size={14} /> Unfollow</button>
+      <button class="libx__link" onclick={() => bulk('download-missing')}><Icon name="download" size={14} /> Download missing</button>
       {#if (status.libraries || []).length}
-        <select class="coll-bulkbar__lib" title="Move the selected series into a library"
+        <select class="libx__movesel" title="Move the selected series into a library"
           onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v !== '') moveSelected(v === 'default' ? null : Number(v)); }}>
           <option value="">Move to…</option>
           {#each status.libraries as lib (lib.id)}<option value={lib.id}>{lib.name}</option>{/each}
         </select>
       {/if}
-      <button class="link-btn" onclick={() => bulk('remove')}>Remove</button>
+      <button class="libx__remove" onclick={() => bulk('remove')}>Remove</button>
     </div>
   {/if}
 
-  <div class="librarypage__scroll" id="series-list" bind:this={scroller} onscroll={onScroll}>
+  <div class="libx__scroll" id="series-list" bind:this={scroller} onscroll={onScroll}>
     <!-- Plugin home rail (reading shelves etc.) injects here — plain DOM, must
-         stay mounted. Inside the scroll so it scrolls away as you browse down;
-         its measured height feeds the virtual list's listTop so the windowing
-         stays aligned. Empty (0-height) until a plugin fills it. -->
+         stay mounted. Its measured height feeds the virtual list's listTop. -->
     <div id="home-plugin-rail" class="home-rail"></div>
     {#if rail.loaded && !rail.rows.length}
-      <div class="empty">
-        <div class="empty__art"><Icon name="star" /></div>
-        <div class="empty__title">{rail.search ? 'No matches' : 'Nothing here yet'}</div>
-        <div class="empty__text">{rail.search ? 'Try a different search or filter.'
-          : isTrusted() ? 'Click "+ Add" to add a series from ComicVine, or Import an existing library.'
+      <div class="libx__empty">
+        <div class="libx__empty-art"><Icon name="star" size={26} /></div>
+        <div class="libx__empty-title">{rail.search || rail.filter !== 'all' ? 'No matches' : 'Nothing here yet'}</div>
+        <div class="libx__empty-body">{rail.search || rail.filter !== 'all' ? 'Try a different search or filter.'
+          : isTrusted() ? 'Click Add to pull a series from ComicVine, or Import an existing library.'
           : 'Nothing here yet — a trusted user or admin can add series to the library.'}</div>
       </div>
     {:else if view === 'grid'}
-      <div class="poster-grid">
-        {#if range.padTop > 0}<div class="poster-grid__pad" style="height:{range.padTop}px"></div>{/if}
+      <div class="libx-grid">
+        {#if range.padTop > 0}<div class="libx-grid__pad" style="height:{range.padTop}px"></div>{/if}
         {#each rail.rows.slice(range.start, range.end) as s (s.id)}
-          <div class="poster" class:is-selected={rail.selecting && railSelect.has(s.id)}
-            onclick={() => open(s)} role="button" tabindex="0"
-            onkeydown={(e) => { if (e.key === 'Enter') open(s); }}>
-            <div class="poster__art">
+          <div class="libx-card" class:is-selected={rail.selecting && railSelect.has(s.id)}
+            onclick={() => open(s)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter') open(s); }}>
+            <div class="libx-card__art" class:is-unmatched={!s.matched}>
               <Cover coverUrl={s.matched ? s.cover_url : null} title={s.matched ? s.title : (s.folder || '?')} />
-              {#if rail.selecting}
-                <span class="poster__check" class:is-on={railSelect.has(s.id)}></span>
-              {/if}
-              {#if s.followed}<span class="poster__star" title="Followed"><Icon name="star" fill /></span>{/if}
-              {#if s.matched}
-                <div class="poster__bar"><div class="poster__fill" class:is-done={s.total > 0 && s.missing === 0} style="width:{pct(s)}%"></div></div>
-              {/if}
+              {#if rail.selecting}<span class="libx-card__check" class:is-on={railSelect.has(s.id)}>{#if railSelect.has(s.id)}<Icon name="check" size={14} />{/if}</span>{/if}
+              {#if s.followed}<span class="libx-card__star" title="Followed"><Icon name="star" fill size={15} /></span>{/if}
+              {#if !s.matched}<span class="libx-card__matchchip">match…</span>{/if}
+              {#if s.matched}<div class="libx-card__bar"><div class="libx-card__fill" class:is-done={isDone(s)} style="width:{pct(s)}%"></div></div>{/if}
             </div>
             {#if s.matched}
-              <div class="poster__title" title={s.title}>{s.title}{#if s.year}<span class="poster__year"> ({s.year})</span>{/if}</div>
-              <div class="poster__meta">
-                <span class="poster__count">{s.owned}/{s.total}</span>
-                {#if s.corrupt > 0}<span class="poster__flag poster__flag--bad" title="{fmt(s.corrupt)} corrupt file(s)">!</span>{/if}
-                {#if !s.sourced}<span class="poster__flag" title="No download source yet"><Icon name="no-source" /></span>{/if}
+              <div class="libx-card__title" title={s.title}>{s.title}{#if s.year}<span class="libx-card__year"> ({s.year})</span>{/if}</div>
+              <div class="libx-card__meta">
+                <span class="libx-card__count">{s.owned}/{s.total}</span>
+                {#if s.corrupt > 0}<span class="libx-card__flag libx-card__flag--bad" title="{fmt(s.corrupt)} corrupt file(s)">!</span>{/if}
+                {#if !s.sourced}<span class="libx-card__flag" title="No download source yet"><Icon name="no-source" size={13} /></span>{/if}
               </div>
             {:else}
-              <div class="poster__title poster__title--unmatched" title={s.folder}>{s.folder || 'Unidentified series'}</div>
-              <div class="poster__meta"><span class="poster__flag poster__flag--warn" title="Needs a ComicVine match">match…</span>
-                {#if s.files}<span class="poster__count">{fmt(s.files)} files</span>{/if}</div>
+              <div class="libx-card__title libx-card__title--unmatched" title={s.folder}>{s.folder || 'Unidentified series'}</div>
+              <div class="libx-card__meta">{#if s.files}<span class="libx-card__count">{fmt(s.files)} files</span>{/if}</div>
             {/if}
           </div>
         {/each}
-        {#if range.padBottom > 0}<div class="poster-grid__pad" style="height:{range.padBottom}px"></div>{/if}
+        {#if range.padBottom > 0}<div class="libx-grid__pad" style="height:{range.padBottom}px"></div>{/if}
       </div>
     {:else}
-      <div class="series-list">
-        <div class="series-head">
-          <span></span><span>Title</span><span class="series-col--wide">Progress</span>
-          <span class="series-col--wide">Latest issue</span><span class="series-col--wide">Size</span><span></span>
+      <div class="libx-list">
+        <div class="libx-list__head">
+          <span></span><span>Title</span><span>Progress</span>
+          <span class="libx-col--wide">Latest</span><span class="libx-col--wide libx-col--right">Size</span><span></span>
         </div>
         {#if range.padTop > 0}<div style="height:{range.padTop}px"></div>{/if}
         {#each rail.rows.slice(range.start, range.end) as s (s.id)}
-          <div class="series-row"
-            class:is-selected={rail.selecting && railSelect.has(s.id)}
-            onclick={() => open(s)} role="button" tabindex="0"
-            onkeydown={(e) => { if (e.key === 'Enter') open(s); }}>
-            {#if !s.matched}
-              <Cover coverUrl={null} title={s.folder || 'Unidentified series'} />
-              <div class="series-row__main">
-                <div class="series-row__title series-row__title--unmatched">{s.folder || 'Unidentified series'}</div>
-                <div class="coll-meta">
-                  <span class="coll-badge coll-badge--nomatch">needs ComicVine match</span>
-                  {#if s.files}<span class="coll-count">{fmt(s.files)} files</span>{/if}
-                </div>
+          <div class="libx-row" class:is-selected={rail.selecting && railSelect.has(s.id)}
+            onclick={() => open(s)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter') open(s); }}>
+            <Cover coverUrl={s.matched ? s.cover_url : null} title={s.matched ? s.title : (s.folder || 'Unidentified series')} />
+            <div class="libx-row__main">
+              <div class="libx-row__title" class:is-unmatched={!s.matched}>{s.matched ? s.title : (s.folder || 'Unidentified series')}{#if s.matched && s.year}<span class="libx-row__year"> ({s.year})</span>{/if}</div>
+              <div class="libx-row__badges">
+                {#if !s.matched}
+                  <span class="libx-badge libx-badge--warn">needs match</span>
+                  {#if s.files}<span class="libx-row__pub">{fmt(s.files)} files</span>{/if}
+                {:else}
+                  {#if s.publisher}<span class="libx-row__pub">{s.publisher}</span>{/if}
+                  {#if s.active > 0}<span class="libx-badge libx-badge--busy">{fmt(s.active)} downloading</span>{/if}
+                  {#if s.missing > 0}<span class="libx-badge libx-badge--miss">{fmt(s.missing)} missing</span>
+                  {:else if s.total > 0}<span class="libx-badge libx-badge--ok">complete</span>{/if}
+                  {#if s.untagged > 0}<span class="libx-badge libx-badge--plain">{fmt(s.untagged)} untagged</span>{/if}
+                  {#if s.corrupt > 0}<span class="libx-badge libx-badge--warn">{fmt(s.corrupt)} corrupt</span>{/if}
+                  {#if !s.sourced}<span class="libx-badge libx-badge--nosrc">no source</span>{/if}
+                  {#if s.restricted}<span class="libx-badge libx-badge--plain" title="Mature — hidden from roles without “View mature content”">mature</span>{/if}
+                {/if}
               </div>
-              <span class="series-col--wide"></span>
-              <span class="series-row__dim series-col--wide">—</span>
-              <span class="series-row__dim series-col--wide">{s.size ? humanBytes(s.size) : '—'}</span>
-            {:else}
-              <Cover coverUrl={s.cover_url} title={s.title} />
-              <div class="series-row__main">
-                <div class="series-row__title">{s.title}{#if s.year}<span class="series-row__year"> ({s.year})</span>{/if}</div>
-                <div class="coll-meta">
-                  {#if s.publisher}<span class="series-row__pub">{s.publisher}</span>{/if}
-                  {#if s.active > 0}<span class="coll-badge coll-badge--busy" title="{fmt(s.active)} issue(s) queued or downloading"><Icon name="download-active" /> {fmt(s.active)}</span>{/if}
-                  {#if s.missing > 0}<span class="coll-badge coll-badge--miss">{fmt(s.missing)} missing</span>
-                  {:else if s.total > 0}<span class="coll-badge coll-badge--ok">complete</span>{/if}
-                  {#if s.untagged > 0}<span class="coll-badge">{fmt(s.untagged)} untagged</span>{/if}
-                  {#if s.corrupt > 0}<span class="coll-badge coll-badge--warn">{fmt(s.corrupt)} corrupt</span>{/if}
-                  {#if !s.sourced}<span class="coll-badge coll-badge--nosrc" title="No download source yet">no source</span>{/if}
-                  {#if s.restricted}<span class="coll-badge coll-badge--warn" title="Mature — hidden from roles without “View mature content”"><Icon name="shield" /></span>{/if}
-                </div>
-              </div>
-              <div class="series-row__progress series-col--wide" title="{s.owned} of {s.total} issues on disk">
-                <span class="series-row__nums">{s.owned}/{s.total}</span>
-                <span class="series-row__bar"><span class:is-done={s.total > 0 && s.missing === 0} style="width:{pct(s)}%"></span></span>
-              </div>
-              <span class="series-row__dim series-col--wide" title="Newest known issue's cover date">{s.latest || '—'}</span>
-              <span class="series-row__dim series-col--wide">{s.size ? humanBytes(s.size) : '—'}</span>
-            {/if}
+            </div>
+            <div class="libx-row__progress">
+              <span class="libx-row__nums">{s.matched ? `${s.owned}/${s.total}` : (s.files ? `${fmt(s.files)} files` : '—')}</span>
+              {#if s.matched}<span class="libx-row__track"><span class="libx-row__fill" class:is-done={isDone(s)} style="width:{pct(s)}%"></span></span>{/if}
+            </div>
+            <span class="libx-row__dim libx-col--wide" title="Newest known issue's cover date">{s.matched ? (s.latest || '—') : '—'}</span>
+            <span class="libx-row__dim libx-col--wide libx-col--right">{s.size ? humanBytes(s.size) : '—'}</span>
             {#if isTrusted()}
-              <button class="coll-mon" class:is-on={s.followed} title={s.followed ? 'Followed — click to unfollow' : 'Not followed — click to follow'} aria-label={s.followed ? 'Unfollow' : 'Follow'} onclick={(e) => { e.stopPropagation(); toggleMon(s); }}><Icon name="star" fill={!!s.followed} /></button>
-            {/if}
+              <button class="libx-row__star" class:is-on={s.followed} title={s.followed ? 'Followed — click to unfollow' : 'Not followed — click to follow'} aria-label={s.followed ? 'Unfollow' : 'Follow'} onclick={(e) => { e.stopPropagation(); toggleMon(s); }}><Icon name="star" fill={!!s.followed} size={15} /></button>
+            {:else}<span></span>{/if}
           </div>
         {/each}
         {#if range.padBottom > 0}<div style="height:{range.padBottom}px"></div>{/if}
@@ -337,3 +321,102 @@
     {/if}
   </div>
 </section>
+
+<style>
+  .libx { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  .libx__bar { display: flex; align-items: center; gap: 8px; padding: 11px 18px; border-bottom: 1px solid var(--line); flex: none; overflow-x: auto; scrollbar-width: none; }
+  .libx__bar::-webkit-scrollbar { display: none; }
+  .libx__count { font: 13px var(--font-mono); color: var(--faint); white-space: nowrap; flex: none; }
+  .libx__count span { color: var(--text); }
+  .libx__filters { display: flex; align-items: center; gap: 6px; flex: none; }
+  .libx__chip { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--muted); font: 600 12.5px var(--font-body); cursor: pointer; white-space: nowrap; flex: none; }
+  .libx__chip.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .libx__chip-count { font: 600 10.5px var(--font-mono); background: var(--panel-2); color: var(--faint); border-radius: 999px; padding: 1px 6px; }
+  .libx__chip.is-active .libx__chip-count { background: rgba(255,255,255,.2); color: #fff; }
+  .libx__spacer { flex: 1; min-width: 8px; }
+  .libx__sort { height: 32px; padding: 0 10px; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; color: var(--text); font: 12.5px var(--font-body); flex: none; }
+  .libx__sort:focus { outline: none; border-color: var(--accent); }
+  .libx__view { display: flex; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 2px; flex: none; }
+  .libx__viewbtn { width: 30px; height: 28px; display: grid; place-items: center; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: var(--faint); }
+  .libx__viewbtn.is-active { background: var(--panel-2); color: var(--text); }
+  .libx__act { height: 36px; padding: 0 13px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 8px; font: 600 12.5px var(--font-body); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; flex: none; }
+  .libx__act.is-active { border-color: var(--accent); background: rgba(255,45,111,.1); color: var(--accent); }
+  .libx__act:disabled { opacity: .7; cursor: default; }
+  .libx__cvicon { display: flex; color: var(--cyan); }
+  .libx__add { height: 36px; padding: 0 15px; border: none; background: var(--accent); color: #fff; border-radius: 8px; font: 600 13px var(--font-body); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; flex: none; }
+
+  .libx__bulk { display: flex; align-items: center; gap: 14px; padding: 10px 18px; border-bottom: 1px solid var(--line); background: rgba(255,45,111,.06); flex: none; flex-wrap: wrap; }
+  .libx__bulk-count { font: 600 12.5px var(--font-body); color: var(--text); }
+  .libx__link { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; color: #c4bdd4; font: 600 12.5px var(--font-body); cursor: pointer; }
+  .libx__link:hover { color: var(--text); }
+  .libx__movesel { height: 30px; padding: 0 9px; background: var(--ink); border: 1px solid var(--line); border-radius: 7px; color: var(--muted); font: 12.5px var(--font-body); }
+  .libx__remove { margin-left: auto; height: 30px; padding: 0 13px; border: 1px solid rgba(255,90,82,.3); background: transparent; color: var(--red); border-radius: 7px; font: 600 12px var(--font-body); cursor: pointer; }
+
+  .libx__scroll { flex: 1; overflow-y: auto; padding: 18px; position: relative; }
+
+  /* grid */
+  .libx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 18px; }
+  .libx-grid__pad { grid-column: 1 / -1; }
+  .libx-card { cursor: pointer; position: relative; }
+  .libx-card__art { aspect-ratio: 2/3; border-radius: 9px; position: relative; overflow: hidden; border: 1px solid var(--line); }
+  .libx-card.is-selected .libx-card__art { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 1px; }
+  .libx-card__art.is-unmatched { border-color: rgba(255,194,75,.4); }
+  .libx-card__art :global(.cover) { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; }
+  .libx-card__check { position: absolute; top: 7px; left: 7px; z-index: 3; width: 22px; height: 22px; border-radius: 6px; border: 2px solid rgba(255,255,255,.7); background: rgba(0,0,0,.35); display: grid; place-items: center; color: #fff; }
+  .libx-card__check.is-on { border-color: var(--accent); background: var(--accent); }
+  .libx-card__star { position: absolute; top: 7px; right: 7px; z-index: 3; color: var(--amber); filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); display: flex; }
+  .libx-card__matchchip { position: absolute; left: 7px; bottom: 12px; z-index: 3; font: 600 10px var(--font-body); text-transform: uppercase; letter-spacing: .04em; color: var(--ink); background: var(--amber); border-radius: 5px; padding: 3px 7px; }
+  .libx-card__bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; height: 5px; background: rgba(0,0,0,.5); }
+  .libx-card__fill { height: 100%; background: var(--accent); }
+  .libx-card__fill.is-done { background: var(--green); }
+  .libx-card__title { font-size: 12.5px; font-weight: 600; margin-top: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .libx-card__title--unmatched { color: var(--faint); }
+  .libx-card__year { color: var(--faint); font-weight: 400; }
+  .libx-card__meta { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+  .libx-card__count { font: 11px var(--font-mono); color: var(--faint); }
+  .libx-card__flag { display: flex; align-items: center; color: var(--faint); }
+  .libx-card__flag--bad { width: 15px; height: 15px; border-radius: 4px; background: rgba(255,90,82,.15); color: var(--red); font: 700 10px var(--font-body); display: grid; place-items: center; }
+
+  /* list */
+  .libx-list { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,.012); }
+  .libx-list__head, .libx-row { display: grid; grid-template-columns: 46px minmax(160px, 1.8fr) 150px 90px 80px 40px; align-items: center; gap: 12px; padding: 9px 14px; }
+  .libx-list__head { border-bottom: 1px solid var(--line); font: 600 10.5px var(--font-body); text-transform: uppercase; letter-spacing: .06em; color: var(--faint); background: rgba(255,255,255,.02); }
+  .libx-col--right { text-align: right; }
+  .libx-row { border-bottom: 1px solid #2a2536; cursor: pointer; }
+  .libx-row:last-child { border-bottom: none; }
+  .libx-row.is-selected { background: rgba(255,45,111,.08); }
+  .libx-row :global(.cover) { width: 38px; height: 52px; }
+  .libx-row__main { min-width: 0; }
+  .libx-row__title { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .libx-row__title.is-unmatched { color: var(--faint); }
+  .libx-row__year { color: var(--faint); font-weight: 400; }
+  .libx-row__badges { display: flex; align-items: center; gap: 7px; margin-top: 4px; flex-wrap: wrap; }
+  .libx-row__pub { font-size: 11.5px; color: var(--faint); }
+  .libx-row__progress { min-width: 0; }
+  .libx-row__nums { font: 11px var(--font-mono); color: var(--muted); display: block; margin-bottom: 4px; }
+  .libx-row__track { display: block; height: 5px; border-radius: 5px; background: var(--ink); overflow: hidden; max-width: 130px; }
+  .libx-row__fill { display: block; height: 100%; background: var(--accent); }
+  .libx-row__fill.is-done { background: var(--green); }
+  .libx-row__dim { font: 12px var(--font-mono); color: var(--faint); }
+  .libx-row__star { width: 30px; height: 30px; display: grid; place-items: center; background: none; border: none; color: #4a4458; cursor: pointer; }
+  .libx-row__star.is-on { color: var(--amber); }
+
+  .libx-badge { font: 600 10.5px var(--font-body); border-radius: 5px; padding: 2px 7px; white-space: nowrap; border: 1px solid transparent; }
+  .libx-badge--busy { color: var(--cyan); background: rgba(43,212,217,.1); border-color: rgba(43,212,217,.3); }
+  .libx-badge--miss { color: var(--amber); background: rgba(255,194,75,.1); border-color: rgba(255,194,75,.3); }
+  .libx-badge--ok { color: var(--green); background: rgba(95,211,138,.1); border-color: rgba(95,211,138,.3); }
+  .libx-badge--warn { color: var(--red); background: rgba(255,90,82,.1); border-color: rgba(255,90,82,.3); }
+  .libx-badge--nosrc { color: var(--muted); background: rgba(255,255,255,.04); border-color: var(--line); }
+  .libx-badge--plain { color: #c4bdd4; background: var(--panel-2); }
+
+  .libx__empty { border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.015); padding: 60px 24px; text-align: center; max-width: 460px; margin: 24px auto; }
+  .libx__empty-art { width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 15px; background: var(--panel-2); display: grid; place-items: center; color: var(--faint); }
+  .libx__empty-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .libx__empty-body { font-size: 13px; color: var(--faint); margin: 0 auto; max-width: 320px; line-height: 1.6; }
+
+  @media (max-width: 760px) {
+    .libx-grid { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 14px; }
+    .libx-list__head, .libx-row { grid-template-columns: 46px 1fr auto 40px; }
+    .libx-col--wide { display: none; }
+  }
+</style>
