@@ -31,10 +31,10 @@
   // Per-row live progress. Works for both immediate downloads (page/byte
   // stream, from state.queue.live) and deferred grabs (percent + seeders,
   // from the download monitor). Returns { pct, label, meta } for the bar.
-  const PHASE = { searching: 'Searching', starting: 'Starting', grabbed: 'Sent', queued: 'Queued', downloading: 'Downloading', done: 'Importing', tagging: 'Tagging', saving: 'Saving' };
+  const PHASE = { searching: 'Searching', starting: 'Starting', connecting: 'Connecting', solving: 'Solving challenge', grabbed: 'Sent', queued: 'Queued', downloading: 'Downloading', done: 'Importing', tagging: 'Tagging', saving: 'Saving' };
   // Phases with no measurable progress yet — show a label + a pulsing bar,
   // never a misleading "0%".
-  const INDETERMINATE = new Set(['searching', 'starting', 'grabbed', 'queued']);
+  const INDETERMINATE = new Set(['searching', 'starting', 'connecting', 'solving', 'grabbed', 'queued']);
   function liveInfo(live) {
     const bytes = live.unit === 'bytes';
     const hasPages = (live.pages || 0) > 0;
@@ -44,7 +44,9 @@
     const indeterminate = INDETERMINATE.has(live.phase) && !hasPages && live.progress == null;
     let meta = '';
     if (indeterminate) {
-      meta = live.phase === 'searching' ? (live.source ? 'looking for a match…' : 'looking for a source…') : '';
+      meta = live.phase === 'searching' ? (live.source ? 'looking for a match…' : 'looking for a source…')
+        : live.phase === 'solving' ? `getting past ${live.detail || 'the host'}'s protection…`
+        : live.phase === 'connecting' ? (live.detail ? `contacting ${live.detail}…` : '') : '';
     } else if (bytes) {
       const size = hasPages ? `${humanBytes(live.page || 0)} / ${humanBytes(live.pages)}` : humanBytes(live.page || 0);
       meta = size + (live.bps ? ` · ${humanBytes(live.bps)}/s` : '') + (hasPages ? ` · ${pct}%` : '');

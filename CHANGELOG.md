@@ -22,7 +22,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 - **Queue rows name their source.** The live progress line carries a source
   badge (and, for in-app downloads, the mirror the bytes come from — e.g.
   "via PixelDrain"), so you can see at a glance which source is serving each
-  download while it runs.
+  download while it runs. A slow pre-download step (connecting, or getting past
+  a host's bot protection) shows a live "Connecting…" / "Solving challenge…"
+  phase with a pulsing bar instead of a stuck "Downloading · 0 B".
 
 ### Fixed
 - **Downloaded issues can be multi-selected.** The series-page checkboxes
