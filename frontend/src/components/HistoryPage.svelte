@@ -207,7 +207,9 @@
 </main>
 
 <style>
-  .histx { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  /* Layout comes from the route reveal rule `body.history .history-page`;
+     setting display here would override the `.scan-page` hide. */
+  .histx { min-height: 0; }
   .histx__top { flex: none; padding: 16px 22px 0; }
   .histx__head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .histx__iconbtn { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 8px; cursor: pointer; }
@@ -237,7 +239,7 @@
   .histx__chip--fail.is-active { background: rgba(255,90,82,.12); border-color: var(--red); color: var(--red); }
   .histx__chip--block.is-active { background: rgba(255,194,75,.12); border-color: var(--amber); color: var(--amber); }
 
-  .histx__scroll { flex: 1; overflow-y: auto; padding: 6px 22px 60px; }
+  .histx__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 22px 60px; }
   .histx__inner { max-width: 900px; margin: 0 auto; }
   .histx__day { position: sticky; top: 0; z-index: 2; background: var(--ink); padding: 14px 2px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #6f6885; }
   .histx__row { display: flex; align-items: center; gap: 13px; padding: 10px 12px; border-radius: 9px; }

@@ -211,7 +211,11 @@
 </main>
 
 <style>
-  .wx { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  /* Layout (display:flex, column, height:100%) comes from the route reveal
+     rule `body.wanted .wanted-page` — the page must NOT set its own display
+     here or it overrides the `.scan-page { display:none }` hide and shows on
+     every route. */
+  .wx { min-height: 0; }
   .wx__top { flex: none; padding: 16px 22px 0; }
   .wx__head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .wx__iconbtn { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 8px; cursor: pointer; }
@@ -238,7 +242,7 @@
   .wx__chip.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .wx__chip--hide.is-active { background: rgba(255,194,75,.12); border-color: var(--amber); color: var(--amber); }
 
-  .wx__scroll { flex: 1; overflow-y: auto; padding: 14px 22px 60px; }
+  .wx__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 22px 60px; }
   .wx__inner { max-width: 900px; margin: 0 auto; }
 
   .wx__card { border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.012); margin-bottom: 14px; overflow: hidden; }

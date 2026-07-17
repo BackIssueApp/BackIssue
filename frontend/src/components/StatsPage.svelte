@@ -173,7 +173,9 @@
 </main>
 
 <style>
-  .statx { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  /* Layout comes from the route reveal rule `body.stats .stats-page`; setting
+     display here would override the `.scan-page` hide and show on every route. */
+  .statx { min-height: 0; }
   .statx__head { display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--line); flex: none; flex-wrap: wrap; }
   .statx__iconbtn { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 8px; cursor: pointer; }
   .statx__iconbtn:hover { color: var(--text); }
@@ -181,7 +183,7 @@
   .statx__summary { font: 12px var(--font-mono); color: var(--faint); }
   .statx__refresh { margin-left: auto; height: 36px; padding: 0 15px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 8px; font: 600 13px var(--font-body); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
   .statx__refresh:hover { color: var(--text); }
-  .statx__scroll { flex: 1; overflow-y: auto; padding: 22px 24px 60px; }
+  .statx__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 24px 60px; }
   .statx__inner { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
   .statx__note { padding: 40px; text-align: center; color: var(--faint); }
 
