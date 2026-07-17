@@ -8,12 +8,19 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Changed
+- **The CBR→CBZ conversion ceiling now scales to your host's memory** instead of
+  a fixed 400MB. A big server converts (and tags) much larger collected editions,
+  while a small or memory-limited container gets a safer, lower ceiling — it reads
+  a container's memory limit (cgroup) rather than the host's total RAM, and stays
+  clear of the unrar engine's own limits. Roughly a 1GB ceiling on a 32GB box, the
+  historical ~400MB on 8GB. Override it with the `MAX_RAR_MB` environment variable.
+
 ### Fixed
 - **Oversized CBR downloads no longer fail.** A collected edition delivered as
-  a RAR too large to repack in memory (the WASM-heap ceiling, ~400MB+) used to
-  error out with "too large to convert safely"; it's now filed as-is as a
-  `.cbr` — readable natively — instead of being lost. Smaller CBRs still
-  convert to tagged CBZ as before.
+  a RAR too large to repack in memory used to error out with "too large to
+  convert safely"; it's now filed as-is as a `.cbr` — readable natively —
+  instead of being lost. Smaller CBRs still convert to tagged CBZ as before.
 
 ## [0.7.1] — 2026-07-17
 

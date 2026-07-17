@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import os from 'node:os';
 import yauzl from 'yauzl';
 import { load } from 'cheerio';
 import { createExtractorFromData } from 'node-unrar-js';
@@ -24,9 +25,27 @@ const toArrayBuffer = (buf) =>
 //     regardless of the caller's concurrency, so a folder of large .cbr files
 //     can't multiply into gigabytes.
 //  2. A hard ceiling — above this a single file could exceed the WASM heap on
-//     its own, so we skip inspection and just treat it as present.
-const MAX_RAR_BYTES = 400 * 1024 * 1024;
+//     its own, so we skip conversion and file it as-is (readable .cbr, untagged).
 const MAX_RAR_CONCURRENT = 2;
+
+// The conversion ceiling scales to what the host can spare rather than a fixed
+// 400MB, so a big box converts large collected editions while a small container
+// stays safe. Peak RSS during a repack is several× the archive size (it's copied
+// into the unrar WASM heap, decompressed in memory, then rebuilt as a zip). We
+// budget ~5% of memory — which keeps the historical ~400MB on a typical 8GB host
+// — preferring a container's cgroup limit over the host's total RAM, and clamp
+// well under the WASM 32-bit address-space limit (peak is ~2× the archive, so a
+// ~1GB ceiling stays clear of 4GB). Set MAX_RAR_MB to override.
+function computeMaxRarBytes() {
+  const envMb = Number(process.env.MAX_RAR_MB);
+  if (Number.isFinite(envMb) && envMb > 0) return Math.round(envMb * 1024 * 1024);
+  const constrained = typeof process.constrainedMemory === 'function' ? process.constrainedMemory() : 0;
+  const budget = (Number.isFinite(constrained) && constrained > 0) ? constrained : os.totalmem();
+  const FLOOR = 128 * 1024 * 1024, CEILING = 1024 * 1024 * 1024;
+  return Math.max(FLOOR, Math.min(CEILING, Math.round(budget * 0.05)));
+}
+const MAX_RAR_BYTES = computeMaxRarBytes();
+const MAX_RAR_MB = Math.round(MAX_RAR_BYTES / 1024 / 1024);
 let rarActive = 0;
 const rarQueue = [];
 // Run fn while holding one of MAX_RAR_CONCURRENT slots; queues if none free.
@@ -162,7 +181,7 @@ export async function readArchiveInfo(path) {
 // ~zero gain), and runs inside the RAR concurrency gate with the size ceiling so
 // concurrent conversions can't multiply into an uncatchable OOM.
 export async function cbrBufferToCbz(buffer) {
-  if (buffer.byteLength > MAX_RAR_BYTES) throw new Error(`too large to convert safely (${Math.round(buffer.byteLength / 1024 / 1024)}MB)`);
+  if (buffer.byteLength > MAX_RAR_BYTES) throw new Error(`too large to convert safely (${Math.round(buffer.byteLength / 1024 / 1024)}MB > ${MAX_RAR_MB}MB ceiling — raise it with MAX_RAR_MB)`);
   return withRarSlot(async () => {
     const extractor = await createExtractorFromData({ data: toArrayBuffer(buffer) });
     const zip = new JSZip();
@@ -203,7 +222,7 @@ export async function convertCbrToCbz(path) {
 // into memory just to have cbrBufferToCbz reject it.
 async function assertRarConvertible(p) {
   const size = await fs.stat(p).then((s) => s.size).catch(() => 0);
-  if (size > MAX_RAR_BYTES) throw new Error(`too large to convert safely (${Math.round(size / 1024 / 1024)}MB)`);
+  if (size > MAX_RAR_BYTES) throw new Error(`too large to convert safely (${Math.round(size / 1024 / 1024)}MB > ${MAX_RAR_MB}MB ceiling — raise it with MAX_RAR_MB)`);
 }
 
 export async function repackRarAsZip(path) {
