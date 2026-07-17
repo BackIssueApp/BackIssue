@@ -34,14 +34,15 @@ const MAX_RAR_CONCURRENT = 2;
 // into the unrar WASM heap, decompressed in memory, then rebuilt as a zip). We
 // budget ~5% of memory — which keeps the historical ~400MB on a typical 8GB host
 // — preferring a container's cgroup limit over the host's total RAM, and clamp
-// well under the WASM 32-bit address-space limit (peak is ~2× the archive, so a
-// ~1GB ceiling stays clear of 4GB). Set MAX_RAR_MB to override.
+// to [400MB, 1GB]: never below the proven 400MB baseline, and well under the WASM
+// 32-bit address-space limit (peak is ~2× the archive, so a ~1GB ceiling stays
+// clear of 4GB). Set MAX_RAR_MB to override.
 function computeMaxRarBytes() {
   const envMb = Number(process.env.MAX_RAR_MB);
   if (Number.isFinite(envMb) && envMb > 0) return Math.round(envMb * 1024 * 1024);
   const constrained = typeof process.constrainedMemory === 'function' ? process.constrainedMemory() : 0;
   const budget = (Number.isFinite(constrained) && constrained > 0) ? constrained : os.totalmem();
-  const FLOOR = 128 * 1024 * 1024, CEILING = 1024 * 1024 * 1024;
+  const FLOOR = 400 * 1024 * 1024, CEILING = 1024 * 1024 * 1024;
   return Math.max(FLOOR, Math.min(CEILING, Math.round(budget * 0.05)));
 }
 const MAX_RAR_BYTES = computeMaxRarBytes();
