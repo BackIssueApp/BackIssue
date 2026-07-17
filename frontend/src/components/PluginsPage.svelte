@@ -153,9 +153,21 @@
   const catCount = (id) => id === 'all' ? pool.length : pool.filter((x) => categoryOf(x) === id).length;
 
   const installedVis = $derived(plugins.filter(flt));
-  const catalogVis = $derived(catalog.filter(flt));
+  // Available lists only what ISN'T installed — an installed plugin lives in
+  // the Installed section (its available-update, if any, surfaces there).
+  const catalogVis = $derived(catalog.filter((c) => !c.installed).filter(flt));
   const isEmpty = $derived(loaded && !installedVis.length && !catalogVis.length);
   const nRunning = $derived(plugins.filter((p) => p.loaded).length);
+
+  // Match an installed plugin to its catalog entry (by name) so an available
+  // update can be offered right on the Installed card.
+  const catalogByName = $derived(new Map(catalog.map((c) => [String(c.name).toLowerCase(), c])));
+  const updateFor = (p) => { const c = catalogByName.get(String(p.name).toLowerCase()); return c?.updateAvailable ? c : null; };
+
+  // Configure deep-links to the settings tab a plugin's category maps to (its
+  // settings mount lives there) rather than dumping the user on the overview.
+  const SETTINGS_TAB = { notifications: 'notifications', auth: 'signin', sources: 'sources', metadata: 'metadata', utility: 'library' };
+  const settingsTabFor = (p) => SETTINGS_TAB[categoryOf(p)] || 'overview';
 
   // Restart the app and wait for it to come back, then re-read the catalog so
   // the restart banner and per-card chips settle.
@@ -231,6 +243,7 @@
             {@const cm = CAT_META[categoryOf(p)]}
             {@const st = statusOf(p)}
             {@const caps = capsOf(p)}
+            {@const upd = updateFor(p)}
             <div class="plx__card" class:is-off={!p.enabled} class:is-failed={!!p.error}>
               <div class="plx__card-head">
                 <div class="plx__ico" style="background:color-mix(in srgb, {cm.tone} 14%, transparent); color:{cm.tone};"><Icon name={cm.icon} size={20} /></div>
@@ -254,9 +267,14 @@
                   <span class="switch switch--sm"><input type="checkbox" checked={p.enabled} onchange={() => toggle(p)} /><span class="switch__track"></span></span>
                   <span class="plx__toggle-label">{p.enabled ? 'Enabled' : 'Disabled'}</span>
                 </label>
-                {#if p.counts?.settings && !p.error}
-                  <button class="plx__configure" onclick={() => navigate('/settings')}>Configure</button>
-                {/if}
+                <div class="plx__foot-actions">
+                  {#if upd}
+                    <button class="plx__install plx__install--sm" disabled={busy[upd.id]} onclick={() => install(upd)}>{busy[upd.id] ? '…' : `Update → v${upd.version}`}</button>
+                  {/if}
+                  {#if p.counts?.settings && !p.error}
+                    <button class="plx__configure" onclick={() => navigate('/settings?tab=' + settingsTabFor(p))}>Configure</button>
+                  {/if}
+                </div>
               </div>
             </div>
           {/each}
@@ -367,8 +385,10 @@
   .plx__card-foot { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
   .plx__toggle { display: flex; align-items: center; gap: 9px; cursor: pointer; }
   .plx__toggle-label { font-size: 12.5px; color: var(--muted); }
-  .plx__configure { margin-left: auto; height: 30px; padding: 0 12px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 7px; font: 600 12px var(--font-body); cursor: pointer; }
+  .plx__foot-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .plx__configure { height: 30px; padding: 0 12px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 7px; font: 600 12px var(--font-body); cursor: pointer; }
   .plx__configure:hover { color: var(--text); border-color: var(--muted); }
+  .plx__install--sm { height: 30px; padding: 0 12px; font-size: 12px; }
 
   .plx__card-actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
   .plx__install { height: 34px; padding: 0 16px; border: none; background: var(--accent); color: #fff; border-radius: 8px; font: 600 12.5px var(--font-body); cursor: pointer; }

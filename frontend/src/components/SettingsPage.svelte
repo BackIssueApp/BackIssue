@@ -1,5 +1,6 @@
 <script>
-  import { goBack, navigate } from '../lib/router.svelte.js';
+  import { untrack } from 'svelte';
+  import { goBack, navigate, route } from '../lib/router.svelte.js';
   import { apiGet, apiPost, apiDelete } from '../lib/api.js';
   import { flags } from '../lib/store.svelte.js';
   import { BackIssue, plugins, bridgeRefs } from '../lib/plugins.svelte.js';
@@ -304,6 +305,15 @@
       dirtySections = new Set(dirtySections).add(page.dataset.tab);
     }
   }
+
+  // Deep-link: /settings?tab=notifications opens that tab (e.g. a plugin's
+  // Configure button). Runs when the page activates or the ?tab= changes; a
+  // manual tab click doesn't touch the URL, so it isn't overridden.
+  $effect(() => {
+    if (!active) return;
+    const want = new URLSearchParams(route.search).get('tab');
+    if (want && TABS.some((t) => t.id === want)) untrack(() => pickTab(want));
+  });
 
   // Load when opened — and again when plugin assets finish loading. Never
   // reload over unsaved edits.
