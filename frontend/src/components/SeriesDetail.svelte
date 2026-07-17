@@ -224,6 +224,33 @@
     return out;
   });
 
+  // Hero completion overview: a per-state breakdown of the issue list for the
+  // segmented progress bar + legend. Derived from issueState, same source of
+  // truth as the badges and filters.
+  const IN_FLIGHT = ['downloading', 'queued', 'grabbed', 'tagging', 'sent'];
+  const hero = $derived.by(() => {
+    const c = { saved: 0, untagged: 0, downloading: 0, failed: 0, corrupt: 0, missing: 0 };
+    for (const i of issues) {
+      const st = issueState(i);
+      if (st === 'done') c.saved++;
+      else if (st === 'untagged') c.untagged++;
+      else if (st === 'corrupt') c.corrupt++;
+      else if (st === 'failed') c.failed++;
+      else if (IN_FLIGHT.includes(st)) c.downloading++;
+      else c.missing++;
+    }
+    const total = issues.length;
+    const owned = c.saved + c.untagged;
+    return { ...c, total, owned, pct: total ? Math.round((owned / total) * 100) : 0,
+      ownedW: total ? (owned / total) * 100 : 0, dlW: total ? (c.downloading / total) * 100 : 0 };
+  });
+  // Live per-filter counts for the issue filter tabs.
+  const filterCounts = $derived.by(() => {
+    const c = {};
+    for (const f of FILTERS) c[f] = issues.filter((i) => issueMatchesFilter(issueState(i), f)).length;
+    return c;
+  });
+
   /* ---- Header actions ---- */
   let refreshBusy = $state(false);
   // Refresh pulls the volume's metadata + issue list from ComicVine.
@@ -497,6 +524,29 @@
               onclick={() => { descOpen = !descOpen; }} role="button" tabindex="0"
               onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); descOpen = !descOpen; } }}>{seriesBlurb}</p>
           {/if}
+          {#if isCv && hero.total}
+            <!-- Completion overview: a segmented bar (owned vs. in-flight) + a
+                 per-state legend, so series health reads at a glance without
+                 filtering to discover it. -->
+            <div class="sx-comp">
+              <div class="sx-comp__top">
+                <span class="sx-comp__owned">{fmt(hero.owned)} of {fmt(hero.total)} owned</span>
+                <span class="sx-comp__pct" class:is-done={hero.owned >= hero.total}>{hero.pct}%</span>
+              </div>
+              <div class="sx-comp__bar">
+                <div class="sx-comp__seg sx-comp__seg--owned" style="width:{hero.ownedW}%"></div>
+                <div class="sx-comp__seg sx-comp__seg--dl" style="width:{hero.dlW}%"></div>
+              </div>
+              <div class="sx-comp__legend">
+                {#if hero.saved}<span class="sx-comp__leg sx-comp__leg--saved">{fmt(hero.saved)} saved</span>{/if}
+                {#if hero.downloading}<span class="sx-comp__leg sx-comp__leg--dl">{fmt(hero.downloading)} downloading</span>{/if}
+                {#if hero.missing}<span class="sx-comp__leg sx-comp__leg--miss">{fmt(hero.missing)} missing</span>{/if}
+                {#if hero.corrupt}<span class="sx-comp__leg sx-comp__leg--bad">{fmt(hero.corrupt)} corrupt</span>{/if}
+                {#if hero.failed}<span class="sx-comp__leg sx-comp__leg--bad">{fmt(hero.failed)} failed</span>{/if}
+                {#if hero.untagged}<span class="sx-comp__leg sx-comp__leg--untagged">{fmt(hero.untagged)} untagged</span>{/if}
+              </div>
+            </div>
+          {/if}
           <!-- Disk location lives in Edit metadata; scan/tag progress and
                completion report via toasts (same pattern as Refresh metadata). -->
           <div class="series-actions">
@@ -607,7 +657,8 @@
           <label class="checkall"><input type="checkbox" id="select-all" checked={isCv && visibleIssues.some((i) => !rowDisabled(i)) && visibleIssues.filter((i) => !rowDisabled(i)).every((i) => detailSelected.has(i.cv_issue_id))} onchange={(e) => selectAll(e.currentTarget.checked)} /> <span>Select all</span></label>
           <div class="filter" id="filter">
             {#each FILTERS as f (f)}
-              <button class="filter__btn" class:is-active={currentFilter === f} onclick={() => { currentFilter = f; }}>{FILTER_LABELS[f]}</button>
+              {@const n = filterCounts[f]}
+              <button class="filter__btn" class:is-active={currentFilter === f} onclick={() => { currentFilter = f; }}>{FILTER_LABELS[f]}{#if n}<span class="filter__count">{fmt(n)}</span>{/if}</button>
             {/each}
           </div>
           <input id="issue-find" type="search" class="issue-find" placeholder="find #…" title="Filter issues by number or title" bind:value={findText} />
@@ -734,3 +785,28 @@
     </div>
   {/if}
 </section>
+
+<style>
+  /* Completion overview in the hero: segmented bar + per-state legend. */
+  .sx-comp { max-width: 600px; margin: 4px 0 16px; }
+  .sx-comp__top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .sx-comp__owned { font: 600 12.5px var(--font-body); color: var(--text); }
+  .sx-comp__pct { font: 600 12.5px var(--font-mono); color: var(--muted); }
+  .sx-comp__pct.is-done { color: var(--green); }
+  .sx-comp__bar { height: 8px; border-radius: 8px; background: var(--ink); overflow: hidden; display: flex; }
+  .sx-comp__seg { height: 100%; }
+  .sx-comp__seg--owned { background: var(--green); }
+  .sx-comp__seg--dl { background: var(--cyan); }
+  .sx-comp__legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 9px; font-size: 11.5px; }
+  .sx-comp__leg { display: inline-flex; align-items: center; gap: 6px; }
+  .sx-comp__leg::before { content: '●'; font-size: 9px; }
+  .sx-comp__leg--saved { color: var(--green); }
+  .sx-comp__leg--dl { color: var(--cyan); }
+  .sx-comp__leg--miss { color: var(--amber); }
+  .sx-comp__leg--bad { color: var(--red); }
+  .sx-comp__leg--untagged { color: var(--muted); }
+
+  /* Count badge on the issue filter tabs. */
+  .filter__count { margin-left: 6px; font: 600 10px var(--font-mono); background: var(--panel-2); color: var(--faint); border-radius: 999px; padding: 1px 6px; }
+  :global(.filter__btn.is-active) .filter__count { background: rgba(255,255,255,.2); color: #fff; }
+</style>
