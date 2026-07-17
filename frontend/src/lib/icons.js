@@ -41,7 +41,6 @@ export const ICON_PATHS = {
   'circle-half': '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z"/>',
   square: '<rect x="3" y="3" width="18" height="18" rx="2"/>',
   'check-square': '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
-  'no-source': '<circle cx="12" cy="12" r="9"/><path d="M5.64 5.64l12.72 12.72"/>',
   // navigation / arrows
   'arrow-up': '<path d="M12 19V5M5 12l7-7 7 7"/>',
   'arrow-down': '<path d="M12 5v14M5 12l7 7 7-7"/>',

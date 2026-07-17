@@ -20,7 +20,6 @@
     { key: 'unmonitored', label: 'Not monitored' },
     { key: 'problems', label: 'Problems' },
     { key: 'unmatched', label: 'Unmatched' },
-    { key: 'manga', label: 'Manga' },
   ];
 
   // Grid ⊞ / list ≣ — a device preference, not a URL one.
@@ -266,7 +265,6 @@
               <div class="libx-card__meta">
                 <span class="libx-card__count">{s.owned}/{s.total}</span>
                 {#if s.corrupt > 0}<span class="libx-card__flag libx-card__flag--bad" title="{fmt(s.corrupt)} corrupt file(s)">!</span>{/if}
-                {#if !s.sourced}<span class="libx-card__flag" title="No download source yet"><Icon name="no-source" size={13} /></span>{/if}
               </div>
             {:else}
               <div class="libx-card__title libx-card__title--unmatched" title={s.folder}>{s.folder || 'Unidentified series'}</div>
@@ -300,7 +298,6 @@
                   {:else if s.total > 0}<span class="libx-badge libx-badge--ok">complete</span>{/if}
                   {#if s.untagged > 0}<span class="libx-badge libx-badge--plain">{fmt(s.untagged)} untagged</span>{/if}
                   {#if s.corrupt > 0}<span class="libx-badge libx-badge--warn">{fmt(s.corrupt)} corrupt</span>{/if}
-                  {#if !s.sourced}<span class="libx-badge libx-badge--nosrc">no source</span>{/if}
                   {#if s.restricted}<span class="libx-badge libx-badge--plain" title="Mature — hidden from roles without “View mature content”">mature</span>{/if}
                 {/if}
               </div>
@@ -406,7 +403,6 @@
   .libx-badge--miss { color: var(--amber); background: rgba(255,194,75,.1); border-color: rgba(255,194,75,.3); }
   .libx-badge--ok { color: var(--green); background: rgba(95,211,138,.1); border-color: rgba(95,211,138,.3); }
   .libx-badge--warn { color: var(--red); background: rgba(255,90,82,.1); border-color: rgba(255,90,82,.3); }
-  .libx-badge--nosrc { color: var(--muted); background: rgba(255,255,255,.04); border-color: var(--line); }
   .libx-badge--plain { color: #c4bdd4; background: var(--panel-2); }
 
   .libx__empty { border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.015); padding: 60px 24px; text-align: center; max-width: 460px; margin: 24px auto; }

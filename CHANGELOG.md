@@ -8,6 +8,16 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Changed
+- Removed the misleading **"no download source"** marker from the Library (the
+  grid card icon and the list-view badge). It keyed off whether a series row
+  carried a catalog/scan URL rather than a ComicVine one, which no longer says
+  anything about downloadability — sources are resolved on demand — so it fired
+  on ordinary ComicVine-matched series.
+- Removed the **Manga** filter chip from the Library toolbar. Manga now lives in
+  its own library (with its own sidebar entry), so filtering the combined view
+  by type is redundant.
+
 ### Fixed
 - The **Queue** badge (sidebar) and the header status pills now match the queue
   view. They were counting only *queued* and *downloading* items, so issues
