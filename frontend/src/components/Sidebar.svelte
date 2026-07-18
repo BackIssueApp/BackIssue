@@ -107,6 +107,10 @@
           <span class="sidenav__icon"><Icon name="settings" /></span> Settings</button>
       {/if}
     {/if}
+    <!-- Plugin items that belong under the System header (addMenuAction with
+         section 'System') join here instead of forming their own group. Always
+         mounted — the {#if} above must never own plugin children. -->
+    <div id="menu-plugin-system" class="sidenav__plugins" onclick={() => { ui.sidebarOpen = false; }}></div>
   </nav>
 
   <!-- Account chip: who you are + account menu. (A fresh install can't reach

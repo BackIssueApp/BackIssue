@@ -111,8 +111,15 @@ const bi = {
       ic.innerHTML = icon || '';
       b.append(ic, document.createTextNode(text));
       b.onclick = onClick;
-      const area = document.getElementById('menu-plugin-actions') || document.body;
       const section = String(opts.section || '');
+      // 'System' joins the CORE System section (below its own items) instead of
+      // creating a plugin group — a second "System" header would be confusing.
+      // Older shells without the mount fall through to the grouped behavior.
+      if (section === 'System') {
+        const sys = document.getElementById('menu-plugin-system');
+        if (sys) { sys.appendChild(b); return b; }
+      }
+      const area = document.getElementById('menu-plugin-actions') || document.body;
       // One container per section (display:contents keeps the nav's flex
       // layout); the sectionless group is created first so it sits on top.
       let group = area.querySelector(`[data-plugin-section="${CSS.escape(section)}"]`);

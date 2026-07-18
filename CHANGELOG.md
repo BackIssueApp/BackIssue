@@ -8,6 +8,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Changed
+- Plugin menu items registered under the **System** section now join the core
+  System group in the sidebar (below Settings) instead of forming a second
+  "System" header of their own.
+
 ### Added
 - **Indexer-provider plugins.** Plugins can now supply Newznab/Torznab indexers
   to the built-in Usenet and Torrent sources (`registerIndexerProvider`), so an
