@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import JSZip from 'jszip';
 import { parseIndexers, searchNewznab } from '../newznab.js';
-import { prowlarrConfigured, prowlarrIndexers } from '../prowlarr.js';
+import { resolveIndexers, indexersManaged } from '../indexerproviders.js';
 import { makeNzbClient } from '../nzbclients.js';
 import { loadReleaseBlacklist, normReleaseTitle } from '../db.js';
 import { normalizeNumber } from '../matcher.js';
@@ -214,18 +214,14 @@ export const usenet = {
   id: 'usenet',
   label: 'usenet',
   kind: 'deferred',
-  // Indexers may come from the manual list OR from Prowlarr (fetched at search
-  // time), so Prowlarr being configured counts as "has indexers" here.
+  // Indexers may come from the manual list OR from a provider plugin (e.g.
+  // Prowlarr), so a managing provider counts as "has indexers" here.
   isEnabled: (config) => !!config?.usenetEnabled
-    && (parseIndexers(config.newznabIndexers).length > 0 || prowlarrConfigured(config))
+    && (parseIndexers(config.newznabIndexers).length > 0 || indexersManaged(config))
     && !!(config.nzbClientHost || config.nzbClientUrl),
 
   async find(ctx) {
-    // Prowlarr replaces the manual list when configured (its indexers are the
-    // source of truth); otherwise use the manually entered indexers.
-    const indexers = prowlarrConfigured(ctx.config)
-      ? (await prowlarrIndexers(ctx.config)).newznab
-      : parseIndexers(ctx.config.newznabIndexers);
+    const indexers = await resolveIndexers(ctx.config, 'newznab');
     if (!indexers.length) return null;
     // Search under every known name for this volume (title + CV/user aliases), so
     // an indexer that lists it as "2000AD" is found even though CV says "2000 AD".
@@ -277,9 +273,7 @@ export const usenet = {
   // candidates the user can pick from — broad (no strict score filter), so the
   // user sees options the auto-matcher would reject; score is a ranking hint.
   async manualSearch(ctx) {
-    const indexers = prowlarrConfigured(ctx.config)
-      ? (await prowlarrIndexers(ctx.config)).newznab
-      : parseIndexers(ctx.config.newznabIndexers);
+    const indexers = await resolveIndexers(ctx.config, 'newznab');
     if (!indexers.length) return { results: [] };
     const queries = manualQueries(ctx);
     const target = manualTarget(ctx);

@@ -78,11 +78,6 @@ export const SETTING_FIELDS = {
   onboardingDone:      { type: 'bool' },
   // Download sources
   sourcePriority:          { type: 'string' },
-  // Prowlarr — feeds the usenet/torrent sources with its managed indexers.
-  prowlarrEnabled:         { type: 'bool' },
-  prowlarrUrl:             { type: 'string', allowEmpty: true },
-  prowlarrApiKey:          { type: 'string', allowEmpty: true },
-  prowlarrExcludeIds:      { type: 'string', allowEmpty: true },
   usenetEnabled:           { type: 'bool' },
   newznabIndexers:         { type: 'string', allowEmpty: true },
   nzbClient:               { type: 'enum', values: ['sabnzbd', 'nzbget'] },

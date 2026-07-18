@@ -71,6 +71,7 @@ const permissions = []; // { key, label, description, tier, plugin } — role-as
 const authProviders = []; // { id, label, loginPath } — external login (SSO/OIDC) buttons
 const credentialProviders = []; // async (username, password) => identity | null — external password backends
 const notifiers = []; // async (event, opts) => void — outbound notification channels (fired per notify())
+const indexerProviders = []; // { id, isActive(config), indexers(config, protocol) } — supply indexers to the usenet/torrent sources
 
 // Per-plugin catalog for the management page: everything discovered on disk,
 // loaded or not. name → { name, version, description, enabled, loaded, error, counts }.
@@ -178,6 +179,16 @@ export const pluginApi = {
   registerNotifier(fn) {
     if (typeof fn === 'function') { notifiers.push(fn); bump('notifiers'); }
   },
+  // An indexer provider that supplies Newznab/Torznab feeds to the built-in
+  // Usenet and Torrent sources (e.g. a Prowlarr plugin). The provider is:
+  //   { id, isActive(config) => bool,
+  //     indexers(config, protocol) => Promise<{ indexers:[{name,url,apiKey}], exclusive?:bool }> }
+  // protocol is 'newznab' (usenet) or 'torznab' (torrent). When any active
+  // provider returns exclusive:true, the manually-entered indexers are dropped
+  // in favour of the provider's list.
+  registerIndexerProvider(provider) {
+    if (provider?.id && typeof provider.indexers === 'function') { indexerProviders.push(provider); bump('indexerProviders'); }
+  },
   // A new library type ({ id, label }) beyond the built-ins (comic/manga/
   // magazine). Registration whitelists the id for setSeriesType and adds a
   // library filter lane (?filter=<id>). The plugin owns the type's behavior —
@@ -205,6 +216,7 @@ export function registeredSources() { return sources; }
 export function registeredSettings() { return Object.assign({}, ...settings); }
 export function registeredStartups() { return startups; }
 export function registeredNotifiers() { return notifiers; }
+export function registeredIndexerProviders() { return indexerProviders; }
 export function registeredRoutes() { return routes; }
 export function registeredJobs() { return jobs; }
 export function registeredClientAssets() { return clientAssets; }
@@ -251,7 +263,7 @@ export async function loadPluginsFromDir(dir, api = pluginApi, disabled = []) {
       enabled: !disabled.includes(name),
       loaded: false,
       error: null,
-      counts: { sources: 0, settings: 0, startups: 0, routes: 0, jobs: 0, assets: 0, permissions: 0, notifiers: 0 },
+      counts: { sources: 0, settings: 0, startups: 0, routes: 0, jobs: 0, assets: 0, permissions: 0, notifiers: 0, indexerProviders: 0 },
     };
     catalog.set(name, info);
     if (!info.enabled) {

@@ -12,7 +12,6 @@ import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
 import { normalizeNumber } from './matcher.js';
 import { testIndexer } from './newznab.js';
-import { testProwlarr, prowlarrIndexerList } from './prowlarr.js';
 import { testClient } from './nzbclients.js';
 import { testTorznabIndexer } from './torznab.js';
 import { testTorrentClient } from './torrentclients.js';
@@ -1474,31 +1473,6 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       res.json(result);
     } catch (e) {
       res.json({ ok: false, message: String(e?.message || e) });
-    }
-  });
-
-  // Probe Prowlarr without saving: confirms the URL/key and reports how many
-  // usenet/torrent indexers it manages.
-  app.post('/api/prowlarr/test', async (req, res) => {
-    const { url, apiKey } = req.body || {};
-    if (!url) return res.status(400).json({ ok: false, message: 'A Prowlarr URL is required.' });
-    try {
-      res.json(await testProwlarr({ prowlarrUrl: String(url).replace(/\/+$/, ''), prowlarrApiKey: apiKey || '' }));
-    } catch (e) {
-      res.json({ ok: false, message: String(e?.message || e) });
-    }
-  });
-
-  // List Prowlarr's enabled indexers for the settings picker (id/name/protocol).
-  // Takes url/key from the body so it works before the settings are saved.
-  app.post('/api/prowlarr/indexers', async (req, res) => {
-    const { url, apiKey } = req.body || {};
-    if (!url) return res.status(400).json({ error: 'A Prowlarr URL is required.' });
-    try {
-      const indexers = await prowlarrIndexerList({ prowlarrUrl: String(url).replace(/\/+$/, ''), prowlarrApiKey: apiKey || '' });
-      res.json({ indexers });
-    } catch (e) {
-      res.status(502).json({ error: String(e?.message || e) });
     }
   });
 

@@ -43,7 +43,7 @@ export function issueCoverUrl(issue) {
 export const bridgeRefs = { refreshSourceUI: () => {} };
 
 const bi = {
-  _clients: [], _statusHooks: [], _sourceSyncHooks: [], _settingsHooks: [], _ready: false,
+  _clients: [], _statusHooks: [], _sourceSyncHooks: [], _settingsHooks: [], _indexerManagedHooks: [], _ready: false,
   registerClient(fn) {
     if (this._ready) { try { fn(this.api); } catch (e) { console.warn('plugin client init failed', e); } }
     else this._clients.push(fn);
@@ -136,6 +136,10 @@ const bi = {
     // Called on every settings-source sync; return true if this plugin's source
     // is enabled (feeds the "no sources enabled" warning). Also update own UI here.
     onSourcesSync(cb) { bi._sourceSyncHooks.push(cb); },
+    // Called on every settings-source sync; return true if this plugin is
+    // managing the indexer lists (an indexer provider like Prowlarr is active),
+    // so core greys the manually-entered indexers and marks them ignored.
+    onIndexersManaged(cb) { bi._indexerManagedHooks.push(cb); },
     // Called when the settings page opens, with the current settings object.
     onSettingsLoad(cb) { bi._settingsHooks.push(cb); },
     refreshSourceUI: () => bridgeRefs.refreshSourceUI(),

@@ -1354,18 +1354,8 @@ body.import .import-page { display: flex; flex-direction: column; height: 100%; 
 /* Indexer list */
 .indexer-list { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 8px; }
 .indexer-empty { margin: 2px 0; font-size: 12px; color: var(--faint); }
-/* Prowlarr indexer picker + "managed by Prowlarr" state */
-.prowlarr-idx__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.prowlarr-idx { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 2px; }
-.prowlarr-idx__row { display: flex; align-items: center; gap: 9px; padding: 5px 6px; border-radius: 7px; cursor: pointer; }
-.prowlarr-idx__row:hover { background: var(--panel-2); }
-.prowlarr-idx__name { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.prowlarr-idx__proto { font: 600 9.5px var(--font-mono, ui-monospace, monospace); text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 20px; border: 1px solid currentColor; flex: none; }
-.prowlarr-idx__proto--usenet { color: #5fd38a; }
-.prowlarr-idx__proto--torrent { color: #2bd4d9; }
-.prowlarr-idx__proto--unknown { color: var(--faint); }
-.prowlarr-idx__err { color: #f87171; }
-.prowlarr-managed { color: var(--accent); display: flex; align-items: center; gap: 6px; }
+/* Manual indexers greyed out while an indexer-provider plugin manages them. */
+.indexers-managed { color: var(--accent); display: flex; align-items: center; gap: 6px; }
 .setx-card.is-managed .indexer-list { opacity: .45; pointer-events: none; }
 .indexer-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--ink); border: 1px solid var(--line); border-radius: 6px; }
 .indexer-row__info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
