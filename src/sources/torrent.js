@@ -3,6 +3,7 @@
 // our category and returns immediately; the background monitor (downloadmonitor.js)
 // polls the client by category and imports each torrent when it finishes.
 import { parseIndexers, searchTorznab } from '../torznab.js';
+import { prowlarrConfigured, prowlarrIndexers } from '../prowlarr.js';
 import { makeTorrentClient } from '../torrentclients.js';
 import { scoreRelease, issueToken, suspiciouslySmall, manualQueries, manualTarget } from './usenet.js';
 
@@ -10,11 +11,19 @@ export const torrent = {
   id: 'torrent',
   label: 'torrent',
   kind: 'deferred',
+  // Indexers may come from the manual list OR from Prowlarr (fetched at search
+  // time), so Prowlarr being configured counts as "has indexers" here.
   isEnabled: (config) =>
-    !!config?.torrentEnabled && parseIndexers(config.torznabIndexers).length > 0 && !!config.qbHost,
+    !!config?.torrentEnabled
+    && (parseIndexers(config.torznabIndexers).length > 0 || prowlarrConfigured(config))
+    && !!config.qbHost,
 
   async find(ctx) {
-    const indexers = parseIndexers(ctx.config.torznabIndexers);
+    // Prowlarr replaces the manual list when configured; otherwise use the
+    // manually entered indexers.
+    const indexers = prowlarrConfigured(ctx.config)
+      ? (await prowlarrIndexers(ctx.config)).torznab
+      : parseIndexers(ctx.config.torznabIndexers);
     if (!indexers.length) return null;
     // Search under every known name for this volume (title + CV/user aliases).
     const names = (ctx.seriesNames && ctx.seriesNames.length) ? ctx.seriesNames : [ctx.seriesTitle];
@@ -55,7 +64,9 @@ export const torrent = {
   // shown so the user can judge health. A pick grabs that single torrent (not a
   // pack) — the per-series pack search is a separate feature.
   async manualSearch(ctx) {
-    const indexers = parseIndexers(ctx.config.torznabIndexers);
+    const indexers = prowlarrConfigured(ctx.config)
+      ? (await prowlarrIndexers(ctx.config)).torznab
+      : parseIndexers(ctx.config.torznabIndexers);
     if (!indexers.length) return { results: [] };
     const queries = manualQueries(ctx);
     const target = manualTarget(ctx);

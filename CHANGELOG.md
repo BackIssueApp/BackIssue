@@ -8,6 +8,17 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+- **Prowlarr support.** Point BackIssue at your Prowlarr instance (Settings →
+  Sources → Prowlarr: URL + API key) and its indexers are used automatically —
+  usenet indexers feed the Usenet source, torrent indexers feed Torrents. No
+  more listing each indexer by hand. A **per-indexer picker** lets you choose
+  exactly which of Prowlarr's indexers to search (all by default). While
+  Prowlarr is enabled, the manually entered Newznab/Torznab indexers are
+  ignored (and shown as managed). Prowlarr only finds releases, so a download
+  client (SABnzbd/NZBGet and/or qBittorrent) is still required; a Test button
+  reports how many usenet/torrent indexers are enabled.
+
 ### Changed
 - Removed the misleading **"no download source"** marker from the Library (the
   grid card icon and the list-view badge). It keyed off whether a series row

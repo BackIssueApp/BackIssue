@@ -33,7 +33,7 @@
   let libDrill = $state(false);         // mobile: rail list → panel detail
   let srcDrill = $state(false);
   let anySourceOn = $state(false);
-  let srcOn = $state({ usenet: false, torrent: false }); // live toggle state (pre-save)
+  let srcOn = $state({ usenet: false, torrent: false, prowlarr: false }); // live toggle state (pre-save)
   let enabledSourceCount = $state(0);
   let dirtySections = $state(new Set()); // tab ids with unsaved edits
   let filterQuery = $state('');
@@ -49,6 +49,11 @@
   // Indexer lists ({ name, url, apiKey }) — shared row UI for both modes.
   let indexerList = $state([]);   // newznab (usenet)
   let torznabList = $state([]);   // torznab (torrent)
+  // Prowlarr indexer picker: the fetched list, plus the set of ids the user has
+  // deselected (persisted as the prowlarrExcludeIds CSV; blank = use all).
+  let prowlarrIndexers = $state([]);
+  let prowlarrExcluded = $state(new Set());
+  let prowlarrList = $state({ loading: false, error: '', loaded: false });
   const MODE_LISTS = { newznab: () => indexerList, torznab: () => torznabList };
   const MODE_ENDPOINTS = { newznab: '/api/indexers/test', torznab: '/api/torznab/test' };
 
@@ -130,6 +135,7 @@
     }
     body.newznabIndexers = serializeIndexers(indexerList);
     body.torznabIndexers = serializeIndexers(torznabList);
+    body.prowlarrExcludeIds = [...prowlarrExcluded].join(',');
     // rootFolders is DERIVED from the libraries' folders — never sent.
     if (sourceOrder.length) body.sourcePriority = sourceOrder.map((s) => s.id).join(',');
     return body;
@@ -151,7 +157,10 @@
     const qport = root.querySelector('#set-qbPort');
     qport.placeholder = '8080';
     if (!qport.value) qport.value = '8080';
-    srcOn = { usenet, torrent };
+    // Prowlarr isn't a standalone source (it feeds usenet/torrent), so it drives
+    // its own rail dot but doesn't count toward "any source enabled".
+    const prowlarr = !!root.querySelector('#set-prowlarrEnabled')?.checked;
+    srcOn = { usenet, torrent, prowlarr };
     const pluginEnabled = BackIssue._sourceSyncHooks.map((fn) => { try { return !!fn(); } catch { return false; } });
     enabledSourceCount = [usenet, torrent, ...pluginEnabled].filter(Boolean).length;
     anySourceOn = enabledSourceCount > 0;
@@ -215,6 +224,8 @@
     applySettingsToForm(s);
     indexerList = parseIndexerString(s.newznabIndexers);
     torznabList = parseIndexerString(s.torznabIndexers);
+    prowlarrExcluded = new Set(String(s.prowlarrExcludeIds || '').split(',').map((x) => x.trim()).filter(Boolean));
+    prowlarrList = { loading: false, error: '', loaded: false };
     try { sourceOrder = (await apiGet('/api/sources')).sources || []; } catch { sourceOrder = []; }
     for (const cb of BackIssue._settingsHooks) { try { cb(s); } catch { /* ignore */ } }
     syncSourceUI();
@@ -377,7 +388,7 @@
   }
 
   /* ---- Connection tests (download clients + CV keys) ---- */
-  let tests = $state({ client: null, qb: null, cv: null });
+  let tests = $state({ client: null, qb: null, cv: null, prowlarr: null });
   async function runTest(key, endpoint, collect) {
     tests[key] = { cls: 'is-testing', text: 'Testing…' };
     let r;
@@ -387,6 +398,38 @@
   }
   const v = (sel) => root.querySelector(sel)?.value ?? '';
   const checked = (sel) => !!root.querySelector(sel)?.checked;
+  const testProwlarr = () => runTest('prowlarr', '/api/prowlarr/test', () => ({
+    url: v('#set-prowlarrUrl').trim(),
+    apiKey: v('#set-prowlarrApiKey').trim(),
+  }));
+  // Fetch Prowlarr's indexer list for the picker (uses the current form values,
+  // so it works before Save).
+  async function loadProwlarrIndexers() {
+    const url = v('#set-prowlarrUrl').trim();
+    if (!url) { prowlarrIndexers = []; prowlarrList = { loading: false, error: 'Enter a Prowlarr URL first.', loaded: true }; return; }
+    prowlarrList = { loading: true, error: '', loaded: false };
+    try {
+      const r = await apiPost('/api/prowlarr/indexers', { url, apiKey: v('#set-prowlarrApiKey').trim() });
+      prowlarrIndexers = r.indexers || [];
+      prowlarrList = { loading: false, error: '', loaded: true };
+    } catch (e) {
+      prowlarrIndexers = [];
+      prowlarrList = { loading: false, error: String(e?.message || e), loaded: true };
+    }
+  }
+  // Checkbox checked = "use this indexer"; unchecking adds it to the exclude set.
+  function toggleProwlarrIndexer(id, use) {
+    const s = new Set(prowlarrExcluded);
+    if (use) s.delete(String(id)); else s.add(String(id));
+    prowlarrExcluded = s;
+  }
+  // Load the indexer list the first time the Prowlarr panel is opened with a
+  // configured, enabled connection.
+  $effect(() => {
+    if (root && active && srcPanel === 'prowlarr' && srcOn.prowlarr && !prowlarrList.loaded && !prowlarrList.loading) {
+      loadProwlarrIndexers();
+    }
+  });
   const testClient = () => runTest('client', '/api/clients/test', () => ({
     nzbClient: v('#set-nzbClient'),
     nzbClientHost: v('#set-nzbClientHost').trim(),
@@ -617,6 +660,7 @@
         <div class="setx-rail">
           {@render railItem('src', 'usenet', 'download', 'Usenet', 'Newznab + SABnzbd/NZBGet', srcOn.usenet ? 'green' : 'muted')}
           {@render railItem('src', 'torrent', 'download', 'Torrents', 'Torznab + qBittorrent', srcOn.torrent ? 'green' : 'muted')}
+          {@render railItem('src', 'prowlarr', 'target', 'Prowlarr', 'Indexer manager (usenet + torrent)', srcOn.prowlarr ? 'green' : 'muted')}
           {#each pluginSrc as pb (pb.key)}
             {@render railItem('src', pb.key, 'download', pb.label, pb.note, pb.on ? 'green' : 'muted')}
           {/each}
@@ -630,6 +674,54 @@
         <div class="setx-detail">
           <button type="button" class="setx-backlink" onclick={() => { srcDrill = false; }}><Icon name="arrow-left" size={14} /> Sources</button>
 
+          <div class="setx-panel" class:is-active={srcPanel === 'prowlarr'}>
+            <div class="setx-card setx-srchead">
+              <label class="switch"><input id="set-prowlarrEnabled" type="checkbox" onchange={syncSourceUI} /><span class="switch__track"></span></label>
+              <div class="setx-srchead__text">
+                <b>Prowlarr</b>
+                <span>Use every indexer your Prowlarr instance manages — its usenet indexers feed the Usenet source, its torrent indexers feed Torrents.</span>
+              </div>
+              <span class="setx-dot setx-dot--{srcOn.prowlarr ? 'green' : 'muted'}"></span>
+            </div>
+            <div id="prowlarr-config" class="src-config setx-srcbody">
+              <div class="setx-card">
+                <h4 class="setx-card__head">Connection</h4>
+                <label class="field"><span>Prowlarr URL</span><input id="set-prowlarrUrl" class="mono" type="text" spellcheck="false" placeholder="http://prowlarr:9696" /></label>
+                <label class="field"><span>API key</span><input id="set-prowlarrApiKey" class="mono" type="text" spellcheck="false" /></label>
+                <div class="client-test">
+                  <button id="prowlarr-test" class="btn btn--ghost" type="button" onclick={testProwlarr}>Test connection</button>
+                  {#if tests.prowlarr}<span id="prowlarr-test-result" class="client-status {tests.prowlarr.cls}">{#if tests.prowlarr.icon}<Icon name={tests.prowlarr.icon} /> {/if}{tests.prowlarr.text}</span>{/if}
+                </div>
+                <p class="modal__note">The API key is in Prowlarr under <b>Settings → General → Security</b>. Prowlarr only <b>finds</b> releases: enable <b>Usenet</b> and/or <b>Torrents</b> (with a download client) for the actual download.</p>
+              </div>
+
+              <div class="setx-card">
+                <div class="prowlarr-idx__head">
+                  <h4 class="setx-card__head">Indexers</h4>
+                  <button type="button" class="btn btn--ghost btn--sm" onclick={loadProwlarrIndexers} disabled={prowlarrList.loading}>{prowlarrList.loading ? 'Loading…' : (prowlarrList.loaded ? 'Reload' : 'Load')}</button>
+                </div>
+                {#if prowlarrList.error}
+                  <p class="modal__note prowlarr-idx__err"><Icon name="alert-triangle" size={14} /> {prowlarrList.error}</p>
+                {:else if prowlarrIndexers.length}
+                  <p class="modal__note">Choose which of Prowlarr's indexers BackIssue searches. Unchecked indexers are skipped.</p>
+                  <div class="prowlarr-idx">
+                    {#each prowlarrIndexers as ix (ix.id)}
+                      <label class="prowlarr-idx__row">
+                        <input type="checkbox" checked={!prowlarrExcluded.has(String(ix.id))} onchange={(e) => toggleProwlarrIndexer(ix.id, e.currentTarget.checked)} />
+                        <span class="prowlarr-idx__name">{ix.name}</span>
+                        <span class="prowlarr-idx__proto prowlarr-idx__proto--{ix.protocol}">{ix.protocol}</span>
+                      </label>
+                    {/each}
+                  </div>
+                {:else if prowlarrList.loaded}
+                  <p class="modal__note">No enabled indexers found — add and enable some in Prowlarr.</p>
+                {:else}
+                  <p class="modal__note">Enter the connection above and <b>Load</b> to choose which indexers to use. All are used until you deselect some.</p>
+                {/if}
+              </div>
+            </div>
+          </div>
+
           <div class="setx-panel" class:is-active={srcPanel === 'usenet'}>
             <div class="setx-card setx-srchead">
               <label class="switch"><input id="set-usenetEnabled" type="checkbox" onchange={syncSourceUI} /><span class="switch__track"></span></label>
@@ -640,12 +732,15 @@
               <span class="setx-dot setx-dot--{srcOn.usenet ? 'green' : 'muted'}"></span>
             </div>
             <div id="usenet-config" class="src-config setx-srcbody">
-              <div class="setx-card">
+              <div class="setx-card" class:is-managed={srcOn.prowlarr}>
                 <h4 class="setx-card__head">Indexers</h4>
+                {#if srcOn.prowlarr}
+                  <p class="modal__note prowlarr-managed"><Icon name="target" size={14} /> Managed by Prowlarr — these manual indexers are ignored while Prowlarr is enabled.</p>
+                {/if}
                 <div id="indexer-list" class="indexer-list">
                   {@render indexerRows('newznab', indexerList)}
                 </div>
-                <button id="add-indexer" class="btn btn--ghost btn--add" type="button" onclick={() => openIndexerModal(-1, 'newznab', null, saveIndexer)}>+ Add indexer</button>
+                <button id="add-indexer" class="btn btn--ghost btn--add" type="button" disabled={srcOn.prowlarr} onclick={() => openIndexerModal(-1, 'newznab', null, saveIndexer)}>+ Add indexer</button>
                 <p class="modal__note">Newznab (the standard indexer API — e.g. NZBgeek) indexers, searched in order; results are merged.</p>
               </div>
 
@@ -699,12 +794,15 @@
               <span class="setx-dot setx-dot--{srcOn.torrent ? 'green' : 'muted'}"></span>
             </div>
             <div id="torrent-config" class="src-config setx-srcbody">
-              <div class="setx-card">
+              <div class="setx-card" class:is-managed={srcOn.prowlarr}>
                 <h4 class="setx-card__head">Indexers (Torznab)</h4>
+                {#if srcOn.prowlarr}
+                  <p class="modal__note prowlarr-managed"><Icon name="target" size={14} /> Managed by Prowlarr — these manual indexers are ignored while Prowlarr is enabled.</p>
+                {/if}
                 <div id="torznab-list" class="indexer-list">
                   {@render indexerRows('torznab', torznabList)}
                 </div>
-                <button id="add-torznab" class="btn btn--ghost btn--add" type="button" onclick={() => openIndexerModal(-1, 'torznab', null, saveIndexer)}>+ Add indexer</button>
+                <button id="add-torznab" class="btn btn--ghost btn--add" type="button" disabled={srcOn.prowlarr} onclick={() => openIndexerModal(-1, 'torznab', null, saveIndexer)}>+ Add indexer</button>
                 <p class="modal__note">Torznab (the standard indexer API — e.g. Jackett or Prowlarr) feeds, searched in order; results are merged and ranked by seeders.</p>
               </div>
 

@@ -155,6 +155,14 @@ const config = {
   // registration order.
   sourcePriority: '',
 
+  // Prowlarr: an indexer manager whose usenet/torrent indexers feed the Usenet
+  // and Torrent sources below. Configure it once here instead of listing each
+  // indexer. Prowlarr only finds releases — a download client is still needed.
+  prowlarrEnabled: false,
+  prowlarrUrl: '',       // e.g. http://prowlarr:9696
+  prowlarrApiKey: '',
+  prowlarrExcludeIds: '', // CSV of Prowlarr indexer ids to NOT use (blank = all)
+
   // Usenet source (Newznab indexers → SABnzbd/NZBGet → import).
   usenetEnabled: false,
   // One indexer per line: name | https://indexer/ | apikey
