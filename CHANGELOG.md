@@ -8,7 +8,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.7.3] — 2026-07-18
+
 ### Added
+- **Indexer-provider plugins.** Plugins can now supply Newznab/Torznab indexers
+  to the built-in Usenet and Torrent sources (`registerIndexerProvider`), so an
+  external service can manage indexers on their behalf — when a provider is
+  active it can take over, and the manually entered indexers are shown as
+  managed and ignored. This powers the new **Prowlarr** plugin (point it at your
+  Prowlarr instance and pick which of its indexers to use).
 - **Settings has a Plugins tab.** Plugins that aren't download sources can now
   mount their settings panel in a dedicated **Settings → Plugins** section
   (`settings-plugin-panels`) with its own rail — instead of squatting in
@@ -18,16 +26,6 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 - Plugin menu items registered under the **System** section now join the core
   System group in the sidebar (below Settings) instead of forming a second
   "System" header of their own.
-
-### Added
-- **Indexer-provider plugins.** Plugins can now supply Newznab/Torznab indexers
-  to the built-in Usenet and Torrent sources (`registerIndexerProvider`), so an
-  external service can manage indexers on their behalf — when a provider is
-  active it can take over, and the manually entered indexers are shown as
-  managed and ignored. This powers the new **Prowlarr** plugin (point it at your
-  Prowlarr instance and pick which of its indexers to use).
-
-### Changed
 - Removed the misleading **"no download source"** marker from the Library (the
   grid card icon and the list-view badge). It keyed off whether a series row
   carried a catalog/scan URL rather than a ComicVine one, which no longer says
