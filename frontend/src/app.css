@@ -1787,8 +1787,10 @@ textarea.dialog-input { resize: vertical; font-family: var(--font-mono); }
 
 /* Plugin source blocks as master-detail panels: hidden in place until their
    rail entry is selected; the active one renders in the card language. */
-.setx-detail #settings-plugin-sources > .src-block { display: none; }
-.setx-detail #settings-plugin-sources > .src-block.setx-active { display: block; border: none; background: none; padding: 0; }
+.setx-detail #settings-plugin-sources > .src-block,
+.setx-detail #settings-plugin-panels > .src-block { display: none; }
+.setx-detail #settings-plugin-sources > .src-block.setx-active,
+.setx-detail #settings-plugin-panels > .src-block.setx-active { display: block; border: none; background: none; padding: 0; }
 .setx-detail .src-block.setx-active > .src-toggle {
   display: flex; align-items: center; gap: 12px; cursor: default;
   border: 1px solid var(--line); border-radius: 12px; padding: 15px 16px; margin-bottom: 14px; background: rgba(255,255,255,.015); }

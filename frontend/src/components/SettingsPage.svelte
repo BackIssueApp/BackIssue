@@ -24,14 +24,17 @@
     { id: 'downloading', label: 'Downloading', icon: 'download' },
     { id: 'sources', label: 'Sources', icon: 'target' },
     { id: 'metadata', label: 'Metadata', icon: 'tag' },
+    { id: 'plugins', label: 'Plugins', icon: 'puzzle' }, // hidden until a plugin mounts a panel
     { id: 'signin', label: 'Sign-in', icon: 'shield' },
     { id: 'notifications', label: 'Notifications', icon: 'bell' },
   ];
   let activeTab = $state('overview');
   let libPanel = $state('libraries');   // libraries | org | maint
   let srcPanel = $state('usenet');      // usenet | torrent | priority
+  let plgPanel = $state('');            // selected plugin panel (Plugins tab)
   let libDrill = $state(false);         // mobile: rail list → panel detail
   let srcDrill = $state(false);
+  let plgDrill = $state(false);
   let anySourceOn = $state(false);
   let srcOn = $state({ usenet: false, torrent: false }); // live toggle state (pre-save)
   let srcManaged = $state(false); // an indexer-provider plugin (e.g. Prowlarr) is managing the indexer lists
@@ -43,7 +46,7 @@
 
   function pickTab(id) {
     activeTab = id;
-    libDrill = false; srcDrill = false; // mobile drill resets on tab switch
+    libDrill = false; srcDrill = false; plgDrill = false; // mobile drill resets on tab switch
     if (id === 'overview') refreshOverview();
   }
 
@@ -168,9 +171,10 @@
   // plugins guard against re-injecting); the rail just class-toggles which one
   // is visible. Label/note/dot are read from the block's own header.
   let pluginSrc = $state([]);
-  function scanPluginBlocks() {
-    const mount = document.getElementById('settings-plugin-sources');
-    if (!mount) return;
+  let pluginPanels = $state([]); // the dedicated Plugins tab (settings-plugin-panels)
+  function scanMount(mountId) {
+    const mount = document.getElementById(mountId);
+    if (!mount) return [];
     const out = [];
     [...mount.querySelectorAll(':scope > .src-block')].forEach((block, i) => {
       const key = 'plugin:' + (block.id || i);
@@ -178,23 +182,30 @@
       const sw = block.querySelector('.switch input');
       out.push({
         key,
-        label: block.querySelector('.src-toggle b')?.textContent?.trim() || 'Plugin source',
-        note: block.querySelector('.src-toggle .modal__note')?.textContent?.trim().slice(0, 48) || 'Plugin source',
+        label: block.querySelector('.src-toggle b')?.textContent?.trim() || 'Plugin',
+        note: block.querySelector('.src-toggle .modal__note')?.textContent?.trim().slice(0, 48) || 'Plugin settings',
         on: !!sw?.checked,
       });
       if (sw && !sw.dataset.setxWired) { sw.dataset.setxWired = '1'; sw.addEventListener('change', () => syncSourceUI()); }
     });
-    pluginSrc = out;
+    return out;
+  }
+  function scanPluginBlocks() {
+    pluginSrc = scanMount('settings-plugin-sources');
+    pluginPanels = scanMount('settings-plugin-panels');
+    // The Plugins tab's rail needs a selection once panels exist.
+    if (pluginPanels.length && !pluginPanels.some((p) => p.key === plgPanel)) plgPanel = pluginPanels[0].key;
   }
   // Reflect the selected panel onto the plugin blocks (in place, CSS only).
-  $effect(() => {
-    void srcPanel; void pluginSrc;
-    const mount = document.getElementById('settings-plugin-sources');
+  function reflectMount(mountId, selected) {
+    const mount = document.getElementById(mountId);
     if (!mount) return;
     for (const block of mount.querySelectorAll(':scope > .src-block')) {
-      block.classList.toggle('setx-active', block.dataset.setxKey === srcPanel);
+      block.classList.toggle('setx-active', block.dataset.setxKey === selected);
     }
-  });
+  }
+  $effect(() => { void pluginSrc; reflectMount('settings-plugin-sources', srcPanel); });
+  $effect(() => { void pluginPanels; reflectMount('settings-plugin-panels', plgPanel); });
 
   // Make every source card (core + plugin-injected) collapsible. Idempotent.
   function wireSourceCards() {
@@ -439,8 +450,12 @@
 
 {#snippet railItem(kind, key, icon, label, note, dot)}
   <button type="button" class="setx-rail__item"
-    class:is-active={(kind === 'lib' ? libPanel : srcPanel) === key}
-    onclick={() => { if (kind === 'lib') { libPanel = key; libDrill = true; } else { srcPanel = key; srcDrill = true; } }}>
+    class:is-active={(kind === 'lib' ? libPanel : kind === 'plg' ? plgPanel : srcPanel) === key}
+    onclick={() => {
+      if (kind === 'lib') { libPanel = key; libDrill = true; }
+      else if (kind === 'plg') { plgPanel = key; plgDrill = true; }
+      else { srcPanel = key; srcDrill = true; }
+    }}>
     <span class="setx-rail__icon"><Icon name={icon} size={15} /></span>
     <span class="setx-rail__text"><b>{label}</b><span>{note}</span></span>
     <span class="setx-dot setx-dot--{dot}"></span>
@@ -464,7 +479,7 @@
 
   <!-- Tab rail -->
   <nav class="setx-tabs" aria-label="Settings pages">
-    {#each TABS as t (t.id)}
+    {#each TABS.filter((t) => t.id !== 'plugins' || pluginPanels.length) as t (t.id)}
       <button type="button" class="setx-tab" class:is-active={activeTab === t.id} onclick={() => pickTab(t.id)}>
         <Icon name={t.icon} size={14} /> {t.label}
         {#if tabDot(t.id)}<span class="setx-tab__dot {tabDot(t.id)}"></span>{/if}
@@ -776,6 +791,24 @@
                block is surfaced as its own rail entry and class-toggled in place,
                never moved, so plugin re-injection guards keep working). -->
           <div id="settings-plugin-sources"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PLUGINS (master–detail; the tab shows only when a plugin mounted a panel) -->
+    <div class="setx-page" data-tab="plugins" class:is-active={activeTab === 'plugins'}>
+      <div class="setx-split" class:is-drilled={plgDrill}>
+        <div class="setx-rail">
+          {#each pluginPanels as pb (pb.key)}
+            {@render railItem('plg', pb.key, 'puzzle', pb.label, pb.note, pb.on ? 'green' : 'muted')}
+          {/each}
+        </div>
+        <div class="setx-detail">
+          <button type="button" class="setx-backlink" onclick={() => { plgDrill = false; }}><Icon name="arrow-left" size={14} /> Plugins</button>
+          <!-- Plugin settings panels inject here (plain DOM — must stay mounted;
+               same contract as settings-plugin-sources, for plugins that are
+               NOT download sources: each block becomes a rail entry). -->
+          <div id="settings-plugin-panels"></div>
         </div>
       </div>
     </div>

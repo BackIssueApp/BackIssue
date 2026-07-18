@@ -8,6 +8,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+- **Settings has a Plugins tab.** Plugins that aren't download sources can now
+  mount their settings panel in a dedicated **Settings → Plugins** section
+  (`settings-plugin-panels`) with its own rail — instead of squatting in
+  Sources. The tab appears only when an installed plugin uses it.
+
 ### Changed
 - Plugin menu items registered under the **System** section now join the core
   System group in the sidebar (below Settings) instead of forming a second
