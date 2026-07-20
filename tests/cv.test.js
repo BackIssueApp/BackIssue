@@ -39,8 +39,31 @@ test('normVolume flattens publisher and image', () => {
   assert.deepEqual(v, { id: 42, name: 'X', publisher: 'Marvel', start_year: '1999', count_of_issues: 12, deck: 'A short blurb.', description: null, image_url: 'u', site_detail_url: 'https://cv/x', aliases: 'Ex' });
 });
 
-test('makeCvClient throws without a key', () => {
-  assert.throws(() => makeCvClient({ comicvineKeys: '' }, {}), /no ComicVine API key/);
+test('makeCvClient without a key uses the hosted service and self-registers', async () => {
+  const calls = [];
+  const fetchImpl = async (url, opts) => {
+    calls.push({ url, method: opts?.method || 'GET' });
+    if (url.endsWith('/api/register')) return { ok: true, json: async () => ({ key: 'inst-1' }) };
+    return { ok: true, status: 200, json: async () => ({ status_code: 1, results: [], number_of_total_results: 0 }) };
+  };
+  const cfg = { comicvineKeys: '', metadataSource: 'hosted', metadataInstanceKey: '' };
+  const cv = makeCvClient(cfg, { fetchImpl, politeMs: 0 });
+  await cv.search('anything');
+  assert.ok(calls.some((c) => c.method === 'POST' && c.url === 'https://data.backissue.app/api/register'));
+  assert.ok(calls.some((c) => c.url.startsWith('https://data.backissue.app/api/search') && c.url.includes('api_key=inst-1')));
+  assert.equal(cfg.metadataInstanceKey, 'inst-1'); // provisioned key kept for reuse
+});
+
+test('makeCvClient with metadataSource=comicvine uses the official API and the user key', async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    calls.push(url);
+    return { ok: true, status: 200, json: async () => ({ status_code: 1, results: [], number_of_total_results: 0 }) };
+  };
+  const cv = makeCvClient({ comicvineKeys: 'userkey', metadataSource: 'comicvine' }, { fetchImpl, politeMs: 0 });
+  await cv.search('anything');
+  assert.ok(calls.some((u) => u.startsWith('https://comicvine.gamespot.com/api/search') && u.includes('api_key=userkey')));
+  assert.ok(!calls.some((u) => u.includes('register')));
 });
 
 test('cv client search parses results and sends key + User-Agent', async () => {

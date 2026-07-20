@@ -16,7 +16,7 @@
   const open = $derived(flags.needsOnboarding || forced);
 
   let step = $state(0);
-  const STEPS = ['Welcome', 'ComicVine', 'Library', 'Downloads', 'Plugins', 'Finish'];
+  const STEPS = ['Welcome', 'Metadata', 'Library', 'Downloads', 'Plugins', 'Finish'];
   const EYEBROWS = ['', 'Step 2 · Metadata', 'Step 3 · Storage', 'Step 4 · Sources', 'Step 5 · Extend', ''];
 
   // Collected values
@@ -85,7 +85,7 @@
     // Libraries are created via /api/libraries (they OWN the storage paths now),
     // so no rootFolders here.
     const body = { onboardingDone: true };
-    if (cvKey.trim()) body.comicvineKeys = cvKey.trim();
+    if (cvKey.trim()) { body.comicvineKeys = cvKey.trim(); body.metadataSource = 'comicvine'; }
     if (source === 'usenet') {
       body.usenetEnabled = true;
       if (ixUrl.trim()) body.newznabIndexers = [ixName.trim() || ixUrl.trim(), ixUrl.trim().replace(/\/+$/, ''), ixKey.trim()].join(' | ');
@@ -146,7 +146,7 @@
 
   const nextLabel = $derived(step === STEPS.length - 1 ? (installing ? 'Installing plugins…' : saving ? 'Saving…' : 'Finish setup') : step === 0 ? 'Get started' : 'Continue');
   const summaryRows = $derived([
-    { label: 'ComicVine key', value: cvKey.trim() ? (tests.cv?.ok ? 'Verified' : 'Added') : 'Skipped', tone: cvKey.trim() ? 'var(--green)' : 'var(--muted)', icon: 'tag' },
+    { label: 'Metadata', value: cvKey.trim() ? (tests.cv?.ok ? 'ComicVine (verified)' : 'ComicVine') : 'Built-in service', tone: 'var(--green)', icon: 'tag' },
     { label: 'Libraries', value: namedLibs.length ? `${namedLibs.length} ${namedLibs.length === 1 ? 'library' : 'libraries'}` : 'None', tone: namedLibs.length ? 'var(--green)' : 'var(--muted)', icon: 'book' },
     { label: 'Download source', value: source === 'usenet' ? 'Usenet' : source === 'torrent' ? 'Torrents' : 'None yet', tone: source === 'none' ? 'var(--muted)' : 'var(--green)', icon: 'download' },
     { label: 'Plugins', value: `${catalogPlugins.filter((p) => pluginSel[p.id]).length} selected`, tone: 'var(--green)', icon: 'puzzle' },
@@ -180,22 +180,22 @@
             <div class="obx__hero obx__hero--brand"><Icon name="book" size={30} /></div>
             <h1 class="obx__h1 obx__h1--big">Welcome to BackIssue</h1>
             <p class="obx__lead">A self-hosted manager for your comic collection — track the series you want, download new issues as they release, and keep everything tagged and organized on disk.</p>
-            <p class="obx__sub">Setup takes about two minutes: a ComicVine API key, where your comics live, and optionally a download source. Everything can be changed later in <b>Settings</b>.</p>
+            <p class="obx__sub">Setup takes about two minutes: where your comics live and optionally a download source — metadata works out of the box. Everything can be changed later in <b>Settings</b>.</p>
             <div class="obx__bullets">
-              <div class="obx__bullet"><span class="obx__bullet-ico"><Icon name="tag" size={16} /></span><div><div class="obx__bullet-t">Rich metadata</div><div class="obx__bullet-b">Covers, credits and issue lists from ComicVine.</div></div></div>
+              <div class="obx__bullet"><span class="obx__bullet-ico"><Icon name="tag" size={16} /></span><div><div class="obx__bullet-t">Rich metadata</div><div class="obx__bullet-b">Covers, credits and issue lists — built in, no API key needed.</div></div></div>
               <div class="obx__bullet"><span class="obx__bullet-ico"><Icon name="download" size={16} /></span><div><div class="obx__bullet-t">Automatic downloads</div><div class="obx__bullet-b">New issues grabbed as they release.</div></div></div>
               <div class="obx__bullet"><span class="obx__bullet-ico"><Icon name="folder" size={16} /></span><div><div class="obx__bullet-t">Organized on disk</div><div class="obx__bullet-b">Tagged and filed into a clean folder tree.</div></div></div>
             </div>
           {:else if step === 1}
-            <h1 class="obx__h1">ComicVine API key</h1>
-            <p class="obx__lead">ComicVine provides every comic's identity — series, issues, covers, credits. A key is free from <a href="https://comicvine.gamespot.com/api/" target="_blank" rel="noreferrer">comicvine.gamespot.com/api <Icon name="external-link" size={13} /></a>.</p>
-            <span class="obx__label">API key</span>
-            <input class="obx__input obx__input--mono" type="text" spellcheck="false" autocomplete="off" placeholder="paste your key…" bind:value={cvKey} />
+            <h1 class="obx__h1">Metadata</h1>
+            <p class="obx__lead">Series, issues, covers and credits come from the built-in BackIssue metadata service — cached, enriched, and ready with <b>no setup</b>. Just hit Continue.</p>
+            <div class="obx__note obx__note--cyan"><span class="obx__note-ico"><Icon name="info" size={16} /></span><p>Prefer ComicVine directly? Paste your API key below — free from <a href="https://comicvine.gamespot.com/api/" target="_blank" rel="noreferrer">comicvine.gamespot.com/api</a>. Otherwise leave it blank; you can switch sources anytime in <b>Settings → Metadata</b>.</p></div>
+            <span class="obx__label">ComicVine API key (optional)</span>
+            <input class="obx__input obx__input--mono" type="text" spellcheck="false" autocomplete="off" placeholder="leave blank to use the built-in service…" bind:value={cvKey} />
             <div class="obx__testrow">
               <button class="obx__test" type="button" disabled={!cvKey.trim()} onclick={testCv}>Test key</button>
               {#if tests.cv}<span class="obx__teststatus" style="color:{cvTone};">{#if tests.cv.icon}<Icon name={tests.cv.icon} size={14} /> {/if}{tests.cv.text}</span>{/if}
             </div>
-            <div class="obx__note obx__note--cyan">You can skip this and add a key later in <b>Settings → Metadata</b>, but search and matching won't work until you do.</div>
           {:else if step === 2}
             <h1 class="obx__h1">Set up your libraries</h1>
             <p class="obx__lead">A library is a named collection with a type and a folder on disk. Create one to start — add more here or in <b>Settings</b> later. Files are organized into <b>folder</b>/Publisher/Title (Year).</p>

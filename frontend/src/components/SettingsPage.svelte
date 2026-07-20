@@ -255,9 +255,12 @@
       { id: 'sources', tab: 'sources', icon: 'target', label: 'Sources',
         value: `${enabledSourceCount} enabled`, note: enabledSourceCount >= 2 ? 'Fallback order applies' : enabledSourceCount === 1 ? 'No fallback if it misses' : 'Nothing can download',
         tone: tone(enabledSourceCount >= 2 ? 'green' : enabledSourceCount === 1 ? 'amber' : 'red') },
-      { id: 'comicvine', tab: 'metadata', icon: 'tag', label: 'ComicVine',
-        value: cvKeys.length ? 'Configured' : 'No API key', note: cvKeys.length ? 'Metadata lookups active' : 'Search and matching need a key',
-        tone: tone(cvKeys.length ? 'green' : 'red') },
+      { id: 'comicvine', tab: 'metadata', icon: 'tag', label: 'Metadata',
+        value: s.metadataSource === 'comicvine' ? (cvKeys.length ? 'ComicVine (your key)' : 'ComicVine — no key') : 'Built-in service',
+        note: s.metadataSource === 'comicvine'
+          ? (cvKeys.length ? 'Direct lookups with your API key' : 'Add a key or switch to the built-in service')
+          : 'Cached + enriched, no setup needed',
+        tone: tone(s.metadataSource === 'comicvine' && !cvKeys.length ? 'red' : 'green') },
       { id: 'libraries', tab: 'library', icon: 'library', label: 'Libraries',
         value: `${libs.length} librar${libs.length === 1 ? 'y' : 'ies'}`, note: `${totalSeries} series in the collection`,
         tone: tone(libs.length ? 'green' : 'amber') },
@@ -272,7 +275,7 @@
         tone: tone(notifyChannels ? 'green' : 'amber') },
     ];
     const attention = [];
-    if (!cvKeys.length) attention.push({ tone: 'red', title: 'ComicVine API key is missing', body: 'Search, matching, and metadata need a key (free at comicvine.gamespot.com).', action: 'Add key', tab: 'metadata' });
+    if (s.metadataSource === 'comicvine' && !cvKeys.length) attention.push({ tone: 'red', title: 'ComicVine API key is missing', body: 'The ComicVine source needs your own key (free at comicvine.gamespot.com) — or switch back to the built-in metadata service.', action: 'Add key', tab: 'metadata' });
     if (enabledSourceCount === 0) attention.push({ tone: 'red', title: 'No download sources enabled', body: 'New comics can’t be downloaded until a source is turned on.', action: 'Enable', tab: 'sources' });
     else if (enabledSourceCount === 1) attention.push({ tone: 'amber', title: 'Only one download source enabled', body: 'A second source gives searches a fallback when the first misses.', action: 'Review', tab: 'sources' });
     if (libs.length && !libFolders) attention.push({ tone: 'amber', title: 'No library has a folder', body: 'Downloads fall back to the downloads folder until a library gets one.', action: 'Set folder', tab: 'library' });
@@ -816,15 +819,23 @@
     <!-- METADATA -->
     <div class="setx-page setx-page--narrow" data-tab="metadata" class:is-active={activeTab === 'metadata'}>
       <h3 class="setx-panel__title">Metadata</h3>
-      <p class="setx-panel__sub">ComicVine keys and where release and tagging data come from.</p>
+      <p class="setx-panel__sub">Where series and issue data comes from.</p>
       <div class="setx-card">
-        <h4 class="setx-card__head">ComicVine API</h4>
-        <label class="field"><span>API key</span><input id="set-comicvineKeys" class="mono" type="text" spellcheck="false" autocomplete="off" placeholder="ComicVine API key…" /></label>
-        <p class="modal__note">Free at comicvine.gamespot.com — it identifies every series and issue.</p>
+        <h4 class="setx-card__head">Metadata source</h4>
+        <label class="field">
+          <span>Source</span>
+          <select id="set-metadataSource">
+            <option value="hosted">BackIssue metadata service (built-in, no setup)</option>
+            <option value="comicvine">ComicVine directly (your own API key)</option>
+          </select>
+        </label>
+        <p class="modal__note">The built-in service works out of the box — cached ComicVine data with enrichment and no rate-limit pauses. Choose ComicVine to query the official API directly with your own key instead.</p>
+        <label class="field"><span>ComicVine API key</span><input id="set-comicvineKeys" class="mono" type="text" spellcheck="false" autocomplete="off" placeholder="Only used with the ComicVine source…" /></label>
+        <p class="modal__note">Free at comicvine.gamespot.com. Only used when the source above is set to ComicVine.</p>
         <div class="client-test"><button id="cv-test" class="btn btn--ghost" type="button" onclick={testCv}>Test key</button>
           {#if tests.cv}<span id="cv-test-result" class="client-status {tests.cv.cls}">{#if tests.cv.icon}<Icon name={tests.cv.icon} /> {/if}{tests.cv.text}</span>{/if}</div>
-        <label class="field"><span>API base URL (optional)</span><input id="set-cvBaseUrl" class="mono" type="text" spellcheck="false" placeholder="https://data.backissue.app/api" /></label>
-        <p class="modal__note">Point metadata lookups at a ComicVine-compatible server instead of the official API — no rate limits, and politeness delays are skipped automatically. Blank = official ComicVine.</p>
+        <label class="field"><span>Service URL (optional)</span><input id="set-cvBaseUrl" class="mono" type="text" spellcheck="false" placeholder="https://data.backissue.app/api" /></label>
+        <p class="modal__note">Self-hosting the metadata service? Point lookups at your own instance. Blank = the built-in service. Ignored when the source is ComicVine.</p>
       </div>
       <div class="setx-card">
         <h4 class="setx-card__head">Tagging &amp; files</h4>

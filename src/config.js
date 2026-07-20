@@ -60,6 +60,11 @@ const config = {
   // ComicTagger tag-on-download.
   tagOnDownload: 'off',
   comicvineKeys: '',
+  // 'hosted' (default: the BackIssue metadata service, zero setup) or
+  // 'comicvine' (direct, requires comicvineKeys).
+  metadataSource: 'hosted',
+  // Issued by the hosted service on first use; persisted via settings.
+  metadataInstanceKey: '',
   // Alternative ComicVine-compatible API base (a self-hosted CloneVine). Blank
   // = the official API (rate-limited, proxied, politeness-paced).
   cvBaseUrl: '',

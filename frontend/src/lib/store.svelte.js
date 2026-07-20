@@ -44,7 +44,9 @@ export async function loadFlags() {
       flags.usenetEnabled = !!s.usenetEnabled;
       flags.torrentEnabled = !!s.torrentEnabled;
       // First run: never onboarded and no ComicVine key yet → offer the wizard.
-      flags.needsOnboarding = !s.onboardingDone && !String(s.comicvineKeys || '').trim();
+      // Strict === false: a partial/odd payload (e.g. mid-restart) must never
+      // read as "unconfigured" and flash the wizard at a configured install.
+      flags.needsOnboarding = s.onboardingDone === false && !String(s.comicvineKeys || '').trim();
     }
   } catch { /* offline */ }
   // Any enabled source (incl. plugins) → the issue "Search sources" button.

@@ -20,3 +20,6 @@ docs/
 
 # Node fatal-error diagnostic reports
 reports/
+
+# ML models (large binaries, distributed separately)
+models/

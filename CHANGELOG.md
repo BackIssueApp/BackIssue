@@ -8,6 +8,18 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.7.4] — 2026-07-20
+
+### Changed
+- **Metadata works out of the box.** BackIssue now defaults to the hosted
+  BackIssue metadata service — cached series/issue data with enrichment and
+  no rate-limit pauses — authenticating with a key each install provisions
+  for itself on first use. No ComicVine API key is required anymore. Prefer
+  querying ComicVine directly? Set Settings → Metadata → Source to ComicVine
+  and add your own key (existing installs with a key keep working either
+  way). Onboarding's ComicVine step is now optional accordingly.
+
+
 ## [0.7.3] — 2026-07-18
 
 ### Added

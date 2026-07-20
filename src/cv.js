@@ -4,10 +4,14 @@ export function cvKey(text) {
   return String(text || '').split(/[\n,]+/).map((k) => k.trim()).find(Boolean) || '';
 }
 
-// ComicVine-compatible REST client. Points at the official API or a
-// self-hosted CloneVine (cvBaseUrl) — one key, no proxying; CloneVine holds
-// the real CV credentials and does its own upstream pacing.
+// ComicVine-compatible REST client. By default it talks to the hosted
+// BackIssue metadata service (cached ComicVine data + Metron enrichment +
+// panel metadata), authenticating with a per-install key it provisions for
+// itself on first use — zero setup. Users who prefer ComicVine directly set
+// metadataSource='comicvine' with their own API key; cvBaseUrl points at a
+// self-hosted metadata service instead of the default hosted one.
 const BASE = 'https://comicvine.gamespot.com/api';
+const HOSTED_BASE = 'https://data.backissue.app/api';
 const UA = 'comic-metadata-client/1.0';
 const VOLUME_PREFIX = '4050';
 const ISSUE_PREFIX = '4000';
@@ -41,19 +45,55 @@ export function normVolume(v) {
 // hammering on.
 function rateLimitError(message) { const e = new Error(message); e.rateLimited = true; return e; }
 
+// Provision (once) and cache the per-install metadata-service key. Persisted
+// through saveSettings so it survives restarts; in-flight promise dedupes
+// concurrent first calls. Dynamic import avoids a config↔settings cycle.
+let instanceKeyPromise = null;
+async function ensureInstanceKey(config, base, doFetch) {
+  if (config.metadataInstanceKey) return config.metadataInstanceKey;
+  return (instanceKeyPromise ??= (async () => {
+    const origin = base.replace(/\/api$/, '');
+    const resp = await doFetch(`${origin}/api/register`, { method: 'POST', headers: { 'User-Agent': UA } });
+    if (!resp.ok) {
+      instanceKeyPromise = null; // allow retry on the next call
+      throw new Error(`metadata service registration failed (HTTP ${resp.status})`);
+    }
+    const key = (await resp.json())?.key;
+    if (!key) {
+      instanceKeyPromise = null;
+      throw new Error('metadata service registration returned no key');
+    }
+    config.metadataInstanceKey = key;
+    try {
+      const { saveSettings } = await import('./settings.js');
+      saveSettings({ metadataInstanceKey: key });
+    } catch { /* tests / stripped installs: key still lives in config for this run */ }
+    return key;
+  })());
+}
+
 export function makeCvClient(config, { fetchImpl, key, politeMs } = {}) {
-  const apiKey = key || cvKey(config.comicvineKeys);
-  if (!apiKey) throw new Error('no ComicVine API key configured');
-  // A custom base URL (a self-hosted CloneVine) speaks the same API but has no
-  // rate limits — skip the politeness pauses.
-  const base = String(config?.cvBaseUrl || '').replace(/\/+$/, '') || BASE;
+  // Direct-ComicVine mode is an explicit user preference AND needs a key;
+  // otherwise the hosted metadata service (or a self-hosted cvBaseUrl) with a
+  // self-provisioned instance key — no configuration required.
+  const directCv = config?.metadataSource === 'comicvine' && !!(key || cvKey(config.comicvineKeys));
+  const doFetch = fetchImpl || fetch;
+  let base;
+  let fixedKey = null;
+  if (directCv) {
+    base = BASE;
+    fixedKey = key || cvKey(config.comicvineKeys);
+  } else {
+    base = String(config?.cvBaseUrl || '').replace(/\/+$/, '') || HOSTED_BASE;
+    fixedKey = key || null; // tests may inject; otherwise provisioned lazily
+  }
   const custom = base !== BASE;
   const pace = politeMs !== undefined ? politeMs : (custom ? 0 : POLITE_MS);
-  const doFetch = fetchImpl || fetch;
 
   // One HTTP call, with a couple of retries for transient failures. A rate
   // limit (HTTP 420/429/503 or status_code 107) is surfaced as .rateLimited.
   async function call(pathAndQuery, attempt = 0) {
+    const apiKey = fixedKey || (await ensureInstanceKey(config, base, doFetch));
     const sep = pathAndQuery.includes('?') ? '&' : '?';
     const url = `${base}${pathAndQuery}${sep}api_key=${encodeURIComponent(apiKey)}&format=json`;
     let resp;

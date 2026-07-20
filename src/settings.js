@@ -23,6 +23,12 @@ export const SETTING_FIELDS = {
   comictaggerPath:     { type: 'string' }, // legacy (ComicTagger removed); tolerated so old settings.json loads
   comicvineKeys:       { type: 'string' },
   cvBaseUrl:           { type: 'string', allowEmpty: true },
+  // Where metadata comes from: the hosted BackIssue metadata service (zero
+  // setup, cached + enriched) or ComicVine directly with the user's own key.
+  metadataSource:      { type: 'enum', values: ['hosted', 'comicvine'] },
+  // Self-provisioned key for the hosted metadata service (issued on first
+  // use; not user-facing).
+  metadataInstanceKey: { type: 'string', allowEmpty: true },
   cvEnrich:            { type: 'bool' },
   // Manga search content ceiling (each level includes the ones below it).
   mangaRating:         { type: 'enum', values: ['safe', 'suggestive', 'erotica', 'pornographic'] },
