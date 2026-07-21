@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { magnetInfohash, torrentInfohash } from '../src/torrenthash.js';
 import { parseTorznabJson, parseTorznab, searchTorznab, testTorznabIndexer } from '../src/torznab.js';
-import { makeQbClient, qbBaseUrl, testTorrentClient } from '../src/torrentclients.js';
+import { makeQbClient, makeTransmissionClient, makeDelugeClient, makeTorrentClient, qbBaseUrl, trBaseUrl, delugeBaseUrl, testTorrentClient } from '../src/torrentclients.js';
 import { torrent } from '../src/sources/torrent.js';
 import { createDownloadMonitor } from '../src/downloadmonitor.js';
 import { openDb, upsertSeries, upsertIssue, recordGrab } from '../src/db.js';
@@ -350,4 +350,275 @@ test('qb add: a .torrent proxy URL that redirects to a magnet takes the magnet p
   const hash = await client.add('http://prowlarr/download?id=1', { name: 'X', category: 'bc' });
   assert.equal(hash, 'abcdef0123456789abcdef0123456789abcdef01'); // hash from the redirect target
   assert.equal(seen.filter((s) => s.url.includes('prowlarr/download')).length, 1); // fetched ONCE (hit-counted links)
+});
+
+// ---- Transmission client ----
+// One RPC endpoint; any request without the current session id gets a 409
+// carrying it. `rotateAfter` expires the id after N successful calls.
+function fakeTransmission({ torrents = [], addResult, labelError = false, rotateAfter = Infinity, session = { version: '4.0.5', 'rpc-version': 17 } } = {}) {
+  const calls = [];
+  let sid = 'sid-1', okCalls = 0, handshakes = 0;
+  const fetchImpl = async (url, opts = {}) => {
+    const body = JSON.parse(opts.body);
+    if ((opts.headers || {})['X-Transmission-Session-Id'] !== sid) {
+      handshakes++;
+      const cur = sid;
+      return { ok: false, status: 409, headers: { get: (h) => (h.toLowerCase() === 'x-transmission-session-id' ? cur : null) }, json: async () => ({}), text: async () => '' };
+    }
+    calls.push({ method: body.method, args: body.arguments, headers: opts.headers });
+    if (++okCalls >= rotateAfter) { rotateAfter = Infinity; sid = 'sid-2'; }
+    const reply = (args, result = 'success') => ({ ok: true, status: 200, headers: { get: () => null }, json: async () => ({ result, arguments: args }) });
+    if (body.method === 'torrent-add') return reply(addResult !== undefined ? addResult : { 'torrent-added': { id: 7, hashString: 'ABCDEF0123456789ABCDEF0123456789ABCDEF01' } });
+    if (body.method === 'torrent-set') return reply({}, labelError ? 'unrecognized argument' : 'success');
+    if (body.method === 'torrent-get') return reply({ torrents });
+    if (body.method === 'torrent-remove') return reply({});
+    if (body.method === 'session-get') return reply(session);
+    return reply({}, 'method not found');
+  };
+  return { fetchImpl, calls, handshakes: () => handshakes };
+}
+
+test('trBaseUrl/delugeBaseUrl build from their own host/port/ssl', () => {
+  assert.equal(trBaseUrl({ trHost: 'nas', trPort: 9091 }), 'http://nas:9091');
+  assert.equal(trBaseUrl({ trHost: '' }), '');
+  assert.equal(delugeBaseUrl({ delugeHost: 'nas', delugePort: 8112, delugeSsl: true }), 'https://nas:8112');
+});
+
+test('transmission add: 409 handshake, magnet hash lowercased, category applied as a label', async () => {
+  const { fetchImpl, calls, handshakes } = fakeTransmission();
+  const client = makeTransmissionClient({ trHost: 'h', trPort: 9091, trUser: 'u', trPass: 'p' }, { fetchImpl });
+  const hash = await client.add('magnet:?xt=urn:btih:ABCDEF0123456789ABCDEF0123456789ABCDEF01', { name: 'Saga 1', category: 'bc' });
+  assert.equal(hash, 'abcdef0123456789abcdef0123456789abcdef01');
+  const add = calls.find((c) => c.method === 'torrent-add');
+  assert.equal(add.args.filename, 'magnet:?xt=urn:btih:ABCDEF0123456789ABCDEF0123456789ABCDEF01');
+  assert.match(add.headers.Authorization, /^Basic /); // credentials ride HTTP Basic
+  assert.deepEqual(calls.find((c) => c.method === 'torrent-set').args, { ids: [7], labels: ['bc'] });
+  assert.equal(handshakes(), 1); // one 409 handshake, then the session id is cached
+});
+
+test('transmission add: a duplicate still yields its hash; label errors are skipped (old RPC)', async () => {
+  const { fetchImpl } = fakeTransmission({ addResult: { 'torrent-duplicate': { id: 3, hashString: 'AAAA' } }, labelError: true });
+  const client = makeTransmissionClient({ trHost: 'h' }, { fetchImpl });
+  assert.equal(await client.add('magnet:?xt=urn:btih:aaaa', { category: 'bc' }), 'aaaa');
+});
+
+test('transmission add: a response without hashString falls back to the magnet infohash', async () => {
+  const { fetchImpl } = fakeTransmission({ addResult: { 'torrent-added': { id: 4 } } });
+  const client = makeTransmissionClient({ trHost: 'h' }, { fetchImpl });
+  assert.equal(await client.add('magnet:?xt=urn:btih:ABCDEF0123456789ABCDEF0123456789ABCDEF01', {}),
+    'abcdef0123456789abcdef0123456789abcdef01');
+});
+
+test('transmission status/list: maps state, appends the name to downloadDir, filters by label', async () => {
+  const cfg = { trHost: 'h', trPort: 9091, torrentCompleteDirRemote: '/downloads', torrentCompleteDir: '\\\\NAS\\dl' };
+  const torrents = [
+    { hashString: 'AAAA', name: 'done', percentDone: 1, error: 0, downloadDir: '/downloads', labels: ['bc'], trackerStats: [{ seederCount: 3 }, { seederCount: 12 }] },
+    { hashString: 'bbbb', name: 'dl', percentDone: 0.5, error: 0, downloadDir: '/downloads', labels: ['bc'] },
+    { hashString: 'cccc', name: 'bad', percentDone: 0.1, error: 3, errorString: 'tracker down', labels: ['bc'] },
+    { hashString: 'dddd', name: 'other', percentDone: 1, error: 0, downloadDir: '/downloads', labels: ['movies'] },
+    { hashString: 'eeee', name: 'old', percentDone: 1, error: 0, downloadDir: '/downloads' }, // pre-labels RPC — kept
+  ];
+  const { fetchImpl } = fakeTransmission({ torrents });
+  const client = makeTransmissionClient(cfg, { fetchImpl });
+  const list = await client.listByCategory('bc');
+  const byId = Object.fromEntries(list.map((t) => [t.id, t]));
+  assert.equal(list.length, 4);
+  assert.equal(byId.dddd, undefined);            // other label filtered out
+  assert.equal(byId.aaaa.state, 'done');
+  assert.equal(byId.aaaa.path, '//NAS/dl/done'); // downloadDir + name, remapped
+  assert.equal(byId.aaaa.seeders, 12);           // best tracker seeder count
+  assert.equal(byId.bbbb.state, 'downloading');
+  assert.equal(byId.bbbb.progress, 50);
+  assert.equal(byId.cccc.state, 'failed');
+  assert.equal(byId.cccc.error, 'tracker down');
+  assert.equal(byId.eeee.state, 'done');         // no labels array → kept, matched by hash later
+});
+
+test('transmission status: queries by hash; an unknown hash reads as queued', async () => {
+  const { fetchImpl, calls } = fakeTransmission({ torrents: [{ hashString: 'AAAA', name: 'x', percentDone: 0.25, error: 0 }] });
+  const client = makeTransmissionClient({ trHost: 'h' }, { fetchImpl });
+  assert.equal((await client.status('aaaa')).progress, 25);
+  assert.deepEqual(calls.find((c) => c.method === 'torrent-get').args.ids, ['aaaa']);
+  const empty = makeTransmissionClient({ trHost: 'h' }, { fetchImpl: fakeTransmission({ torrents: [] }).fetchImpl });
+  assert.equal((await empty.status('aaaa')).state, 'queued');
+});
+
+test('transmission remove: passes ids and delete-local-data', async () => {
+  const { fetchImpl, calls } = fakeTransmission();
+  const client = makeTransmissionClient({ trHost: 'h' }, { fetchImpl });
+  await client.remove('aaaa', { deleteFiles: true });
+  assert.deepEqual(calls.find((c) => c.method === 'torrent-remove').args, { ids: ['aaaa'], 'delete-local-data': true });
+});
+
+test('transmission: a later 409 (rotated session id) re-handshakes transparently', async () => {
+  const { fetchImpl, handshakes } = fakeTransmission({ rotateAfter: 1 });
+  const client = makeTransmissionClient({ trHost: 'h' }, { fetchImpl });
+  await client.listByCategory('bc'); // handshake 1; the ok call then rotates the id
+  await client.listByCategory('bc'); // stale id → 409 → handshake 2 → retried ok
+  assert.equal(handshakes(), 2);
+});
+
+test('testTorrentClient: transmission success reports version + RPC through the handshake', async () => {
+  const { fetchImpl } = fakeTransmission();
+  const r = await testTorrentClient({ torrentClient: 'transmission', trHost: 'h', trPort: 9091 }, { fetchImpl });
+  assert.equal(r.ok, true);
+  assert.match(r.message, /Transmission 4\.0\.5 \(RPC 17\)/);
+});
+
+test('testTorrentClient: transmission 401 → credentials hint; missing host reported', async () => {
+  const fetchImpl = async () => ({ ok: false, status: 401, headers: { get: () => null }, json: async () => ({}) });
+  const r = await testTorrentClient({ torrentClient: 'transmission', trHost: 'h' }, { fetchImpl });
+  assert.equal(r.ok, false);
+  assert.match(r.message, /username\/password/);
+  const r2 = await testTorrentClient({ torrentClient: 'transmission' }, { fetchImpl });
+  assert.match(r2.message, /host is required/i);
+});
+
+// ---- Deluge client ----
+// Web-UI JSON-RPC: auth.login issues a session cookie, later calls without a
+// valid one get a "Not authenticated" error. `expireAfter` kills the session
+// after N authed calls; web.connect flips a disconnected UI to connected.
+function fakeDeluge({ torrents = {}, addResult, password = 'pw', connected = true, hosts = [['h1', '127.0.0.1', 58846, 'Online']], labelError = false, version = '2.1.1', expireAfter = Infinity } = {}) {
+  const calls = [];
+  let sessions = 0, valid = null, authed = 0;
+  const fetchImpl = async (url, opts = {}) => {
+    const body = JSON.parse(opts.body);
+    const cookie = (opts.headers || {}).Cookie || null;
+    const reply = (result, error = null, setCookie = null) => ({
+      ok: true, status: 200,
+      json: async () => ({ result, error, id: body.id }),
+      headers: { get: (h) => (h.toLowerCase() === 'set-cookie' ? setCookie : null), getSetCookie: () => (setCookie ? [setCookie] : []) },
+    });
+    calls.push({ method: body.method, params: body.params, cookie });
+    if (body.method === 'auth.login') {
+      if (body.params[0] !== password) return reply(false);
+      valid = `_session_id=s${++sessions}`;
+      return reply(true, null, `${valid}; Path=/json; HttpOnly`);
+    }
+    if (cookie !== valid) return reply(null, { message: 'Not authenticated', code: 1 });
+    if (++authed >= expireAfter) { expireAfter = Infinity; valid = null; } // session dies after this call
+    if (body.method === 'web.connected') return reply(connected);
+    if (body.method === 'web.get_hosts') return reply(hosts);
+    if (body.method === 'web.connect') { connected = true; return reply(null); }
+    if (body.method === 'core.add_torrent_magnet' || body.method === 'core.add_torrent_url') return reply(addResult !== undefined ? addResult : 'abcdef0123456789abcdef0123456789abcdef01');
+    if (body.method === 'label.add' || body.method === 'label.set_torrent') return reply(null, labelError ? { message: 'Unknown method' } : null);
+    if (body.method === 'core.get_torrents_status') return reply(torrents);
+    if (body.method === 'core.remove_torrent') return reply(true);
+    if (body.method === 'daemon.get_version') return reply(version);
+    return reply(null, { message: `Unknown method ${body.method}` });
+  };
+  return { fetchImpl, calls };
+}
+
+test('deluge add: cookie login, magnet add, category applied as a lowercase label', async () => {
+  const { fetchImpl, calls } = fakeDeluge();
+  const client = makeDelugeClient({ delugeHost: 'h', delugePort: 8112, delugePass: 'pw' }, { fetchImpl });
+  const hash = await client.add('magnet:?xt=urn:btih:aaaa', { name: 'Saga 1', category: 'BackIssue' });
+  assert.equal(hash, 'abcdef0123456789abcdef0123456789abcdef01');
+  const add = calls.find((c) => c.method === 'core.add_torrent_magnet');
+  assert.equal(add.params[0], 'magnet:?xt=urn:btih:aaaa');
+  assert.equal(add.cookie, '_session_id=s1'); // session cookie echoed after login
+  assert.deepEqual(calls.find((c) => c.method === 'label.add').params, ['backissue']);
+  assert.deepEqual(calls.find((c) => c.method === 'label.set_torrent').params, [hash, 'backissue']);
+});
+
+test('deluge add: http links go through core.add_torrent_url', async () => {
+  const { fetchImpl, calls } = fakeDeluge();
+  const client = makeDelugeClient({ delugeHost: 'h', delugePass: 'pw' }, { fetchImpl });
+  assert.equal(await client.add('http://prowlarr/download?id=1', {}), 'abcdef0123456789abcdef0123456789abcdef01');
+  assert.equal(calls.find((c) => c.method === 'core.add_torrent_url').params[0], 'http://prowlarr/download?id=1');
+});
+
+test('deluge add: a duplicate (null result) falls back to the magnet infohash', async () => {
+  const { fetchImpl } = fakeDeluge({ addResult: null });
+  const client = makeDelugeClient({ delugeHost: 'h', delugePass: 'pw' }, { fetchImpl });
+  assert.equal(await client.add('magnet:?xt=urn:btih:ABCDEF0123456789ABCDEF0123456789ABCDEF01', {}),
+    'abcdef0123456789abcdef0123456789abcdef01');
+});
+
+test('deluge add: a missing Label plugin never fails the add', async () => {
+  const { fetchImpl } = fakeDeluge({ labelError: true });
+  const client = makeDelugeClient({ delugeHost: 'h', delugePass: 'pw' }, { fetchImpl });
+  assert.equal(await client.add('magnet:?xt=urn:btih:aaaa', { category: 'bc' }), 'abcdef0123456789abcdef0123456789abcdef01');
+});
+
+test('deluge status/list: progress is already 0-100, save_path + name remapped, label-filtered', async () => {
+  const cfg = { delugeHost: 'h', delugePass: 'pw', torrentCompleteDirRemote: '/downloads', torrentCompleteDir: '\\\\NAS\\dl' };
+  const torrents = {
+    aaaa: { name: 'done', progress: 100, state: 'Seeding', save_path: '/downloads', label: 'bc', total_seeds: 9 },
+    bbbb: { name: 'dl', progress: 41.7, state: 'Downloading', label: 'bc' },
+    cccc: { name: 'bad', progress: 10, state: 'Error', label: 'bc' },
+    dddd: { name: 'other', progress: 100, state: 'Seeding', save_path: '/downloads', label: 'movies' },
+    eeee: { name: 'unlabeled', progress: 50, state: 'Downloading' }, // Label plugin absent — kept
+  };
+  const { fetchImpl } = fakeDeluge({ torrents });
+  const client = makeDelugeClient(cfg, { fetchImpl });
+  const list = await client.listByCategory('BC'); // matched lowercase
+  const byId = Object.fromEntries(list.map((t) => [t.id, t]));
+  assert.equal(list.length, 4);
+  assert.equal(byId.dddd, undefined);
+  assert.equal(byId.aaaa.state, 'done');
+  assert.equal(byId.aaaa.path, '//NAS/dl/done'); // save_path + name, remapped
+  assert.equal(byId.aaaa.seeders, 9);
+  assert.equal(byId.bbbb.state, 'downloading');
+  assert.equal(byId.bbbb.progress, 42);
+  assert.equal(byId.cccc.state, 'failed');
+  assert.equal(byId.eeee.state, 'downloading');
+});
+
+test('deluge status: filters by id; an unknown hash reads as queued', async () => {
+  const { fetchImpl, calls } = fakeDeluge({ torrents: {} });
+  const client = makeDelugeClient({ delugeHost: 'h', delugePass: 'pw' }, { fetchImpl });
+  assert.equal((await client.status('aaaa')).state, 'queued');
+  assert.deepEqual(calls.find((c) => c.method === 'core.get_torrents_status').params[0], { id: ['aaaa'] });
+});
+
+test('deluge remove: core.remove_torrent gets the hash + delete flag', async () => {
+  const { fetchImpl, calls } = fakeDeluge();
+  const client = makeDelugeClient({ delugeHost: 'h', delugePass: 'pw' }, { fetchImpl });
+  await client.remove('aaaa', { deleteFiles: true });
+  assert.deepEqual(calls.find((c) => c.method === 'core.remove_torrent').params, ['aaaa', true]);
+});
+
+test('deluge: an expired web session re-logs-in and retries once', async () => {
+  const torrents = { aaaa: { name: 'x', progress: 50, state: 'Downloading' } };
+  const { fetchImpl, calls } = fakeDeluge({ torrents, expireAfter: 2 });
+  const client = makeDelugeClient({ delugeHost: 'h', delugePass: 'pw' }, { fetchImpl });
+  await client.listByCategory('bc');              // login s1 → connected → list (session then expires)
+  const list = await client.listByCategory('bc'); // stale cookie → re-login s2 → retried
+  assert.equal(list.length, 1);
+  assert.equal(calls.filter((c) => c.method === 'auth.login').length, 2);
+});
+
+test('testTorrentClient: deluge success reports the daemon version', async () => {
+  const { fetchImpl } = fakeDeluge();
+  const r = await testTorrentClient({ torrentClient: 'deluge', delugeHost: 'h', delugePort: 8112, delugePass: 'pw' }, { fetchImpl });
+  assert.equal(r.ok, true);
+  assert.match(r.message, /Deluge 2\.1\.1/);
+});
+
+test('testTorrentClient: deluge wrong password / no daemon are reported clearly', async () => {
+  const bad = await testTorrentClient({ torrentClient: 'deluge', delugeHost: 'h', delugePass: 'nope' }, { fetchImpl: fakeDeluge().fetchImpl });
+  assert.equal(bad.ok, false);
+  assert.match(bad.message, /password/i);
+  const off = await testTorrentClient({ torrentClient: 'deluge', delugeHost: 'h', delugePass: 'pw' }, { fetchImpl: fakeDeluge({ connected: false, hosts: [] }).fetchImpl });
+  assert.equal(off.ok, false);
+  assert.match(off.message, /daemon/i);
+  // A disconnected UI with a known daemon host is attached automatically.
+  const attach = await testTorrentClient({ torrentClient: 'deluge', delugeHost: 'h', delugePass: 'pw' }, { fetchImpl: fakeDeluge({ connected: false }).fetchImpl });
+  assert.equal(attach.ok, true);
+});
+
+test('makeTorrentClient: dispatches on torrentClient', () => {
+  assert.ok(makeTorrentClient({ torrentClient: 'transmission', trHost: 'h' }, {}).add);
+  assert.ok(makeTorrentClient({ torrentClient: 'deluge', delugeHost: 'h' }, {}).add);
+  assert.throws(() => makeTorrentClient({ torrentClient: 'rtorrent', qbHost: 'h' }, {}), /unknown torrentClient/);
+});
+
+test('torrent source: enablement follows the selected client\'s host', () => {
+  const base = { torrentEnabled: true, torznabIndexers: 'j|http://j|k' };
+  assert.equal(torrent.isEnabled({ ...base, torrentClient: 'transmission', trHost: 'h' }), true);
+  assert.equal(torrent.isEnabled({ ...base, torrentClient: 'transmission', qbHost: 'h' }), false);
+  assert.equal(torrent.isEnabled({ ...base, torrentClient: 'deluge', delugeHost: 'h' }), true);
+  assert.equal(torrent.isEnabled({ ...base, torrentClient: 'deluge' }), false);
 });

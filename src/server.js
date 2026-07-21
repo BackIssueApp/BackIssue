@@ -1496,7 +1496,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     }
   });
 
-  // Ping qBittorrent without adding anything.
+  // Ping the configured torrent client without adding anything.
   app.post('/api/torrent-client/test', async (req, res) => {
     try {
       res.json(await testTorrentClient(req.body || {}));

@@ -183,23 +183,33 @@ const config = {
   usenetPollSeconds: 15,
   usenetTimeoutMinutes: 60,
 
-  // Torrent source (Torznab indexers → qBittorrent → import). Once imported, the
-  // torrent is LEFT in qBittorrent so it keeps seeding — manage ratio/removal there.
+  // Torrent source (Torznab indexers → a torrent client → import). Once imported,
+  // the torrent is LEFT in the client so it keeps seeding — manage ratio/removal there.
   torrentEnabled: false,
   // One Torznab indexer per line: name | https://jackett/…/torznab | apikey
   torznabIndexers: '',
+  // Download client: 'qbittorrent', 'transmission', or 'deluge'.
   torrentClient: 'qbittorrent',
   qbHost: '',            // hostname or IP, e.g. nas or 192.168.1.10
   qbPort: '',            // qBittorrent Web UI port (default 8080)
   qbSsl: false,          // talk to the Web UI over https
   qbUser: '',            // Web UI username
   qbPass: '',            // Web UI password
+  trHost: '',            // hostname or IP, e.g. nas or 192.168.1.10
+  trPort: '',            // Transmission RPC port (default 9091)
+  trSsl: false,          // talk to the RPC endpoint over https
+  trUser: '',            // RPC username (blank if auth is off)
+  trPass: '',            // RPC password
+  delugeHost: '',        // hostname or IP, e.g. nas or 192.168.1.10
+  delugePort: '',        // Deluge web UI port (default 8112)
+  delugeSsl: false,      // talk to the web UI over https
+  delugePass: '',        // web UI password (Deluge's only credential)
   torrentCategory: 'backissue',
-  // Completed content path mapping (like the usenet remap): qBittorrent reports a
+  // Completed content path mapping (like the usenet remap): the client reports a
   // finished torrent's content at a path on ITS filesystem; this app may read that
   // folder at a different path over the network. Blank if they share a path.
   torrentCompleteDir: '',        // path THIS app reads
-  torrentCompleteDirRemote: '',  // same folder as qBittorrent reports it
+  torrentCompleteDirRemote: '',  // same folder as the client reports it
   torrentPollSeconds: 20,
   torrentTimeoutMinutes: 120,    // torrents can be slow to find peers
 

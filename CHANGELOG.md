@@ -8,6 +8,14 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+- **Transmission and Deluge support.** The torrent source can now download
+  through Transmission or Deluge as well as qBittorrent — pick the client under
+  Settings → Sources → Torrents, with per-client connection fields and a Test
+  button. The category maps to a label on both new clients (Transmission 4.x
+  labels; Deluge's Label plugin when enabled), and the completed-folder path
+  mapping is shared across all three.
+
 ### Fixed
 - The metadata-service instance key is persisted only by the live app
   configuration — test runs (or any code constructing its own config) can no
@@ -15,6 +23,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   metadata 401s and re-triggered onboarding.
 
 ### Changed
+- **Onboarding no longer has a Metadata step.** New installs use the built-in
+  metadata service automatically — nothing to configure. Switching to a
+  personal ComicVine key lives in Settings → Metadata, which now shows a
+  warning about ComicVine's API rate limits when that source is selected.
+- The onboarding torrent step now offers all supported download clients
+  (qBittorrent, Transmission, Deluge), matching the usenet step's selector.
 - Indexer descriptors from indexer providers can now pin their own
   Newznab/Torznab category filter, which overrides the per-search default.
 

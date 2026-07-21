@@ -13,6 +13,7 @@
   let { active = false } = $props();
 
   const DEFAULT_PORTS = { sabnzbd: '8080', nzbget: '6789' };
+  const TORRENT_PORTS = { qbittorrent: ['#set-qbPort', '8080'], transmission: ['#set-trPort', '9091'], deluge: ['#set-delugePort', '8112'] };
 
   // "Split detail" settings: a top tab rail shows ONE page at a time. Every
   // page stays MOUNTED (CSS-hidden, never {#if}-removed) — the generic set-*
@@ -141,6 +142,10 @@
 
   // Swap client credential fields to the selected client, hint default ports,
   // and let plugins report whether their source is enabled.
+  // Show the rate-limit warning only when ComicVine-direct is selected.
+  let cvDirect = $state(false);
+  function syncMetaUI() { cvDirect = document.getElementById('set-metadataSource')?.value === 'comicvine'; }
+
   function syncSourceUI() {
     if (!root) return;
     const usenet = root.querySelector('#set-usenetEnabled').checked;
@@ -152,9 +157,14 @@
     port.placeholder = DEFAULT_PORTS[client] || '';
     if (!port.value) port.value = DEFAULT_PORTS[client] || '';
     const torrent = root.querySelector('#set-torrentEnabled').checked;
-    const qport = root.querySelector('#set-qbPort');
-    qport.placeholder = '8080';
-    if (!qport.value) qport.value = '8080';
+    const tcfg = root.querySelector('#torrent-config');
+    tcfg.classList.remove('client-qbittorrent', 'client-transmission', 'client-deluge');
+    const tclient = root.querySelector('#set-torrentClient').value;
+    tcfg.classList.add('client-' + tclient);
+    const [tportSel, tportDefault] = TORRENT_PORTS[tclient] || TORRENT_PORTS.qbittorrent;
+    const tport = root.querySelector(tportSel);
+    tport.placeholder = tportDefault;
+    if (!tport.value) tport.value = tportDefault;
     srcOn = { usenet, torrent };
     // An indexer-provider plugin (e.g. Prowlarr) may be managing the lists.
     srcManaged = BackIssue._indexerManagedHooks.some((fn) => { try { return !!fn(); } catch { return false; } });
@@ -232,6 +242,7 @@
     try { sourceOrder = (await apiGet('/api/sources')).sources || []; } catch { sourceOrder = []; }
     for (const cb of BackIssue._settingsHooks) { try { cb(s); } catch { /* ignore */ } }
     syncSourceUI();
+    syncMetaUI();
     previewNaming();
     for (const b of root.querySelectorAll('.src-block')) {
       const sw = b.querySelector('.switch input');
@@ -414,11 +425,21 @@
     nzbClientPass: v('#set-nzbClientPass'),
   }));
   const testQb = () => runTest('qb', '/api/torrent-client/test', () => ({
+    torrentClient: v('#set-torrentClient'),
     qbHost: v('#set-qbHost').trim(),
     qbPort: v('#set-qbPort').trim(),
     qbSsl: checked('#set-qbSsl'),
     qbUser: v('#set-qbUser').trim(),
     qbPass: v('#set-qbPass'),
+    trHost: v('#set-trHost').trim(),
+    trPort: v('#set-trPort').trim(),
+    trSsl: checked('#set-trSsl'),
+    trUser: v('#set-trUser').trim(),
+    trPass: v('#set-trPass'),
+    delugeHost: v('#set-delugeHost').trim(),
+    delugePort: v('#set-delugePort').trim(),
+    delugeSsl: checked('#set-delugeSsl'),
+    delugePass: v('#set-delugePass'),
   }));
   const testCv = () => runTest('cv', '/api/cv/test', () => ({ keys: v('#set-comicvineKeys') }));
 
@@ -637,7 +658,7 @@
       <div class="setx-split" class:is-drilled={srcDrill}>
         <div class="setx-rail">
           {@render railItem('src', 'usenet', 'download', 'Usenet', 'Newznab + SABnzbd/NZBGet', srcOn.usenet ? 'green' : 'muted')}
-          {@render railItem('src', 'torrent', 'download', 'Torrents', 'Torznab + qBittorrent', srcOn.torrent ? 'green' : 'muted')}
+          {@render railItem('src', 'torrent', 'download', 'Torrents', 'Torznab + torrent client', srcOn.torrent ? 'green' : 'muted')}
           {#each pluginSrc as pb (pb.key)}
             {@render railItem('src', pb.key, 'download', pb.label, pb.note, pb.on ? 'green' : 'muted')}
           {/each}
@@ -718,7 +739,7 @@
               <label class="switch"><input id="set-torrentEnabled" type="checkbox" onchange={syncSourceUI} /><span class="switch__track"></span></label>
               <div class="setx-srchead__text">
                 <b>Torrents</b>
-                <span>Search Torznab indexers (Jackett/Prowlarr) and download via qBittorrent.</span>
+                <span>Search Torznab indexers (Jackett/Prowlarr) and download via qBittorrent, Transmission, or Deluge.</span>
               </div>
               <span class="setx-dot setx-dot--{srcOn.torrent ? 'green' : 'muted'}"></span>
             </div>
@@ -736,12 +757,30 @@
               </div>
 
               <div class="setx-card">
-                <h4 class="setx-card__head">qBittorrent</h4>
-                <label class="field"><span>Host</span><input id="set-qbHost" class="mono" type="text" spellcheck="false" placeholder="nas or 192.168.1.10" /></label>
-                <label class="field"><span>Port</span><input id="set-qbPort" class="mono" type="number" min="1" max="65535" placeholder="8080" /></label>
-                <label class="field field--check"><input id="set-qbSsl" type="checkbox" /><span>Use HTTPS</span></label>
-                <label class="field"><span>Username</span><input id="set-qbUser" type="text" spellcheck="false" /></label>
-                <label class="field"><span>Password</span><input id="set-qbPass" type="password" spellcheck="false" /></label>
+                <h4 class="setx-card__head">Download client</h4>
+                <label class="field"><span>Client</span>
+                  <select id="set-torrentClient" onchange={syncSourceUI}><option value="qbittorrent">qBittorrent</option><option value="transmission">Transmission</option><option value="deluge">Deluge</option></select>
+                </label>
+                <div class="only-qbittorrent">
+                  <label class="field"><span>Host</span><input id="set-qbHost" class="mono" type="text" spellcheck="false" placeholder="nas or 192.168.1.10" /></label>
+                  <label class="field"><span>Port</span><input id="set-qbPort" class="mono" type="number" min="1" max="65535" placeholder="8080" /></label>
+                  <label class="field field--check"><input id="set-qbSsl" type="checkbox" /><span>Use HTTPS</span></label>
+                  <label class="field"><span>Username</span><input id="set-qbUser" type="text" spellcheck="false" /></label>
+                  <label class="field"><span>Password</span><input id="set-qbPass" type="password" spellcheck="false" /></label>
+                </div>
+                <div class="only-transmission">
+                  <label class="field"><span>Host</span><input id="set-trHost" class="mono" type="text" spellcheck="false" placeholder="nas or 192.168.1.10" /></label>
+                  <label class="field"><span>Port</span><input id="set-trPort" class="mono" type="number" min="1" max="65535" placeholder="9091" /></label>
+                  <label class="field field--check"><input id="set-trSsl" type="checkbox" /><span>Use HTTPS</span></label>
+                  <label class="field"><span>Username</span><input id="set-trUser" type="text" spellcheck="false" /></label>
+                  <label class="field"><span>Password</span><input id="set-trPass" type="password" spellcheck="false" /></label>
+                </div>
+                <div class="only-deluge">
+                  <label class="field"><span>Host</span><input id="set-delugeHost" class="mono" type="text" spellcheck="false" placeholder="nas or 192.168.1.10" /></label>
+                  <label class="field"><span>Port</span><input id="set-delugePort" class="mono" type="number" min="1" max="65535" placeholder="8112" /></label>
+                  <label class="field field--check"><input id="set-delugeSsl" type="checkbox" /><span>Use HTTPS</span></label>
+                  <label class="field"><span>Password</span><input id="set-delugePass" type="password" spellcheck="false" /></label>
+                </div>
                 <label class="field"><span>Category</span><input id="set-torrentCategory" type="text" spellcheck="false" placeholder="backissue" /></label>
                 <div class="client-test">
                   <button id="qb-test" class="btn btn--ghost" type="button" onclick={testQb}>Test connection</button>
@@ -753,7 +792,7 @@
                 <h4 class="setx-card__head">Completed downloads</h4>
                 <label class="field"><span>Folder (this app's view)</span><input id="set-torrentCompleteDir" class="mono" type="text" spellcheck="false" placeholder="\\NAS\dl\complete" /></label>
                 <label class="field"><span>Folder (client's view)</span><input id="set-torrentCompleteDirRemote" class="mono" type="text" spellcheck="false" placeholder="/downloads/complete" /></label>
-                <p class="modal__note">Only needed if qBittorrent runs on another machine. Map its content path onto the path this app reads over the network.</p>
+                <p class="modal__note">Only needed if the download client runs on another machine. Map its content path onto the path this app reads over the network.</p>
               </div>
 
               <div class="setx-card">
@@ -762,7 +801,7 @@
                   <label class="field"><span>Poll every (s)</span><input id="set-torrentPollSeconds" type="number" min="5" max="600" /></label>
                   <label class="field"><span>Give up after (min)</span><input id="set-torrentTimeoutMinutes" type="number" min="1" max="1440" /></label>
                 </div>
-                <p class="modal__note">BackIssue hands the magnet/.torrent to qBittorrent, watches it, and imports each torrent when it completes. After import the torrent is <b>left seeding</b> — manage ratio and removal in qBittorrent.</p>
+                <p class="modal__note">BackIssue hands the magnet/.torrent to your client, watches it, and imports each torrent when it completes. After import the torrent is <b>left seeding</b> — manage ratio and removal in the client.</p>
               </div>
 
               <div class="setx-card">
@@ -824,18 +863,27 @@
         <h4 class="setx-card__head">Metadata source</h4>
         <label class="field">
           <span>Source</span>
-          <select id="set-metadataSource">
+          <select id="set-metadataSource" onchange={syncMetaUI}>
             <option value="hosted">BackIssue metadata service (built-in, no setup)</option>
             <option value="comicvine">ComicVine directly (your own API key)</option>
           </select>
         </label>
         <p class="modal__note">The built-in service works out of the box — cached ComicVine data with enrichment and no rate-limit pauses. Choose ComicVine to query the official API directly with your own key instead.</p>
-        <label class="field"><span>ComicVine API key</span><input id="set-comicvineKeys" class="mono" type="text" spellcheck="false" autocomplete="off" placeholder="Only used with the ComicVine source…" /></label>
-        <p class="modal__note">Free at comicvine.gamespot.com. Only used when the source above is set to ComicVine.</p>
-        <div class="client-test"><button id="cv-test" class="btn btn--ghost" type="button" onclick={testCv}>Test key</button>
-          {#if tests.cv}<span id="cv-test-result" class="client-status {tests.cv.cls}">{#if tests.cv.icon}<Icon name={tests.cv.icon} /> {/if}{tests.cv.text}</span>{/if}</div>
-        <label class="field"><span>Service URL (optional)</span><input id="set-cvBaseUrl" class="mono" type="text" spellcheck="false" placeholder="https://data.backissue.app/api" /></label>
-        <p class="modal__note">Self-hosting the metadata service? Point lookups at your own instance. Blank = the built-in service. Ignored when the source is ComicVine.</p>
+        <!-- The ComicVine fields stay mounted (their set-* ids are collected on
+             save); hidden attr just removes them from view on the built-in source. -->
+        <div hidden={!cvDirect}>
+          <p class="modal__note list-note--warn"><Icon name="info" /> ComicVine's API is rate-limited (about 200 requests per resource per hour, with velocity checks on top). Big imports, library scans and release matching will pause when the limit is hit and can take much longer. The built-in service has no such limits.</p>
+          <label class="field"><span>ComicVine API key</span><input id="set-comicvineKeys" class="mono" type="text" spellcheck="false" autocomplete="off" placeholder="Only used with the ComicVine source…" /></label>
+          <p class="modal__note">Free at comicvine.gamespot.com. Only used when the source above is set to ComicVine.</p>
+          <div class="client-test"><button id="cv-test" class="btn btn--ghost" type="button" onclick={testCv}>Test key</button>
+            {#if tests.cv}<span id="cv-test-result" class="client-status {tests.cv.cls}">{#if tests.cv.icon}<Icon name={tests.cv.icon} /> {/if}{tests.cv.text}</span>{/if}</div>
+        </div>
+        <!-- Service URL (self-hosted metadata instance) is an advanced escape
+             hatch: kept mounted so a saved value persists, but not shown. It
+             remains settable via the API / a previously saved value. -->
+        <div hidden>
+          <label class="field"><span>Service URL (optional)</span><input id="set-cvBaseUrl" class="mono" type="text" spellcheck="false" placeholder="https://data.backissue.app/api" /></label>
+        </div>
       </div>
       <div class="setx-card">
         <h4 class="setx-card__head">Tagging &amp; files</h4>

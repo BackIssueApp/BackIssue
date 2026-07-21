@@ -1,10 +1,11 @@
-// Deferred download source: torrents via Torznab indexers + qBittorrent.
-// Mirrors the usenet source — grab() hands a magnet/.torrent to qBittorrent under
-// our category and returns immediately; the background monitor (downloadmonitor.js)
-// polls the client by category and imports each torrent when it finishes.
+// Deferred download source: torrents via Torznab indexers + a torrent client
+// (qBittorrent, Transmission, or Deluge). Mirrors the usenet source — grab()
+// hands a magnet/.torrent to the client under our category and returns
+// immediately; the background monitor (downloadmonitor.js) polls the client by
+// category and imports each torrent when it finishes.
 import { parseIndexers, searchTorznab } from '../torznab.js';
 import { resolveIndexers, indexersManaged } from '../indexerproviders.js';
-import { makeTorrentClient } from '../torrentclients.js';
+import { makeTorrentClient, torrentClientHost } from '../torrentclients.js';
 import { scoreRelease, issueToken, suspiciouslySmall, manualQueries, manualTarget } from './usenet.js';
 
 export const torrent = {
@@ -16,7 +17,7 @@ export const torrent = {
   isEnabled: (config) =>
     !!config?.torrentEnabled
     && (parseIndexers(config.torznabIndexers).length > 0 || indexersManaged(config))
-    && !!config.qbHost,
+    && !!torrentClientHost(config),
 
   async find(ctx) {
     const indexers = await resolveIndexers(ctx.config, 'torznab');
@@ -48,7 +49,7 @@ export const torrent = {
     return best ? { source: 'torrent', ...best } : null;
   },
 
-  // Add the magnet/.torrent to qBittorrent under our category; return the infohash
+  // Add the magnet/.torrent to the client under our category; return the infohash
   // so the monitor can match it later. Does not wait for the download.
   async grab(candidate, ctx) {
     const client = makeTorrentClient(ctx.config, {});

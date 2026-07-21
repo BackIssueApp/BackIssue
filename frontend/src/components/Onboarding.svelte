@@ -1,8 +1,10 @@
 <script>
   import { trapFocus } from '../lib/dom.js';
   // First-run wizard: a full-screen, step-railed setup. Collects just enough to
-  // be useful — a ComicVine key, one or more named libraries, optionally one
-  // download source, optional plugins — and points at Settings for the rest.
+  // be useful — one or more named libraries, optionally one download source,
+  // optional plugins — and points at Settings for the rest. Metadata needs no
+  // setup at all (the built-in service self-provisions; switching to a personal
+  // ComicVine key lives in Settings → Metadata).
   // Skippable at every step; skipping only sets the onboardingDone flag.
   import { apiGet, apiPost } from '../lib/api.js';
   import { route, setQuery } from '../lib/router.svelte.js';
@@ -16,18 +18,16 @@
   const open = $derived(flags.needsOnboarding || forced);
 
   let step = $state(0);
-  const STEPS = ['Welcome', 'Metadata', 'Library', 'Downloads', 'Plugins', 'Finish'];
-  const EYEBROWS = ['', 'Step 2 · Metadata', 'Step 3 · Storage', 'Step 4 · Sources', 'Step 5 · Extend', ''];
-
-  // Collected values
-  let cvKey = $state(''); // the app uses a single ComicVine key now
+  const STEPS = ['Welcome', 'Library', 'Downloads', 'Plugins', 'Finish'];
+  const EYEBROWS = ['', 'Step 2 · Storage', 'Step 3 · Sources', 'Step 4 · Extend', ''];
   let source = $state('none'); // 'none' | 'usenet' | 'torrent'
   // usenet
   let ixName = $state(''), ixUrl = $state(''), ixKey = $state('');
   let nzbClient = $state('sabnzbd'), nzbHost = $state(''), nzbPort = $state(''), nzbApiKey = $state(''), nzbUser = $state(''), nzbPass = $state('');
   // torrent
   let tzName = $state(''), tzUrl = $state(''), tzKey = $state('');
-  let qbHost = $state(''), qbPort = $state('8080'), qbUser = $state(''), qbPass = $state('');
+  let torrentClient = $state('qbittorrent'), tcHost = $state(''), tcPort = $state(''), tcUser = $state(''), tcPass = $state('');
+  const tcDefaultPort = $derived(torrentClient === 'transmission' ? '9091' : torrentClient === 'deluge' ? '8112' : '8080');
 
   // Named libraries (the new model — no rootFolders). Seed one Comics library.
   let libs = $state([{ id: 1, name: 'Comics', type: 'comic', folder: '' }]);
@@ -37,7 +37,7 @@
     if (libTypesFetched) return; libTypesFetched = true;
     try { const r = await apiGet('/api/libraries'); if (Array.isArray(r.types) && r.types.length) libTypes = r.types; } catch { /* keep defaults */ }
   }
-  $effect(() => { if (step === 2) loadLibTypes(); });
+  $effect(() => { if (step === 1) loadLibTypes(); });
   function addLib() { libs = [...libs, { id: Date.now(), name: '', type: 'comic', folder: '' }]; }
   function removeLib(id) { libs = libs.filter((l) => l.id !== id); }
 
@@ -55,10 +55,10 @@
       for (const p of catalogPlugins) pluginSel[p.id] = p.id === 'reader'; // pre-tick the reader
     } catch { catalogPlugins = []; }
   }
-  $effect(() => { if (step === 4) loadPluginCatalog(); });
+  $effect(() => { if (step === 3) loadPluginCatalog(); });
 
   // Shared test-button state
-  let tests = $state({ cv: null, ix: null, client: null });
+  let tests = $state({ ix: null, client: null });
   async function runTest(slot, endpoint, body) {
     tests[slot] = { cls: 'is-testing', text: 'Testing…' };
     let r;
@@ -66,16 +66,21 @@
     catch (e) { r = { ok: false, message: String(e) }; }
     tests[slot] = { cls: r.ok ? 'is-ok' : 'is-bad', icon: r.ok ? 'check' : 'close', text: r.message, ok: !!r.ok };
   }
-  const testCv = () => runTest('cv', '/api/cv/test', { keys: cvKey });
   const testIx = () => runTest('ix', source === 'torrent' ? '/api/torznab/test' : '/api/indexers/test',
     source === 'torrent' ? { name: tzName, url: tzUrl.trim(), apiKey: tzKey.trim() } : { name: ixName, url: ixUrl.trim(), apiKey: ixKey.trim() });
+  // Torrent client fields, keyed for the selected client (test payload + save).
+  function torrentClientBody() {
+    const host = tcHost.trim(), port = tcPort.trim();
+    if (torrentClient === 'transmission') return { torrentClient, trHost: host, trPort: port, trSsl: false, trUser: tcUser.trim(), trPass: tcPass };
+    if (torrentClient === 'deluge') return { torrentClient, delugeHost: host, delugePort: port, delugeSsl: false, delugePass: tcPass };
+    return { torrentClient, qbHost: host, qbPort: port, qbSsl: false, qbUser: tcUser.trim(), qbPass: tcPass };
+  }
   const testClient = () => runTest('client',
     source === 'torrent' ? '/api/torrent-client/test' : '/api/clients/test',
     source === 'torrent'
-      ? { qbHost: qbHost.trim(), qbPort: qbPort.trim(), qbSsl: false, qbUser: qbUser.trim(), qbPass }
+      ? torrentClientBody()
       : { nzbClient, nzbClientHost: nzbHost.trim(), nzbClientPort: nzbPort.trim(), nzbClientSsl: false, nzbClientApiKey: nzbApiKey.trim(), nzbClientUser: nzbUser.trim(), nzbClientPass: nzbPass });
 
-  const cvTone = $derived(tests.cv?.ok ? 'var(--green)' : tests.cv?.cls === 'is-bad' ? 'var(--red)' : 'var(--muted)');
   const namedLibs = $derived(libs.filter((l) => l.name.trim()));
 
   let saving = $state(false);
@@ -85,7 +90,6 @@
     // Libraries are created via /api/libraries (they OWN the storage paths now),
     // so no rootFolders here.
     const body = { onboardingDone: true };
-    if (cvKey.trim()) { body.comicvineKeys = cvKey.trim(); body.metadataSource = 'comicvine'; }
     if (source === 'usenet') {
       body.usenetEnabled = true;
       if (ixUrl.trim()) body.newznabIndexers = [ixName.trim() || ixUrl.trim(), ixUrl.trim().replace(/\/+$/, ''), ixKey.trim()].join(' | ');
@@ -98,10 +102,11 @@
     } else if (source === 'torrent') {
       body.torrentEnabled = true;
       if (tzUrl.trim()) body.torznabIndexers = [tzName.trim() || tzUrl.trim(), tzUrl.trim().replace(/\/+$/, ''), tzKey.trim()].join(' | ');
-      if (qbHost.trim()) body.qbHost = qbHost.trim();
-      if (qbPort.trim()) body.qbPort = qbPort.trim();
-      if (qbUser.trim()) body.qbUser = qbUser.trim();
-      if (qbPass) body.qbPass = qbPass;
+      body.torrentClient = torrentClient;
+      // Only send what was filled in, keyed for the chosen client.
+      for (const [k, v] of Object.entries(torrentClientBody())) {
+        if (k !== 'torrentClient' && typeof v === 'string' && v) body[k] = v;
+      }
     }
     try {
       await apiPost('/api/settings', body);
@@ -146,7 +151,7 @@
 
   const nextLabel = $derived(step === STEPS.length - 1 ? (installing ? 'Installing plugins…' : saving ? 'Saving…' : 'Finish setup') : step === 0 ? 'Get started' : 'Continue');
   const summaryRows = $derived([
-    { label: 'Metadata', value: cvKey.trim() ? (tests.cv?.ok ? 'ComicVine (verified)' : 'ComicVine') : 'Built-in service', tone: 'var(--green)', icon: 'tag' },
+    { label: 'Metadata', value: 'Built-in service', tone: 'var(--green)', icon: 'tag' },
     { label: 'Libraries', value: namedLibs.length ? `${namedLibs.length} ${namedLibs.length === 1 ? 'library' : 'libraries'}` : 'None', tone: namedLibs.length ? 'var(--green)' : 'var(--muted)', icon: 'book' },
     { label: 'Download source', value: source === 'usenet' ? 'Usenet' : source === 'torrent' ? 'Torrents' : 'None yet', tone: source === 'none' ? 'var(--muted)' : 'var(--green)', icon: 'download' },
     { label: 'Plugins', value: `${catalogPlugins.filter((p) => pluginSel[p.id]).length} selected`, tone: 'var(--green)', icon: 'puzzle' },
@@ -187,16 +192,6 @@
               <div class="obx__bullet"><span class="obx__bullet-ico"><Icon name="folder" size={16} /></span><div><div class="obx__bullet-t">Organized on disk</div><div class="obx__bullet-b">Tagged and filed into a clean folder tree.</div></div></div>
             </div>
           {:else if step === 1}
-            <h1 class="obx__h1">Metadata</h1>
-            <p class="obx__lead">Series, issues, covers and credits come from the built-in BackIssue metadata service — cached, enriched, and ready with <b>no setup</b>. Just hit Continue.</p>
-            <div class="obx__note obx__note--cyan"><span class="obx__note-ico"><Icon name="info" size={16} /></span><p>Prefer ComicVine directly? Paste your API key below — free from <a href="https://comicvine.gamespot.com/api/" target="_blank" rel="noreferrer">comicvine.gamespot.com/api</a>. Otherwise leave it blank; you can switch sources anytime in <b>Settings → Metadata</b>.</p></div>
-            <span class="obx__label">ComicVine API key (optional)</span>
-            <input class="obx__input obx__input--mono" type="text" spellcheck="false" autocomplete="off" placeholder="leave blank to use the built-in service…" bind:value={cvKey} />
-            <div class="obx__testrow">
-              <button class="obx__test" type="button" disabled={!cvKey.trim()} onclick={testCv}>Test key</button>
-              {#if tests.cv}<span class="obx__teststatus" style="color:{cvTone};">{#if tests.cv.icon}<Icon name={tests.cv.icon} size={14} /> {/if}{tests.cv.text}</span>{/if}
-            </div>
-          {:else if step === 2}
             <h1 class="obx__h1">Set up your libraries</h1>
             <p class="obx__lead">A library is a named collection with a type and a folder on disk. Create one to start — add more here or in <b>Settings</b> later. Files are organized into <b>folder</b>/Publisher/Title (Year).</p>
             <div class="obx__libs">
@@ -219,14 +214,14 @@
             </div>
             <button class="obx__addlib" onclick={addLib}><Icon name="plus" size={14} /> Add another library</button>
             <div class="obx__note obx__note--amber"><span class="obx__note-ico"><Icon name="info" size={16} /></span><p>Already have comics in these folders? After setup, use <b>Import</b> in the sidebar to match them to ComicVine and pull them into the collection. Leave a folder blank to decide later.</p></div>
-          {:else if step === 3}
+          {:else if step === 2}
             <h1 class="obx__h1">Download source</h1>
             <p class="obx__lead">How should BackIssue download issues? Pick one to configure now — enable more or fine-tune later in Settings.</p>
             <div class="obx__sources">
               <button class="obx__source" class:is-active={source === 'usenet'} onclick={() => { source = 'usenet'; tests.ix = tests.client = null; }}>
                 <span class="obx__source-ico"><Icon name="download" size={16} /></span><span class="obx__source-label">Usenet</span><span class="obx__source-desc">SABnzbd / NZBGet</span></button>
               <button class="obx__source" class:is-active={source === 'torrent'} onclick={() => { source = 'torrent'; tests.ix = tests.client = null; }}>
-                <span class="obx__source-ico"><Icon name="globe" size={16} /></span><span class="obx__source-label">Torrents</span><span class="obx__source-desc">qBittorrent</span></button>
+                <span class="obx__source-ico"><Icon name="globe" size={16} /></span><span class="obx__source-label">Torrents</span><span class="obx__source-desc">qBittorrent / Transmission / Deluge</span></button>
               <button class="obx__source" class:is-active={source === 'none'} onclick={() => { source = 'none'; }}>
                 <span class="obx__source-ico"><Icon name="info" size={16} /></span><span class="obx__source-label">Decide later</span><span class="obx__source-desc">Skip for now</span></button>
             </div>
@@ -259,16 +254,21 @@
                   <div class="obx__testrow obx__mt"><button class="obx__test" type="button" disabled={!tzUrl.trim()} onclick={testIx}>Test indexer</button>{#if tests.ix}<span class="obx__teststatus obx__ts--{tests.ix.cls}">{#if tests.ix.icon}<Icon name={tests.ix.icon} size={14} /> {/if}{tests.ix.text}</span>{/if}</div>
                 </div>
                 <div>
-                  <div class="obx__cfg-h">qBittorrent</div>
-                  <div class="obx__grid-hp"><input class="obx__input" placeholder="Host" bind:value={qbHost} /><input class="obx__input" placeholder="8080" bind:value={qbPort} /></div>
-                  <div class="obx__grid2 obx__mt"><input class="obx__input" placeholder="Username" bind:value={qbUser} /><input class="obx__input" type="password" placeholder="Password" bind:value={qbPass} /></div>
-                  <div class="obx__testrow obx__mt"><button class="obx__test" type="button" disabled={!qbHost.trim()} onclick={testClient}>Test connection</button>{#if tests.client}<span class="obx__teststatus obx__ts--{tests.client.cls}">{#if tests.client.icon}<Icon name={tests.client.icon} size={14} /> {/if}{tests.client.text}</span>{/if}</div>
+                  <div class="obx__cfg-h">Download client</div>
+                  <select class="obx__input" bind:value={torrentClient} onchange={() => { tests.client = null; }}><option value="qbittorrent">qBittorrent</option><option value="transmission">Transmission</option><option value="deluge">Deluge</option></select>
+                  <div class="obx__grid-hp obx__mt"><input class="obx__input" placeholder="Host" bind:value={tcHost} /><input class="obx__input" placeholder={tcDefaultPort} bind:value={tcPort} /></div>
+                  {#if torrentClient === 'deluge'}
+                    <input class="obx__input obx__mt" type="password" placeholder="Web UI password" bind:value={tcPass} />
+                  {:else}
+                    <div class="obx__grid2 obx__mt"><input class="obx__input" placeholder="Username" bind:value={tcUser} /><input class="obx__input" type="password" placeholder="Password" bind:value={tcPass} /></div>
+                  {/if}
+                  <div class="obx__testrow obx__mt"><button class="obx__test" type="button" disabled={!tcHost.trim()} onclick={testClient}>Test connection</button>{#if tests.client}<span class="obx__teststatus obx__ts--{tests.client.cls}">{#if tests.client.icon}<Icon name={tests.client.icon} size={14} /> {/if}{tests.client.text}</span>{/if}</div>
                 </div>
               </div>
             {:else}
               <div class="obx__note">No usenet or torrent setup? That's fine — plugins can add other download sources later from the <b>Plugins</b> page. You can still track series and import files you already have.</div>
             {/if}
-          {:else if step === 4}
+          {:else if step === 3}
             <h1 class="obx__h1">Add plugins</h1>
             <p class="obx__lead">BackIssue is modular — pick plugins to install now, or add them anytime from the <b>Plugins</b> page. Selected plugins activate when you finish.</p>
             {#if !pluginsFetched}
@@ -298,7 +298,7 @@
                 <div class="obx__srow"><span class="obx__sico" style="color:{r.tone}; background:color-mix(in srgb, {r.tone} 12%, transparent);"><Icon name={r.icon} size={14} /></span><span class="obx__slabel">{r.label}</span><span class="obx__svalue" style="color:{r.tone};">{r.value}</span></div>
               {/each}
             </div>
-            <p class="obx__sub">Next: add a series with <b>+ Add</b> (searches ComicVine), or pull in an existing library via <b>Import</b> in the sidebar.</p>
+            <p class="obx__sub">Next: add a series with <b>+ Add</b> (searches the metadata library), or pull in an existing library via <b>Import</b> in the sidebar.</p>
           {/if}
         </div>
       </div>

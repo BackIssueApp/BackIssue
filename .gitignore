@@ -23,3 +23,6 @@ reports/
 
 # ML models (large binaries, distributed separately)
 models/
+
+# dev-server output logs
+*.log

@@ -1347,6 +1347,10 @@ body.import .import-page { display: flex; flex-direction: column; height: 100%; 
 .src-config .only-sabnzbd, .src-config .only-nzbget { display: none; }
 .src-config.client-sabnzbd .only-sabnzbd { display: block; }
 .src-config.client-nzbget .only-nzbget { display: block; }
+.src-config .only-qbittorrent, .src-config .only-transmission, .src-config .only-deluge { display: none; }
+.src-config.client-qbittorrent .only-qbittorrent { display: block; }
+.src-config.client-transmission .only-transmission { display: block; }
+.src-config.client-deluge .only-deluge { display: block; }
 /* Two fields side by side */
 .fields-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .fields-row .field { grid-template-columns: 1fr; }
