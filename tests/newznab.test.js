@@ -14,6 +14,13 @@ test('parseIndexers: empty/undefined → []', () => {
   assert.deepEqual(parseIndexers(undefined), []);
 });
 
+test('buildSearchUrl: an indexer-pinned cat overrides the caller, blank pin means no filter', () => {
+  const pinned = buildSearchUrl({ url: 'https://nz', apiKey: 'k', cat: '7000,7030' }, 'x', { cat: '' });
+  assert.match(pinned, /cat=7000%2C7030/);
+  const blank = buildSearchUrl({ url: 'https://nz', apiKey: 'k', cat: '' }, 'x', { cat: '7030' });
+  assert.doesNotMatch(blank, /cat=/);
+});
+
 test('buildSearchUrl: newznab params with comics category', () => {
   const url = buildSearchUrl({ url: 'https://nz', apiKey: 'k' }, 'Invincible 001');
   assert.match(url, /^https:\/\/nz\/api\?/);

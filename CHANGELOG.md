@@ -8,6 +8,16 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+- The metadata-service instance key is persisted only by the live app
+  configuration — test runs (or any code constructing its own config) can no
+  longer overwrite the real key in `settings.json`, which previously caused
+  metadata 401s and re-triggered onboarding.
+
+### Changed
+- Indexer descriptors from indexer providers can now pin their own
+  Newznab/Torznab category filter, which overrides the per-search default.
+
 ## [0.7.4] — 2026-07-20
 
 ### Changed

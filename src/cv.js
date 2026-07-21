@@ -65,9 +65,17 @@ async function ensureInstanceKey(config, base, doFetch) {
     }
     config.metadataInstanceKey = key;
     try {
-      const { saveSettings } = await import('./settings.js');
-      saveSettings({ metadataInstanceKey: key });
-    } catch { /* tests / stripped installs: key still lives in config for this run */ }
+      // Persist ONLY when this is the live app config. Tests pass their own
+      // config objects with mocked fetches — writing their keys through
+      // saveSettings would poison the real settings.json (this happened:
+      // the mock key "inst-1" landed in production settings and 401'd all
+      // metadata until cleared).
+      const live = (await import('./config.js')).default;
+      if (config === live) {
+        const { saveSettings } = await import('./settings.js');
+        saveSettings({ metadataInstanceKey: key });
+      }
+    } catch { /* stripped installs: key still lives in config for this run */ }
     return key;
   })());
 }

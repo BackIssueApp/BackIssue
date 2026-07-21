@@ -20,7 +20,9 @@ export function parseIndexers(str) {
 }
 
 // Newznab search endpoint. cat 7030 = Books/Comics on most indexers; pass cat=''
-// to search uncategorised.
+// to search uncategorised. An indexer descriptor may pin its own `cat`, which
+// wins over the caller's — indexer providers (e.g. Prowlarr) use this to scope
+// general-purpose indexers to comic categories.
 // Tolerate a URL saved with a trailing /api (some indexer UIs include it) so we
 // don't build /api/api.
 const apiRoot = (url) => String(url || '').replace(/\/+$/, '').replace(/\/api$/i, '');
@@ -30,7 +32,8 @@ export function buildSearchUrl(indexer, query, { cat = '7030', limit = 50 } = {}
   // A present-but-EMPTY q trips "Missing parameter" on some servers (althub),
   // while omitting it entirely is the standard "latest uploads" (RSS) request.
   if (String(query || '').trim()) p.set('q', query);
-  if (cat) p.set('cat', cat);
+  const useCat = indexer.cat !== undefined ? indexer.cat : cat;
+  if (useCat) p.set('cat', useCat);
   return `${apiRoot(indexer.url)}/api?${p.toString()}`;
 }
 
