@@ -15,8 +15,9 @@ import { testIndexer } from './newznab.js';
 import { testClient } from './nzbclients.js';
 import { testTorznabIndexer } from './torznab.js';
 import { testTorrentClient } from './torrentclients.js';
-import { pluginsDir, pluginCatalog, setPluginEnabled, registeredRoutes, registeredPermissions, registeredAuthProviders, registeredCredentialProviders, pluginLibraryTypes } from './plugins.js';
+import { pluginsDir, pluginCatalog, setPluginEnabled, registeredRoutes, registeredPermissions, registeredAuthProviders, registeredCredentialProviders, pluginLibraryTypes, registeredLibraryScanners } from './plugins.js';
 import { fetchCatalog, installPlugin, uninstallPlugin } from './plugincatalog.js';
+import { logWarn } from './logstore.js';
 import * as users from './users.js';
 import * as lists from './lists.js';
 import * as notifications from './notifications.js';
@@ -1190,12 +1191,20 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       ...pluginLibraryTypes().map((t) => ({ id: t.id, label: t.label })),
     ],
   }));
+  // A new/edited library of a plugin-owned type indexes immediately —
+  // fire-and-forget, so the settings UI never waits on a folder walk.
+  const kickLibraryScanners = (libraryId, type) => {
+    for (const s of registeredLibraryScanners()) {
+      if (s.type !== String(type || '').toLowerCase()) continue;
+      Promise.resolve(s.scan({ libraryId })).catch((e) => console.warn(`library scan (${s.type}):`, e?.message || e));
+    }
+  };
   app.post('/api/libraries', (req, res) => {
-    try { const id = createLibrary(db, { name: req.body?.name, type: req.body?.type || 'comic', rootFolder: req.body?.rootFolder }); syncRootsFromLibraries(); res.json({ id, libraries: listLibraries(db) }); }
+    try { const id = createLibrary(db, { name: req.body?.name, type: req.body?.type || 'comic', rootFolder: req.body?.rootFolder }); syncRootsFromLibraries(); kickLibraryScanners(id, req.body?.type); res.json({ id, libraries: listLibraries(db) }); }
     catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
   });
   app.post('/api/libraries/:id', (req, res) => {
-    try { updateLibrary(db, Number(req.params.id), { name: req.body?.name, type: req.body?.type, rootFolder: req.body?.rootFolder, folderPattern: req.body?.folderPattern, restricted: req.body?.restricted, sortOrder: req.body?.sortOrder }); syncRootsFromLibraries(); res.json({ libraries: listLibraries(db) }); }
+    try { updateLibrary(db, Number(req.params.id), { name: req.body?.name, type: req.body?.type, rootFolder: req.body?.rootFolder, folderPattern: req.body?.folderPattern, restricted: req.body?.restricted, sortOrder: req.body?.sortOrder }); syncRootsFromLibraries(); const lib = listLibraries(db).find((l) => l.id === Number(req.params.id)); kickLibraryScanners(lib?.id, lib?.type); res.json({ libraries: listLibraries(db) }); }
     catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
   });
   app.delete('/api/libraries/:id', (req, res) => { const removed = deleteLibrary(db, Number(req.params.id)); syncRootsFromLibraries(); res.json({ removed, libraries: listLibraries(db) }); });
@@ -1423,7 +1432,12 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
         r.queued = ids.length;
       }
       res.json(r);
-    } catch (e) { res.status(502).json({ error: String(e?.message || e) }); }
+    } catch (e) {
+      // Surface add failures in the server log — "fetch failed" style errors
+      // are otherwise invisible to the operator (client toast only).
+      logWarn(`add-cv failed for volume ${comicvineId}: ${e?.message || e}${e?.cause ? ` (${e.cause.code || e.cause.message || e.cause})` : ''}`, 'metadata');
+      res.status(502).json({ error: String(e?.message || e) });
+    }
   });
   app.post('/api/collection/:id/cv', async (req, res) => {
     const comicvineId = Number(req.body?.comicvineId);

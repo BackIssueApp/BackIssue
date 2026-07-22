@@ -64,8 +64,8 @@
   }
   async function run() {
     if (!(await confirmDialog({
-      title: 'Import all ready series?',
-      message: 'Files stay where they are; matched folders become ComicVine series in your collection.',
+      title: 'Import everything ready?',
+      message: 'Comic folders stay where they are and become series in your collection; plugin-handled items (e.g. book files) are filed into their own library.',
       confirmLabel: 'Import',
     }))) return;
     const r = await apiPost('/api/import/run');
@@ -125,12 +125,16 @@
             <div class="import-folder">{c.name || c.folder}
               {#if c.year}<span class="scan-muted">({c.year})</span>{/if}
               <span class="scan-muted">· {fmt(c.file_count || 0)} files</span></div>
-            {#if c.cv_id}
+            {#if c.cv_id || (c.handler && c.cv_name)}
+              <!-- Matched: to ComicVine, or (handler candidates, e.g. ebook
+                   files) to the handler's own metadata source. -->
               <div class="import-match"><b>{c.cv_name || 'ComicVine'}</b>
                 {#if c.cv_year}<span class="scan-muted">({c.cv_year})</span>{/if}
                 <span class="conf {conf.cls}">{conf.label}</span></div>
             {:else if c.confidence === 'error'}
               <div class="import-match import-match--none">ComicVine search failed <span class="conf conf--low">“Scan for new” retries it</span></div>
+            {:else if c.handler}
+              <div class="import-match import-match--none">No metadata match <span class="conf conf--none">imports with the file's own info</span></div>
             {:else}
               <div class="import-match import-match--none">No ComicVine match <span class="conf conf--none">will import unmatched</span></div>
             {/if}
@@ -143,7 +147,11 @@
               {#if c.status !== 'ready'}
                 <button class="btn btn--sm btn--primary" onclick={() => candidateAction(c.id, 'confirm')}>Confirm</button>
               {/if}
-              <button class="btn btn--sm btn--ghost" onclick={() => changeMatch(c)}>Change match</button>
+              {#if !c.handler}
+                <!-- The CV picker only applies to comic candidates; handler
+                     candidates re-identify from the file on import. -->
+                <button class="btn btn--sm btn--ghost" onclick={() => changeMatch(c)}>Change match</button>
+              {/if}
               {#if c.status !== 'skipped'}
                 <button class="btn btn--sm btn--ghost" onclick={() => candidateAction(c.id, 'skip')}>Skip</button>
               {:else}

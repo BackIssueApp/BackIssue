@@ -2,9 +2,17 @@
 // over the existing schema — no new tables. "Collection series" means the same
 // scope the sidebar uses: a series you follow OR own at least one valid file for.
 import { cvKey } from './cv.js';
+import { SELF_DESCRIBED_TYPES } from './db.js';
 
 // A series counts toward the collection if followed or backed by a valid file.
 const IN_COLLECTION = `(s.followed=1 OR EXISTS(SELECT 1 FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1))`;
+
+// SQL fragment: is s a self-described (plugin-typed) series? Those carry their
+// own metadata — they're "resolved", never lumped in with unmatched comics.
+const selfDescribedSql = () => {
+  const types = [...SELF_DESCRIBED_TYPES];
+  return types.length ? `s.type IN (${types.map((t) => `'${t}'`).join(',')})` : '0';
+};
 
 export function collectionStats(db, config = {}, { includeRestricted = true } = {}) {
   // Titles of restricted series must not reach viewers without
@@ -33,6 +41,7 @@ export function collectionStats(db, config = {}, { includeRestricted = true } = 
   const series = db.prepare(`SELECT
     COUNT(*) total,
     SUM(CASE WHEN s.cv_id IS NOT NULL THEN 1 ELSE 0 END) matched,
+    SUM(CASE WHEN ${selfDescribedSql()} THEN 1 ELSE 0 END) selfdesc,
     SUM(CASE WHEN s.followed=1 THEN 1 ELSE 0 END) followed
     FROM series s WHERE ${IN_COLLECTION}`).get();
 
@@ -42,7 +51,8 @@ export function collectionStats(db, config = {}, { includeRestricted = true } = 
 
   // ---- By-publisher rollup (matched → CV publisher; else Unmatched/Unknown) ----
   const byPublisher = db.prepare(`SELECT
-      COALESCE(cv.publisher, CASE WHEN s.cv_id IS NULL THEN 'Unmatched' ELSE 'Unknown' END) publisher,
+      COALESCE(cv.publisher, CASE WHEN ${selfDescribedSql()} THEN COALESCE(s.publisher, 'Unknown')
+        WHEN s.cv_id IS NULL THEN 'Unmatched' ELSE 'Unknown' END) publisher,
       COUNT(DISTINCT s.id) series,
       COUNT(DISTINCT CASE WHEN lf.valid=1 AND lf.cv_issue_id IS NOT NULL THEN lf.cv_issue_id END) issues,
       COUNT(CASE WHEN lf.valid=1 THEN 1 END) files,
@@ -91,7 +101,9 @@ export function collectionStats(db, config = {}, { includeRestricted = true } = 
     issues: cv.issues || 0,
     detailed: cv.detailed || 0,
     seriesMatched: series.matched || 0,
-    seriesUnmatched: (series.total || 0) - (series.matched || 0),
+    // Self-described (plugin-typed) series carry their own metadata — they're
+    // not "waiting for a ComicVine match".
+    seriesUnmatched: Math.max(0, (series.total || 0) - (series.matched || 0) - (series.selfdesc || 0)),
     filesLinked: linkage.linked || 0,
     filesUnlinked: linkage.unlinked || 0,
   };

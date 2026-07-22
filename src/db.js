@@ -163,6 +163,10 @@ function migrate(db) {
   // Mature/restricted flag. When 1, the series (and its issues, files, releases)
   // are hidden from any user whose role lacks the library.restricted permission.
   if (!cols.includes('restricted')) db.exec('ALTER TABLE series ADD COLUMN restricted INTEGER NOT NULL DEFAULT 0');
+  // Local description for self-described series (plugin-registered types whose
+  // metadata lives on the series row itself). CV-matched series keep using the
+  // cached cv_series description; this column stays NULL for them.
+  if (!cols.includes('description')) db.exec('ALTER TABLE series ADD COLUMN description TEXT');
   // Library type: 'comic' (default) | 'manga' | future types (e.g. 'magazine').
   // Kept as free TEXT so new types don't need a migration; consumers treat
   // unknown values as 'comic'. Drives parsing conventions (chapters vs issues),
@@ -226,6 +230,11 @@ function migrate(db) {
   if (icCols.length && !icCols.includes('series_type')) db.exec('ALTER TABLE import_candidates ADD COLUMN series_type TEXT');
   // Owning explicit library (candidate folder under that library's root).
   if (icCols.length && !icCols.includes('library_id')) db.exec('ALTER TABLE import_candidates ADD COLUMN library_id INTEGER');
+  // Plugin import handler that produced (and will import) this candidate.
+  // NULL = the core comic flow. For handler candidates `folder` holds the
+  // handler's unique key (e.g. a file path) and cv_name/cv_year/cv_image carry
+  // the handler's own metadata match for display.
+  if (icCols.length && !icCols.includes('handler')) db.exec('ALTER TABLE import_candidates ADD COLUMN handler TEXT');
   // The Mylar integration is gone — BackIssue replaces it.
   db.exec('DROP TABLE IF EXISTS mylar_series_map');
   // The dedicated tag log was folded into the Logs page (category 'tag').
@@ -277,6 +286,13 @@ export function setSeriesRestricted(db, id, restricted) {
 // planned as a plugin with schedule-driven issues) registers itself via
 // registerLibraryType, which pushes into this whitelist at plugin load.
 export const SERIES_TYPES = ['comic', 'manga'];
+// Types whose series are SELF-DESCRIBED: the series row itself is the metadata
+// authority (title/publisher/year/cover/description) and the issue list is the
+// local `issues` table — there is no external match to make. Populated by
+// registerLibraryType({ selfDescribed: true }). Collection views render these
+// rows from their own columns, and the ComicVine machinery (match sweep,
+// "unmatched" lane, download rollups) leaves them alone.
+export const SELF_DESCRIBED_TYPES = new Set();
 export function setSeriesType(db, id, type) {
   if (!SERIES_TYPES.includes(type)) throw new Error(`unknown series type "${type}"`);
   db.prepare('UPDATE series SET type=? WHERE id=?').run(type, id);
@@ -704,10 +720,14 @@ export function libraryStats(db) {
     SUM(CASE WHEN name LIKE '%.cbr' THEN 1 ELSE 0 END) cbr FROM library_files`).get();
   return { total: r.total, bytes: r.bytes, tagged: r.tagged || 0, untagged: r.untagged || 0, corrupt: r.corrupt || 0, cbr: r.cbr || 0 };
 }
-export function pruneLibraryFiles(db, seen) {
+// `only` (optional RegExp): prune ONLY rows whose path matches — a scan must
+// never delete index rows for file types it doesn't walk (e.g. plugin-indexed
+// ebook files during a comic scan, whose walker only sees .cbz/.cbr).
+export function pruneLibraryFiles(db, seen, only = null) {
   const keep = seen instanceof Set ? seen : new Set(seen);
   let n = 0;
   for (const row of db.prepare('SELECT path FROM library_files').all()) {
+    if (only && !only.test(row.path)) continue;
     if (!keep.has(row.path)) { db.prepare('DELETE FROM library_files WHERE path=?').run(row.path); n++; }
   }
   return n;
@@ -767,6 +787,18 @@ export function collectionSeries(db, { filter = 'all', search = '', sort = 'titl
   return rows.map((r) => {
     const sourced = !String(r.url).startsWith('cv:');
     if (!r.cv_id) {
+      // Self-described types (plugin-registered, e.g. an ebook shelf): the
+      // series row IS the metadata — render it as matched, rolled up against
+      // its own issue rows. There is no external source to be "unmatched" from.
+      if (SELF_DESCRIBED_TYPES.has(r.type)) {
+        return {
+          id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, cv_id: null, cv_locked: 0, sourced: false, matched: true, source: 'local',
+          title: r.title, publisher: r.publisher, year: r.year, cover_url: r.cover_url, restricted: !!r.restricted, type: r.type,
+          folder: dirBaseName(r.file_dir), files: r.file_count,
+          total: r.bc_total, owned: r.bc_owned, missing: Math.max(0, r.bc_total - r.bc_owned), untagged: 0, corrupt: r.corrupt,
+          latest: null, active: 0, size: r.size_bytes,
+        };
+      }
       return {
         id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, cv_id: null, cv_locked: 0, sourced, matched: false, source: 'unmatched',
         title: null, publisher: null, year: null, cover_url: null, restricted: !!r.restricted, type: r.type || 'comic',
@@ -795,7 +827,8 @@ export function seriesMatchesFilter(r, filter) {
     : filter === 'followed' ? !!r.followed
     : filter === 'unmonitored' ? !r.monitored
     : filter === 'problems' ? (r.untagged > 0 || r.corrupt > 0)
-    : filter === 'unmatched' ? !r.cv_id
+    // Self-described rows are matched by construction — never "unmatched".
+    : filter === 'unmatched' ? !r.matched
     // Library-type lanes. The comics lane means "not any other known type",
     // so unknown/legacy values count as comics and are never silently hidden.
     : filter === 'comics' ? !SERIES_TYPES.includes(r.type) || r.type === 'comic'
@@ -904,6 +937,46 @@ export function seriesCollectionDetail(db, id, userId = null) {
     return {
       series: seriesOut, cv: cvOut, source: 'cv', sourced, issues, superseded,
       unlinkedFiles: files.filter((f) => f.cv_issue_id == null && f.issue_id == null).map(asFile),
+    };
+  }
+
+  // Self-described series (plugin-registered types): the catalog rows ARE the
+  // data — issues come from the local issues table, each with its linked files,
+  // in the same shape the CV branch produces so the UI renders identically.
+  if (SELF_DESCRIBED_TYPES.has(series.type || 'comic')) {
+    const filesByIssue = new Map();
+    for (const f of files) {
+      if (f.issue_id == null) continue;
+      if (!filesByIssue.has(f.issue_id)) filesByIssue.set(f.issue_id, []);
+      filesByIssue.get(f.issue_id).push(f);
+    }
+    const issueRows = db.prepare(
+      'SELECT * FROM issues WHERE series_id=? ORDER BY CAST(issue_number AS REAL), issue_number, id',
+    ).all(id);
+    const issues = issueRows.map((bi) => {
+      const fs = filesByIssue.get(bi.id) || [];
+      const valid = fs.filter((f) => f.valid);
+      const owned = valid.length > 0;
+      return {
+        id: bi.id,                       // local issue id — plugins key routes on it
+        cv_issue_id: null,               // no external identity, nothing to queue
+        number: bi.issue_number,
+        title: bi.title,
+        image_url: null,                 // covers come from a plugin cover provider
+        cover_date: null,
+        has_detail: true,                // nothing more to fetch — no sweep polling
+        owned,
+        corrupt: fs.length > 0 && !owned,
+        untagged: false,
+        status: bi.status,
+        downloadable: false,             // self-described types have no download sources
+        files: fs.map(asIssueFile),
+      };
+    });
+    return {
+      series: { ...seriesOut, description: series.description || null },
+      cv: null, source: 'local', sourced: false, matched: true, issues, superseded: 0,
+      unlinkedFiles: files.filter((f) => f.issue_id == null).map(asFile),
     };
   }
 
@@ -1229,12 +1302,12 @@ export function clearImportCandidates(db, { keepImported = true } = {}) {
 }
 export function upsertImportCandidate(db, c) {
   return db.prepare(`INSERT INTO import_candidates
-    (folder,name,year,publisher,file_count,cv_id,cv_name,cv_year,cv_image,confidence,status,series_type,library_id,scanned_at)
-    VALUES (@folder,@name,@year,@publisher,@file_count,@cv_id,@cv_name,@cv_year,@cv_image,@confidence,@status,@series_type,@library_id,datetime('now'))
+    (folder,name,year,publisher,file_count,cv_id,cv_name,cv_year,cv_image,confidence,status,series_type,library_id,handler,scanned_at)
+    VALUES (@folder,@name,@year,@publisher,@file_count,@cv_id,@cv_name,@cv_year,@cv_image,@confidence,@status,@series_type,@library_id,@handler,datetime('now'))
     ON CONFLICT(folder) DO UPDATE SET name=excluded.name,year=excluded.year,publisher=excluded.publisher,
       file_count=excluded.file_count,cv_id=excluded.cv_id,cv_name=excluded.cv_name,cv_year=excluded.cv_year,
-      cv_image=excluded.cv_image,confidence=excluded.confidence,status=excluded.status,series_type=excluded.series_type,library_id=excluded.library_id,scanned_at=datetime('now')`)
-    .run({ name: null, year: null, publisher: null, file_count: 0, cv_id: null, cv_name: null, cv_year: null, cv_image: null, confidence: 'none', status: 'review', series_type: null, library_id: null, ...c });
+      cv_image=excluded.cv_image,confidence=excluded.confidence,status=excluded.status,series_type=excluded.series_type,library_id=excluded.library_id,handler=excluded.handler,scanned_at=datetime('now')`)
+    .run({ name: null, year: null, publisher: null, file_count: 0, cv_id: null, cv_name: null, cv_year: null, cv_image: null, confidence: 'none', status: 'review', series_type: null, library_id: null, handler: null, ...c });
 }
 export function listImportCandidates(db) {
   return db.prepare(`SELECT * FROM import_candidates ORDER BY
@@ -1265,25 +1338,30 @@ export function clearSeriesCv(db, seriesId) {
 
 // Owned (has a valid file) or followed series that still need a CV match.
 // A locked match (manually chosen) is never re-matched automatically.
+// Self-described types carry their own metadata — never swept for a CV match.
 export function seriesNeedingCvMatch(db, { includeMatched = false } = {}) {
+  const selfDescribed = [...SELF_DESCRIBED_TYPES];
   return db.prepare(`
     SELECT s.* FROM series s
     WHERE (s.followed=1 OR EXISTS(SELECT 1 FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1))
       AND s.cv_locked=0
       ${includeMatched ? '' : 'AND s.cv_id IS NULL'}
-    ORDER BY s.title`).all();
+      ${selfDescribed.length ? `AND COALESCE(s.type,'comic') NOT IN (${selfDescribed.map(() => '?').join(',')})` : ''}
+    ORDER BY s.title`).all(...selfDescribed);
 }
 
 // Stop tracking a comic: drop its file index and remove it from the collection.
-// A CV-only row (no catalog source) is deleted outright; an adopted catalog
-// row is kept but unfollowed/unlinked so it leaves the collection.
+// A CV-only row (no catalog source) is deleted outright — as is a self-described
+// row, whose series/issues exist only to mirror files (the owning plugin's scan
+// re-creates them if the files are still on disk); an adopted catalog row is
+// kept but unfollowed/unlinked so it leaves the collection.
 // Does NOT touch files on disk. Returns the file paths that were indexed.
 export function untrackSeries(db, id) {
   const series = getSeriesById(db, id);
   if (!series) return { removed: false, files: [] };
   const files = db.prepare('SELECT path FROM library_files WHERE series_id=?').all(id).map((r) => r.path);
   db.prepare('DELETE FROM library_files WHERE series_id=?').run(id);
-  if (String(series.url).startsWith('cv:')) {
+  if (String(series.url).startsWith('cv:') || SELF_DESCRIBED_TYPES.has(series.type || 'comic')) {
     db.prepare('DELETE FROM issues WHERE series_id=?').run(id);
     db.prepare('DELETE FROM series WHERE id=?').run(id);
   } else {

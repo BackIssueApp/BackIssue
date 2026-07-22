@@ -434,3 +434,51 @@ test('personal follows are per-user; the monitor flag stays global', async () =>
   assert.equal(after.followed, 0);
   assert.equal(after.monitored, 1);
 });
+
+test('pruneLibraryFiles with `only`: a scan never deletes rows for file types it does not walk', () => {
+  const db = openDb(':memory:');
+  const base = { size: 1, mtime: 1, valid: 1 };
+  upsertLibraryFile(db, { path: '/a.cbz', dir: '/M/S', name: 'a.cbz', ...base });
+  upsertLibraryFile(db, { path: '/b.cbz', dir: '/M/S', name: 'b.cbz', ...base });
+  upsertLibraryFile(db, { path: '/shelf/book.epub', dir: '/shelf', name: 'book.epub', ...base });
+  // A comic walk saw only /a.cbz: the other comic is pruned, the ebook row —
+  // owned by another indexer — is untouched even though the walk never saw it.
+  assert.equal(pruneLibraryFiles(db, new Set(['/a.cbz']), /\.(cbz|cbr)$/i), 1);
+  assert.ok(getLibraryFile(db, '/shelf/book.epub'), 'plugin-owned row survives');
+  assert.ok(!getLibraryFile(db, '/b.cbz'));
+});
+
+test('self-described series: rendered from their own columns, never "unmatched", deleted whole', async () => {
+  const { SELF_DESCRIBED_TYPES, SERIES_TYPES, seriesMatchesFilter, untrackSeries } = await import('../src/db.js');
+  if (!SERIES_TYPES.includes('ebook')) SERIES_TYPES.push('ebook');
+  SELF_DESCRIBED_TYPES.add('ebook'); // what registerLibraryType({ selfDescribed: true }) does
+  const db = openDb(':memory:');
+  const s = upsertSeries(db, { title: 'Dune', url: 'ebook:l1:b:dune~frank-herbert', publisher: 'Frank Herbert' });
+  db.prepare("UPDATE series SET type='ebook', description='Spice.', year='1965' WHERE id=?").run(s);
+  const i = upsertIssue(db, { seriesId: s, title: 'Dune', issueNumber: '1', url: 'ebookfile:/shelf/dune.epub' });
+  db.prepare("UPDATE issues SET status='done' WHERE id=?").run(i);
+  upsertLibraryFile(db, { path: '/shelf/dune.epub', dir: '/shelf', name: 'dune.epub', size: 9, mtime: 1, valid: 1, has_metadata: 1 });
+  linkLibraryFile(db, '/shelf/dune.epub', s, i);
+
+  // The Library grid row: matched + local, own title/byline, own rollup.
+  const row = collectionSeries(db, {}).find((r) => r.id === s);
+  assert.equal(row.source, 'local');
+  assert.equal(row.matched, true);
+  assert.equal(row.title, 'Dune');
+  assert.equal(row.publisher, 'Frank Herbert');
+  assert.deepEqual([row.total, row.owned, row.missing], [1, 1, 0]);
+  assert.ok(seriesMatchesFilter(row, 'ebook'), 'its own type lane');
+  assert.ok(!seriesMatchesFilter(row, 'unmatched'), 'self-described is never unmatched');
+
+  // The series page: local issues in the CV shape, description included.
+  const det = seriesCollectionDetail(db, s);
+  assert.equal(det.source, 'local');
+  assert.equal(det.series.description, 'Spice.');
+  assert.deepEqual(det.issues.map((x) => [x.number, x.owned, x.downloadable, x.cv_issue_id]), [['1', true, false, null]]);
+
+  // Removing from the library deletes the whole row set (the plugin's scan
+  // re-creates it if the file remains) — no orphan series/issue rows.
+  untrackSeries(db, s);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM series').get().n, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM issues').get().n, 0);
+});

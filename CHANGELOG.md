@@ -9,6 +9,28 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 ## [Unreleased]
 
 ### Added
+- **Self-described library types (plugin hook).** `registerLibraryType` now
+  accepts `selfDescribed: true`: series of such a type carry their own
+  metadata on the series row (title, byline, year, cover, description — a new
+  `series.description` column) and list their local issue rows. The Library
+  grid and series pages render them like any matched series, the ComicVine
+  machinery (match sweep, "unmatched" lane, download buttons) leaves them
+  alone, and removing one deletes its rows cleanly. Powers the ebooks
+  plugin's Books libraries.
+- **Import handlers (plugin hook).** Plugins can register an Import-tool
+  handler (`registerImportHandler`) for non-comic file types: the import scan
+  asks each handler to propose candidates for the same review list (with the
+  handler's own metadata match on the card), and confirmed candidates are
+  imported by the handler — e.g. loose ebook files filing into a Books
+  library.
+- Per-issue plugin actions and covers now work on self-described series
+  pages, so plugin types get Read/Download-style actions on the normal rows.
+- **Library scanners (plugin hook).** A plugin can register a scanner for its
+  library type (`registerLibraryScanner`); creating or editing a library of
+  that type indexes it immediately, the same way comic libraries scan.
+- Failed series adds now log a warning with the underlying network cause
+  (previously the error only appeared as a client toast, leaving nothing in
+  the server logs to diagnose).
 - **Transmission and Deluge support.** The torrent source can now download
   through Transmission or Deluge as well as qBittorrent — pick the client under
   Settings → Sources → Torrents, with per-client connection fields and a Test
@@ -17,6 +39,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   mapping is shared across all three.
 
 ### Fixed
+- Library-wide scans and boot reconciliation no longer prune `library_files`
+  rows they didn't index: pruning is scoped to the comic file types the scan
+  actually walks, and files of series that belong to an explicit library are
+  kept — so plugin-indexed files (e.g. ebooks) survive "Scan entire library".
+  The Verify tool likewise skips non-comic files instead of flagging them
+  corrupt.
 - The metadata-service instance key is persisted only by the live app
   configuration — test runs (or any code constructing its own config) can no
   longer overwrite the real key in `settings.json`, which previously caused

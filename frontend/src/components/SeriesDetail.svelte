@@ -23,6 +23,11 @@
   const s = $derived(detail.series);
   const det = $derived(detail.det);
   const isCv = $derived(!!det && det.source === 'cv' && Array.isArray(det.issues));
+  // Self-described series (plugin library types, e.g. Books): same issue
+  // list/grid as CV series, but no ComicVine identity and no downloads —
+  // per-item actions come from plugins (read, download file, …).
+  const isLocal = $derived(!!det && det.source === 'local' && Array.isArray(det.issues));
+  const hasIssues = $derived(isCv || isLocal);
 
   // Rename this series' files to the configured folder/file pattern. Dry-runs
   // first to show the count, then executes on confirm.
@@ -51,18 +56,19 @@
     reloadDetail();
   }
   const isUnmatched = $derived(!!det && det.source === 'unmatched');
-  const issues = $derived(isCv ? det.issues : []);
+  const issues = $derived(hasIssues ? det.issues : []);
   const missingIds = $derived(issues.filter((i) => !i.owned).map((i) => i.cv_issue_id));
 
   const issueCountLabel = $derived(
     isCv && det.cv ? `${fmt(det.cv.issue_count)} issues`
+    : isLocal ? `${fmt(det.issues.length)} ${det.issues.length === 1 ? 'item' : 'items'}`
     : isUnmatched ? (det.files && det.files.length ? `${fmt(det.files.length)} files` : 'unmatched')
     : s ? `${s.issue_count} issues` : '');
 
-  /* ---- Series blurb (CV deck, else the description flattened to text) ---- */
+  /* ---- Series blurb (CV deck/description, else a local description) ---- */
   let descOpen = $state(false);
   const seriesBlurb = $derived.by(() => {
-    const raw = det?.cv?.deck || det?.cv?.description || '';
+    const raw = det?.cv?.deck || det?.cv?.description || det?.series?.description || '';
     const text = String(raw).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
     return text || null;
   });
@@ -125,7 +131,7 @@
   let stride = $state(42);       // row / card-row height incl. gap, measured
   let cols = $state(1);          // cards per row (1 in list mode), measured
 
-  const visibleIssues = $derived(isCv ? issues.filter((i) => !rowHidden(i)) : []);
+  const visibleIssues = $derived(hasIssues ? issues.filter((i) => !rowHidden(i)) : []);
   const virtual = $derived(visibleIssues.length > VIRTUAL_MIN);
   const range = $derived.by(() => {
     const n = visibleIssues.length;
@@ -171,7 +177,9 @@
   /* ---- Selection + summary ---- */
   // Selection is universal — owned issues are selectable too (read status,
   // reading lists). Downloads filter to what's actually downloadable instead.
-  const rowDisabled = () => false;
+  // Selection is keyed by ComicVine issue id, so local (self-described) items
+  // — which have none — aren't selectable.
+  const rowDisabled = (i) => i?.cv_issue_id == null;
   const downloadable = (i) => !(i.owned && !i.corrupt) && issueState(i) !== 'done';
   let lastToggled = $state(null); // index into visibleIssues, for shift-click ranges
   $effect(() => {
@@ -216,8 +224,8 @@
   });
   const summary = $derived.by(() => {
     if (isUnmatched) return fmt((det.files || []).length) + ((det.files || []).length === 1 ? ' file' : ' files');
-    if (!isCv) return '';
-    let out = `${fmt(issues.length)} issues · ${fmt(counts.owned)} owned`;
+    if (!hasIssues) return '';
+    let out = `${fmt(issues.length)} ${isLocal ? 'items' : 'issues'} · ${fmt(counts.owned)} owned`;
     if (counts.missing) out += ` · ${fmt(counts.missing)} missing`;
     if (counts.corrupt) out += ` · ⚠ ${fmt(counts.corrupt)} corrupt`;
     if (counts.untagged) out += ` · ${fmt(counts.untagged)} untagged`;
@@ -514,7 +522,7 @@
               {#if det.cv.metron_rating}
                 <span class="tag" class:tag--warn={['Mature','Explicit','Adult'].includes(det.cv.metron_rating)} title="Content rating (from enriched metadata)">{det.cv.metron_rating}</span>
               {/if}
-            {:else if det}
+            {:else if det && det.source === 'unmatched'}
               <span class="cv-none">No ComicVine match</span>
               {#if isTrusted()}<button class="link-btn cv-fix" onclick={() => openCvPicker(s.id, s.title, null, { files: pickerFileCount })}>Match…</button>{/if}
             {/if}
@@ -554,7 +562,7 @@
               {#if isTrusted()}
                 <button id="download-series" class="btn btn--primary" onclick={() => openCvPicker(s.id, (det.series && det.series.folder) || s.title, null, { files: pickerFileCount })}>Match to ComicVine</button>
               {/if}
-            {:else if can('downloads.grab')}
+            {:else if !isLocal && can('downloads.grab')}
               {#if isCv}
                 <button id="download-series" class="btn btn--primary" disabled={!missingIds.length} onclick={() => downloadCvIssues(missingIds)}>
                   {missingIds.length ? `Download missing (${fmt(missingIds.length)})` : 'Download missing'}</button>
@@ -562,7 +570,7 @@
                 <button id="download-series" class="btn btn--primary" disabled>Download missing</button>
               {/if}
             {/if}
-            {#if can('downloads.grab')}
+            {#if !isLocal && can('downloads.grab')}
               <!-- Selection now includes owned issues (read status, lists) — the
                    download acts on the downloadable subset only. -->
               {@const dlIds = issues.filter((i) => detailSelected.has(i.cv_issue_id) && downloadable(i)).map((i) => i.cv_issue_id)}
@@ -591,21 +599,25 @@
                   onclick={(e) => { e.stopPropagation(); moreOpen = !moreOpen; }}>⋯</button>
                 {#if moreOpen}
                   <div class="series-more__menu" role="menu">
-                    {#if can('library.manage')}
+                    {#if !isLocal && can('library.manage')}
                       <button class="menu__item" role="menuitem" title="Auto-download: should the system search for and fetch this series' new/missing issues?"
                         onclick={() => { moreOpen = false; toggleMonitored(); }}><Icon name="download" /> {s.monitored ? 'Auto-download: on' : 'Auto-download: off'}</button>
                     {/if}
                     {#if isTrusted()}
-                      <button class="menu__item" role="menuitem" disabled={refreshBusy} title="Re-pull metadata + issues from ComicVine"
-                        onclick={() => { moreOpen = false; refreshSeries(); }}><Icon name="refresh" /> {refreshBusy ? 'Refreshing…' : 'Refresh metadata'}</button>
+                      {#if !isLocal}
+                        <button class="menu__item" role="menuitem" disabled={refreshBusy} title="Re-pull metadata + issues from ComicVine"
+                          onclick={() => { moreOpen = false; refreshSeries(); }}><Icon name="refresh" /> {refreshBusy ? 'Refreshing…' : 'Refresh metadata'}</button>
+                      {/if}
                       {#if isCv}
                         <button class="menu__item" role="menuitem" title="Hand-edit this series' metadata, location, and alt names — edits survive refreshes"
                           onclick={() => { moreOpen = false; openEditMetadata(s.id, det?.cv, det?.series, det?.location); }}><Icon name="edit" /> Edit metadata…</button>
                       {/if}
-                      <button class="menu__item" role="menuitem" title="Pick a different ComicVine match for this series"
-                        onclick={() => { moreOpen = false; openCvPicker(s.id, s.title, null, { files: pickerFileCount }); }}><Icon name="diamond" /> Fix match…</button>
-                      <button class="menu__item" role="menuitem" disabled={scanBusy} title="Scan this series' folder for owned issues"
-                        onclick={() => { moreOpen = false; notify('Scanning folder…', 'info'); scanFolder(); }}><Icon name="search" /> {scanBusy ? scanText : 'Scan folder'}</button>
+                      {#if !isLocal}
+                        <button class="menu__item" role="menuitem" title="Pick a different ComicVine match for this series"
+                          onclick={() => { moreOpen = false; openCvPicker(s.id, s.title, null, { files: pickerFileCount }); }}><Icon name="diamond" /> Fix match…</button>
+                        <button class="menu__item" role="menuitem" disabled={scanBusy} title="Scan this series' folder for owned issues"
+                          onclick={() => { moreOpen = false; notify('Scanning folder…', 'info'); scanFolder(); }}><Icon name="search" /> {scanBusy ? scanText : 'Scan folder'}</button>
+                      {/if}
                       {#if isCv}
                         <button class="menu__item" role="menuitem" disabled={refileBusy} title="Move/rename this series' files to match the configured folder & file patterns"
                           onclick={() => { moreOpen = false; refileFiles(); }}><Icon name="edit" /> {refileBusy ? 'Renaming…' : 'Rename files'}</button>
@@ -619,7 +631,7 @@
                           onclick={() => { moreOpen = false; cleanupDuplicates(); }}><Icon name="trash" /> {cleanupBusy ? 'Removing…' : `Remove ${fmt(det.superseded)} duplicate${det.superseded === 1 ? '' : 's'}`}</button>
                       {/if}
                     {/if}
-                    {#if can('downloads.grab')}
+                    {#if !isLocal && can('downloads.grab')}
                       <button id="redownload-series" class="menu__item" role="menuitem" title="Re-queue every missing, failed, and corrupt issue"
                         onclick={() => { moreOpen = false; redownloadAll(); }}><Icon name="rotate-ccw" /> Retry missing &amp; corrupt</button>
                       {#if flags.anySource}
@@ -628,7 +640,10 @@
                       {/if}
                     {/if}
                     {#if isTrusted()}
-                      {#if (status.libraries || []).length}
+                      {#if isLocal}
+                        <!-- A self-described series belongs to its plugin library; core
+                             moves/typing would orphan it from its own scanner. -->
+                      {:else if (status.libraries || []).length}
                         <!-- Explicit libraries exist → move between them (the type rides along). -->
                         {#each status.libraries.filter((l) => l.id !== det?.series?.library_id) as lib (lib.id)}
                           <button class="menu__item" role="menuitem" title="Move this series into the {lib.name} library"
@@ -687,7 +702,7 @@
                 <div class="unmatched-files__head scan-muted">No files scanned yet — set the Location, then Scan folder.</div>
               {/if}
             </div>
-          {:else if isCv && gridMode}
+          {:else if hasIssues && gridMode}
             <!-- Cover grid: each issue is a card; owned covers come from a
                  plugin provider (reader page-0 thumbs) or ComicVine art. -->
             <div class="issue-grid">
@@ -698,8 +713,8 @@
                 <div class="icard"
                   class:is-corrupt={i.corrupt} class:is-checked={detailSelected.has(i.cv_issue_id)}
                   title={i.corrupt && corruptReason(i) ? 'Corrupt: ' + corruptReason(i) : (i.title || '')}>
-                  <div class="icard__art" onclick={() => openIssueInfo(i.cv_issue_id, i.number)} role="button" tabindex="0"
-                    onkeydown={(e) => { if (e.key === 'Enter') openIssueInfo(i.cv_issue_id, i.number); }}>
+                  <div class="icard__art" onclick={() => i.cv_issue_id && openIssueInfo(i.cv_issue_id, i.number)} role="button" tabindex="0"
+                    onkeydown={(e) => { if (e.key === 'Enter' && i.cv_issue_id) openIssueInfo(i.cv_issue_id, i.number); }}>
                     <div class="icard__ph">#{i.number ?? '?'}</div>
                     {#if cover}<img loading="lazy" alt="" referrerpolicy="no-referrer" src={cover}
                       onerror={(e) => e.currentTarget.remove()} />{/if}
@@ -715,7 +730,7 @@
                             onclick={() => a.run(i, detail.series)}>{@html typeof a.icon === 'function' ? a.icon(i) : a.icon}</button>
                         {/if}
                       {/each}
-                      {#if can('downloads.grab')}
+                      {#if can('downloads.grab') && i.cv_issue_id}
                         {#if i.corrupt}
                           <button class="icard__btn icard__btn--warn" title="File is corrupt — re-download" onclick={() => redownloadCvIssues([i.cv_issue_id])}><Icon name="refresh" /></button>
                         {:else if !i.owned}
@@ -737,7 +752,7 @@
             {#if !visibleIssues.length && issues.length}
               <div class="list-note">Nothing matches this filter.</div>
             {/if}
-          {:else if isCv}
+          {:else if hasIssues}
             {#if range.padTop > 0}<div style="height:{range.padTop}px"></div>{/if}
             {#each visibleIssues.slice(range.start, range.end) as i, vi (i.cv_issue_id ?? i.id ?? i.number)}
               {@const state = issueState(i)}
@@ -752,7 +767,11 @@
                   onclick={(e) => e.stopPropagation()}
                   onchange={() => toggleIssue(i, range.start + vi)} />
                 <span class="issue__num">{i.number || '—'}</span>
-                <button class="issue__title" title="Issue details" onclick={(e) => { e.stopPropagation(); openIssueInfo(i.cv_issue_id, i.number); }}>{i.title}</button>
+                {#if i.cv_issue_id}
+                  <button class="issue__title" title="Issue details" onclick={(e) => { e.stopPropagation(); openIssueInfo(i.cv_issue_id, i.number); }}>{i.title}</button>
+                {:else}
+                  <span class="issue__title">{i.title}</span>
+                {/if}
                 <span class="issue__col issue__col--date" title="Cover date">{i.cover_date || ''}</span>
                 <span class="issue__col issue__col--pages" title="Pages">{bf?.page_count ? fmt(bf.page_count) + 'p' : ''}</span>
                 <span class="issue__col issue__col--size" title={bf ? bf.name : ''}>{bf?.size ? humanBytes(bf.size) : ''}</span>
@@ -764,11 +783,11 @@
                     <button class="issue__dl" title={typeof a.title === 'function' ? a.title(i) : a.title} onclick={(e) => { e.stopPropagation(); a.run(i, detail.series); }}>{@html typeof a.icon === 'function' ? a.icon(i) : a.icon}</button>
                   {/if}
                 {/each}
-                {#if i.corrupt && can('downloads.grab')}
+                {#if i.corrupt && can('downloads.grab') && i.cv_issue_id}
                   <button class="issue__dl issue__dl--warn" title="File is corrupt — re-download" onclick={(e) => { e.stopPropagation(); redownloadCvIssues([i.cv_issue_id]); }}><Icon name="refresh" /></button>
                 {:else if i.owned}
                   <button class="issue__dl" title={i.untagged ? 'Owned — no ComicVine tags yet (use “Tag files”)' : 'Owned'} disabled><Icon name="check" /></button>
-                {:else if !i.corrupt && can('downloads.grab')}
+                {:else if !i.corrupt && can('downloads.grab') && i.cv_issue_id}
                   <button class="issue__dl" title="Download this issue" onclick={(e) => { e.stopPropagation(); downloadCvIssues([i.cv_issue_id]); }}><Icon name="download" /></button>
                 {/if}
               </div>

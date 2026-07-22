@@ -13,7 +13,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import config from './config.js';
-import { SERIES_TYPES } from './db.js';
+import { SERIES_TYPES, SELF_DESCRIBED_TYPES } from './db.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PLUGINS_DIR = process.env.PLUGINS_DIR || path.join(root, 'plugins');
@@ -72,6 +72,8 @@ const authProviders = []; // { id, label, loginPath } — external login (SSO/OI
 const credentialProviders = []; // async (username, password) => identity | null — external password backends
 const notifiers = []; // async (event, opts) => void — outbound notification channels (fired per notify())
 const indexerProviders = []; // { id, isActive(config), indexers(config, protocol) } — supply indexers to the usenet/torrent sources
+const importHandlers = []; // { id, label, scan(ctx), import(candidate, ctx) } — non-comic file types in the Import tool
+const libraryScanners = []; // { type, scan({libraryId}) } — plugin-owned library types index on the same scan actions
 
 // Per-plugin catalog for the management page: everything discovered on disk,
 // loaded or not. name → { name, version, description, enabled, loaded, error, counts }.
@@ -189,15 +191,46 @@ export const pluginApi = {
   registerIndexerProvider(provider) {
     if (provider?.id && typeof provider.indexers === 'function') { indexerProviders.push(provider); bump('indexerProviders'); }
   },
-  // A new library type ({ id, label }) beyond the built-ins (comic/manga/
-  // magazine). Registration whitelists the id for setSeriesType and adds a
-  // library filter lane (?filter=<id>). The plugin owns the type's behavior —
-  // its parsing, sources, or issue generation; core only tracks and filters.
-  registerLibraryType({ id, label } = {}) {
+  // A new library type ({ id, label, selfDescribed? }) beyond the built-ins
+  // (comic/manga/magazine). Registration whitelists the id for setSeriesType
+  // and adds a library filter lane (?filter=<id>). The plugin owns the type's
+  // behavior — its parsing, sources, or issue generation; core only tracks and
+  // filters. selfDescribed:true declares that series of this type carry their
+  // own metadata on the series row (title/publisher/year/cover/description) and
+  // list their local issue rows — core renders them from those columns and
+  // keeps the ComicVine machinery (match sweep, unmatched lane) off them.
+  registerLibraryType({ id, label, selfDescribed = false } = {}) {
     const clean = String(id || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
     if (!clean) throw new Error('registerLibraryType: a type needs an id');
     if (!SERIES_TYPES.includes(clean)) SERIES_TYPES.push(clean);
+    if (selfDescribed) SELF_DESCRIBED_TYPES.add(clean);
     libraryTypes.push({ id: clean, label: label || clean, plugin: currentLoadingPlugin });
+  },
+  // An Import-tool handler for non-comic file types. The import scan calls
+  // `scan({ db, config, roots, skip, log })` — the handler walks the roots for
+  // its own files and returns candidates:
+  //   { key, name, year?, publisher?, fileCount?, matchName?, matchYear?,
+  //     matchImage?, confidence ('high'|'medium'|'low'|'none'), seriesType?,
+  //     libraryId? }
+  // `key` must be unique and stable (a file path); `skip` is the set of keys
+  // whose review state core is keeping — return nothing for those. Confirmed
+  // candidates come back through `import(candidate, { db, config, log })`,
+  // which files the item into its library and catalogs it (throw = failed).
+  registerImportHandler(handler) {
+    if (!handler?.id || typeof handler.scan !== 'function' || typeof handler.import !== 'function') return;
+    if (importHandlers.some((h) => h.id === handler.id)) return; // idempotent
+    importHandlers.push({ ...handler, id: String(handler.id), plugin: currentLoadingPlugin });
+    bump('importHandlers');
+  },
+  // A scanner for libraries of a plugin-owned type. Core calls
+  // `scan({ libraryId })` (fire-and-forget) when a library of that type is
+  // created or edited, and from the System "scan" tooling — so plugin
+  // libraries index through the same user actions as comic ones.
+  registerLibraryScanner({ type, scan } = {}) {
+    const clean = String(type || '').toLowerCase();
+    if (!clean || typeof scan !== 'function') return;
+    if (libraryScanners.some((s) => s.type === clean)) return; // idempotent
+    libraryScanners.push({ type: clean, scan, plugin: currentLoadingPlugin });
   },
 };
 
@@ -221,6 +254,8 @@ export function registeredRoutes() { return routes; }
 export function registeredJobs() { return jobs; }
 export function registeredClientAssets() { return clientAssets; }
 export function registeredPermissions() { return permissions; }
+export function registeredImportHandlers() { return importHandlers; }
+export function registeredLibraryScanners() { return libraryScanners; }
 // Absolute path to the plugins directory (for serving plugin client files).
 export function pluginsDir() { return PLUGINS_DIR; }
 
@@ -263,7 +298,7 @@ export async function loadPluginsFromDir(dir, api = pluginApi, disabled = []) {
       enabled: !disabled.includes(name),
       loaded: false,
       error: null,
-      counts: { sources: 0, settings: 0, startups: 0, routes: 0, jobs: 0, assets: 0, permissions: 0, notifiers: 0, indexerProviders: 0 },
+      counts: { sources: 0, settings: 0, startups: 0, routes: 0, jobs: 0, assets: 0, permissions: 0, notifiers: 0, indexerProviders: 0, importHandlers: 0 },
     };
     catalog.set(name, info);
     if (!info.enabled) {

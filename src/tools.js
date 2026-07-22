@@ -14,6 +14,7 @@ import { linkFilesToCv, refreshCvVolume } from './cvmatch.js';
 import { tagFileFromCv } from './metatagger.js';
 import { fileStemFromPattern } from './naming.js';
 import { deleteLibraryFile, getLibraryFile } from './db.js';
+import { COMIC_RE } from './scanner.js';
 import { logWarn } from './logstore.js';
 
 // Run fn over items with bounded concurrency, so per-file network I/O overlaps.
@@ -106,9 +107,12 @@ export async function verifyLibrary(db, onProgress = () => {}, { corruptOnly = f
   // corruptOnly re-checks just the files currently flagged bad — a fast pass to
   // confirm fixes (mislabeled formats, off-by-one sizes) cleared them, instead of
   // deep-reading the whole library.
+  // Only archives the comic pipeline owns — rows other indexers put here
+  // (e.g. a plugin's ebook files) have their own health story; a zip check
+  // against a PDF would flag perfectly good files corrupt.
   const files = db.prepare(
     corruptOnly ? 'SELECT path FROM library_files WHERE valid=0' : 'SELECT path FROM library_files',
-  ).all().map((r) => r.path);
+  ).all().map((r) => r.path).filter((p) => COMIC_RE.test(p) || /\.(zip|rar)$/i.test(p));
   let done = 0, ok = 0, corrupt = 0, missing = 0, repacked = 0, unreachable = 0;
   await eachFile(files, async (p) => {
     try {
@@ -191,7 +195,7 @@ export async function scanEntireLibrary(db, roots, onProgress = () => {}) {
     else swept += await sweepTempFiles(root); // crash-stranded .part/.tag-* litter
     base += rootTotal;
   }
-  if (!unreachable && seen.size > 0) pruneLibraryFiles(db, seen);
+  if (!unreachable && seen.size > 0) pruneLibraryFiles(db, seen, COMIC_RE); // comic files only — other indexers own their own rows
   const s = libraryStats(db);
   return { files: s.total, tagged: s.tagged, untagged: s.untagged, corrupt: s.corrupt, ...(swept ? { tempSwept: swept } : {}), ...(unreachable ? { unreachableRoots: unreachable } : {}) };
 }

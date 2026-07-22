@@ -6,7 +6,9 @@ import { scoreMatch, normalizeNumber, normalizeTitle, extractYear } from './matc
 import { detectEdition } from './editions.js';
 import { readArchiveInfo } from './archive.js';
 
-const COMIC_RE = /\.(cbz|cbr)$/i;
+// Exported so prune paths can scope themselves to the files this scan walks
+// (never deleting index rows other indexers — e.g. an ebook plugin — own).
+export const COMIC_RE = /\.(cbz|cbr)$/i;
 const RANK = { high: 3, medium: 2, low: 1, none: 0 };
 
 // Edition-aware match key so Annual/TPB/Special #1 never collide with regular

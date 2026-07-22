@@ -4,7 +4,7 @@ import { processPack } from './pack.js';
 import { createApp } from './server.js';
 import config from './config.js';
 import { loadSettings, currentSettings, saveSettings } from './settings.js';
-import { loadPlugins, registeredStartups, registeredRoutes, registeredJobs, registeredClientAssets } from './plugins.js';
+import { loadPlugins, registeredStartups, registeredRoutes, registeredJobs, registeredClientAssets, registeredImportHandlers } from './plugins.js';
 import { spawn } from 'node:child_process';
 import fsp from 'node:fs/promises';
 import fss from 'node:fs';
@@ -404,7 +404,33 @@ async function runImportScan({ fresh = false } = {}) {
       }
       state.import.total = groups.length;
       job.progress({ total: groups.length });
-      const client = cvClient();
+      // Plugin import handlers (non-comic file types, e.g. ebooks): each walks
+      // the same roots for its own files and proposes candidates into the same
+      // review list. Keys with review state worth keeping (a user decision, or
+      // a solid match) are skipped — mirroring the comic keep-set above.
+      let handlerFound = 0;
+      for (const h of registeredImportHandlers()) {
+        try {
+          const skip = fresh ? new Set() : new Set(db.prepare(
+            "SELECT folder FROM import_candidates WHERE handler=? AND (status<>'review' OR confidence IN ('medium','high','manual'))",
+          ).all(h.id).map((r) => r.folder));
+          const found = await h.scan({ db, config, roots: allRoots, skip, log: (m) => logInfo(m, 'import') });
+          for (const c of found || []) {
+            if (!c?.key) continue;
+            upsertImportCandidate(db, {
+              folder: c.key, name: c.name ?? null, year: c.year ?? null, publisher: c.publisher ?? null,
+              file_count: c.fileCount ?? 1, cv_id: null,
+              cv_name: c.matchName ?? null, cv_year: c.matchYear ?? null, cv_image: c.matchImage ?? null,
+              confidence: c.confidence || 'none', status: c.confidence === 'high' ? 'ready' : 'review',
+              series_type: c.seriesType ?? null, library_id: c.libraryId ?? null, handler: h.id,
+            });
+            handlerFound++;
+          }
+        } catch (e) { console.warn(`import scan: ${h.id} handler failed:`, e?.message || e); }
+      }
+      // ComicVine is only needed for the comic candidates — an all-handler scan
+      // (no new comic folders) must not require a key.
+      const client = groups.length ? cvClient() : null;
       let done = 0;
       await poolWithResource(groups, config.cvConcurrency || 3, () => null, async (g) => {
         // Embedded ComicInfo.xml (tagged libraries) beats guessing from folder
@@ -456,8 +482,8 @@ async function runImportScan({ fresh = false } = {}) {
         job.progress({ done, total: groups.length, message: `${done}/${groups.length}` });
       }, () => {});
       state.import = { running: false, phase: 'reviewing', done, total: groups.length, scannedAt: new Date().toISOString() };
-      logInfo(`Library scan complete: ${groups.length} new volume(s) found${fresh ? ' (full rescan)' : ''}`, 'import');
-      job.finish({ found: groups.length });
+      logInfo(`Library scan complete: ${groups.length + handlerFound} new item(s) found${fresh ? ' (full rescan)' : ''}`, 'import');
+      job.finish({ found: groups.length + handlerFound });
     } catch (e) { state.import = { running: false, error: String(e?.message || e) }; job.fail(e); }
   })();
   return { started: true };
@@ -476,6 +502,18 @@ async function runImport() {
     let done = 0, imported = 0;
     for (const c of ready) {
       try {
+        // Handler candidates: the owning plugin files the item into its
+        // library and catalogs it (a throw lands in the catch below).
+        if (c.handler) {
+          const h = registeredImportHandlers().find((x) => x.id === c.handler);
+          if (!h) throw new Error(`import handler "${c.handler}" is not loaded`);
+          await h.import(c, { db, config, log: (m) => logInfo(m, 'import') });
+          setImportCandidateStatus(db, c.id, 'imported');
+          imported++;
+          state.import = { running: true, phase: 'importing', done: ++done, total: ready.length, imported };
+          job.progress({ done, total: ready.length, message: `${imported} imported` });
+          continue;
+        }
         let seriesId;
         if (c.cv_id && client) {
           seriesId = (await addSeriesFromCv(db, client, c.cv_id)).seriesId;

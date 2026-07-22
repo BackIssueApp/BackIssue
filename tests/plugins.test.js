@@ -98,3 +98,25 @@ test('registerLibraryType whitelists a plugin type for setSeriesType', async () 
   assert.equal(getSeriesById(db, id).type, 'lightnovel');
   assert.throws(() => pluginApi.registerLibraryType({}), /needs an id/);
 });
+
+test('registerLibraryType selfDescribed feeds the self-described whitelist', async () => {
+  const { pluginApi } = await import('../src/plugins.js');
+  const { SERIES_TYPES, SELF_DESCRIBED_TYPES } = await import('../src/db.js');
+  pluginApi.registerLibraryType({ id: 'audiobook', label: 'Audiobooks', selfDescribed: true });
+  assert.ok(SERIES_TYPES.includes('audiobook'));
+  assert.ok(SELF_DESCRIBED_TYPES.has('audiobook'));
+  pluginApi.registerLibraryType({ id: 'zine', label: 'Zines' }); // default: not self-described
+  assert.ok(!SELF_DESCRIBED_TYPES.has('zine'));
+});
+
+test('registerImportHandler: validated and idempotent by id', async () => {
+  const { pluginApi, registeredImportHandlers } = await import('../src/plugins.js');
+  const before = registeredImportHandlers().length;
+  pluginApi.registerImportHandler({ id: 'demo-files', scan: async () => [], import: async () => {} });
+  pluginApi.registerImportHandler({ id: 'demo-files', scan: async () => [], import: async () => {} }); // dupe ignored
+  assert.equal(registeredImportHandlers().filter((h) => h.id === 'demo-files').length, 1);
+  assert.equal(registeredImportHandlers().length, before + 1);
+  pluginApi.registerImportHandler({ id: 'no-scan', import: async () => {} }); // invalid — ignored
+  pluginApi.registerImportHandler({ scan: async () => [], import: async () => {} }); // no id — ignored
+  assert.equal(registeredImportHandlers().length, before + 1);
+});

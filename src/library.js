@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import config from './config.js';
-import { findComicFiles, parseIssueFromFilename } from './scanner.js';
+import { findComicFiles, parseIssueFromFilename, COMIC_RE } from './scanner.js';
 import { readArchiveInfo, verifyArchive } from './archive.js';
 import { upsertLibraryFile, getLibraryFile, pruneLibraryFiles, libraryStats, linkLibraryFile, deleteLibraryFile, getCvIssue } from './db.js';
 import { normalizeNumber } from './matcher.js';
@@ -118,7 +118,7 @@ export async function indexLibrary({ db, dir, deep = false, onProgress = () => {
     },
     () => {},
   );
-  if (!collect) pruneLibraryFiles(db, seen); // multi-root callers prune once, at the end
+  if (!collect) pruneLibraryFiles(db, seen, COMIC_RE); // multi-root callers prune once, at the end; comic files only — other indexers own their own rows
   // Now that files are attributed to series (above), link them to CV issues for
   // every matched series so the collection's owned/missing rolls up against
   // ComicVine. Pure DB, no I/O.
@@ -223,8 +223,10 @@ export function reconcileLibrary(db) {
   for (const s of db.prepare('SELECT id, cv_id FROM series WHERE cv_id IS NOT NULL').all()) {
     try { linkFilesToCv(db, s.id, s.cv_id); } catch { /* skip */ }
   }
+  // Members of an explicit library are tracked by definition (libraries own
+  // their contents — incl. plugin types whose series never carry a CV id).
   const pruned = db.prepare(
-    'DELETE FROM library_files WHERE series_id IS NULL OR series_id IN (SELECT id FROM series WHERE followed=0 AND cv_id IS NULL)'
+    'DELETE FROM library_files WHERE series_id IS NULL OR series_id IN (SELECT id FROM series WHERE followed=0 AND cv_id IS NULL AND library_id IS NULL)'
   ).run().changes;
   return { attributed, pruned };
 }
