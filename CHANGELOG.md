@@ -39,6 +39,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   mapping is shared across all three.
 
 ### Fixed
+- The Content-Security-Policy now permits same-origin `blob:` frames and
+  blob/data images, fonts, and styles — in-browser book reading (the EPUB
+  shell renders sections into sandboxed blob: iframes) showed a blank page
+  under the previous policy. Scripts remain restricted to self + the inline
+  bootstrap, and framing the app stays forbidden.
 - Library-wide scans and boot reconciliation no longer prune `library_files`
   rows they didn't index: pruning is scoped to the comic file types the scan
   actually walks, and files of series that belong to an explicit library are

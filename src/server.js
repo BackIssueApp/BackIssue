@@ -69,9 +69,16 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     res.setHeader('Referrer-Policy', 'no-referrer');
     // Images come from the R2/ComicVine mirror and the reader's own routes;
     // scripts/styles are self + the inline bootstrap (needs 'unsafe-inline').
+    // blob: appears because in-browser readers (the EPUB shell) render book
+    // sections into same-origin sandboxed blob: iframes, whose inherited CSP
+    // must also allow the book's own blob:-served images/fonts/styles. blob:
+    // URLs can only be minted by our own same-origin scripts, so this doesn't
+    // widen where content can come FROM — scripts stay 'self' + inline, and
+    // frame-ancestors 'none' still forbids anyone framing US.
     res.setHeader('Content-Security-Policy',
-      "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; "
-      + "script-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+      "default-src 'self'; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' blob:; "
+      + "script-src 'self' 'unsafe-inline'; font-src 'self' data: blob:; frame-src 'self' blob:; "
+      + "frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
     next();
   });
 
