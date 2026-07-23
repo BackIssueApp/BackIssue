@@ -8,7 +8,7 @@ import { poolWithResource } from './pool.js';
 import { convertCbrToCbz, verifyArchive, readArchiveInfo, sniffFormat, repackRarAsZip } from './archive.js';
 import { removeSupersededFiles, indexLibrary } from './library.js';
 import { walkFiles } from './sources/usenet.js';
-import { pruneLibraryFiles } from './db.js';
+import { pruneLibraryFiles, SELF_DESCRIBED_TYPES } from './db.js';
 import { libraryStats } from './db.js';
 import { linkFilesToCv, refreshCvVolume } from './cvmatch.js';
 import { tagFileFromCv } from './metatagger.js';
@@ -264,4 +264,38 @@ export async function relinkAllCv(db, onProgress = () => {}) {
     onProgress({ done: ++done, total: series.length, message: `${filesLinked} linked` });
   }
   return { seriesRelinked: series.length, filesLinked };
+}
+
+// Ghost series: legacy scrape-era catalog rows — never ComicVine-matched, not a
+// plugin-owned (self-described) type, and holding zero valid files. Their
+// "wanted" issues pollute the Wanted tab yet can never download (sources
+// resolve via ComicVine now), and the normal untrack path deliberately KEEPS
+// legacy rows, so users can't clear them from the UI. Default run is a
+// PREVIEW; { remove: true } deletes series + issues + follows outright.
+export async function removeGhostSeries(db, onProgress = () => {}, opts = {}) {
+  const ghosts = db.prepare(`
+    SELECT s.id, s.title, s.type FROM series s
+    WHERE s.cv_id IS NULL
+      AND (s.url IS NULL OR s.url NOT LIKE 'cv:%')
+      AND NOT EXISTS (SELECT 1 FROM library_files lf WHERE lf.series_id = s.id AND lf.valid = 1)
+  `).all().filter((s) => !SELF_DESCRIBED_TYPES.has(s.type || 'comic'));
+  if (!opts.remove) {
+    // Preview: log the full list so the operator can inspect before deleting.
+    for (const g of ghosts) logWarn(`ghost series (preview): ${g.title} [id ${g.id}]`, 'tools');
+    onProgress({ done: ghosts.length, total: ghosts.length });
+    return { ghostsFound: ghosts.length, removed: 0 };
+  }
+  let done = 0;
+  const del = db.transaction((g) => {
+    db.prepare('DELETE FROM issues WHERE series_id=?').run(g.id);
+    db.prepare('DELETE FROM user_follows WHERE series_id=?').run(g.id);
+    db.prepare('DELETE FROM library_files WHERE series_id=?').run(g.id); // invalid leftovers
+    db.prepare('DELETE FROM series WHERE id=?').run(g.id);
+  });
+  for (const g of ghosts) {
+    del(g);
+    logWarn(`ghost series removed: ${g.title} [id ${g.id}]`, 'tools');
+    onProgress({ done: ++done, total: ghosts.length, message: g.title });
+  }
+  return { ghostsFound: ghosts.length, removed: done };
 }

@@ -99,6 +99,7 @@
   // ================= TOOLS =================
   let st = $state(null);
   let verifyCorruptOnly = $state(false); // survives the 1.2s poll re-render
+  let ghostsRemove = $state(false);      // unticked = preview only
 
   async function renderTools() { try { st = await apiGet('/api/tools'); } catch { /* keep last */ } }
   $effect(() => {
@@ -182,7 +183,8 @@
   let startingId = $state(null);
   async function runTool(t) {
     startingId = t.id;
-    const body = t.id === 'verify' && verifyCorruptOnly ? { corruptOnly: true } : {};
+    const body = t.id === 'verify' && verifyCorruptOnly ? { corruptOnly: true }
+      : t.id === 'remove-ghosts' && ghostsRemove ? { remove: true } : {};
     const r = await apiPost('/api/tools/' + t.id, body);
     if (r.error) notify(r.error, 'error');
     startingId = null;
@@ -420,6 +422,9 @@
               {/if}
               {#if t.id === 'verify'}
                 <label class="sysx__tool-opt"><input type="checkbox" bind:checked={verifyCorruptOnly} disabled={busy} /> Only re-check corrupt files{st?.corruptCount ? ` (${fmt(st.corruptCount)})` : ''}</label>
+              {/if}
+              {#if t.id === 'remove-ghosts'}
+                <label class="sysx__tool-opt"><input type="checkbox" bind:checked={ghostsRemove} disabled={busy} /> Actually delete (unticked = preview to Logs)</label>
               {/if}
               <div class="sysx__tool-foot">
                 <button class="sysx__primary sysx__primary--sm" disabled={busy || startingId === t.id} onclick={() => runTool(t)}>

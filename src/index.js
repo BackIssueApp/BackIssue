@@ -22,7 +22,7 @@ import { fetchWeeklyReleases, matchReleases } from './releases.js';
 import { startJob, listJobs, clearFinishedJobs, attachJobsDb } from './jobs.js';
 import { createScheduler } from './scheduler.js';
 import { createDownloadMonitor } from './downloadmonitor.js';
-import { tagAllUntagged, convertAllCbr, removeAllDuplicates, verifyLibrary, relinkAllCv, scanEntireLibrary, backupDatabase, renameAllFiles } from './tools.js';
+import { tagAllUntagged, convertAllCbr, removeAllDuplicates, verifyLibrary, relinkAllCv, scanEntireLibrary, backupDatabase, renameAllFiles, removeGhostSeries } from './tools.js';
 import { collectionStats } from './stats.js';
 import { installConsoleCapture, attachLogDb, listLogs, clearLogs, logInfo, logWarn, logError, logCounts, logCategories } from './logstore.js';
 import { runCvMatch as runCvMatchLib, cacheAndLink, addSeriesFromCv, refreshCvVolume, refreshAllIssueDetails, rankCandidates } from './cvmatch.js';
@@ -142,6 +142,7 @@ const TOOLS = {
   'fetch-metadata': { label: 'Download issue metadata', desc: 'Fetch ComicVine detail (descriptions, credits, dates, covers) for every issue in your collection that is missing it. Already-cached issues are skipped; if ComicVine rate-limits, it stops cleanly — just run it again to finish.', needsCv: true, run: (op) => fetchAllIssueMetadata(db, cvClient(), op) },
   'rename-files': { label: 'Rename files to pattern', desc: 'Rename every CV-linked file to your file pattern (same folder — no moves) so imported scene-named files match downloaded ones. Collisions are skipped.', run: (op) => renameAllFiles(db, op) },
   'backup-db': { label: 'Back up database', desc: 'Snapshot the catalog database into backups/ next to it (keeps the newest 5). Safe while the app is in use. Restore: stop the app and copy a snapshot over catalog.db.', run: (op) => backupDatabase(db, config.dbPath, op) },
+  'remove-ghosts': { label: 'Remove ghost series', desc: 'Find leftover series from before ComicVine matching — no CV match, no files on disk — whose "wanted" issues clutter the Wanted tab but can never download. Runs as a preview (see Logs → tools for the list); tick the box to actually delete them.', run: (op, opts) => removeGhostSeries(db, op, opts) },
 };
 const summarizeTool = (r) => Object.entries(r || {}).map(([k, v]) => `${v} ${k.replace(/([A-Z])/g, ' $1').toLowerCase()}`).join(', ');
 function runTool(tool, opts = {}) {

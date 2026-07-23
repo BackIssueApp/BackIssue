@@ -277,3 +277,36 @@ test('renameAllFiles: renames CV-linked files to the standard name, updates the 
   assert.equal(again.unchanged, 1);
   await fs.rm(dir, { recursive: true, force: true });
 });
+
+test('removeGhostSeries: previews then deletes legacy no-CV no-file rows; spares matched, filed, and plugin-typed series', async () => {
+  const { removeGhostSeries } = await import('../src/tools.js');
+  const { SELF_DESCRIBED_TYPES } = await import('../src/db.js');
+  const db = openDb(':memory:');
+  // Ghost: legacy catalog URL, no CV id, no files, plus a wanted issue and a follow.
+  const ghost = upsertSeries(db, { title: 'Old Scrape Relic', url: 'https://example.invalid/relic.html' });
+  db.prepare("INSERT INTO issues (series_id, title, status, url) VALUES (?, 'Relic #1', 'wanted', 'https://example.invalid/relic-1')").run(ghost);
+  db.prepare('INSERT INTO user_follows (user_id, series_id) VALUES (1, ?)').run(ghost);
+  // Matched series: same emptiness but has a CV id — must survive.
+  const matched = upsertSeries(db, { title: 'Matched Empty', url: 'cv:99' });
+  db.prepare('UPDATE series SET cv_id = 99 WHERE id = ?').run(matched);
+  // Legacy row that still owns a valid file — must survive.
+  const withFile = upsertSeries(db, { title: 'Legacy With File', url: 'https://example.invalid/keep.html' });
+  upsertLibraryFile(db, { path: 'X:/keep/f.cbz', dir: 'X:/keep', name: 'f.cbz', size: 1, mtime: 1, valid: 1, series_id: withFile });
+  // Self-described plugin type (e.g. a book) — never a ghost.
+  SELF_DESCRIBED_TYPES.add('ebook');
+  const book = upsertSeries(db, { title: 'A Book', url: 'ebook:l1:s:a-book' });
+  db.prepare("UPDATE series SET type = 'ebook' WHERE id = ?").run(book);
+
+  // Preview: reports, deletes nothing.
+  const preview = await removeGhostSeries(db);
+  assert.deepEqual([preview.ghostsFound, preview.removed], [1, 0]);
+  assert.ok(db.prepare('SELECT 1 FROM series WHERE id = ?').get(ghost));
+
+  // Remove: ghost (and its issues + follows) gone, everything else intact.
+  const r = await removeGhostSeries(db, () => {}, { remove: true });
+  assert.deepEqual([r.ghostsFound, r.removed], [1, 1]);
+  assert.equal(db.prepare('SELECT 1 FROM series WHERE id = ?').get(ghost), undefined);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM issues WHERE series_id = ?').get(ghost).c, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM user_follows WHERE series_id = ?').get(ghost).c, 0);
+  for (const id of [matched, withFile, book]) assert.ok(db.prepare('SELECT 1 FROM series WHERE id = ?').get(id), 'survivor ' + id);
+});

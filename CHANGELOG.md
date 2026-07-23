@@ -8,6 +8,14 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+- **"Remove ghost series" tool (System → Tools).** Finds leftover series from
+  before ComicVine matching — no CV match, no files on disk — whose wanted
+  issues clutter the Wanted tab but can never download (and which the normal
+  untrack path deliberately keeps). Runs as a preview logging the full list;
+  tick "Actually delete" to remove them (issues and follows included).
+
+
 ## [0.7.5] — 2026-07-23
 
 ### Added
