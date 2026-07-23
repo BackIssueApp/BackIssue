@@ -139,7 +139,7 @@
 
     <div class="wx__chips">
       <button class="wx__chip" class:is-active={!followed} onclick={() => setQuery({ wf: null })}>All series</button>
-      <button class="wx__chip" class:is-active={followed} onclick={() => setQuery({ wf: 'followed' })}>Monitored only</button>
+      <button class="wx__chip" class:is-active={followed} onclick={() => setQuery({ wf: 'followed' })} title="Series you follow (the ☆ on a series page)">Following</button>
       <button id="wanted-unreleased" class="wx__chip wx__chip--hide" class:is-active={hideUnreleased}
         title="Hides issues whose known cover date is in the future (most cached issues have no date — this only hides what we know)"
         onclick={() => setQuery({ hide: hideUnreleased ? null : '1' })}><Icon name="eye-off" size={14} /> Hide unreleased</button>
@@ -171,7 +171,7 @@
             <div class="wx__series-main">
               <div class="wx__series-title">
                 <a href={'/volume/' + g.id} onclick={(e) => { e.stopPropagation(); e.preventDefault(); navigate('/volume/' + g.id); }}>{g.title || '?'}</a>
-                {#if g.followed}<span class="wx__star" title="Monitored"><Icon name="star" fill size={13} /></span>{/if}
+                {#if g.followed}<span class="wx__star" title="Following"><Icon name="star" fill size={13} /></span>{/if}
               </div>
               {#if g.hasBar}
                 <div class="wx__prog">

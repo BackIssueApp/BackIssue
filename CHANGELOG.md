@@ -16,6 +16,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   tick "Actually delete" to remove them (issues and follows included).
 
 
+### Changed
+- The Wanted tab's "Monitored only" filter is now called **"Following"** — it
+  filters by the ☆ Follow star on series pages, and nothing else in the app
+  ever called that "monitoring" (users couldn't find the control).
+
 ## [0.7.5] — 2026-07-23
 
 ### Added
