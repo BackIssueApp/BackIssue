@@ -405,13 +405,13 @@
   }
 
   /* ---- Connection tests (download clients + CV keys) ---- */
-  let tests = $state({ client: null, qb: null, cv: null });
+  let tests = $state({ client: null, qb: null, cv: null, meta: null });
   async function runTest(key, endpoint, collect) {
     tests[key] = { cls: 'is-testing', text: 'Testing…' };
     let r;
     try { r = await apiPost(endpoint, collect()); }
     catch (e) { r = { ok: false, message: String(e) }; }
-    tests[key] = { cls: r.ok ? 'is-ok' : 'is-bad', icon: r.ok ? 'check' : 'close', text: r.message };
+    tests[key] = { cls: r.ok ? 'is-ok' : 'is-bad', icon: r.ok ? 'check' : 'close', text: r.message, ok: !!r.ok };
   }
   const v = (sel) => root.querySelector(sel)?.value ?? '';
   const checked = (sel) => !!root.querySelector(sel)?.checked;
@@ -442,6 +442,12 @@
     delugePass: v('#set-delugePass'),
   }));
   const testCv = () => runTest('cv', '/api/cv/test', () => ({ keys: v('#set-comicvineKeys') }));
+  // Built-in service: registration + round trip. A success may have JUST
+  // provisioned the key — refresh loadedSettings so the status line updates.
+  const testMeta = async () => {
+    await runTest('meta', '/api/metadata/test', () => ({}));
+    if (tests.meta?.ok) { try { loadedSettings = { ...loadedSettings, ...(await apiGet('/api/settings')) }; } catch { /* status refreshes next open */ } }
+  };
 
   function movePriority(i, dir) {
     const j = i + dir;
@@ -869,6 +875,17 @@
           </select>
         </label>
         <p class="modal__note">The built-in service works out of the box — cached ComicVine data with enrichment and no rate-limit pauses. Choose ComicVine to query the official API directly with your own key instead.</p>
+        <div hidden={cvDirect}>
+          <p class="modal__note">
+            {#if loadedSettings.metadataInstanceKey}
+              <Icon name="check" /> Registered with the metadata service (instance key ends in <b class="mono">{String(loadedSettings.metadataInstanceKey).slice(-6)}</b>).
+            {:else}
+              Not registered yet — this install provisions its key automatically on first use.
+            {/if}
+          </p>
+          <div class="client-test"><button class="btn btn--ghost" type="button" onclick={testMeta}>Test service</button>
+            {#if tests.meta}<span class="client-status {tests.meta.cls}">{#if tests.meta.icon}<Icon name={tests.meta.icon} /> {/if}{tests.meta.text}</span>{/if}</div>
+        </div>
         <!-- The ComicVine fields stay mounted (their set-* ids are collected on
              save); hidden attr just removes them from view on the built-in source. -->
         <div hidden={!cvDirect}>

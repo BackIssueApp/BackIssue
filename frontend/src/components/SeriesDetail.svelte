@@ -1,7 +1,7 @@
 <script>
   import { goBack, navigate } from '../lib/router.svelte.js';
   import { detail, detailSelected, flags, ops, loadCollection, reloadDetail, clearDetail, issueState, downloadCvIssues, redownloadCvIssues, redownloadIssues, watchDetailSweep } from '../lib/store.svelte.js';
-  import { issueActions, seriesActions, issueActionsTick, issueCoverUrl } from '../lib/plugins.svelte.js';
+  import { plugins, issueActions, seriesActions, issueActionsTick, issueCoverUrl, seriesViews, renderSeriesView } from '../lib/plugins.svelte.js';
   import { isTrusted, can } from '../lib/auth.svelte.js';
   import { apiGet, apiPost } from '../lib/api.js';
   import { notify } from '../lib/toasts.svelte.js';
@@ -23,11 +23,32 @@
   const s = $derived(detail.series);
   const det = $derived(detail.det);
   const isCv = $derived(!!det && det.source === 'cv' && Array.isArray(det.issues));
-  // Self-described series (plugin library types, e.g. Books): same issue
-  // list/grid as CV series, but no ComicVine identity and no downloads —
-  // per-item actions come from plugins (read, download file, …).
+  // Self-described series (plugin library types, e.g. Books): the hero/header
+  // renders here like any series, but the issue area belongs to the plugin
+  // that owns the type (registerSeriesView) — comic vocabulary (filter chips,
+  // issue grid, selection) makes no sense for them.
   const isLocal = $derived(!!det && det.source === 'local' && Array.isArray(det.issues));
   const hasIssues = $derived(isCv || isLocal);
+
+  /* ---- Plugin-owned issue area ----
+     The plugin that registered this series' library type replaces the chips +
+     issue list + selection with its own view; hero and ⋯ menu stay core.
+     Comic/manga series never have a registered view, so they're unaffected. */
+  const pluginView = $derived(seriesViews[det?.series?.type ?? s?.type] || null);
+  let viewHost = $state(null);
+  $effect(() => {
+    const host = viewHost, view = pluginView;
+    if (!host || !view || !det) return;
+    // Re-render when the series data refreshes or a plugin bumps the actions
+    // tick (e.g. reading progress changed) — the same signal the rows use.
+    void issueActionsTick.n;
+    void issues;
+    // det.series is the full detail payload (year, type, description, …) —
+    // richer than the header-paint row the hero uses.
+    renderSeriesView(view, host, { series: det.series, issues, refresh: reloadDetail });
+    // Clear between renders and on unmount — plugin listeners die with their nodes.
+    return () => host.replaceChildren();
+  });
 
   // Rename this series' files to the configured folder/file pattern. Dry-runs
   // first to show the count, then executes on confirm.
@@ -177,9 +198,8 @@
   /* ---- Selection + summary ---- */
   // Selection is universal — owned issues are selectable too (read status,
   // reading lists). Downloads filter to what's actually downloadable instead.
-  // Selection is keyed by ComicVine issue id, so local (self-described) items
-  // — which have none — aren't selectable.
-  const rowDisabled = (i) => i?.cv_issue_id == null;
+  // Selection is keyed by ComicVine issue id (every CV row has one; plugin-
+  // owned series never reach this list).
   const downloadable = (i) => !(i.owned && !i.corrupt) && issueState(i) !== 'done';
   let lastToggled = $state(null); // index into visibleIssues, for shift-click ranges
   $effect(() => {
@@ -189,14 +209,13 @@
     if (scroller && scroller.scrollTop > 0) scroller.scrollTop = 0;
   });
   function toggleIssue(i, index = null, shiftKey = false) {
-    if (rowDisabled(i)) return;
     const willCheck = !detailSelected.has(i.cv_issue_id);
     if (shiftKey && lastToggled != null && index != null && index !== lastToggled) {
       // Shift-click: set the whole range to the clicked row's new state.
       const [a, b] = [Math.min(lastToggled, index), Math.max(lastToggled, index)];
       for (let k = a; k <= b; k++) {
         const it = visibleIssues[k];
-        if (!it || rowDisabled(it)) continue;
+        if (!it) continue;
         if (willCheck) detailSelected.add(it.cv_issue_id); else detailSelected.delete(it.cv_issue_id);
       }
     } else if (willCheck) detailSelected.add(i.cv_issue_id);
@@ -207,7 +226,6 @@
   // those corrupt issues — not every issue in the series.
   function selectAll(checked) {
     for (const i of visibleIssues) {
-      if (rowDisabled(i)) continue;
       if (checked) detailSelected.add(i.cv_issue_id); else detailSelected.delete(i.cv_issue_id);
     }
   }
@@ -224,8 +242,8 @@
   });
   const summary = $derived.by(() => {
     if (isUnmatched) return fmt((det.files || []).length) + ((det.files || []).length === 1 ? ' file' : ' files');
-    if (!hasIssues) return '';
-    let out = `${fmt(issues.length)} ${isLocal ? 'items' : 'issues'} · ${fmt(counts.owned)} owned`;
+    if (!isCv) return '';
+    let out = `${fmt(issues.length)} issues · ${fmt(counts.owned)} owned`;
     if (counts.missing) out += ` · ${fmt(counts.missing)} missing`;
     if (counts.corrupt) out += ` · ⚠ ${fmt(counts.corrupt)} corrupt`;
     if (counts.untagged) out += ` · ${fmt(counts.untagged)} untagged`;
@@ -668,26 +686,37 @@
       </header>
 
       <div class="issues">
-        <div class="issues__head">
-          <label class="checkall"><input type="checkbox" id="select-all" checked={isCv && visibleIssues.some((i) => !rowDisabled(i)) && visibleIssues.filter((i) => !rowDisabled(i)).every((i) => detailSelected.has(i.cv_issue_id))} onchange={(e) => selectAll(e.currentTarget.checked)} /> <span>Select all</span></label>
-          <div class="filter" id="filter">
-            {#each FILTERS as f (f)}
-              {@const n = filterCounts[f]}
-              <button class="filter__btn" class:is-active={currentFilter === f} onclick={() => { currentFilter = f; }}>{FILTER_LABELS[f]}{#if n}<span class="filter__count">{fmt(n)}</span>{/if}</button>
-            {/each}
+        {#if !pluginView && !isLocal}
+          <div class="issues__head">
+            <label class="checkall"><input type="checkbox" id="select-all" checked={visibleIssues.length > 0 && visibleIssues.every((i) => detailSelected.has(i.cv_issue_id))} onchange={(e) => selectAll(e.currentTarget.checked)} /> <span>Select all</span></label>
+            <div class="filter" id="filter">
+              {#each FILTERS as f (f)}
+                {@const n = filterCounts[f]}
+                <button class="filter__btn" class:is-active={currentFilter === f} onclick={() => { currentFilter = f; }}>{FILTER_LABELS[f]}{#if n}<span class="filter__count">{fmt(n)}</span>{/if}</button>
+              {/each}
+            </div>
+            <input id="issue-find" type="search" class="issue-find" placeholder="find #…" title="Filter issues by number or title" bind:value={findText} />
+            <div class="viewtoggle" role="group" aria-label="Issue view">
+              <button class="viewtoggle__btn" class:is-active={gridMode} title="Cover grid" onclick={() => setIssueView('grid')}><Icon name="grid" /></button>
+              <button class="viewtoggle__btn" class:is-active={!gridMode} title="List" onclick={() => setIssueView('list')}><Icon name="list" /></button>
+            </div>
+            <span id="issues-summary" class="muted">{summary}</span>
           </div>
-          <input id="issue-find" type="search" class="issue-find" placeholder="find #…" title="Filter issues by number or title" bind:value={findText} />
-          <div class="viewtoggle" role="group" aria-label="Issue view">
-            <button class="viewtoggle__btn" class:is-active={gridMode} title="Cover grid" onclick={() => setIssueView('grid')}><Icon name="grid" /></button>
-            <button class="viewtoggle__btn" class:is-active={!gridMode} title="List" onclick={() => setIssueView('list')}><Icon name="list" /></button>
-          </div>
-          <span id="issues-summary" class="muted">{summary}</span>
-        </div>
+        {/if}
         <div id="issues-list" class="issues-list" bind:this={listEl}>
           {#if detail.failed}
             <div class="list-note">Could not load this series — is the app running? Try again.</div>
           {:else if !det && s}
             <div class="list-note">Loading issues…</div>
+          {:else if pluginView}
+            <!-- The plugin that owns this library type draws the issue area
+                 (registerSeriesView) into this container — see the $effect. -->
+            <div class="plugin-series-view" bind:this={viewHost}></div>
+          {:else if isLocal}
+            <!-- A plugin-owned type with no registered view: its client script
+                 is still loading, or failed to load. The comic layout would be
+                 nonsense here, so say so quietly instead. -->
+            <div class="list-note">{plugins.ready ? 'This series is managed by a plugin whose page view didn’t load — try reloading.' : 'Loading…'}</div>
           {:else if isUnmatched}
             <!-- A comic with no ComicVine match: no issue list (sources are download-only) —
                  show the files on disk and a prompt to match. -->
@@ -702,26 +731,24 @@
                 <div class="unmatched-files__head scan-muted">No files scanned yet — set the Location, then Scan folder.</div>
               {/if}
             </div>
-          {:else if hasIssues && gridMode}
+          {:else if isCv && gridMode}
             <!-- Cover grid: each issue is a card; owned covers come from a
                  plugin provider (reader page-0 thumbs) or ComicVine art. -->
             <div class="issue-grid">
               {#if range.padTop > 0}<div class="issue-grid__pad" style="height:{range.padTop}px"></div>{/if}
-              {#each visibleIssues.slice(range.start, range.end) as i, vi (i.cv_issue_id ?? i.id ?? i.number)}
+              {#each visibleIssues.slice(range.start, range.end) as i, vi (i.cv_issue_id)}
                 {@const state = issueState(i)}
                 {@const cover = issueCoverUrl(i)}
                 <div class="icard"
                   class:is-corrupt={i.corrupt} class:is-checked={detailSelected.has(i.cv_issue_id)}
                   title={i.corrupt && corruptReason(i) ? 'Corrupt: ' + corruptReason(i) : (i.title || '')}>
-                  <div class="icard__art" onclick={() => i.cv_issue_id && openIssueInfo(i.cv_issue_id, i.number)} role="button" tabindex="0"
-                    onkeydown={(e) => { if (e.key === 'Enter' && i.cv_issue_id) openIssueInfo(i.cv_issue_id, i.number); }}>
+                  <div class="icard__art" onclick={() => openIssueInfo(i.cv_issue_id, i.number)} role="button" tabindex="0"
+                    onkeydown={(e) => { if (e.key === 'Enter') openIssueInfo(i.cv_issue_id, i.number); }}>
                     <div class="icard__ph">#{i.number ?? '?'}</div>
                     {#if cover}<img loading="lazy" alt="" referrerpolicy="no-referrer" src={cover}
                       onerror={(e) => e.currentTarget.remove()} />{/if}
-                    {#if !rowDisabled(i)}
-                      <input class="icard__check" type="checkbox" checked={detailSelected.has(i.cv_issue_id)}
-                        onclick={(e) => { e.stopPropagation(); toggleIssue(i, range.start + vi, e.shiftKey); }} />
-                    {/if}
+                    <input class="icard__check" type="checkbox" checked={detailSelected.has(i.cv_issue_id)}
+                      onclick={(e) => { e.stopPropagation(); toggleIssue(i, range.start + vi, e.shiftKey); }} />
                     <span class="icard__state icard__state--{state}" title={state}></span>
                     <div class="icard__actions" onclick={(e) => e.stopPropagation()}>
                       {#each issueActions as a (a.id + ':' + issueActionsTick.n)}
@@ -730,7 +757,7 @@
                             onclick={() => a.run(i, detail.series)}>{@html typeof a.icon === 'function' ? a.icon(i) : a.icon}</button>
                         {/if}
                       {/each}
-                      {#if can('downloads.grab') && i.cv_issue_id}
+                      {#if can('downloads.grab')}
                         {#if i.corrupt}
                           <button class="icard__btn icard__btn--warn" title="File is corrupt — re-download" onclick={() => redownloadCvIssues([i.cv_issue_id])}><Icon name="refresh" /></button>
                         {:else if !i.owned}
@@ -752,9 +779,9 @@
             {#if !visibleIssues.length && issues.length}
               <div class="list-note">Nothing matches this filter.</div>
             {/if}
-          {:else if hasIssues}
+          {:else if isCv}
             {#if range.padTop > 0}<div style="height:{range.padTop}px"></div>{/if}
-            {#each visibleIssues.slice(range.start, range.end) as i, vi (i.cv_issue_id ?? i.id ?? i.number)}
+            {#each visibleIssues.slice(range.start, range.end) as i, vi (i.cv_issue_id)}
               {@const state = issueState(i)}
               {@const bf = bestFile(i)}
               <div class="issue"
@@ -762,16 +789,12 @@
                 title={i.corrupt && corruptReason(i) ? 'Corrupt: ' + corruptReason(i) : undefined}
                 onclick={(e) => toggleIssue(i, range.start + vi, e.shiftKey)} role="button" tabindex="0"
                 onkeydown={(e) => { if (e.key === 'Enter') toggleIssue(i, range.start + vi, e.shiftKey); }}>
-                <input type="checkbox" value={i.cv_issue_id ?? ''} disabled={rowDisabled(i)}
+                <input type="checkbox" value={i.cv_issue_id}
                   checked={detailSelected.has(i.cv_issue_id)}
                   onclick={(e) => e.stopPropagation()}
                   onchange={() => toggleIssue(i, range.start + vi)} />
                 <span class="issue__num">{i.number || '—'}</span>
-                {#if i.cv_issue_id}
-                  <button class="issue__title" title="Issue details" onclick={(e) => { e.stopPropagation(); openIssueInfo(i.cv_issue_id, i.number); }}>{i.title}</button>
-                {:else}
-                  <span class="issue__title">{i.title}</span>
-                {/if}
+                <button class="issue__title" title="Issue details" onclick={(e) => { e.stopPropagation(); openIssueInfo(i.cv_issue_id, i.number); }}>{i.title}</button>
                 <span class="issue__col issue__col--date" title="Cover date">{i.cover_date || ''}</span>
                 <span class="issue__col issue__col--pages" title="Pages">{bf?.page_count ? fmt(bf.page_count) + 'p' : ''}</span>
                 <span class="issue__col issue__col--size" title={bf ? bf.name : ''}>{bf?.size ? humanBytes(bf.size) : ''}</span>
@@ -783,11 +806,11 @@
                     <button class="issue__dl" title={typeof a.title === 'function' ? a.title(i) : a.title} onclick={(e) => { e.stopPropagation(); a.run(i, detail.series); }}>{@html typeof a.icon === 'function' ? a.icon(i) : a.icon}</button>
                   {/if}
                 {/each}
-                {#if i.corrupt && can('downloads.grab') && i.cv_issue_id}
+                {#if i.corrupt && can('downloads.grab')}
                   <button class="issue__dl issue__dl--warn" title="File is corrupt — re-download" onclick={(e) => { e.stopPropagation(); redownloadCvIssues([i.cv_issue_id]); }}><Icon name="refresh" /></button>
                 {:else if i.owned}
                   <button class="issue__dl" title={i.untagged ? 'Owned — no ComicVine tags yet (use “Tag files”)' : 'Owned'} disabled><Icon name="check" /></button>
-                {:else if !i.corrupt && can('downloads.grab') && i.cv_issue_id}
+                {:else if !i.corrupt && can('downloads.grab')}
                   <button class="issue__dl" title="Download this issue" onclick={(e) => { e.stopPropagation(); downloadCvIssues([i.cv_issue_id]); }}><Icon name="download" /></button>
                 {/if}
               </div>

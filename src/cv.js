@@ -49,14 +49,22 @@ function rateLimitError(message) { const e = new Error(message); e.rateLimited =
 // through saveSettings so it survives restarts; in-flight promise dedupes
 // concurrent first calls. Dynamic import avoids a config↔settings cycle.
 let instanceKeyPromise = null;
-async function ensureInstanceKey(config, base, doFetch) {
+// Exported for plugins that talk to the hosted metadata service directly
+// (e.g. book matching): they provision through the same single-flight path
+// instead of waiting for core's first metadata call to mint the key.
+export async function ensureInstanceKey(config, base, doFetch) {
   if (config.metadataInstanceKey) return config.metadataInstanceKey;
   return (instanceKeyPromise ??= (async () => {
-    const origin = base.replace(/\/api$/, '');
-    const resp = await doFetch(`${origin}/api/register`, { method: 'POST', headers: { 'User-Agent': UA } });
+    // Tolerate non-canonical bases (trailing slash/space, /API casing) — a
+    // malformed origin turns into an unknown path upstream, which answers 401
+    // and reads like an auth problem. Name the URL in the error so a support
+    // report identifies a bad Service URL setting on sight.
+    const origin = base.trim().replace(/\/+$/, '').replace(/\/api$/i, '');
+    const url = `${origin}/api/register`;
+    const resp = await doFetch(url, { method: 'POST', headers: { 'User-Agent': UA } });
     if (!resp.ok) {
       instanceKeyPromise = null; // allow retry on the next call
-      throw new Error(`metadata service registration failed (HTTP ${resp.status})`);
+      throw new Error(`metadata service registration failed (HTTP ${resp.status} from ${url})`);
     }
     const key = (await resp.json())?.key;
     if (!key) {
@@ -92,7 +100,11 @@ export function makeCvClient(config, { fetchImpl, key, politeMs } = {}) {
     base = BASE;
     fixedKey = key || cvKey(config.comicvineKeys);
   } else {
-    base = String(config?.cvBaseUrl || '').replace(/\/+$/, '') || HOSTED_BASE;
+    // The supplied metadata service IS the endpoint — a stored cvBaseUrl is
+    // deliberately ignored (stale/malformed values in that old setting were a
+    // recurring support case: a broken URL reads as an auth failure). The env
+    // override exists for tests and development only, never settings.
+    base = String(process.env.METADATA_BASE_OVERRIDE || '').trim().replace(/\/+$/, '') || HOSTED_BASE;
     fixedKey = key || null; // tests may inject; otherwise provisioned lazily
   }
   const custom = base !== BASE;

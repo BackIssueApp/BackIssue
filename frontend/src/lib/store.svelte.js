@@ -83,6 +83,9 @@ export async function openVolume(id) {
       publisher: row?.publisher || null,
       issue_count: row?.total || 0,
       followed: row?.followed || 0,
+      // Library type up front: a plugin-owned type (e.g. ebook) swaps the
+      // issue area for its plugin view without first flashing comic chrome.
+      type: row?.type || null,
     };
     detailSelected.clear();
   }
@@ -97,6 +100,7 @@ export async function openVolume(id) {
     publisher: sr.publisher,
     issue_count: cv ? cv.issue_count : (det.issues ? det.issues.length : 0),
     followed: sr.followed,
+    type: sr.type || null,
   };
   detail.det = det;
   detail.failed = false;

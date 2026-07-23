@@ -9,6 +9,14 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 ## [Unreleased]
 
 ### Added
+- **Plugin-owned series views (plugin hook).** A plugin that registers a
+  library type can now take over the issue area of that type's series pages
+  (`registerSeriesView({ type, render })` on the client bridge): the hero,
+  byline, description, and ⋯ menu stay core, while the filter chips, issue
+  grid/list, and selection toolbar are replaced by the plugin's own
+  rendering — re-drawn whenever the series data refreshes or the plugin
+  signals a state change. Comic and manga series are unaffected. Powers the
+  ebooks plugin's book-shelf series pages.
 - **Self-described library types (plugin hook).** `registerLibraryType` now
   accepts `selfDescribed: true`: series of such a type carry their own
   metadata on the series row (title, byline, year, cover, description — a new
@@ -39,6 +47,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   mapping is shared across all three.
 
 ### Fixed
+- **The built-in metadata service ignores the old Service URL setting.** A
+  stale or malformed `cvBaseUrl` value silently redirected (or broke)
+  metadata and key registration — errors that read as auth failures ("HTTP
+  401"). Hosted mode now always uses the official endpoint; registration
+  errors name the exact URL they tried; and Settings → Metadata shows the
+  install's registration status with a "Test service" button that provisions
+  the key on demand.
 - The Content-Security-Policy now permits same-origin `blob:` frames and
   blob/data images, fonts, and styles — in-browser book reading (the EPUB
   shell renders sections into sandboxed blob: iframes) showed a blank page

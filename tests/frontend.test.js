@@ -38,10 +38,29 @@ test('plugin bridge exposes the documented client API', () => {
   // window.BackIssue is a public contract with plugin client scripts (e.g.
   // plugins/<name>/client/ui.js) — renaming any of these breaks them at runtime.
   const bridge = fs.readFileSync('frontend/src/lib/plugins.svelte.js', 'utf8');
-  for (const name of ['registerClient', 'slot', 'addMenuAction', 'onStatus', 'onSourcesSync', 'onSettingsLoad', 'refreshSourceUI', 'escapeHtml', 'fmt']) {
+  for (const name of ['registerClient', 'slot', 'addMenuAction', 'onStatus', 'onSourcesSync', 'onSettingsLoad', 'refreshSourceUI', 'escapeHtml', 'fmt',
+    'registerIssueAction', 'registerSeriesAction', 'registerIssueCover', 'registerSeriesView', 'refreshIssueActions']) {
     assert.ok(bridge.includes(name), `plugin client api lost "${name}"`);
   }
   assert.ok(bridge.includes('window.BackIssue'), 'bridge must be published as window.BackIssue');
+});
+
+test('plugin series views replace the issue area, and their ctx carries the documented helpers', () => {
+  // registerSeriesView is a public contract: the owning plugin draws the
+  // issue area of its type's series pages into a plain container, with a ctx
+  // of { series, issues, refresh, can, icon, get, post }.
+  const bridge = fs.readFileSync('frontend/src/lib/plugins.svelte.js', 'utf8');
+  const ctxBlock = bridge.match(/renderSeriesView[\s\S]*?\n\}/)?.[0] || '';
+  for (const key of ['series', 'issues', 'refresh', 'can:', 'icon:', 'get:', 'post:']) {
+    assert.ok(ctxBlock.includes(key), `series-view ctx lost "${key.replace(':', '')}"`);
+  }
+  // SeriesDetail must delegate to the view (container + re-render signal) and
+  // keep the hero: the plugin container replaces chips + list, nothing more.
+  const detail = fs.readFileSync('frontend/src/components/SeriesDetail.svelte', 'utf8');
+  assert.ok(detail.includes('renderSeriesView('), 'SeriesDetail must render registered plugin views');
+  assert.ok(detail.includes('plugin-series-view'), 'SeriesDetail must mount a plain container for the view');
+  assert.ok(detail.includes('issueActionsTick.n') && detail.includes('host.replaceChildren()'),
+    'plugin views must re-render on the actions tick and be cleared on teardown');
 });
 
 test('plugin DOM slots exist in the UI markup', () => {

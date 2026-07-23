@@ -927,6 +927,28 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // Try ComicVine keys without saving them (the Settings Test button).
   app.post('/api/cv/test', async (req, res) => res.json(await testCvKeys(req.body?.keys)));
 
+  // Built-in metadata service: registration status + live round-trip test.
+  // Provisions the instance key if this install doesn't have one yet (that IS
+  // the registration), then proves it with a real authenticated search.
+  app.post('/api/metadata/test', async (req, res) => {
+    try {
+      const { makeCvClient } = await import('./cv.js');
+      // Live config when already in hosted mode so a provisioned key PERSISTS
+      // (the persistence guard ignores clones); a clone only when the user is
+      // on ComicVine-direct and just probing the built-in service.
+      const cv = makeCvClient(config.metadataSource === 'comicvine' ? { ...config, metadataSource: 'hosted' } : config);
+      await cv.search('batman');
+      const tail = String(config.metadataInstanceKey || '').slice(-6);
+      res.json({ ok: true, registered: true, message: `Registered and responding — instance key …${tail}` });
+    } catch (e) {
+      res.json({
+        ok: false,
+        registered: !!config.metadataInstanceKey,
+        message: String(e?.message || e),
+      });
+    }
+  });
+
   // ---- Manual multi-source search + grab (per issue) ----
   // Queries every enabled source that supports it; a pick is pinned to the issue
   // and downloaded via that source's normal path.

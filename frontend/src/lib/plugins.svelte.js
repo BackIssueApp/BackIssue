@@ -29,6 +29,26 @@ export const seriesActions = $state([]);
 // Series actions share the same tick.
 export const issueActionsTick = $state({ n: 0 });
 
+// Plugin-owned series views, keyed by library type. The plugin that registered
+// a type (e.g. 'ebook') can replace the ISSUE AREA of that type's series pages
+// — filter chips + issue list + selection — with its own rendering; the hero/
+// header stays core. Reactive so a view registered after mount still attaches.
+export const seriesViews = $state({});
+
+// Called by SeriesDetail to hand a plugin its container. ctx carries the same
+// bridge helpers plugin clients already know (api.can/icon/get/post) plus the
+// open series' data and a refresh() that re-fetches the series detail. A
+// throwing view is the plugin's problem — the page itself must never crash.
+export function renderSeriesView(view, container, { series, issues, refresh }) {
+  try {
+    view.render(container, {
+      series, issues, refresh,
+      can: bi.api.can, icon: bi.api.icon,
+      get: bi.api.get, post: bi.api.post,
+    });
+  } catch (e) { console.warn('plugin series view failed', e); }
+}
+
 // Issue-cover providers (plugins may serve real covers, e.g. the reader's
 // page-0 thumbnails for owned files). First non-null answer wins.
 export const issueCoverProviders = $state([]);
@@ -77,6 +97,17 @@ const bi = {
     // Add a series-level action button (rendered in the series header).
     registerSeriesAction(action) {
       if (action && typeof action.run === 'function') seriesActions.push(action);
+    },
+    // Own the issue area of series pages for a library type this plugin
+    // registered on the server: { type, render(container, ctx) }. The
+    // container is a plain DOM element replacing the filter chips + issue
+    // list (the hero/header stays core); render is called on mount and again
+    // whenever the series data refreshes or the issue-actions tick bumps —
+    // the container is cleared between calls, so just draw from scratch.
+    // ctx = { series, issues, refresh(), can(perm), icon(name), get(path),
+    // post(path, body) }.
+    registerSeriesView(view) {
+      if (view && view.type && typeof view.render === 'function') seriesViews[String(view.type)] = view;
     },
     // Provide cover-image URLs for issue cards: fn(issue) → url | null. First
     // non-null provider wins; core falls back to CV art, then a placeholder.
