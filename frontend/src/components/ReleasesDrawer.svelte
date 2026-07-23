@@ -141,6 +141,27 @@
     return true;
   }
 
+  // Bulk-grab every eligible tracked release in the current view: tracked
+  // (untracked series can't download), not owned, not already queued here.
+  // Uses the same per-release endpoint; one summary toast instead of a storm.
+  let bulkBusy = $state(false);
+  const bulkEligible = $derived(items.filter((m) => m.tracked && m.seriesId && !m.owned && !queued.has(relKey(m))));
+  async function downloadAllMissing() {
+    if (bulkBusy || !bulkEligible.length) return;
+    bulkBusy = true;
+    let ok = 0, failed = 0;
+    for (const m of bulkEligible) {
+      try {
+        const r = await apiPost('/api/releases/download', { seriesId: m.seriesId, number: m.number });
+        if (r.error) { failed++; continue; }
+        queued.add(relKey(m));
+        ok++;
+      } catch { failed++; }
+    }
+    bulkBusy = false;
+    notify(failed ? `Queued ${ok} — ${failed} failed (see Queue/Logs)` : `Queued ${ok} release${ok === 1 ? '' : 's'}`, failed ? 'error' : 'ok');
+  }
+
   async function addRelease(m) {
     m._adding = true;
     try {
@@ -170,6 +191,10 @@
       <div class="releases-filters" id="releases-filters">
         <button class="filter__btn" class:is-active={filter === 'all'} onclick={() => { filter = 'all'; }}>All</button>
         <button class="filter__btn" class:is-active={filter === 'mine'} onclick={() => { filter = 'mine'; }}>In collection</button>
+        {#if bulkEligible.length}
+          <button class="btn btn--ghost btn--sm" disabled={bulkBusy} title="Queue every tracked, unowned release shown (skips ones already queued)" onclick={downloadAllMissing}>
+            <Icon name="download" /> {bulkBusy ? 'Queueing…' : `Download all (${bulkEligible.length})`}</button>
+        {/if}
       </div>
       <div id="releases-list" class="queue-list">
         {#if st.running}

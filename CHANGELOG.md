@@ -14,6 +14,10 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   issues clutter the Wanted tab but can never download (and which the normal
   untrack path deliberately keeps). Runs as a preview logging the full list;
   tick "Actually delete" to remove them (issues and follows included).
+- **"Download all" on the Releases page.** One button queues every tracked,
+  unowned release in the current view — the manual catch-up for weeks where
+  auto-grab missed some issues. Skips releases already queued or owned, and
+  reports one summary instead of a toast per issue.
 
 
 ### Changed
