@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.7.5] — 2026-07-23
+
 ### Added
 - **Plugin-owned series views (plugin hook).** A plugin that registers a
   library type can now take over the issue area of that type's series pages
