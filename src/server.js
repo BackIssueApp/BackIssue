@@ -1041,10 +1041,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     const offset = Math.max(0, Number(req.query.offset) || 0);
     res.json(listWantedIssues(db, {
       limit, offset,
-      followedOnly: req.query.followed === '1',
+      userFollowedOnly: req.query.followed === '1', // the "Following" chip = the caller's ☆ stars
       hideUnreleased: req.query.hideUnreleased === '1',
       search: String(req.query.q || '').trim(),
       includeRestricted: canRestricted(req),
+      userId: req.user?.id ?? 0, // drives the ☆ badge column too
     }));
   });
   app.get('/api/tools', (req, res) => res.json(toolsState()));
@@ -1172,8 +1173,9 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     const b = req.body || {};
     const { items } = listWantedIssues(db, {
       limit: 500, offset: 0,
-      followedOnly: !!b.followed, hideUnreleased: !!b.hideUnreleased,
+      userFollowedOnly: !!b.followed, hideUnreleased: !!b.hideUnreleased,
       search: String(b.q || '').trim(),
+      userId: req.user?.id ?? 0, // "download all my Following" respects the caller's stars
     });
     const ids = [];
     for (const it of items) {

@@ -555,14 +555,23 @@ export function recordImport(db, { seriesId = null, seriesTitle = null, issueTit
 // valid file) that has NO valid file yet. `queue_status` carries the in-flight
 // state (queued/grabbed/failed…) when the issue has already been sent for
 // download, so the page can show a badge instead of a Download button.
-export function listWantedIssues(db, { limit = 200, offset = 0, followedOnly = false, hideUnreleased = false, releasedWithinDays = 0, search = '', includeRestricted = true } = {}) {
+export function listWantedIssues(db, { limit = 200, offset = 0, followedOnly = false, userFollowedOnly = false, hideUnreleased = false, releasedWithinDays = 0, search = '', includeRestricted = true, userId = 0 } = {}) {
+  // Two DISTINCT "follow" systems meet here:
+  //  - s.followed = GLOBAL automation flag (set on add, toggled as
+  //    "Auto-download"). `followedOnly` filters on it and is what the RSS
+  //    auto-grabber (buildWantedIndex) needs — it has no user.
+  //  - user_follows = the per-user ☆ star. `userFollowedOnly` filters on it
+  //    and is what the Wanted page's "Following" chip + the row badges use.
+  // They must never be conflated: making `followedOnly` per-user once emptied
+  // the auto-grab index (no user → no matches → automation silently stopped).
   const conds = [
     `(s.followed=1 OR EXISTS(SELECT 1 FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1))`,
     `NOT EXISTS (SELECT 1 FROM library_files lf2 WHERE lf2.cv_issue_id = ci.comicvine_id AND lf2.valid=1)`,
   ];
-  const args = {};
+  const args = { uid: userId };
   if (!includeRestricted) conds.push('s.restricted = 0');
   if (followedOnly) conds.push('s.followed=1');
+  if (userFollowedOnly) conds.push('EXISTS(SELECT 1 FROM user_follows uf WHERE uf.series_id = s.id AND uf.user_id = @uid)');
   // Best-effort: most cached issues have no cover date (volume stubs don't carry
   // one), so this only hides issues we KNOW are future-dated — honest, not complete.
   if (hideUnreleased) conds.push(`NOT (ci.cover_date IS NOT NULL AND date(ci.cover_date) > date('now'))`);
@@ -580,8 +589,13 @@ export function listWantedIssues(db, { limit = 200, offset = 0, followedOnly = f
     JOIN cv_series cv ON cv.comicvine_id = s.cv_id
     JOIN cv_issues ci ON ci.cv_series_id = s.cv_id
     WHERE ${conds.join(' AND ')}`;
-  const total = db.prepare(`SELECT COUNT(*) n ${from}`).get(args).n;
-  const items = db.prepare(`SELECT s.id series_id, COALESCE(cv.name, s.title) series_title, s.followed,
+  // better-sqlite3 rejects unused named params: the COUNT only knows @uid
+  // when the Following filter put it in the WHERE.
+  const totalArgs = { ...args };
+  if (!from.includes('@uid')) delete totalArgs.uid;
+  const total = db.prepare(`SELECT COUNT(*) n ${from}`).get(totalArgs).n;
+  const items = db.prepare(`SELECT s.id series_id, COALESCE(cv.name, s.title) series_title,
+      EXISTS(SELECT 1 FROM user_follows uf WHERE uf.series_id = s.id AND uf.user_id = @uid) followed,
       cv.image_url series_cover,
       ci.comicvine_id cv_issue_id, ci.issue_number, ci.name issue_name, ci.cover_date,
       (SELECT i.status FROM issues i WHERE i.url = 'cvissue:' || ci.comicvine_id) queue_status

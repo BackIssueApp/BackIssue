@@ -37,13 +37,14 @@ test('listWantedIssues: missing issues of collection series only, owned excluded
   assert.deepEqual(w.items.map((i) => `${i.series_title} #${i.issue_number}`), ['Saga #2', 'Saga #3', 'X-Men #1']);
 });
 
-test('listWantedIssues: followedOnly + search + queue status + paging', () => {
+test('listWantedIssues: followedOnly (global auto-download flag) + search + queue status + paging', async () => {
   const { db, saga } = seed();
   // Queue Saga #2 → its wanted row carries the status.
   const iid = ensureCvIssueRow(db, { seriesId: saga, cvIssueId: 2, number: '2', title: 'Saga #2' });
   setIssueStatus(db, iid, 'queued');
+  // followedOnly is the GLOBAL flag the auto-grabber uses — seed() set it on Saga.
   const fo = listWantedIssues(db, { followedOnly: true });
-  assert.equal(fo.total, 2); // only Saga (followed)
+  assert.equal(fo.total, 2); // only Saga (global followed=1)
   assert.equal(fo.items[0].queue_status, 'queued');
   const q = listWantedIssues(db, { search: 'x-m' });
   assert.equal(q.total, 1);
@@ -53,15 +54,20 @@ test('listWantedIssues: followedOnly + search + queue status + paging', () => {
   assert.equal(page.total, 3);
 });
 
-test('GET /api/wanted serves the paged wanted list', async () => {
-  const { db } = seed();
+test('GET /api/wanted serves the paged list; ?followed=1 is the caller\'s ☆ stars', async () => {
+  const { setUserFollow } = await import('../src/db.js');
+  const { db, saga } = seed();
   const app = createApp({ db, state: { queue: {} } });
   const s = await new Promise((res) => { const x = app.listen(0, () => res(x)); });
   const base = `http://localhost:${s.address().port}`;
   const all = await (await fetch(`${base}/api/wanted`)).json();
   assert.equal(all.total, 3);
-  const fo = await (await fetch(`${base}/api/wanted?followed=1&q=saga`)).json();
-  assert.equal(fo.total, 2);
+  // No stars for this (auth-less) request's user yet → the Following view is empty,
+  // even though Saga carries the GLOBAL auto-download flag from seed().
+  assert.equal((await (await fetch(`${base}/api/wanted?followed=1`)).json()).total, 0);
+  // Star Saga for user 0 (the bare app's default) → Following now shows its 2 wanted.
+  setUserFollow(db, 0, saga, true);
+  assert.equal((await (await fetch(`${base}/api/wanted?followed=1&q=saga`)).json()).total, 2);
   s.close();
 });
 
@@ -94,4 +100,25 @@ test('listWantedIssues: releasedWithinDays = the new-releases lane', () => {
   // A future store date is NOT recent (not out yet).
   db.prepare("UPDATE cv_issues SET store_date='2099-01-01' WHERE comicvine_id=2").run();
   assert.equal(listWantedIssues(db, { releasedWithinDays: 14 }).total, 0);
+});
+
+test('Following is per-user (☆ stars), not the global auto-download flag', async () => {
+  const { setUserFollow } = await import('../src/db.js');
+  const { db, saga, xm } = seed();
+  // Global followed=1 on Saga (set by seed) is the automation flag — with no
+  // personal star, user 1's Following view is EMPTY.
+  assert.equal(listWantedIssues(db, { userFollowedOnly: true, userId: 1 }).items.length, 0);
+  // User 1 stars X-Men: their Following shows X-Men's missing issue only —
+  // and the followed badge flags exactly that row.
+  setUserFollow(db, 1, xm, true);
+  const mine = listWantedIssues(db, { userFollowedOnly: true, userId: 1 });
+  assert.deepEqual(mine.items.map((i) => i.series_title), ['X-Men']);
+  // Another user's stars don't leak into user 1's view.
+  setUserFollow(db, 2, saga, true);
+  assert.equal(listWantedIssues(db, { userFollowedOnly: true, userId: 1 }).items.length, 1);
+  // The unfiltered view still shows both collection series, with per-user badges.
+  const all = listWantedIssues(db, { userId: 1 });
+  const badge = Object.fromEntries(all.items.map((i) => [i.series_title, i.followed]));
+  assert.equal(badge['X-Men'], 1);
+  assert.equal(badge['Saga'], 0);
 });

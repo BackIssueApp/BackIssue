@@ -9,6 +9,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 ## [Unreleased]
 
 ### Added
+- **Wanted "Following" filter and star badges are per-user.** The chip now
+  filters by your ☆ Follow (matching the series-page star) instead of the
+  global auto-download flag — so it no longer shows series you did not
+  personally follow. The global flag still governs what the auto-grabber
+  downloads; the two are now separate throughout.
 - **"Remove ghost series" tool (System → Tools).** Finds leftover series from
   before ComicVine matching — no CV match, no files on disk — whose wanted
   issues clutter the Wanted tab but can never download (and which the normal
