@@ -102,6 +102,10 @@ export function initUserTables(db) {
   // CREATE TABLE IF NOT EXISTS can't add a column to an existing table.
   const userCols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
   if (!userCols.includes('email')) db.exec('ALTER TABLE users ADD COLUMN email TEXT');
+  // Per-user "hide mature content": when set, restricted/mature series are hidden
+  // for this user EVEN IF their role could see them (library.restricted). A
+  // personal preference on top of the role gate — see canRestricted in server.js.
+  if (!userCols.includes('hide_mature')) db.exec('ALTER TABLE users ADD COLUMN hide_mature INTEGER NOT NULL DEFAULT 0');
   db.exec(`
     CREATE TABLE IF NOT EXISTS external_identities (
       provider TEXT NOT NULL,
@@ -314,12 +318,18 @@ export function listUsers(db) {
  *  last activity, and any external-login providers. */
 export function userProfile(db, id) {
   const u = db.prepare(`
-    SELECT u.id, u.username, u.email, u.role, u.created_at,
+    SELECT u.id, u.username, u.email, u.role, u.created_at, u.hide_mature,
            (SELECT MAX(last_seen) FROM sessions s WHERE s.user_id = u.id) AS last_seen,
            (SELECT GROUP_CONCAT(DISTINCT provider) FROM external_identities e WHERE e.user_id = u.id) AS providers
       FROM users u WHERE u.id = ?`).get(id);
   if (!u) return null;
-  return { ...u, providers: u.providers ? u.providers.split(',') : [] };
+  return { ...u, hide_mature: !!u.hide_mature, providers: u.providers ? u.providers.split(',') : [] };
+}
+
+/** Set a user's personal "hide mature content" preference (self-service). */
+export function setHideMature(db, id, on) {
+  db.prepare('UPDATE users SET hide_mature=? WHERE id=?').run(on ? 1 : 0, id);
+  return !!on;
 }
 
 /** Set a user's email (self-service). Blank clears it. Validates format and
@@ -406,7 +416,7 @@ export function createApiKey(db, userId) {
 export function apiKeyUser(db, key) {
   if (!key || !String(key).startsWith('bi_')) return null;
   const row = db.prepare(`
-    SELECT u.id, u.username, u.role, u.disabled FROM api_keys k
+    SELECT u.id, u.username, u.role, u.disabled, u.hide_mature FROM api_keys k
       JOIN users u ON u.id = k.user_id
      WHERE k.key_hash = ?`).get(tokenHash(key));
   if (!row || row.disabled) return null;
@@ -440,7 +450,7 @@ export function createSession(db, userId) {
 export function sessionUser(db, token) {
   if (!token) return null;
   const row = db.prepare(`
-    SELECT u.id, u.username, u.role, u.disabled FROM sessions s
+    SELECT u.id, u.username, u.role, u.disabled, u.hide_mature FROM sessions s
       JOIN users u ON u.id = s.user_id
      WHERE s.token_hash=? AND s.expires_at > strftime('%Y-%m-%dT%H:%M:%SZ','now')`)
     .get(tokenHash(token));

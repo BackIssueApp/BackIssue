@@ -38,6 +38,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   everything.
 
 ### Added
+- **"Hide mature content" — a personal preference.** Each account can hide series
+  marked mature from their own Library, search, reader and OPDS — even if their
+  role is allowed to see them — from **Profile → Content**. Nothing is deleted;
+  turning it off shows the content again. (Roles without the mature-content
+  permission never saw it in the first place.)
 - **On-demand books show in the Library as "available".** File-less catalog
   entries (books that download on first open) now appear in the Library grid
   alongside your owned books, in their own type lane, with a clear "available"

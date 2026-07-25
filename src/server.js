@@ -222,7 +222,10 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   );
   // May this request see mature/restricted series? Drives content filtering on
   // every surface that lists or opens series/issues.
-  const canRestricted = (req) => users.roleGrants(db, req.user.role, 'library.restricted', permCatalog);
+  // Sees mature/restricted content only if the role grants it AND the user has
+  // not personally opted to hide it (a self-service preference layered on top of
+  // the role gate — so an admin can browse SFW without giving up the permission).
+  const canRestricted = (req) => users.roleGrants(db, req.user.role, 'library.restricted', permCatalog) && !req.user.hide_mature;
   // The notification categories whose BROADCASTS this user may see: each
   // category requires one of its mapped permissions (open mode sees all;
   // targeted rows always reach their user regardless).
@@ -405,7 +408,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // returned here ('*' = everything). UI hiding is courtesy; the middleware
   // above is the enforcement.
   const publicUser = (u) => u
-    ? { id: u.id, username: u.username, role: u.role, permissions: users.rolePermissions(db, u.role, permCatalog) }
+    ? { id: u.id, username: u.username, role: u.role, permissions: users.rolePermissions(db, u.role, permCatalog), hideMature: !!u.hide_mature }
     : null;
   app.get('/api/auth/me', (req, res) => {
     if (!anyUsers.get().e) {
@@ -531,6 +534,15 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     if (!req.user || req.user.id === 0) return res.status(403).json({ error: 'sign in with a real account first' });
     try { res.json({ email: users.updateEmail(db, req.user.id, (req.body || {}).email) }); }
     catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
+  });
+  // Personal "hide mature content" preference (self-service). Takes effect on the
+  // next request via canRestricted; the Basic-auth cache clears so an OPDS/mobile
+  // client sees the change without waiting out the cache.
+  app.post('/api/auth/hide-mature', (req, res) => {
+    if (!req.user || req.user.id === 0) return res.status(403).json({ error: 'sign in with a real account first' });
+    const on = users.setHideMature(db, req.user.id, !!(req.body || {}).hide);
+    users.clearBasicCache();
+    res.json({ hideMature: on });
   });
   app.post('/api/auth/logout-others', (req, res) => {
     if (!req.user || req.user.id === 0) return res.status(403).json({ error: 'sign in with a real account first' });

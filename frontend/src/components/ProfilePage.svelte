@@ -3,16 +3,21 @@
   // plugins add their own per-user options (reading shelves & defaults, OPDS
   // access, …). Reached from the sidebar's account menu.
   import { goBack } from '../lib/router.svelte.js';
-  import { auth, logout } from '../lib/auth.svelte.js';
+  import { auth, logout, can } from '../lib/auth.svelte.js';
   import { openAccountModal } from './AccountModal.svelte';
   import { apiGet, apiPost } from '../lib/api.js';
   import { notify } from '../lib/toasts.svelte.js';
   import { confirmDialog } from './DialogModal.svelte';
+  import { loadCollection } from '../lib/store.svelte.js';
   import Icon from '../lib/Icon.svelte';
 
   let { active = false } = $props();
   let profile = $state(null);
   let email = $state('');
+  let hideMature = $state(false);
+  // The mature toggle only matters for accounts that could otherwise see
+  // restricted content; open-mode (no accounts) has no per-user prefs.
+  const canSeeMature = $derived(!auth.openMode && can('library.restricted'));
   let apiKey = $state(null);      // { prefix, created_at, last_used } | null
   let freshKey = $state('');      // the raw key, shown once after generation
   let qrDataUrl = $state('');     // QR of the connection payload for the mobile app
@@ -26,9 +31,26 @@
   const fmtDate = (s) => (s ? new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—');
 
   async function load() {
-    try { const r = await apiGet('/api/auth/profile'); profile = r.user; email = profile?.email || ''; }
+    try { const r = await apiGet('/api/auth/profile'); profile = r.user; email = profile?.email || ''; hideMature = !!profile?.hide_mature; }
     catch { profile = null; }
     try { apiKey = (await apiGet('/api/auth/apikey')).key; } catch { apiKey = null; }
+  }
+
+  // Toggle the personal "hide mature content" preference. Optimistic; reverts on
+  // error. On success, refresh the Library so restricted rows appear/disappear.
+  async function toggleMature() {
+    const next = !hideMature;
+    hideMature = next;
+    try {
+      const r = await apiPost('/api/auth/hide-mature', { hide: next });
+      if (r.error) throw new Error(r.error);
+      hideMature = !!r.hideMature;
+      if (auth.user) auth.user.hideMature = hideMature;
+      loadCollection();
+    } catch (e) {
+      hideMature = !next;
+      notify(String(e?.message || e), 'error');
+    }
   }
   $effect(() => { if (active) load(); });
 
@@ -137,6 +159,20 @@
           {/if}
         </div>
 
+        <!-- content preferences -->
+        {#if canSeeMature}
+          <div class="pfx__card">
+            <div class="pfx__cardhead">Content</div>
+            <label class="pfx__toggle">
+              <span class="pfx__toggle-main">
+                <b>Hide mature content</b>
+                <span class="pfx__note">Hide series marked mature from your Library, search, and reader — even though your role is allowed to see them. Nothing is deleted; turn this off any time to show it again.</span>
+              </span>
+              <span class="switch"><input type="checkbox" checked={hideMature} onchange={toggleMature}><span class="switch__track"></span></span>
+            </label>
+          </div>
+        {/if}
+
         <!-- api key -->
         <div class="pfx__card">
           <div class="pfx__cardhead">API key</div>
@@ -215,6 +251,11 @@
   .pfx__ghost--sm { height: 30px; flex: none; }
   .pfx__ghost--danger { color: var(--red); border-color: rgba(255,90,82,.35); }
   .pfx__primary { height: 36px; padding: 0 15px; border: none; background: var(--accent); color: #fff; border-radius: 8px; font: 600 12.5px var(--font-body); cursor: pointer; }
+  .pfx__toggle { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; cursor: pointer; }
+  .pfx__toggle-main { display: flex; flex-direction: column; gap: 2px; }
+  .pfx__toggle-main b { font-size: 13.5px; }
+  .pfx__toggle .pfx__note { margin: 4px 0 0; }
+  .pfx__toggle .switch { flex: none; margin-top: 2px; }
   .pfx__note { font-size: 12px; color: var(--faint); margin: 12px 0 0; line-height: 1.55; }
   .pfx__note--top { margin: 0 0 14px; }
   .pfx__note code, .pfx__note--top code { font-family: var(--font-mono); color: var(--muted); }
