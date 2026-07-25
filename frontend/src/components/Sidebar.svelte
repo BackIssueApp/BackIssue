@@ -27,24 +27,30 @@
     navigate(path);
   }
 
-  // Library entries under the main one. Explicitly created libraries (Settings
-  // → Libraries) take precedence; with none defined, auto type-lanes appear
-  // once the collection holds a second library type. One type, no libraries =
-  // the classic single entry.
-  const TYPE_LABELS = { comic: 'Comics', manga: 'Manga', magazine: 'Magazines' };
-  const typeLanes = $derived(
-    (status.libraries || []).length
-      ? status.libraries.map((l) => ({ key: 'lib:' + l.id, q: '/?library=' + l.id, label: l.name }))
-      : (status.libraryTypes || []).length > 1
-        ? status.libraryTypes.map((t) => ({
-            key: t.type === 'comic' ? 'comics' : t.type,
-            q: '/?filter=' + (t.type === 'comic' ? 'comics' : t.type),
-            label: TYPE_LABELS[t.type] || (t.type.charAt(0).toUpperCase() + t.type.slice(1)),
-          }))
-        : []);
+  // The libraries you can open. Explicitly created libraries (Settings →
+  // Libraries) take precedence; otherwise one entry per library type. With a
+  // single type (or a fresh, empty install) a single "everything" entry keeps
+  // the grid — and its Add button — reachable. Home ('/') is separate: it shows
+  // the account's reading rails, not the whole collection.
+  const TYPE_LABELS = { comic: 'Comics', manga: 'Manga', magazine: 'Magazines', ebook: 'Books' };
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const libraryEntries = $derived.by(() => {
+    const libs = status.libraries || [];
+    if (libs.length) return libs.map((l) => ({ key: 'lib:' + l.id, q: '/?library=' + l.id, label: l.name }));
+    const types = status.libraryTypes || [];
+    if (types.length > 1)
+      return types.map((t) => ({
+        key: t.type === 'comic' ? 'comics' : t.type,
+        q: '/?filter=' + (t.type === 'comic' ? 'comics' : t.type),
+        label: TYPE_LABELS[t.type] || cap(t.type),
+      }));
+    return [{ key: 'all', q: '/?all=1', label: types[0] ? (TYPE_LABELS[types[0].type] || cap(types[0].type)) : 'Library' }];
+  });
   const activeLane = $derived.by(() => {
     const p = new URLSearchParams(route.search);
-    return p.get('library') ? 'lib:' + p.get('library') : (p.get('filter') || '');
+    if (p.get('library')) return 'lib:' + p.get('library');
+    if (p.get('all')) return 'all';
+    return p.get('filter') || '';
   });
   const laneActive = (key) => isActive('/') && activeLane === key;
 </script>
@@ -57,11 +63,7 @@
   <nav class="sidenav">
     <div class="sidenav__head">Library</div>
     <button class="sidenav__item" class:is-active={isActive('/') && !activeLane} onclick={() => go('/')}>
-      <span class="sidenav__icon"><Icon name="library" /></span> Library</button>
-    {#each typeLanes as lane (lane.key)}
-      <button class="sidenav__item sidenav__item--sub" class:is-active={laneActive(lane.key)} onclick={() => go(lane.q)}>
-        <span class="sidenav__icon"><Icon name="book" /></span> {lane.label}</button>
-    {/each}
+      <span class="sidenav__icon"><Icon name="home" /></span> Home</button>
     <button id="lists-btn" class="sidenav__item" class:is-active={isActive('/lists')} onclick={() => go('/lists')}>
       <span class="sidenav__icon"><Icon name="list" /></span> Lists</button>
     {#if isTrusted()}
@@ -70,6 +72,12 @@
     {/if}
     <button id="stats-btn" class="sidenav__item" class:is-active={isActive('/stats')} onclick={() => go('/stats')}>
       <span class="sidenav__icon"><Icon name="bar-chart" /></span> Stats</button>
+
+    <div class="sidenav__head">Libraries</div>
+    {#each libraryEntries as lane (lane.key)}
+      <button class="sidenav__item" class:is-active={laneActive(lane.key)} onclick={() => go(lane.q)}>
+        <span class="sidenav__icon"><Icon name="book" /></span> {lane.label}</button>
+    {/each}
 
     {#if can('downloads.grab')}
       <div class="sidenav__head">Downloads</div>

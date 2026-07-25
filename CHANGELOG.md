@@ -31,6 +31,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   library (or page) instead of aggregating the whole catalog — opening a 1,600-
   series Comics library dropped from ~600 ms to ~80 ms; the huge Books library is
   unchanged.
+- **Home is now your reading rails; libraries open from the sidebar.** The app's
+  home (`/`) shows your reading shelves (Continue, Next up, and so on) instead of
+  every book, comic and manga at once. Each library is a **Libraries** entry in
+  the sidebar — selecting one opens its grid. Search still shows results across
+  everything.
 
 ### Added
 - **On-demand books show in the Library as "available".** File-less catalog

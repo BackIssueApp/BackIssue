@@ -26,6 +26,16 @@
   let view = $state(localStorage.getItem('libraryView') || 'grid');
   function setView(v) { view = v; localStorage.setItem('libraryView', v); }
 
+  // Home vs. browse. Home ('/') shows only the account's reading rails (a plugin
+  // fills #home-plugin-rail); opening a library — or searching — swaps to the
+  // poster/list grid. "Browsing" = any URL that names a library, a type lane, a
+  // search, or the all-items view. The grid + its toolbar render only then.
+  const browsing = $derived.by(() => {
+    const p = new URLSearchParams(route.search);
+    return !!(p.get('library') || p.get('filter') || p.get('q') || p.get('all'));
+  });
+  const homeMode = $derived(!browsing);
+
   function libQuery(filter) {
     const p = new URLSearchParams(route.search);
     if (filter && filter !== 'all') p.set('filter', filter); else p.delete('filter');
@@ -179,14 +189,20 @@
   }
   $effect(() => { void rail.rows; void view; measure(); });
   // The home rail is filled by a plugin (plain DOM), so Svelte can't see it
-  // change height — watch it and re-measure listTop when shelves appear/hide.
+  // change height or gain shelves — watch it, re-measure listTop when shelves
+  // appear/hide, and track whether any shelf rendered (drives the home hint).
+  let railHasContent = $state(false);
   $effect(() => {
     if (typeof ResizeObserver === 'undefined' || !scroller) return;
     const railEl = scroller.querySelector('#home-plugin-rail');
     if (!railEl) return;
-    const ro = new ResizeObserver(() => measure());
+    const sync = () => { railHasContent = railEl.children.length > 0; measure(); };
+    sync();
+    const ro = new ResizeObserver(sync);
     ro.observe(railEl);
-    return () => ro.disconnect();
+    const mo = typeof MutationObserver !== 'undefined' ? new MutationObserver(sync) : null;
+    mo?.observe(railEl, { childList: true });
+    return () => { ro.disconnect(); mo?.disconnect(); };
   });
   $effect(() => {
     if (typeof window === 'undefined') return;
@@ -202,7 +218,8 @@
   });
 </script>
 
-<section class="librarypage libx">
+<section class="librarypage libx" class:is-home={homeMode}>
+  {#if !homeMode}
   <!-- toolbar: count · filters (with counts) · sort · view · actions -->
   <div class="libx__bar">
     <span class="libx__count">Library <span id="series-count">{rail.loaded ? fmt(rail.total) : ''}</span></span>
@@ -248,12 +265,22 @@
       <button class="libx__remove" onclick={() => bulk('remove')}>Remove</button>
     </div>
   {/if}
+  {/if}
 
-  <div class="libx__scroll" id="series-list" bind:this={scroller} onscroll={onScroll}>
+  <div class="libx__scroll" id="series-list" bind:this={scroller} onscroll={onScroll} class:is-browse={!homeMode}>
     <!-- Plugin home rail (reading shelves etc.) injects here — plain DOM, must
-         stay mounted. Its measured height feeds the virtual list's listTop. -->
+         stay mounted (never gate behind {#if}). Its height feeds listTop; it's
+         hidden by CSS while browsing so rails are a Home-only surface. -->
     <div id="home-plugin-rail" class="home-rail"></div>
-    {#if rail.loaded && !rail.rows.length}
+    {#if homeMode}
+      {#if !railHasContent}
+        <div class="libx__empty">
+          <div class="libx__empty-art"><Icon name="home" size={26} /></div>
+          <div class="libx__empty-title">Welcome back</div>
+          <div class="libx__empty-body">Your reading shelves appear here as you read. Pick a library from the sidebar to browse everything in it.</div>
+        </div>
+      {/if}
+    {:else if rail.loaded && !rail.rows.length}
       <div class="libx__empty">
         <div class="libx__empty-art"><Icon name="star" size={26} /></div>
         <div class="libx__empty-title">{rail.search || rail.filter !== 'all' ? 'No matches' : 'Nothing here yet'}</div>
@@ -366,6 +393,9 @@
   .libx__remove { margin-left: auto; height: 30px; padding: 0 13px; border: 1px solid rgba(255,90,82,.3); background: transparent; color: var(--red); border-radius: 7px; font: 600 12px var(--font-body); cursor: pointer; }
 
   .libx__scroll { flex: 1; overflow-y: auto; padding: 18px; position: relative; }
+  /* Reading rails are a Home-only surface — the plugin slot stays mounted, but
+     hide it while browsing a library so the grid starts at the top. */
+  .libx__scroll.is-browse :global(#home-plugin-rail) { display: none; }
 
   /* grid */
   .libx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 18px; }
