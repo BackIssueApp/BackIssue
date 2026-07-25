@@ -66,6 +66,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   filters by the ☆ Follow star on series pages, and nothing else in the app
   ever called that "monitoring" (users couldn't find the control).
 
+### Fixed
+- **Native mobile apps no longer choke on very large libraries.** The mobile
+  apps request the whole library as one unpaginated list; on a library with a
+  large on-demand book catalog that response held ~140k entries and the app ran
+  out of memory rendering it. The unpaginated collection endpoint now returns
+  only the native comic/manga libraries, so the apps stay fast (the web Library
+  grid is unaffected — it pages, and still shows every library type). Book
+  support in the mobile apps will restore those libraries with paging later.
+
 ## [0.7.5] — 2026-07-23
 
 ### Added

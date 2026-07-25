@@ -1211,8 +1211,12 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     // Legacy fused shape: the whole set + counts in one scan ({ rows, counts }),
     // preserved for any pre-pagination caller that passes counts without a limit.
     if (req.query.counts) return res.json(collectionPage(db, { ...opts, keys: COLLECTION_CHIP_KEYS }));
-    // Legacy array shape (no params) — internal/other consumers.
-    res.json(collectionSeries(db, opts));
+    // Legacy array shape (no params) — the native mobile apps (Android/iOS)
+    // consume this unpaginated list. They can't yet page or render the on-demand
+    // ebook catalog (150k self-described entries) and OOM on the full set, so
+    // restrict it to the native comic/manga libraries until the mobile clients
+    // add pagination + ebook support. The web SPA always passes limit (above).
+    res.json(collectionSeries(db, { ...opts, excludeSelfDescribed: true }));
   });
   // Per-filter counts for the library filter chips (independent of the active
   // filter, so switching chips doesn't change the badges).

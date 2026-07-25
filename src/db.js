@@ -1005,8 +1005,13 @@ function mapCollection(db, { search = '', sort = 'title', includeRestricted = tr
   return rows.map(mapCollectionRow);
 }
 
-export function collectionSeries(db, { filter = 'all', ...opts } = {}) {
-  return mapCollection(db, opts).filter((r) => seriesMatchesFilter(r, filter));
+export function collectionSeries(db, { filter = 'all', excludeSelfDescribed = false, ...opts } = {}) {
+  let rows = mapCollection(db, opts).filter((r) => seriesMatchesFilter(r, filter));
+  // Mobile clients consume the unpaginated array shape and can't yet handle the
+  // on-demand ebook catalog (150k self-described entries), so callers can ask to
+  // drop plugin-owned self-described library types and keep the native comics.
+  if (excludeSelfDescribed) rows = rows.filter((r) => !SELF_DESCRIBED_TYPES.has(r.type || 'comic'));
+  return rows;
 }
 
 // A Library page: rows for one filter/search/sort window (LIMIT/OFFSET), the
