@@ -6,7 +6,7 @@ import fsp from 'node:fs/promises';
 import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
-import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
+import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, collectionPage, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
 import { resolveSeriesDir, defaultRootedDir } from './paths.js';
 import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
@@ -1192,11 +1192,32 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   app.post('/api/queue/resume', (req, res) => { state.queue.paused = false; res.json({ paused: false }); });
   app.post('/api/queue/clear', (req, res) => { res.json({ cleared: cancelQueued(db) }); });
 
-  app.get('/api/collection', (req, res) => res.json(collectionSeries(db, { filter: req.query.filter, search: req.query.search, sort: req.query.sort, includeRestricted: canRestricted(req), userId: req.user.id, library: req.query.library ? Number(req.query.library) : null })));
+  // Filter-chip keys — the badges are independent of the active filter, so
+  // switching chips never changes them.
+  const COLLECTION_CHIP_KEYS = ['all', 'incomplete', 'followed', 'unmonitored', 'problems', 'unmatched', 'manga'];
+  app.get('/api/collection', (req, res) => {
+    const opts = { filter: req.query.filter, search: req.query.search, sort: req.query.sort, includeRestricted: canRestricted(req), userId: req.user.id, library: req.query.library ? Number(req.query.library) : null };
+    // Paginated shape ({ rows, total, counts }): filter/sort/search are pushed
+    // into SQL and only a page (limit≤500, default 200) is returned — so the
+    // Library grid stays fast at 150k rows. counts=1 (default here) fuses the
+    // filter-independent chip counts into the same request; loadMore passes
+    // counts=0 to skip that lean pass on scroll.
+    if (req.query.limit != null || req.query.offset != null) {
+      const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 200));
+      const offset = Math.max(0, Number(req.query.offset) || 0);
+      const keys = req.query.counts === '0' ? [] : COLLECTION_CHIP_KEYS;
+      return res.json(collectionPage(db, { ...opts, keys, limit, offset }));
+    }
+    // Legacy fused shape: the whole set + counts in one scan ({ rows, counts }),
+    // preserved for any pre-pagination caller that passes counts without a limit.
+    if (req.query.counts) return res.json(collectionPage(db, { ...opts, keys: COLLECTION_CHIP_KEYS }));
+    // Legacy array shape (no params) — internal/other consumers.
+    res.json(collectionSeries(db, opts));
+  });
   // Per-filter counts for the library filter chips (independent of the active
   // filter, so switching chips doesn't change the badges).
   app.get('/api/collection/counts', (req, res) => res.json(collectionCounts(db, {
-    keys: ['all', 'incomplete', 'followed', 'unmonitored', 'problems', 'unmatched', 'manga'],
+    keys: COLLECTION_CHIP_KEYS,
     search: req.query.search, includeRestricted: canRestricted(req), userId: req.user.id,
     library: req.query.library ? Number(req.query.library) : null,
   })));

@@ -120,3 +120,20 @@ test('registerImportHandler: validated and idempotent by id', async () => {
   pluginApi.registerImportHandler({ scan: async () => [], import: async () => {} }); // no id — ignored
   assert.equal(registeredImportHandlers().length, before + 1);
 });
+
+test('registerRemoteBookSource: validated, idempotent by id, and returned by registeredRemoteBookSources', async () => {
+  const { pluginApi, registeredRemoteBookSources } = await import('../src/plugins.js');
+  const before = registeredRemoteBookSources().length;
+  const src = { id: 'demo-remote', label: 'Demo', listPage: async () => ({ books: [] }), materialize: async () => ({ path: '/x' }) };
+  pluginApi.registerRemoteBookSource(src);
+  pluginApi.registerRemoteBookSource({ ...src }); // dupe id ignored
+  const mine = registeredRemoteBookSources().filter((s) => s.id === 'demo-remote');
+  assert.equal(mine.length, 1);
+  assert.equal(mine[0].label, 'Demo');
+  assert.equal(registeredRemoteBookSources().length, before + 1);
+  // Invalid shapes are ignored (needs id + listPage + materialize).
+  pluginApi.registerRemoteBookSource({ id: 'no-list', materialize: async () => ({}) });
+  pluginApi.registerRemoteBookSource({ id: 'no-mat', listPage: async () => ({}) });
+  pluginApi.registerRemoteBookSource({ listPage: async () => ({}), materialize: async () => ({}) }); // no id
+  assert.equal(registeredRemoteBookSources().length, before + 1);
+});

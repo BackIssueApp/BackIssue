@@ -6,7 +6,13 @@ import { apiGet, apiPost } from './api.js';
 import { subscribe } from './events.svelte.js';
 import { notify } from './toasts.svelte.js';
 
-export const rail = $state({ rows: [], counts: {}, filter: 'all', sort: 'title', search: '', library: null, selecting: false, loaded: false });
+// rows holds the LOADED prefix of the collection (an infinite-scroll window that
+// grows as the user scrolls). total is the full count for the active filter — the
+// grid shows it and keeps loading pages until rows.length reaches it. counts are
+// the filter-independent chip badges (fetched once, with page 1).
+export const rail = $state({ rows: [], counts: {}, total: 0, filter: 'all', sort: 'title', search: '', library: null, selecting: false, loaded: false, loadingMore: false });
+// Rows per network page — a few hundred keeps each response a few hundred KB.
+const COLLECTION_PAGE = 200;
 // Shell chrome state (mobile sidebar overlay).
 export const ui = $state({ sidebarOpen: false });
 // Multi-select on the rail (series ids) — only meaningful while rail.selecting.
@@ -53,15 +59,41 @@ export async function loadFlags() {
   try { flags.anySource = ((await apiGet('/api/sources')).sources || []).length > 0; } catch { /* offline */ }
 }
 
+function collectionScope() {
+  return 'filter=' + rail.filter + '&sort=' + rail.sort
+    + '&search=' + encodeURIComponent(rail.search) + (rail.library ? '&library=' + rail.library : '');
+}
+
+// Load (or reload) the FIRST page of the collection — the server filters, sorts
+// and searches in SQL and returns just this page plus the total and the fused,
+// filter-independent chip counts. Called on every filter/sort/search/library
+// change (it resets the infinite-scroll window to the top). Best-effort; a
+// failure keeps the last good list and badges.
 export async function loadCollection() {
-  const scope = 'search=' + encodeURIComponent(rail.search) + (rail.library ? '&library=' + rail.library : '');
+  rail.loadingMore = false; // cancel any in-flight append's effect from re-appending onto the old set
   try {
-    rail.rows = await apiGet('/api/collection?filter=' + rail.filter + '&' + scope + '&sort=' + rail.sort);
+    const r = await apiGet('/api/collection?counts=1&offset=0&limit=' + COLLECTION_PAGE + '&' + collectionScope());
+    rail.rows = r.rows || [];
+    rail.total = r.total ?? rail.rows.length;
+    rail.counts = r.counts || {};
     rail.loaded = true;
   } catch { /* keep the last good list */ }
-  // Filter-chip counts — independent of the active filter, so they don't change
-  // as you click chips. Best-effort; the chips just omit the badge on failure.
-  try { rail.counts = await apiGet('/api/collection/counts?' + scope); } catch { /* keep last */ }
+}
+
+// Fetch the next page and APPEND it — the infinite-scroll grid calls this as the
+// user nears the end of what's loaded. Skips the chip-count pass (counts=0) since
+// they don't change between pages, and self-throttles to one request in flight.
+export async function loadMoreCollection() {
+  if (rail.loadingMore || !rail.loaded) return;
+  if (rail.rows.length >= rail.total) return; // everything for this filter is loaded
+  rail.loadingMore = true;
+  const offset = rail.rows.length;
+  try {
+    const r = await apiGet('/api/collection?counts=0&offset=' + offset + '&limit=' + COLLECTION_PAGE + '&' + collectionScope());
+    // Guard against a filter/sort change that landed while this was in flight:
+    // only append if our starting offset still matches the current tail.
+    if (r.rows?.length && rail.rows.length === offset) rail.rows = [...rail.rows, ...r.rows];
+  } catch { /* keep what we have */ } finally { rail.loadingMore = false; }
 }
 
 // Open a series by id: fetch the ComicVine-authoritative detail and derive the

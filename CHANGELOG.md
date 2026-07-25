@@ -8,7 +8,43 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Changed
+- **The Library grid now loads a page at a time (server-side pagination).**
+  Filtering, sorting, searching and the library selector all run in SQL, and the
+  grid fetches ~200 rows at a time, loading more as you scroll (infinite scroll)
+  instead of pulling the entire collection up front. On a 141k-entry library the
+  first paint's response dropped from ~57 MB to ~85 KB (the browser no longer
+  parses tens of megabytes to show the first screen), and each filter/sort/search
+  change fetches just the first page. Comics and manga behave exactly as before.
+- **Library grid loads a very large collection far faster.** The collection
+  query is now a single scan that fuses the rows and the filter-chip counts
+  (previously two full passes per load), and its per-series rollups are
+  pre-aggregated in one grouped pass instead of a fistful of per-row subqueries.
+  On a synthetic 150k-entry library this cut a Library load from ~3.9s to ~1.4s
+  server-side. Added a `library_files(series_id, valid)` index for the ownership
+  rollups.
+
 ### Added
+- **On-demand books show in the Library as "available".** File-less catalog
+  entries (books that download on first open) now appear in the Library grid
+  alongside your owned books, in their own type lane, with a clear "available"
+  badge — distinct from owned and from missing. An on-demand book is never
+  counted as missing or incomplete: it is there to read, just not on disk yet.
+  A series that mixes owned and on-demand books rolls up correctly (e.g. `2/5`
+  with three available). Comics and manga are unchanged.
+- **On-demand ebook libraries (plugin hook).** `registerRemoteBookSource` lets a
+  plugin expose an entire remote book catalog as file-less library entries —
+  metadata and covers only, no downloads. The ebooks plugin syncs the catalog
+  into a Books library and fetches each book's file the first time someone opens
+  it to read (cache-on-read), so a huge shelf can be browsed without downloading
+  it up front. The hook is generic: `listPage(config, page)` paginates the
+  catalog and `materialize(config, id, opts)` downloads one book on demand.
+- **Pluggable ebook metadata sources (plugin hook).** `registerBookMetadataSource`
+  lets a plugin supply a book-metadata source that the ebooks plugin tries
+  BEFORE its built-in hosted fallback (by ascending priority). The Book
+  Warehouse plugin registers as the preferred source, so its richer
+  series/genre data and covers enrich your library when it has the book, with
+  the hosted service filling in the rest.
 - **Wanted "Following" filter and star badges are per-user.** The chip now
   filters by your ☆ Follow (matching the series-page star) instead of the
   global auto-download flag — so it no longer shows series you did not

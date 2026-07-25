@@ -74,6 +74,8 @@ const notifiers = []; // async (event, opts) => void — outbound notification c
 const indexerProviders = []; // { id, isActive(config), indexers(config, protocol) } — supply indexers to the usenet/torrent sources
 const importHandlers = []; // { id, label, scan(ctx), import(candidate, ctx) } — non-comic file types in the Import tool
 const libraryScanners = []; // { type, scan({libraryId}) } — plugin-owned library types index on the same scan actions
+const bookMetadataSources = []; // { id, priority, makeClient(config) } — ebook metadata sources, preferred before the hosted fallback
+const remoteBookSources = []; // { id, label, listPage(config,page), materialize(config,remoteId,opts) } — file-less remote book catalogs cached on read
 
 // Per-plugin catalog for the management page: everything discovered on disk,
 // loaded or not. name → { name, version, description, enabled, loaded, error, counts }.
@@ -232,6 +234,31 @@ export const pluginApi = {
     if (libraryScanners.some((s) => s.type === clean)) return; // idempotent
     libraryScanners.push({ type: clean, scan, plugin: currentLoadingPlugin });
   },
+  // A book-metadata source for the ebooks plugin's matching. `makeClient(config)`
+  // returns a client with `available()` and `search(q, limit)` → results in the
+  // hosted service's shape ({id,title,subtitle,authors[],description,publisher,
+  // published_date,isbn_10,isbn_13,page_count,categories[],language,thumbnail}).
+  // The ebooks plugin tries registered sources (by ascending `priority`, default
+  // 100) BEFORE its built-in hosted fallback, so a lower number = preferred.
+  registerBookMetadataSource(source) {
+    if (!source?.id || typeof source.makeClient !== 'function') return;
+    if (bookMetadataSources.some((s) => s.id === source.id)) return; // idempotent
+    bookMetadataSources.push({ priority: 100, ...source, id: String(source.id), plugin: currentLoadingPlugin });
+  },
+  // A file-less REMOTE book catalog for the ebooks plugin's on-demand library.
+  // `listPage(config, page)` returns { books:[bookMeta], page, totalPages, total }
+  // where bookMeta = { remote_id, title, author, series, series_index, isbn,
+  // publisher, year, language, description, coverUrl } (coverUrl = a session-
+  // authed URL the browser can use for the cover, e.g. the plugin's own proxy
+  // route). `materialize(config, remoteId, { libraryId, dbPath })` downloads the
+  // book on demand and returns { path }. The ebooks plugin syncs a source's
+  // catalog as metadata-only entries and calls materialize the first time a user
+  // opens one to read. The source knows its own config, so callers pass null.
+  registerRemoteBookSource(source) {
+    if (!source?.id || typeof source.listPage !== 'function' || typeof source.materialize !== 'function') return;
+    if (remoteBookSources.some((s) => s.id === source.id)) return; // idempotent
+    remoteBookSources.push({ ...source, id: String(source.id), plugin: currentLoadingPlugin });
+  },
 };
 
 // Library types added by plugins (beyond the built-ins) — for UI listings.
@@ -256,6 +283,8 @@ export function registeredClientAssets() { return clientAssets; }
 export function registeredPermissions() { return permissions; }
 export function registeredImportHandlers() { return importHandlers; }
 export function registeredLibraryScanners() { return libraryScanners; }
+export function registeredBookMetadataSources() { return [...bookMetadataSources].sort((a, b) => a.priority - b.priority); }
+export function registeredRemoteBookSources() { return [...remoteBookSources]; }
 // Absolute path to the plugins directory (for serving plugin client files).
 export function pluginsDir() { return PLUGINS_DIR; }
 

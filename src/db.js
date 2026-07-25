@@ -3,6 +3,14 @@ import { normalizeNumber } from './matcher.js';
 
 export function initSchema(db) {
   db.pragma('journal_mode = WAL');
+  // WAL's standard companions (see also every plugin that opens catalog.db):
+  //  • synchronous=NORMAL — durable across an app crash (only an OS/power crash
+  //    can lose the last txn), and much faster than the FULL default on the
+  //    write-heavy paths (scans, the on-demand sync).
+  //  • busy_timeout — a momentarily-locked DB (a plugin write overlapping the
+  //    server) retries for 5s instead of erroring SQLITE_BUSY immediately.
+  db.pragma('synchronous = NORMAL');
+  db.pragma('busy_timeout = 5000');
   db.exec(`
     CREATE TABLE IF NOT EXISTS series (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -149,6 +157,10 @@ function migrate(db) {
   if (lf.length && !lf.includes('issue_id')) db.exec('ALTER TABLE library_files ADD COLUMN issue_id INTEGER');
   if (lf.length && !lf.includes('cv_issue_id')) db.exec('ALTER TABLE library_files ADD COLUMN cv_issue_id INTEGER');
   if (lf.length) db.exec('CREATE INDEX IF NOT EXISTS idx_libfiles_series ON library_files(series_id)');
+  // Ownership/size/corrupt rollups on the Library grid probe "valid files for
+  // this series" once per row — a composite keeps that an empty-range seek even
+  // across a very large collection (e.g. 100k+ file-less on-demand ebook rows).
+  if (lf.length && lf.includes('valid')) db.exec('CREATE INDEX IF NOT EXISTS idx_libfiles_series_valid ON library_files(series_id, valid)');
   // "Is this CV issue owned?" is probed constantly (wanted list, pack imports,
   // ownership rollups) — without this index each probe scans the whole table.
   if (lf.length && lf.includes('cv_issue_id')) db.exec('CREATE INDEX IF NOT EXISTS idx_libfiles_cvissue ON library_files(cv_issue_id)');
@@ -197,7 +209,7 @@ function migrate(db) {
   for (const col of ['description', 'credits', 'site_detail_url', 'image_url']) {
     if (cvi.length && !cvi.includes(col)) db.exec(`ALTER TABLE cv_issues ADD COLUMN ${col} TEXT`);
   }
-  // Metron enrichment fields (CloneVine's enrich=metron) + the CV fields we
+  // Metron enrichment fields (the metadata service's enrich=metron) + the CV fields we
   // didn't originally store. Only populated when the metadata endpoint
   // supports enrichment / the fetch carries them.
   for (const col of ['metron_rating', 'metron_status', 'metron_year_end', 'metron_series_type',
@@ -752,90 +764,299 @@ export function pruneLibraryFiles(db, seen, only = null) {
 // Last path segment (folder name) of a dir, across / or \ separators.
 function dirBaseName(d) { return d ? (String(d).split(/[\\/]/).filter(Boolean).pop() || null) : null; }
 
-export function collectionSeries(db, { filter = 'all', search = '', sort = 'title', includeRestricted = true, userId = null, library = null } = {}) {
-  // Sort options for the rail: title (default), recently added (id desc — rows
-  // are only ever inserted), most missing (CV total minus owned).
-  const ORDERS = {
-    title: 'ORDER BY s.title',
-    added: 'ORDER BY s.id DESC',
-    missing: `ORDER BY (
-      (SELECT COUNT(*) FROM cv_issues ci WHERE ci.cv_series_id = s.cv_id) -
-      (SELECT COUNT(DISTINCT lf.cv_issue_id) FROM library_files lf WHERE lf.series_id = s.id AND lf.valid = 1 AND lf.cv_issue_id IS NOT NULL)
-    ) DESC, s.title`,
-  };
-  const orderBy = ORDERS[sort] || ORDERS.title;
-  const rows = db.prepare(`
-    SELECT s.id, s.title, s.publisher, s.year, s.cover_url, s.followed, s.cv_id, s.cv_locked, s.url, s.restricted, s.type,
-      EXISTS(SELECT 1 FROM user_follows uf WHERE uf.series_id=s.id AND uf.user_id=@uid) my_follow,
-      cv.name cv_name, cv.publisher cv_publisher, cv.start_year cv_year, cv.image_url cv_image,
-      (SELECT COUNT(*) FROM issues i WHERE i.series_id=s.id) bc_total,
-      (SELECT COUNT(*) FROM issues i WHERE i.series_id=s.id AND EXISTS
-        (SELECT 1 FROM library_files lf WHERE lf.issue_id=i.id AND lf.valid=1)) bc_owned,
-      (SELECT COUNT(*) FROM cv_issues ci WHERE ci.cv_series_id=s.cv_id) cv_total,
-      (SELECT COUNT(DISTINCT lf.cv_issue_id) FROM library_files lf
-        WHERE lf.series_id=s.id AND lf.valid=1 AND lf.cv_issue_id IS NOT NULL) cv_owned,
-      (SELECT COUNT(*) FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1 AND lf.has_metadata=0) untagged,
-      -- corrupt = invalid files with NO valid copy of the same issue (a good .cbz
-      -- superseding an old bad .cbr means that issue is not corrupt).
-      (SELECT COUNT(*) FROM library_files bad WHERE bad.series_id=s.id AND bad.valid=0
-        AND NOT EXISTS (SELECT 1 FROM library_files g WHERE g.series_id=s.id AND g.valid=1
-          AND g.cv_issue_id IS NOT NULL AND g.cv_issue_id=bad.cv_issue_id)) corrupt,
-      (SELECT COUNT(*) FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1) file_count,
-      (SELECT lf.dir FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1 GROUP BY lf.dir ORDER BY COUNT(*) DESC LIMIT 1) file_dir,
-      -- list-view extras: newest known issue date, in-flight downloads, disk footprint
-      (SELECT MAX(ci.cover_date) FROM cv_issues ci WHERE ci.cv_series_id=s.cv_id) cv_latest,
-      (SELECT COUNT(*) FROM issues i WHERE i.series_id=s.id
-        AND i.status IN ('queued','downloading','grabbed','tagging')) active,
-      (SELECT COALESCE(SUM(lf.size),0) FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1) size_bytes
-    FROM series s
-    LEFT JOIN cv_series cv ON cv.comicvine_id=s.cv_id
-    WHERE (s.followed=1 OR EXISTS(SELECT 1 FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1)
-           OR EXISTS(SELECT 1 FROM user_follows uf WHERE uf.series_id=s.id AND uf.user_id=@uid))
-      ${includeRestricted ? '' : 'AND s.restricted = 0'}
-      ${library != null ? 'AND s.library_id = @lib' : ''}
-      ${search ? 'AND (s.title LIKE @q OR cv.name LIKE @q OR cv.publisher LIKE @q)' : ''}
-    ${orderBy}`).all({ uid: userId ?? -1, ...(library != null ? { lib: library } : {}), ...(search ? { q: `%${search}%` } : {}) });
-  // ComicVine is the data source. A matched comic shows CV name/publisher/year/
-  // cover and rolls up against CV's issues. An unmatched comic surfaces NO source
-  // metadata — just a neutral "needs a ComicVine match" state (sources are download-only).
-  return rows.map((r) => {
-    const sourced = !String(r.url).startsWith('cv:');
-    if (!r.cv_id) {
-      // Self-described types (plugin-registered, e.g. an ebook shelf): the
-      // series row IS the metadata — render it as matched, rolled up against
-      // its own issue rows. There is no external source to be "unmatched" from.
-      if (SELF_DESCRIBED_TYPES.has(r.type)) {
-        return {
-          id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, cv_id: null, cv_locked: 0, sourced: false, matched: true, source: 'local',
-          title: r.title, publisher: r.publisher, year: r.year, cover_url: r.cover_url, restricted: !!r.restricted, type: r.type,
-          folder: dirBaseName(r.file_dir), files: r.file_count,
-          total: r.bc_total, owned: r.bc_owned, missing: Math.max(0, r.bc_total - r.bc_owned), untagged: 0, corrupt: r.corrupt,
-          latest: null, active: 0, size: r.size_bytes,
-        };
-      }
-      return {
-        id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, cv_id: null, cv_locked: 0, sourced, matched: false, source: 'unmatched',
-        title: null, publisher: null, year: null, cover_url: null, restricted: !!r.restricted, type: r.type || 'comic',
-        folder: dirBaseName(r.file_dir), files: r.file_count,
-        total: 0, owned: 0, missing: 0, untagged: r.untagged, corrupt: r.corrupt,
-        latest: null, active: r.active, size: r.size_bytes,
-      };
-    }
-    const total = r.cv_total;
-    const owned = Math.min(r.cv_owned, r.cv_total);
-    return {
-      id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, cv_id: r.cv_id, cv_locked: r.cv_locked, sourced, matched: true, source: 'cv',
-      title: r.cv_name || r.title, publisher: r.cv_publisher || null, year: r.cv_year || null, cover_url: r.cv_image || null,
-      cv_name: r.cv_name, cv_year: r.cv_year, restricted: !!r.restricted, type: r.type || 'comic',
-      total, owned, missing: Math.max(0, total - owned), untagged: r.untagged, corrupt: r.corrupt,
-      latest: r.cv_latest, active: r.active, size: r.size_bytes,
-    };
-  })
-    .filter((r) => seriesMatchesFilter(r, filter));
+// The mapped collection set BEFORE any filter chip is applied — shared by the
+// list query, the combined page query, and the per-filter counts so all three
+// see byte-identical rows and can never disagree. One SQL, one JS map.
+//
+// Scale note (~100k+ file-less "on-demand" ebook rows): the per-series file and
+// issue rollups are pre-aggregated ONCE in two grouped CTEs (lfroll/issroll) and
+// LEFT JOINed, instead of running a handful of correlated subqueries per row.
+// What stays correlated is gated so it only runs where it can be non-trivial:
+// the cv_issues scans only for CV-matched series, the corrupt/folder scans only
+// for a series that actually has files. A file-less row therefore triggers no
+// correlated table probe beyond its personal-follow check.
+// Self-described type whitelist as bound params — every collection query's WHERE
+// gate and CASE guards reference it. Empty set → the guard is the constant 0.
+// `alias` picks whether the guard reads the series alias (s.type, inside the base
+// query) or the plain column (type, when filtering the wrapped `coll` CTE).
+function selfTypeGuard(alias = 's.') {
+  const selfTypes = [...SELF_DESCRIBED_TYPES];
+  const params = {};
+  selfTypes.forEach((t, i) => { params['st' + i] = t; });
+  const col = `${alias}type`;
+  const guard = selfTypes.length ? `${col} IN (${selfTypes.map((_, i) => '@st' + i).join(',')})` : '0';
+  return { selfTypes, params, guard };
 }
 
-// Does a mapped collection row belong to a given filter chip? Shared by the
-// list query and the per-filter counts so the two can never disagree.
+// The per-series rollups, pre-aggregated ONCE (a single grouped pass over the
+// small library_files/issues tables) instead of a fistful of correlated
+// subqueries per row. At ~150k file-less on-demand ebook rows the correlated
+// form re-probed those tables ~8× per row; the CTE join collapses that to two
+// scans plus a couple of genuinely per-row lookups (gated so they only run where
+// they can be non-trivial). Shared verbatim by every collection query so they can
+// never see different rollups. Requires @uid.
+const COLL_CTES = `
+  lfroll AS (
+    SELECT series_id,
+      SUM(CASE WHEN valid=1 THEN 1 ELSE 0 END) file_count,
+      SUM(CASE WHEN valid=0 THEN 1 ELSE 0 END) invalid_count,
+      COALESCE(SUM(CASE WHEN valid=1 THEN size ELSE 0 END), 0) size_bytes,
+      SUM(CASE WHEN valid=1 AND has_metadata=0 THEN 1 ELSE 0 END) untagged,
+      COUNT(DISTINCT CASE WHEN valid=1 AND issue_id IS NOT NULL THEN issue_id END) owned_issues,
+      COUNT(DISTINCT CASE WHEN valid=1 AND cv_issue_id IS NOT NULL THEN cv_issue_id END) cv_owned
+    FROM library_files GROUP BY series_id
+  ),
+  issroll AS (
+    SELECT series_id,
+      COUNT(*) bc_total,
+      SUM(CASE WHEN status IN ('queued','downloading','grabbed','tagging') THEN 1 ELSE 0 END) active
+    FROM issues GROUP BY series_id
+  ),
+  -- The active user's personal follows, materialised once (tiny) — joined in
+  -- rather than an EXISTS re-probed on every one of ~150k rows.
+  myfollow AS (SELECT series_id FROM user_follows WHERE user_id=@uid)`;
+
+// The four LEFT JOINs every collection query shares.
+const COLL_JOINS = `
+  FROM series s
+  LEFT JOIN cv_series cv ON cv.comicvine_id=s.cv_id
+  LEFT JOIN lfroll lf ON lf.series_id=s.id
+  LEFT JOIN issroll iss ON iss.series_id=s.id
+  LEFT JOIN myfollow mf ON mf.series_id=s.id`;
+
+// Full display column list (drives the row shape) — expensive per-row lookups
+// (file_dir, cv_latest) live here, so this select is only ever run for a bounded
+// set of ids (a page), never the whole 150k membership set.
+function collFullCols(guard) {
+  return `SELECT s.id, s.title, s.publisher, s.year, s.cover_url, s.followed, s.cv_id, s.cv_locked, s.url, s.restricted, s.type,
+      (mf.series_id IS NOT NULL) my_follow,
+      cv.name cv_name, cv.publisher cv_publisher, cv.start_year cv_year, cv.image_url cv_image,
+      CASE WHEN ${guard} THEN COALESCE(iss.bc_total, 0) ELSE 0 END bc_total,
+      CASE WHEN ${guard} THEN COALESCE(lf.owned_issues, 0) ELSE 0 END bc_owned,
+      CASE WHEN s.cv_id IS NULL THEN 0 ELSE (SELECT COUNT(*) FROM cv_issues ci WHERE ci.cv_series_id=s.cv_id) END cv_total,
+      COALESCE(lf.cv_owned, 0) cv_owned,
+      CASE WHEN ${guard} THEN 0 ELSE COALESCE(lf.untagged, 0) END untagged,
+      CASE WHEN COALESCE(lf.invalid_count, 0) = 0 THEN 0 ELSE
+        (SELECT COUNT(*) FROM library_files bad WHERE bad.series_id=s.id AND bad.valid=0
+          AND NOT EXISTS (SELECT 1 FROM library_files g WHERE g.series_id=s.id AND g.valid=1
+            AND g.cv_issue_id IS NOT NULL AND g.cv_issue_id=bad.cv_issue_id)) END corrupt,
+      COALESCE(lf.file_count, 0) file_count,
+      CASE WHEN COALESCE(lf.file_count, 0) = 0 THEN NULL ELSE
+        (SELECT g.dir FROM library_files g WHERE g.series_id=s.id AND g.valid=1 GROUP BY g.dir ORDER BY COUNT(*) DESC LIMIT 1) END file_dir,
+      CASE WHEN s.cv_id IS NULL THEN NULL ELSE (SELECT MAX(ci.cover_date) FROM cv_issues ci WHERE ci.cv_series_id=s.cv_id) END cv_latest,
+      CASE WHEN ${guard} THEN 0 ELSE COALESCE(iss.active, 0) END active,
+      COALESCE(lf.size_bytes, 0) size_bytes`;
+}
+
+// Lean column list — ONLY what the filter predicates and sorts need. Cheap enough
+// to compute across the whole membership set (the two correlated bits, cv_total
+// and corrupt, are gated to the handful of series that can be non-trivial), so it
+// drives id-selection (for a page) and the fused chip counts.
+function collLeanCols(guard) {
+  return `SELECT s.id, s.title, s.type, s.cv_id, s.followed,
+      (mf.series_id IS NOT NULL) my_follow,
+      CASE WHEN ${guard} THEN 0 ELSE COALESCE(lf.untagged, 0) END untagged,
+      CASE WHEN COALESCE(lf.invalid_count, 0) = 0 THEN 0 ELSE
+        (SELECT COUNT(*) FROM library_files bad WHERE bad.series_id=s.id AND bad.valid=0
+          AND NOT EXISTS (SELECT 1 FROM library_files g WHERE g.series_id=s.id AND g.valid=1
+            AND g.cv_issue_id IS NOT NULL AND g.cv_issue_id=bad.cv_issue_id)) END corrupt,
+      CASE WHEN s.cv_id IS NULL THEN 0 ELSE (SELECT COUNT(*) FROM cv_issues ci WHERE ci.cv_series_id=s.cv_id) END cv_total,
+      COALESCE(lf.cv_owned, 0) cv_owned`;
+}
+
+// A collection MEMBER = followed OR owns a valid file OR the caller personally
+// follows OR (self-described) has catalog issue rows. The optional scope narrows
+// by mature-visibility / library / search. Returns the WHERE fragment + its params.
+function membershipWhere({ guard, selfTypesLen, includeRestricted = true, library = null, search = '' }) {
+  const sql = `WHERE (s.followed=1 OR COALESCE(lf.file_count, 0) > 0
+           OR mf.series_id IS NOT NULL
+           ${selfTypesLen ? `OR (${guard} AND COALESCE(iss.bc_total, 0) > 0)` : ''})
+      ${includeRestricted ? '' : 'AND s.restricted = 0'}
+      ${library != null ? 'AND s.library_id = @lib' : ''}
+      ${search ? 'AND (s.title LIKE @q OR cv.name LIKE @q OR cv.publisher LIKE @q)' : ''}`;
+  const params = { ...(library != null ? { lib: library } : {}), ...(search ? { q: `%${search}%` } : {}) };
+  return { sql, params };
+}
+
+// Sort clauses over OUTPUT columns (id/title/cv_total/cv_owned) — valid whether
+// applied to the flat base query or the wrapped `coll` CTE. `title` == s.title
+// (the catalog title), matching the historical ORDER BY s.title exactly.
+const COLL_ORDERS = {
+  title: 'ORDER BY title',
+  added: 'ORDER BY id DESC',
+  missing: 'ORDER BY (cv_total - cv_owned) DESC, title',
+};
+
+// SQL translation of every seriesMatchesFilter chip, evaluated over the wrapped
+// `coll` CTE's columns (id,title,type,cv_id,followed,my_follow,untagged,corrupt,
+// cv_total,cv_owned). Each branch mirrors the JS in seriesMatchesFilter EXACTLY;
+// keep the two in lockstep. Mutates `params` with any type-lane literals it binds.
+function chipPredicateSql(filter, { guardOuter, seriesTypeList, params }) {
+  // Mapped `type` == COALESCE(NULLIF(type,''),'comic'): the ||'comic' default the
+  // mapper applies to comics, and a no-op for self-described (always non-empty).
+  const effType = `COALESCE(NULLIF(type,''),'comic')`;
+  if (filter === 'incomplete') return 'cv_id IS NOT NULL AND cv_total > cv_owned';   // missing>0 (only CV series)
+  if (filter === 'followed') return 'my_follow = 1';                                 // per-user star
+  if (filter === 'unmonitored') return 'COALESCE(followed,0) = 0';                   // !monitored
+  if (filter === 'problems') return 'untagged > 0 OR corrupt > 0';
+  if (filter === 'unmatched') return `cv_id IS NULL AND COALESCE(${guardOuter},0) = 0`; // !matched
+  if (filter === 'comics') return `${effType} NOT IN (${seriesTypeList}) OR ${effType} = 'comic'`;
+  if (SERIES_TYPES.includes(filter)) { params['lane_' + filter] = filter; return `${effType} = @lane_${filter}`; }
+  return '1'; // all / unknown → everything
+}
+
+// One lean SQL pass over the membership set → { counts, total }. counts are
+// filter-INDEPENDENT (each chip tallied over the search set), total honors the
+// active filter. Replaces mapping 150k rows just to count them.
+function collCountPass(db, { keys = [], filter = 'all', search = '', includeRestricted = true, userId = null, library = null } = {}) {
+  const { selfTypes, params: selfParams, guard } = selfTypeGuard('s.');
+  const { guard: guardOuter } = selfTypeGuard('');
+  const seriesTypes = [...SERIES_TYPES];
+  const stParams = {}; seriesTypes.forEach((t, i) => { stParams['ktype' + i] = t; });
+  const seriesTypeList = seriesTypes.length ? seriesTypes.map((_, i) => '@ktype' + i).join(',') : `''`;
+  const mem = membershipWhere({ guard, selfTypesLen: selfTypes.length, includeRestricted, library, search });
+  const params = { uid: userId ?? -1, ...selfParams, ...stParams, ...mem.params };
+  const predCtx = { guardOuter, seriesTypeList, params };
+  const selects = keys.map((k) => k === 'all'
+    ? `COUNT(*) "all"`
+    : `SUM(CASE WHEN (${chipPredicateSql(k, predCtx)}) THEN 1 ELSE 0 END) "${k}"`);
+  const totalSel = filter && filter !== 'all'
+    ? `SUM(CASE WHEN (${chipPredicateSql(filter, predCtx)}) THEN 1 ELSE 0 END) "__total"`
+    : `COUNT(*) "__total"`;
+  selects.push(totalSel);
+  const row = db.prepare(`WITH ${COLL_CTES},
+    coll AS (${collLeanCols(guard)} ${COLL_JOINS} ${mem.sql})
+    SELECT ${selects.join(', ')} FROM coll`).get(params) || {};
+  const counts = {};
+  for (const k of keys) counts[k] = row[k] || 0;
+  return { counts, total: row.__total || 0 };
+}
+
+// Hydrate the full row shape for a bounded, ordered list of series ids — the
+// expensive display columns run for a PAGE (≤limit), never the whole set. Rows
+// come back in the given id order.
+function mapCollectionByIds(db, ids, { userId = null } = {}) {
+  if (!ids.length) return [];
+  const { params: selfParams, guard } = selfTypeGuard('s.');
+  const idParams = {}; ids.forEach((v, i) => { idParams['id' + i] = v; });
+  const ph = ids.map((_, i) => '@id' + i).join(',');
+  const rows = db.prepare(`WITH ${COLL_CTES}
+    ${collFullCols(guard)} ${COLL_JOINS}
+    WHERE s.id IN (${ph})`).all({ uid: userId ?? -1, ...selfParams, ...idParams });
+  const byId = new Map(rows.map((r) => [r.id, mapCollectionRow(r)]));
+  return ids.map((id) => byId.get(id)).filter(Boolean);
+}
+
+// ComicVine is the data source. A matched comic shows CV name/publisher/year/
+// cover and rolls up against CV's issues. An unmatched comic surfaces NO source
+// metadata — just a neutral "needs a ComicVine match" state (sources are
+// download-only). Self-described rows render from their own columns. The SINGLE
+// row→object mapper, shared by the full-array and paged paths so no shape drifts.
+function mapCollectionRow(r) {
+  const sourced = !String(r.url).startsWith('cv:');
+  if (!r.cv_id) {
+    if (SELF_DESCRIBED_TYPES.has(r.type)) {
+      // Every issue is either OWNED (a valid local file) or AVAILABLE (an
+      // on-demand entry that downloads on first open) — never "missing".
+      const owned = r.bc_owned;
+      const available = Math.max(0, r.bc_total - owned);
+      return {
+        id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, cv_id: null, cv_locked: 0, sourced: false, matched: true, source: 'local',
+        title: r.title, publisher: r.publisher, year: r.year, cover_url: r.cover_url, restricted: !!r.restricted, type: r.type,
+        folder: dirBaseName(r.file_dir), files: r.file_count,
+        total: r.bc_total, owned, missing: 0, available, on_demand: available > 0, untagged: 0, corrupt: r.corrupt,
+        latest: null, active: 0, size: r.size_bytes,
+      };
+    }
+    return {
+      id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, cv_id: null, cv_locked: 0, sourced, matched: false, source: 'unmatched',
+      title: null, publisher: null, year: null, cover_url: null, restricted: !!r.restricted, type: r.type || 'comic',
+      folder: dirBaseName(r.file_dir), files: r.file_count,
+      total: 0, owned: 0, missing: 0, available: 0, on_demand: false, untagged: r.untagged, corrupt: r.corrupt,
+      latest: null, active: r.active, size: r.size_bytes,
+    };
+  }
+  const total = r.cv_total;
+  const owned = Math.min(r.cv_owned, r.cv_total);
+  return {
+    id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, cv_id: r.cv_id, cv_locked: r.cv_locked, sourced, matched: true, source: 'cv',
+    title: r.cv_name || r.title, publisher: r.cv_publisher || null, year: r.cv_year || null, cover_url: r.cv_image || null,
+    cv_name: r.cv_name, cv_year: r.cv_year, restricted: !!r.restricted, type: r.type || 'comic',
+    total, owned, missing: Math.max(0, total - owned), available: 0, on_demand: false, untagged: r.untagged, corrupt: r.corrupt,
+    latest: r.cv_latest, active: r.active, size: r.size_bytes,
+  };
+}
+
+// The full mapped collection set BEFORE any filter chip — the flat base query
+// over the whole membership set. Used by the array API (stats/tests/internal
+// callers) and the legacy full-array route. Not paginated: every member is
+// mapped, so prefer collectionPage with a limit for the Library grid.
+function mapCollection(db, { search = '', sort = 'title', includeRestricted = true, userId = null, library = null } = {}) {
+  const { selfTypes, params: selfParams, guard } = selfTypeGuard('s.');
+  const mem = membershipWhere({ guard, selfTypesLen: selfTypes.length, includeRestricted, library, search });
+  const orderBy = COLL_ORDERS[sort] || COLL_ORDERS.title;
+  // Wrap the base select in a `coll` CTE so the ORDER BY resolves cv_total /
+  // cv_owned / title against REAL (materialised) columns. Referencing output
+  // aliases inside an ORDER BY expression like (cv_total - cv_owned) is not
+  // reliably resolved by SQLite — the missing sort silently mis-ordered.
+  const rows = db.prepare(`WITH ${COLL_CTES},
+    coll AS (${collFullCols(guard)} ${COLL_JOINS} ${mem.sql})
+    SELECT * FROM coll ${orderBy}`).all({ uid: userId ?? -1, ...selfParams, ...mem.params });
+  return rows.map(mapCollectionRow);
+}
+
+export function collectionSeries(db, { filter = 'all', ...opts } = {}) {
+  return mapCollection(db, opts).filter((r) => seriesMatchesFilter(r, filter));
+}
+
+// A Library page: rows for one filter/search/sort window (LIMIT/OFFSET), the
+// total for that filter, and the filter-independent chip counts — all in SQL, so
+// a page stays a few hundred KB no matter how large the collection.
+//
+// Backward-compat: WITHOUT `limit`, returns the legacy fused shape (ALL rows +
+// counts, mapped once in JS) that the pre-pagination fused route relied on. WITH
+// `limit`, paginates in SQL: filter+sort+search are pushed into the query, the
+// page is selected by id then hydrated (expensive columns only for the page),
+// and chip counts come from one lean COUNT pass — never by mapping every row.
+export function collectionPage(db, { keys = [], filter = 'all', limit = null, offset = 0, ...opts } = {}) {
+  if (limit == null) {
+    // Legacy fused path: map the whole set once, tally chips + rows in JS.
+    const all = mapCollection(db, opts);
+    const counts = {};
+    for (const k of keys) counts[k] = k === 'all' ? all.length : all.filter((r) => seriesMatchesFilter(r, k)).length;
+    const rows = filter && filter !== 'all' ? all.filter((r) => seriesMatchesFilter(r, filter)) : all;
+    return { rows, counts, total: rows.length };
+  }
+  const { search = '', sort = 'title', includeRestricted = true, userId = null, library = null } = opts;
+  const cap = Math.max(1, Math.min(500, Number(limit) || 200));
+  const off = Math.max(0, Number(offset) || 0);
+  // Chip counts + this filter's total, one lean pass — but ONLY when chips are
+  // asked for (page 1). loadMore passes keys=[] so a scroll page skips this whole
+  // scan (the total/counts don't change between pages of the same filter, and the
+  // client already holds them). total is null then; the client keeps page 1's.
+  const { counts, total } = keys.length
+    ? collCountPass(db, { keys, filter, search, includeRestricted, userId, library })
+    : { counts: {}, total: null };
+  // Select the page's ids in sort order (lean scan), then hydrate the full shape.
+  const { selfTypes, params: selfParams, guard } = selfTypeGuard('s.');
+  const { guard: guardOuter } = selfTypeGuard('');
+  const seriesTypes = [...SERIES_TYPES];
+  const stParams = {}; seriesTypes.forEach((t, i) => { stParams['ktype' + i] = t; });
+  const seriesTypeList = seriesTypes.length ? seriesTypes.map((_, i) => '@ktype' + i).join(',') : `''`;
+  const mem = membershipWhere({ guard, selfTypesLen: selfTypes.length, includeRestricted, library, search });
+  const idParams = { uid: userId ?? -1, ...selfParams, ...stParams, ...mem.params, lim: cap, off };
+  const pred = chipPredicateSql(filter, { guardOuter, seriesTypeList, params: idParams });
+  const orderBy = COLL_ORDERS[sort] || COLL_ORDERS.title;
+  const idRows = db.prepare(`WITH ${COLL_CTES},
+    coll AS (${collLeanCols(guard)} ${COLL_JOINS} ${mem.sql})
+    SELECT id FROM coll WHERE (${pred}) ${orderBy} LIMIT @lim OFFSET @off`).all(idParams);
+  const rows = mapCollectionByIds(db, idRows.map((r) => r.id), { userId });
+  return { rows, total, counts };
+}
+
+// Does a mapped collection row belong to a given filter chip? The JS source of
+// truth mirrored by chipPredicateSql — keep the two in lockstep. Shared by the
+// legacy list/count paths so they can never disagree.
 export function seriesMatchesFilter(r, filter) {
   return filter === 'incomplete' ? r.missing > 0
     : filter === 'followed' ? !!r.followed
@@ -852,13 +1073,10 @@ export function seriesMatchesFilter(r, filter) {
 }
 
 // Per-filter counts over the current search set (filter-independent), for the
-// filter-chip badges. Reuses collectionSeries with filter='all' — no extra
-// query shape to keep in sync — and tallies each chip in JS.
+// filter-chip badges. One lean SQL pass — no full-set map. Kept as a standalone
+// endpoint for compatibility; a Library load uses collectionPage's fused counts.
 export function collectionCounts(db, { keys = [], ...opts } = {}) {
-  const all = collectionSeries(db, { ...opts, filter: 'all' });
-  const counts = {};
-  for (const k of keys) counts[k] = k === 'all' ? all.length : all.filter((r) => seriesMatchesFilter(r, k)).length;
-  return counts;
+  return collCountPass(db, { keys, filter: 'all', ...opts }).counts;
 }
 
 export function seriesCollectionDetail(db, id, userId = null) {

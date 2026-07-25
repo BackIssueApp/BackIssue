@@ -482,3 +482,358 @@ test('self-described series: rendered from their own columns, never "unmatched",
   assert.equal(db.prepare('SELECT COUNT(*) n FROM series').get().n, 0);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM issues').get().n, 0);
 });
+
+// Helpers for the on-demand ebook tests: a file-less remote book has a series +
+// an issue row but NO library_files row (it downloads on first open); an owned
+// book additionally has a valid linked file.
+function seedEbookType() {
+  return import('../src/db.js').then((m) => {
+    if (!m.SERIES_TYPES.includes('ebook')) m.SERIES_TYPES.push('ebook');
+    m.SELF_DESCRIBED_TYPES.add('ebook');
+    return m;
+  });
+}
+function addRemoteBook(db, { title, author = 'Some Author', libraryId = null }) {
+  const url = `ebook:l1:b:${title.toLowerCase().replace(/\s+/g, '-')}`;
+  const sid = upsertSeries(db, { title, url, publisher: author });
+  db.prepare("UPDATE series SET type='ebook', library_id=? WHERE id=?").run(libraryId, sid);
+  const iid = upsertIssue(db, { seriesId: sid, title, issueNumber: '1', url: `ebookremote:src:${title}` });
+  db.prepare("UPDATE issues SET status='done', file_path=NULL WHERE id=?").run(iid);
+  return { sid, iid };
+}
+function addOwnedBookIssue(db, sid, { title, path }) {
+  const iid = upsertIssue(db, { seriesId: sid, title, issueNumber: '2', url: `ebookfile:${path}` });
+  db.prepare("UPDATE issues SET status='done', file_path=? WHERE id=?").run(path, iid);
+  upsertLibraryFile(db, { path, dir: '/shelf', name: title, size: 9, mtime: 1, valid: 1, has_metadata: 1 });
+  linkLibraryFile(db, path, sid, iid);
+  return iid;
+}
+
+test('on-demand ebooks: file-less self-described series is visible + available, not missing', async () => {
+  const { collectionSeries, seriesMatchesFilter } = await seedEbookType();
+  const db = openDb(':memory:');
+  const { sid } = addRemoteBook(db, { title: 'Neuromancer' });
+
+  // Visibility: a file-less, un-followed self-described series still shows up.
+  const row = collectionSeries(db, {}).find((r) => r.id === sid);
+  assert.ok(row, 'file-less on-demand ebook appears in the collection');
+  assert.equal(row.matched, true);
+  assert.equal(row.source, 'local');
+  // Rollup: 1 issue, 0 owned, 1 available, 0 missing — available, NOT missing.
+  assert.deepEqual([row.total, row.owned, row.available, row.missing], [1, 0, 1, 0]);
+  assert.equal(row.on_demand, true);
+
+  // Filter chips: it is in its own type lane, is NOT incomplete (missing===0),
+  // is NOT a "problem", is NOT unmatched.
+  assert.ok(seriesMatchesFilter(row, 'ebook'), 'in its ebook lane');
+  assert.ok(!seriesMatchesFilter(row, 'incomplete'), 'available is not incomplete');
+  assert.ok(!seriesMatchesFilter(row, 'problems'), 'no problems');
+  assert.ok(!seriesMatchesFilter(row, 'unmatched'), 'never unmatched');
+  assert.equal(collectionSeries(db, { filter: 'incomplete' }).find((r) => r.id === sid), undefined);
+});
+
+test('on-demand ebooks: a mixed series (some owned, some on-demand) rolls up correctly', async () => {
+  const { collectionSeries } = await seedEbookType();
+  const db = openDb(':memory:');
+  // A calibre-style series: issue 1 is file-less/remote, issue 2 is owned.
+  const { sid } = addRemoteBook(db, { title: 'Dune Saga' });
+  addOwnedBookIssue(db, sid, { title: 'Dune Messiah', path: '/shelf/dune-messiah.epub' });
+
+  const row = collectionSeries(db, {}).find((r) => r.id === sid);
+  assert.deepEqual([row.total, row.owned, row.available, row.missing], [2, 1, 1, 0]);
+  assert.equal(row.on_demand, true, 'still has an available book');
+  assert.equal(row.files, 1, 'one file on disk');
+});
+
+test('on-demand ebooks: an all-owned self-described series is complete, not on-demand', async () => {
+  const { collectionSeries } = await seedEbookType();
+  const db = openDb(':memory:');
+  const sid = upsertSeries(db, { title: 'Foundation', url: 'ebook:l1:b:foundation', publisher: 'Asimov' });
+  db.prepare("UPDATE series SET type='ebook' WHERE id=?").run(sid);
+  addOwnedBookIssue(db, sid, { title: 'Foundation', path: '/shelf/foundation.epub' });
+
+  const row = collectionSeries(db, {}).find((r) => r.id === sid);
+  assert.deepEqual([row.total, row.owned, row.available, row.missing], [1, 1, 0, 0]);
+  assert.equal(row.on_demand, false);
+});
+
+test('collectionPage: fused counts match the list for every chip and are filter-independent', async () => {
+  const { collectionPage, collectionSeries, collectionCounts } = await seedEbookType();
+  const db = openDb(':memory:');
+  // Two on-demand ebooks, one owned ebook, one incomplete comic, one followed comic.
+  addRemoteBook(db, { title: 'Book A' });
+  addRemoteBook(db, { title: 'Book B' });
+  const owned = upsertSeries(db, { title: 'Book C', url: 'ebook:l1:b:c', publisher: 'X' });
+  db.prepare("UPDATE series SET type='ebook' WHERE id=?").run(owned);
+  addOwnedBookIssue(db, owned, { title: 'Book C', path: '/shelf/c.epub' });
+  // A CV comic with a missing issue (incomplete) and a follow.
+  const cvid = 555;
+  const { upsertCvSeries, upsertCvIssue, setSeriesCv, setFollowed } = await import('../src/db.js');
+  upsertCvSeries(db, { id: cvid, name: 'Saga', publisher: 'Image', start_year: 2012 });
+  upsertCvIssue(db, { id: 9001, cv_series_id: cvid, issue_number: '1' });
+  upsertCvIssue(db, { id: 9002, cv_series_id: cvid, issue_number: '2' });
+  const comic = upsertSeries(db, { title: 'Saga', url: '/c/saga', publisher: 'Image' });
+  setSeriesCv(db, comic, cvid);
+  setFollowed(db, comic, 1);
+
+  const keys = ['all', 'incomplete', 'followed', 'unmonitored', 'problems', 'unmatched', 'manga'];
+  const page = collectionPage(db, { filter: 'all', keys });
+  const all = collectionSeries(db, { filter: 'all' });
+
+  // rows for filter=all == the full mapped set.
+  assert.equal(page.rows.length, all.length);
+  // Every chip count equals the independently-filtered list length.
+  for (const k of keys) {
+    const listLen = k === 'all' ? all.length : collectionSeries(db, { filter: k }).length;
+    assert.equal(page.counts[k], listLen, `count[${k}] matches the list`);
+  }
+  // The standalone counts endpoint agrees with the fused counts.
+  assert.deepEqual(collectionCounts(db, { keys }), page.counts);
+
+  // Counts are independent of the active filter: asking for a narrow filter
+  // returns fewer rows but identical counts.
+  const narrow = collectionPage(db, { filter: 'incomplete', keys });
+  assert.deepEqual(narrow.counts, page.counts, 'counts do not depend on the active filter');
+  assert.equal(narrow.rows.length, page.counts.incomplete, 'rows honor the active filter');
+  // The two on-demand ebooks never count as incomplete.
+  assert.equal(page.counts.incomplete, 1, 'only the comic is incomplete');
+});
+
+test('collectionSeries: comic + manga rows keep their exact field shape (no ebook fields leak in)', async () => {
+  await seedEbookType();
+  const db = openDb(':memory:');
+  // Owned comic (unmatched — no cv_id) and a followed manga.
+  const comic = upsertSeries(db, { title: 'Local Comic', url: '/c/lc', publisher: 'Indie' });
+  const iid = upsertIssue(db, { seriesId: comic, title: 'LC #1', issueNumber: '1', url: '/i/lc1' });
+  upsertLibraryFile(db, { path: '/lib/lc/1.cbz', dir: '/lib/lc', name: '1.cbz', size: 5, mtime: 1, valid: 1, has_metadata: 1 });
+  linkLibraryFile(db, '/lib/lc/1.cbz', comic, iid);
+  const manga = upsertSeries(db, { title: 'Berserk', url: 'cv:1', publisher: 'Dark Horse' });
+  db.prepare("UPDATE series SET type='manga', followed=1 WHERE id=?").run(manga);
+
+  const rows = collectionSeries(db, {});
+  const c = rows.find((r) => r.id === comic);
+  const m = rows.find((r) => r.id === manga);
+  // Comic rows carry the new fields defaulted (available/on_demand) but stay 0/false.
+  assert.equal(c.available, 0);
+  assert.equal(c.on_demand, false);
+  assert.equal(c.type, 'comic');
+  assert.equal(m.type, 'manga');
+  assert.equal(m.available, 0);
+  assert.equal(m.on_demand, false);
+  // Exact key set is stable (guards against accidental shape drift).
+  const keyset = Object.keys(c).sort().join(',');
+  assert.equal(keyset, ['active', 'available', 'corrupt', 'cover_url', 'cv_id', 'cv_locked', 'files', 'folder', 'followed', 'id', 'latest', 'matched', 'missing', 'monitored', 'on_demand', 'owned', 'publisher', 'restricted', 'size', 'source', 'sourced', 'title', 'total', 'type', 'untagged', 'year'].join(','));
+});
+
+test('collectionSeries: search, sort and library filter still work with on-demand ebooks mixed in', async () => {
+  const { collectionSeries, createLibrary, assignSeriesLibrary } = await seedEbookType();
+  const db = openDb(':memory:');
+  const lib = createLibrary(db, { name: 'Books', type: 'ebook' }); // assignment keeps members' ebook type
+  const { sid: a } = addRemoteBook(db, { title: 'Alpha' });
+  const { sid: z } = addRemoteBook(db, { title: 'Zeta' });
+  assignSeriesLibrary(db, a, lib);
+
+  // Search matches the self-described title.
+  const found = collectionSeries(db, { search: 'Alph' });
+  assert.equal(found.length, 1);
+  assert.equal(found[0].id, a);
+
+  // Title sort orders the two books A→Z.
+  const titles = collectionSeries(db, { sort: 'title' }).map((r) => r.title);
+  assert.ok(titles.indexOf('Alpha') < titles.indexOf('Zeta'));
+
+  // Library lane returns only the assigned member.
+  const inLib = collectionSeries(db, { library: lib });
+  assert.equal(inLib.length, 1);
+  assert.equal(inLib[0].id, a);
+  assert.equal(collectionSeries(db, { library: lib }).some((r) => r.id === z), false);
+});
+
+// ---- Server-side pagination: collectionPage(limit/offset) parity vs the
+// JS-filtered full scan, across a mixed comic + manga + ebook fixture. ----
+
+// A diverse collection touching every filter-chip predicate branch. Returns the
+// module + db + a map of labelled series ids so tests can assert membership.
+async function seedMixedCollection() {
+  const m = await seedEbookType();
+  const { openDb, upsertSeries, upsertIssue, upsertLibraryFile, linkLibraryFile,
+    upsertCvSeries, upsertCvIssue, setSeriesCv, linkFileCvIssue, setFollowed,
+    setUserFollow, setSeriesRestricted } = m;
+  const db = openDb(':memory:');
+  const ids = {};
+  let cvSeq = 7000, cvIssueSeq = 70000, fileSeq = 0;
+
+  // A CV-matched comic/manga with `total` CV issues and `owned` valid+linked files.
+  function cvSeries({ title, type = 'comic', total, owned, monitored = false, restricted = false }) {
+    const cvId = ++cvSeq;
+    upsertCvSeries(db, { id: cvId, name: title, publisher: 'Pub', start_year: 2000 });
+    const cvIssueIds = [];
+    for (let i = 1; i <= total; i++) { const cid = ++cvIssueSeq; upsertCvIssue(db, { id: cid, cv_series_id: cvId, issue_number: String(i) }); cvIssueIds.push(cid); }
+    const sid = upsertSeries(db, { title, url: '/c/' + title, publisher: 'Pub' });
+    if (type !== 'comic') db.prepare('UPDATE series SET type=? WHERE id=?').run(type, sid);
+    setSeriesCv(db, sid, cvId);
+    for (let i = 0; i < owned; i++) {
+      const p = `/lib/${title}/${i}.cbz`;
+      upsertLibraryFile(db, { path: p, dir: `/lib/${title}`, name: `${i}.cbz`, size: 5, mtime: 1, valid: 1, has_metadata: 1 });
+      linkLibraryFile(db, p, sid, null);
+      linkFileCvIssue(db, p, cvIssueIds[i]);
+    }
+    if (monitored) setFollowed(db, sid, 1);
+    if (restricted) setSeriesRestricted(db, sid, true);
+    return sid;
+  }
+  // An unmatched comic/manga: a folder of files, no CV link. untagged/corrupt drive "problems".
+  function unmatched({ title, type = 'comic', untagged = false, corrupt = false }) {
+    const sid = upsertSeries(db, { title, url: '/c/' + title });
+    if (type !== 'comic') db.prepare('UPDATE series SET type=? WHERE id=?').run(type, sid);
+    const good = `/lib/${title}/good-${++fileSeq}.cbz`;
+    upsertLibraryFile(db, { path: good, dir: `/lib/${title}`, name: 'good.cbz', size: 5, mtime: 1, valid: 1, has_metadata: untagged ? 0 : 1 });
+    linkLibraryFile(db, good, sid, null);
+    if (corrupt) { const bad = `/lib/${title}/bad-${++fileSeq}.cbz`; upsertLibraryFile(db, { path: bad, dir: `/lib/${title}`, name: 'bad.cbz', size: 1, mtime: 1, valid: 0 }); linkLibraryFile(db, bad, sid, null); }
+    return sid;
+  }
+
+  ids.comicIncomplete = cvSeries({ title: 'Alpha Comic', total: 4, owned: 1, monitored: true });   // incomplete, monitored, comics
+  ids.comicComplete = cvSeries({ title: 'Bravo Comic', total: 2, owned: 2 });                        // complete, unmonitored, comics
+  ids.comicUntagged = unmatched({ title: 'Charlie Comic', untagged: true });                          // unmatched + problems, comics
+  ids.comicCorrupt = unmatched({ title: 'Delta Comic', corrupt: true });                              // unmatched + problems(corrupt)
+  ids.mangaIncomplete = cvSeries({ title: 'Echo Manga', type: 'manga', total: 3, owned: 1 });         // manga + incomplete (owned<total)
+  ids.mangaUnmatched = unmatched({ title: 'Foxtrot Manga', type: 'manga' });                          // manga + unmatched
+  ids.comicRestricted = cvSeries({ title: 'Golf Comic', total: 2, owned: 0, monitored: true, restricted: true }); // mature member — hidden without perm
+
+  // Ebooks (self-described): one fully owned, two on-demand (file-less).
+  const eOwned = upsertSeries(db, { title: 'Hotel Ebook', url: 'ebook:l1:b:hotel', publisher: 'Auth' });
+  db.prepare("UPDATE series SET type='ebook' WHERE id=?").run(eOwned);
+  { const p = '/shelf/hotel.epub'; const iid = upsertIssue(db, { seriesId: eOwned, title: 'Hotel', issueNumber: '1', url: 'ebookfile:' + p }); db.prepare("UPDATE issues SET status='done' WHERE id=?").run(iid); upsertLibraryFile(db, { path: p, dir: '/shelf', name: 'hotel.epub', size: 9, mtime: 1, valid: 1, has_metadata: 1 }); linkLibraryFile(db, p, eOwned, iid); }
+  ids.ebookOwned = eOwned;
+  ids.ebookOnDemandA = addRemoteBook(db, { title: 'India Ebook' }).sid;
+  ids.ebookOnDemandB = addRemoteBook(db, { title: 'Juliet Ebook' }).sid;
+
+  // User 1 personally follows two of them (the per-user ☆).
+  setUserFollow(db, 1, ids.comicIncomplete, true);
+  setUserFollow(db, 1, ids.ebookOnDemandA, true);
+
+  return { m, db, ids };
+}
+
+// Walk every page of collectionPage for one filter, returning the ordered ids.
+function pageAllIds(collectionPage, db, opts, pageSize = 2) {
+  const out = []; let offset = 0;
+  for (;;) {
+    const { rows } = collectionPage(db, { ...opts, keys: [], limit: pageSize, offset });
+    for (const r of rows) out.push(r.id);
+    if (rows.length < pageSize) break;
+    offset += pageSize;
+  }
+  return out;
+}
+
+const MIX_FILTERS = ['all', 'incomplete', 'followed', 'unmonitored', 'problems', 'unmatched', 'comics', 'manga', 'ebook'];
+
+test('collectionPage: every filter predicate matches the JS seriesMatchesFilter membership (mixed fixture)', async () => {
+  const { m, db } = await seedMixedCollection();
+  const { collectionPage, collectionSeries } = m;
+  for (const filter of MIX_FILTERS) {
+    const jsIds = collectionSeries(db, { filter, userId: 1 }).map((r) => r.id).sort((a, b) => a - b);
+    const sqlIds = pageAllIds(collectionPage, db, { filter, userId: 1 }).slice().sort((a, b) => a - b);
+    assert.deepEqual(sqlIds, jsIds, `filter "${filter}" membership must match the JS filter`);
+    // No dup/skip: a single big page returns the same set with no repeats.
+    const onePage = collectionPage(db, { filter, keys: [], userId: 1, limit: 500, offset: 0 });
+    assert.equal(onePage.rows.length, jsIds.length, `filter "${filter}" total rows`);
+    assert.equal(new Set(onePage.rows.map((r) => r.id)).size, jsIds.length, `filter "${filter}" no duplicate rows`);
+  }
+});
+
+test('collectionPage: total per filter equals the full-scan count', async () => {
+  const { m, db } = await seedMixedCollection();
+  const { collectionPage, collectionSeries } = m;
+  for (const filter of MIX_FILTERS) {
+    const expected = collectionSeries(db, { filter, userId: 1 }).length;
+    // total is computed alongside the chip counts (page 1); pass keys to get it.
+    const { total } = collectionPage(db, { filter, keys: ['all'], userId: 1, limit: 3, offset: 0 });
+    assert.equal(total, expected, `total for "${filter}"`);
+  }
+});
+
+test('collectionPage: loadMore path (no keys) returns rows only, skipping the count/total scan', async () => {
+  const { m, db } = await seedMixedCollection();
+  const { collectionPage } = m;
+  const more = collectionPage(db, { filter: 'all', keys: [], userId: 1, limit: 3, offset: 3 });
+  assert.equal(more.rows.length, 3);
+  assert.equal(more.total, null, 'total skipped when no chip keys are requested (loadMore)');
+  assert.deepEqual(more.counts, {});
+});
+
+test('collectionPage: chip counts are filter-independent and match the JS tally', async () => {
+  const { m, db } = await seedMixedCollection();
+  const { collectionPage, collectionSeries, seriesMatchesFilter } = m;
+  const keys = ['all', 'incomplete', 'followed', 'unmonitored', 'problems', 'unmatched', 'manga', 'comics', 'ebook'];
+  const all = collectionSeries(db, { filter: 'all', userId: 1 });
+  const jsCounts = {};
+  for (const k of keys) jsCounts[k] = k === 'all' ? all.length : all.filter((r) => seriesMatchesFilter(r, k)).length;
+  // Counts are identical no matter which filter the page is showing.
+  for (const active of ['all', 'incomplete', 'ebook', 'problems']) {
+    const { counts } = collectionPage(db, { filter: active, keys, userId: 1, limit: 3, offset: 0 });
+    assert.deepEqual(counts, jsCounts, `counts must not depend on the active filter (was "${active}")`);
+  }
+  // And the standalone counts endpoint agrees.
+  assert.deepEqual(m.collectionCounts(db, { keys, userId: 1 }), jsCounts);
+});
+
+test('collectionPage: sort orders (title / added / missing) are correct across page boundaries', async () => {
+  const { m, db } = await seedMixedCollection();
+  const { collectionPage, collectionSeries } = m;
+  for (const sort of ['title', 'added', 'missing']) {
+    const full = collectionSeries(db, { filter: 'all', sort, userId: 1 }).map((r) => r.id);
+    const paged = pageAllIds(collectionPage, db, { filter: 'all', sort, userId: 1 }, 2); // tiny pages exercise boundaries
+    assert.deepEqual(paged, full, `sort "${sort}" order must be identical across pages`);
+  }
+});
+
+test('collectionPage: a limit/offset window is exactly that slice of the ordered result', async () => {
+  const { m, db } = await seedMixedCollection();
+  const { collectionPage, collectionSeries } = m;
+  const full = collectionSeries(db, { filter: 'all', sort: 'title', userId: 1 }).map((r) => r.id);
+  for (const [offset, limit] of [[0, 3], [3, 3], [2, 4], [full.length - 1, 5]]) {
+    const win = collectionPage(db, { filter: 'all', sort: 'title', keys: [], userId: 1, limit, offset }).rows.map((r) => r.id);
+    assert.deepEqual(win, full.slice(offset, offset + limit), `window offset=${offset} limit=${limit}`);
+  }
+});
+
+test('collectionPage: search + library filter honored in the paged path', async () => {
+  const { m, db, ids } = await seedMixedCollection();
+  const { collectionPage, collectionSeries, createLibrary, assignSeriesLibrary } = m;
+  // Search: every title containing "Ebook" (the owned + two on-demand ebooks).
+  const searchFull = collectionSeries(db, { search: 'Ebook', userId: 1 }).map((r) => r.id).sort((a, b) => a - b);
+  const searchPaged = pageAllIds(collectionPage, db, { search: 'Ebook', userId: 1 }, 2).sort((a, b) => a - b);
+  assert.deepEqual(searchPaged, searchFull);
+  assert.equal(collectionPage(db, { search: 'Ebook', keys: ['all'], userId: 1, limit: 100, offset: 0 }).total, searchFull.length);
+
+  // Library lane: move one ebook into a library, page it back — only that member.
+  const lib = createLibrary(db, { name: 'Books', type: 'ebook' });
+  assignSeriesLibrary(db, ids.ebookOnDemandB, lib);
+  const libPaged = pageAllIds(collectionPage, db, { library: lib, userId: 1 }, 2);
+  assert.deepEqual(libPaged.sort((a, b) => a - b), [ids.ebookOnDemandB]);
+});
+
+test('collectionPage: includeRestricted=false hides mature members in both rows and counts', async () => {
+  const { m, db, ids } = await seedMixedCollection();
+  const { collectionPage } = m;
+  const shown = pageAllIds(collectionPage, db, { includeRestricted: false, userId: 1 }, 3);
+  assert.ok(!shown.includes(ids.comicRestricted), 'restricted series hidden without the mature perm');
+  const withMature = pageAllIds(collectionPage, db, { includeRestricted: true, userId: 1 }, 3);
+  assert.ok(withMature.includes(ids.comicRestricted), 'restricted series shown with the mature perm');
+  // The chip counts respect the same visibility.
+  const cRestricted = collectionPage(db, { includeRestricted: false, keys: ['all'], userId: 1, limit: 1, offset: 0 }).counts.all;
+  const cAll = collectionPage(db, { includeRestricted: true, keys: ['all'], userId: 1, limit: 1, offset: 0 }).counts.all;
+  assert.equal(cAll - cRestricted, 1, 'exactly the one restricted member is filtered out');
+});
+
+test('collectionPage: legacy no-limit call still returns the whole set + counts (back-compat)', async () => {
+  const { m, db } = await seedMixedCollection();
+  const { collectionPage, collectionSeries } = m;
+  const legacy = collectionPage(db, { filter: 'all', keys: ['all', 'incomplete'], userId: 1 }); // no limit
+  assert.equal(legacy.rows.length, collectionSeries(db, { filter: 'all', userId: 1 }).length, 'all rows returned');
+  assert.equal(legacy.counts.all, legacy.rows.length);
+  assert.ok('total' in legacy);
+});

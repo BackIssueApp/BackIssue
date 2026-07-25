@@ -2,7 +2,7 @@
   // The Library: a poster wall of every volume (grid), or a dense table
   // (list) for power flows. Replaces the old side rail as the main '/' view.
   import { navigate, route, setQuery } from '../lib/router.svelte.js';
-  import { rail, railSelect, ops, loadCollection } from '../lib/store.svelte.js';
+  import { rail, railSelect, ops, loadCollection, loadMoreCollection } from '../lib/store.svelte.js';
   import { status } from '../lib/status.svelte.js';
   import { apiPost } from '../lib/api.js';
   import { notify } from '../lib/toasts.svelte.js';
@@ -122,7 +122,10 @@
   });
 
   const pct = (s) => (s.total ? Math.min(100, Math.round((s.owned / s.total) * 100)) : 0);
-  const isDone = (s) => s.total > 0 && s.missing === 0;
+  // "Done" = fully owned. On-demand series (available, un-owned books that fetch
+  // on open) have missing===0 too, but they aren't complete — they read as
+  // available, not green-done.
+  const isDone = (s) => s.total > 0 && s.missing === 0 && !s.on_demand;
 
   /* ---- Virtualized posters & rows ----
      Same windowing as the volume page (see SeriesDetail): a big library must
@@ -141,6 +144,16 @@
     const n = rail.rows.length;
     if (!virtual) return { start: 0, end: n, padTop: 0, padBottom: 0 };
     return windowRange({ n, cols: view === 'grid' ? cols : 1, stride, viewH, scrollTop, listTop, overscan: 6 });
+  });
+  // Infinite scroll: when the rendered window nears the end of what's LOADED and
+  // more rows exist server-side, pull the next page. The window is virtualized
+  // over the loaded prefix (range.end is clamped to rail.rows.length), so this
+  // fires as the viewport's bottom overscan reaches the tail — a few rows early.
+  $effect(() => {
+    void range.end; void rail.rows.length; void rail.total; void rail.loadingMore;
+    if (!rail.loaded) return;
+    const c = view === 'grid' ? cols : 1;
+    if (range.end >= rail.rows.length - c * 4 && rail.rows.length < rail.total) loadMoreCollection();
   });
 
   let raf = 0;
@@ -181,9 +194,10 @@
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   });
-  // Filter/search/sort changes swap the row set — snap back to the top.
+  // Filter/search/sort/library changes swap the row set — snap back to the top
+  // so the infinite-scroll window restarts from page 1's rows.
   $effect(() => {
-    void rail.filter; void rail.search; void rail.sort;
+    void rail.filter; void rail.search; void rail.sort; void rail.library;
     if (scroller && scroller.scrollTop > 0) { scroller.scrollTop = 0; scrollTop = 0; }
   });
 </script>
@@ -191,7 +205,7 @@
 <section class="librarypage libx">
   <!-- toolbar: count · filters (with counts) · sort · view · actions -->
   <div class="libx__bar">
-    <span class="libx__count">Library <span id="series-count">{rail.loaded ? fmt(rail.rows.length) : ''}</span></span>
+    <span class="libx__count">Library <span id="series-count">{rail.loaded ? fmt(rail.total) : ''}</span></span>
     <div class="libx__filters">
       {#each FILTERS as f (f.key)}
         {@const n = rail.counts?.[f.key]}
@@ -264,6 +278,7 @@
               <div class="libx-card__title" title={s.title}>{s.title}{#if s.year}<span class="libx-card__year"> ({s.year})</span>{/if}</div>
               <div class="libx-card__meta">
                 <span class="libx-card__count">{s.owned}/{s.total}</span>
+                {#if s.on_demand}<span class="libx-badge libx-badge--avail" title="{fmt(s.available)} available on demand"><Icon name="download" size={11} /> {fmt(s.available)}</span>{/if}
                 {#if s.corrupt > 0}<span class="libx-card__flag libx-card__flag--bad" title="{fmt(s.corrupt)} corrupt file(s)">!</span>{/if}
               </div>
             {:else}
@@ -295,6 +310,7 @@
                   {#if s.publisher}<span class="libx-row__pub">{s.publisher}</span>{/if}
                   {#if s.active > 0}<span class="libx-badge libx-badge--busy">{fmt(s.active)} downloading</span>{/if}
                   {#if s.missing > 0}<span class="libx-badge libx-badge--miss">{fmt(s.missing)} missing</span>
+                  {:else if s.on_demand}<span class="libx-badge libx-badge--avail"><Icon name="download" size={12} /> {fmt(s.available)} available</span>
                   {:else if s.total > 0}<span class="libx-badge libx-badge--ok">complete</span>{/if}
                   {#if s.untagged > 0}<span class="libx-badge libx-badge--plain">{fmt(s.untagged)} untagged</span>{/if}
                   {#if s.corrupt > 0}<span class="libx-badge libx-badge--warn">{fmt(s.corrupt)} corrupt</span>{/if}
@@ -404,6 +420,10 @@
   .libx-badge--ok { color: var(--green); background: rgba(95,211,138,.1); border-color: rgba(95,211,138,.3); }
   .libx-badge--warn { color: var(--red); background: rgba(255,90,82,.1); border-color: rgba(255,90,82,.3); }
   .libx-badge--plain { color: #c4bdd4; background: var(--panel-2); }
+  /* On-demand / available: books catalogued but not yet on disk (fetch on open).
+     A distinct violet, so it never reads as owned (green) or missing (amber). */
+  .libx-badge--avail { color: var(--violet, #b28dff); background: rgba(160,122,255,.12); border-color: rgba(160,122,255,.32); display: inline-flex; align-items: center; gap: 4px; }
+  .libx-card__meta .libx-badge--avail { font-size: 10px; padding: 1px 5px; }
 
   .libx__empty { border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.015); padding: 60px 24px; text-align: center; max-width: 460px; margin: 24px auto; }
   .libx__empty-art { width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 15px; background: var(--panel-2); display: grid; place-items: center; color: var(--faint); }
