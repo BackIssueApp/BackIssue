@@ -23,6 +23,14 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   On a synthetic 150k-entry library this cut a Library load from ~3.9s to ~1.4s
   server-side. Added a `library_files(series_id, valid)` index for the ownership
   rollups.
+- **The app is much snappier with a large on-demand book catalog.** Two fixes:
+  the status poll (every ~2s) was running unindexed full scans of a 141k `series`
+  table — added `series(library_id)`, `series(type)`, and a partial
+  `series(followed)` index, cutting its work from ~390 ms to ~35 ms per poll. And
+  opening or scrolling a library now scopes its per-series rollups to just that
+  library (or page) instead of aggregating the whole catalog — opening a 1,600-
+  series Comics library dropped from ~600 ms to ~80 ms; the huge Books library is
+  unchanged.
 
 ### Added
 - **On-demand books show in the Library as "available".** File-less catalog

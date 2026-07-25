@@ -198,6 +198,13 @@ function migrate(db) {
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`);
   if (!cols.includes('library_id')) db.exec('ALTER TABLE series ADD COLUMN library_id INTEGER');
+  // series is now large (an on-demand book catalog can hold 100k+ rows), and
+  // /api/status polls run per-library counts, a GROUP BY type, and a followed
+  // count every tick — all full scans without these. type/library_id are
+  // ALTER-added above, so the indexes must be created here, after the columns.
+  db.exec('CREATE INDEX IF NOT EXISTS idx_series_library ON series(library_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_series_type ON series(type)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_series_followed ON series(followed) WHERE followed=1');
   const libCols = db.prepare('PRAGMA table_info(libraries)').all().map((c) => c.name);
   if (libCols.length && !libCols.includes('folder_pattern')) db.exec('ALTER TABLE libraries ADD COLUMN folder_pattern TEXT');
   if (libCols.length && !libCols.includes('restricted')) db.exec('ALTER TABLE libraries ADD COLUMN restricted INTEGER NOT NULL DEFAULT 0');
@@ -795,7 +802,15 @@ function selfTypeGuard(alias = 's.') {
 // scans plus a couple of genuinely per-row lookups (gated so they only run where
 // they can be non-trivial). Shared verbatim by every collection query so they can
 // never see different rollups. Requires @uid.
-const COLL_CTES = `
+// `scopeSql` optionally narrows the two GROUP BY rollups to a subset of series
+// (a `SELECT id …` subquery for one library, or a bound id list for a page).
+// SQLite won't push an outer `WHERE s.id IN (…)` / `s.library_id=@lib` down
+// through a GROUP BY, so at 150k+ series a page load would otherwise re-aggregate
+// the ENTIRE catalog just to read a few hundred rows — push the filter in here.
+// Empty scope = whole catalog (unchanged behaviour). Requires @uid.
+const collCtes = (scopeSql = '') => {
+  const w = scopeSql ? `WHERE series_id IN (${scopeSql})` : '';
+  return `
   lfroll AS (
     SELECT series_id,
       SUM(CASE WHEN valid=1 THEN 1 ELSE 0 END) file_count,
@@ -804,17 +819,22 @@ const COLL_CTES = `
       SUM(CASE WHEN valid=1 AND has_metadata=0 THEN 1 ELSE 0 END) untagged,
       COUNT(DISTINCT CASE WHEN valid=1 AND issue_id IS NOT NULL THEN issue_id END) owned_issues,
       COUNT(DISTINCT CASE WHEN valid=1 AND cv_issue_id IS NOT NULL THEN cv_issue_id END) cv_owned
-    FROM library_files GROUP BY series_id
+    FROM library_files ${w} GROUP BY series_id
   ),
   issroll AS (
     SELECT series_id,
       COUNT(*) bc_total,
       SUM(CASE WHEN status IN ('queued','downloading','grabbed','tagging') THEN 1 ELSE 0 END) active
-    FROM issues GROUP BY series_id
+    FROM issues ${w} GROUP BY series_id
   ),
   -- The active user's personal follows, materialised once (tiny) — joined in
   -- rather than an EXISTS re-probed on every one of ~150k rows.
   myfollow AS (SELECT series_id FROM user_follows WHERE user_id=@uid)`;
+};
+
+// Scope a rollup to one library's series (used by the paged/count/legacy paths
+// when a single library is being viewed) — null library = whole catalog.
+const libraryScopeSql = (library) => (library != null ? 'SELECT id FROM series WHERE library_id=@lib' : '');
 
 // The four LEFT JOINs every collection query shares.
 const COLL_JOINS = `
@@ -924,7 +944,7 @@ function collCountPass(db, { keys = [], filter = 'all', search = '', includeRest
     ? `SUM(CASE WHEN (${chipPredicateSql(filter, predCtx)}) THEN 1 ELSE 0 END) "__total"`
     : `COUNT(*) "__total"`;
   selects.push(totalSel);
-  const row = db.prepare(`WITH ${COLL_CTES},
+  const row = db.prepare(`WITH ${collCtes(libraryScopeSql(library))},
     coll AS (${collLeanCols(guard)} ${COLL_JOINS} ${mem.sql})
     SELECT ${selects.join(', ')} FROM coll`).get(params) || {};
   const counts = {};
@@ -940,7 +960,7 @@ function mapCollectionByIds(db, ids, { userId = null } = {}) {
   const { params: selfParams, guard } = selfTypeGuard('s.');
   const idParams = {}; ids.forEach((v, i) => { idParams['id' + i] = v; });
   const ph = ids.map((_, i) => '@id' + i).join(',');
-  const rows = db.prepare(`WITH ${COLL_CTES}
+  const rows = db.prepare(`WITH ${collCtes(ph)}
     ${collFullCols(guard)} ${COLL_JOINS}
     WHERE s.id IN (${ph})`).all({ uid: userId ?? -1, ...selfParams, ...idParams });
   const byId = new Map(rows.map((r) => [r.id, mapCollectionRow(r)]));
@@ -999,7 +1019,7 @@ function mapCollection(db, { search = '', sort = 'title', includeRestricted = tr
   // cv_owned / title against REAL (materialised) columns. Referencing output
   // aliases inside an ORDER BY expression like (cv_total - cv_owned) is not
   // reliably resolved by SQLite — the missing sort silently mis-ordered.
-  const rows = db.prepare(`WITH ${COLL_CTES},
+  const rows = db.prepare(`WITH ${collCtes(libraryScopeSql(library))},
     coll AS (${collFullCols(guard)} ${COLL_JOINS} ${mem.sql})
     SELECT * FROM coll ${orderBy}`).all({ uid: userId ?? -1, ...selfParams, ...mem.params });
   return rows.map(mapCollectionRow);
@@ -1052,7 +1072,7 @@ export function collectionPage(db, { keys = [], filter = 'all', limit = null, of
   const idParams = { uid: userId ?? -1, ...selfParams, ...stParams, ...mem.params, lim: cap, off };
   const pred = chipPredicateSql(filter, { guardOuter, seriesTypeList, params: idParams });
   const orderBy = COLL_ORDERS[sort] || COLL_ORDERS.title;
-  const idRows = db.prepare(`WITH ${COLL_CTES},
+  const idRows = db.prepare(`WITH ${collCtes(libraryScopeSql(library))},
     coll AS (${collLeanCols(guard)} ${COLL_JOINS} ${mem.sql})
     SELECT id FROM coll WHERE (${pred}) ${orderBy} LIMIT @lim OFFSET @off`).all(idParams);
   const rows = mapCollectionByIds(db, idRows.map((r) => r.id), { userId });
