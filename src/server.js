@@ -1022,7 +1022,18 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   });
 
   // ---- Library tools ----
-  app.get('/api/stats', (req, res) => res.json(stats({ includeRestricted: canRestricted(req) })));
+  // Dashboard stats aggregate the whole catalog (~1.2s of synchronous queries
+  // at 320k series) — cache per visibility for a minute; it's a dashboard, not
+  // a live feed, and recomputing it per visit blocked the event loop.
+  const statsCache = new Map(); // includeRestricted → { at, data }
+  app.get('/api/stats', (req, res) => {
+    const inclR = canRestricted(req);
+    const hit = statsCache.get(inclR);
+    if (hit && Date.now() - hit.at < 60_000) return res.json(hit.data);
+    const data = stats({ includeRestricted: inclR });
+    statsCache.set(inclR, { at: Date.now(), data });
+    res.json(data);
+  });
   app.get('/api/sources', (req, res) => res.json({ sources: listSources ? listSources() : [] }));
   // Import history — what was added and from where (newest first, paged).
   app.get('/api/history', (req, res) => {

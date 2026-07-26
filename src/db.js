@@ -1135,27 +1135,41 @@ export function collectionPage(db, { keys = [], filter = 'all', limit = null, of
   const fastChipPred = (() => {
     const effType = `COALESCE(NULLIF(s.type,''),'comic')`;
     if (!filter || filter === 'all' || pred === '1') return '1';
-    if (filter === 'followed') return `EXISTS(SELECT 1 FROM user_follows xpf WHERE xpf.user_id=@uid AND xpf.series_id=s.id)`;
+    // IN (small set), not EXISTS-per-row: with an ORDER BY title walk the
+    // planner probed user_follows for every row until LIMIT filled — ~3s on a
+    // library the user follows nothing in. Driving from the follows set is ~3ms.
+    if (filter === 'followed') return `s.id IN (SELECT series_id FROM user_follows WHERE user_id=@uid)`;
     if (filter === 'unmonitored') return 'COALESCE(s.followed,0) = 0';
     if (filter === 'unmatched') return `s.cv_id IS NULL AND COALESCE(${guard},0) = 0`;
     if (filter === 'comics') return `${effType} NOT IN (${seriesTypeList}) OR ${effType} = 'comic'`;
     if (SERIES_TYPES.includes(filter)) return `${effType} = @lane_${filter}`;
     return null; // incomplete / problems
   })();
-  const fastPath = fastChipPred != null && !collectionsOnly && FAST_ORDERS[sort];
+  const fastPath = fastChipPred != null && FAST_ORDERS[sort];
   // Index steering: a title sort should ride idx_series_lib_title (walk in
   // order, stop at LIMIT); every other sort must NOT — the composite would
   // return title-ordered rows that then need a full re-sort, losing the id
   // walk's early exit. The unary + defeats index use on the library term for
   // those sorts (standard SQLite planner steering), keeping each at ~1ms.
-  const libTerm = library == null ? '' : (sort === 'title' ? 'AND s.library_id = @lib' : 'AND +s.library_id = @lib');
+  // Selective predicates (followed / collections) drive from their own small
+  // set, so they also skip the title-index walk.
+  const drivesFromSet = filter === 'followed' || collectionsOnly;
+  const libTerm = library == null ? '' : (sort === 'title' && !drivesFromSet ? 'AND s.library_id = @lib' : 'AND +s.library_id = @lib');
+  // Collections view: membership AND (self-described AND bc_total>=2) reduces
+  // to just the latter (>=2 implies the self-described membership arm), so the
+  // page drives from the multi-issue set (~80ms) instead of materializing the
+  // rollup CTEs over the whole catalog (~1.5s, on the event loop). Mirrors the
+  // CTE path's behavior of ignoring collectionsOnly when no self types exist.
+  const memFast = collectionsOnly && selfTypes.length
+    ? `${guard} AND s.id IN (SELECT series_id FROM issues GROUP BY series_id HAVING COUNT(*) >= 2)`
+    : `(s.followed=1
+          OR EXISTS(SELECT 1 FROM library_files xlf WHERE xlf.series_id=s.id AND xlf.valid=1)
+          OR EXISTS(SELECT 1 FROM user_follows xuf WHERE xuf.user_id=@uid AND xuf.series_id=s.id)
+          ${selfTypes.length ? `OR (${guard} AND EXISTS(SELECT 1 FROM issues xi WHERE xi.series_id=s.id))` : ''})`;
   const idRows = fastPath
     ? db.prepare(`SELECT s.id FROM series s
         ${search ? 'LEFT JOIN cv_series cv ON cv.comicvine_id=s.cv_id' : ''}
-        WHERE (s.followed=1
-          OR EXISTS(SELECT 1 FROM library_files xlf WHERE xlf.series_id=s.id AND xlf.valid=1)
-          OR EXISTS(SELECT 1 FROM user_follows xuf WHERE xuf.user_id=@uid AND xuf.series_id=s.id)
-          ${selfTypes.length ? `OR (${guard} AND EXISTS(SELECT 1 FROM issues xi WHERE xi.series_id=s.id))` : ''})
+        WHERE ${memFast}
         ${includeRestricted ? '' : 'AND s.restricted = 0'}
         ${libTerm}
         ${restrictIds ? 'AND s.id IN (SELECT value FROM json_each(@restrictIds))' : ''}
