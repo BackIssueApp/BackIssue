@@ -1084,19 +1084,36 @@ export function collectionPage(db, { keys = [], filter = 'all', limit = null, of
   const idParams = { uid: userId ?? -1, ...selfParams, ...stParams, ...mem.params, lim: cap, off };
   const pred = chipPredicateSql(filter, { guardOuter, seriesTypeList, params: idParams });
   const orderBy = COLL_ORDERS[sort] || COLL_ORDERS.title;
-  // Fast path: when the chip predicate is trivial (all/unknown) and the sort
+  // Fast path: when the chip predicate needs only `series` columns and the sort
   // doesn't need CV rollups, the page's ids come straight off `series` with
   // indexed EXISTS probes — no lfroll/issroll materialization. Semantically
-  // identical (aggregate > 0 ⇔ EXISTS); for ORDER BY id DESC SQLite walks the
-  // PK backwards and stops at LIMIT, so "recently added" pages are ~instant at
-  // 300k+ rows instead of re-aggregating the whole library per request.
+  // identical (aggregate > 0 ⇔ EXISTS, my_follow ⇔ EXISTS user_follows); for
+  // ORDER BY id DESC SQLite walks the PK backwards and stops at LIMIT, so
+  // "recently added" pages are ~instant at 300k+ rows instead of re-aggregating
+  // the whole library per request. incomplete/problems need the CV/file rollups
+  // and stay on the CTE path; so do collectionsOnly (bc_total>=2) and the
+  // missing sort (cv_total-cv_owned).
   const FAST_ORDERS = {
     title: 'ORDER BY s.title',
     added: 'ORDER BY s.id DESC',
     year: 'ORDER BY CAST(s.year AS INTEGER) DESC, s.title',
     'year-asc': 'ORDER BY (s.year IS NULL), CAST(s.year AS INTEGER) ASC, s.title',
   };
-  const fastPath = pred === '1' && !collectionsOnly && FAST_ORDERS[sort];
+  // chipPredicateSql over s.* — same expressions, source columns instead of the
+  // coll CTE's output columns (chipPredicateSql already bound any @lane_ param).
+  // null = this chip needs rollup columns → CTE path. Keep in lockstep with
+  // chipPredicateSql / seriesMatchesFilter.
+  const fastChipPred = (() => {
+    const effType = `COALESCE(NULLIF(s.type,''),'comic')`;
+    if (!filter || filter === 'all' || pred === '1') return '1';
+    if (filter === 'followed') return `EXISTS(SELECT 1 FROM user_follows xpf WHERE xpf.user_id=@uid AND xpf.series_id=s.id)`;
+    if (filter === 'unmonitored') return 'COALESCE(s.followed,0) = 0';
+    if (filter === 'unmatched') return `s.cv_id IS NULL AND COALESCE(${guard},0) = 0`;
+    if (filter === 'comics') return `${effType} NOT IN (${seriesTypeList}) OR ${effType} = 'comic'`;
+    if (SERIES_TYPES.includes(filter)) return `${effType} = @lane_${filter}`;
+    return null; // incomplete / problems
+  })();
+  const fastPath = fastChipPred != null && !collectionsOnly && FAST_ORDERS[sort];
   const idRows = fastPath
     ? db.prepare(`SELECT s.id FROM series s
         ${search ? 'LEFT JOIN cv_series cv ON cv.comicvine_id=s.cv_id' : ''}
@@ -1108,6 +1125,7 @@ export function collectionPage(db, { keys = [], filter = 'all', limit = null, of
         ${library != null ? 'AND s.library_id = @lib' : ''}
         ${restrictIds ? 'AND s.id IN (SELECT value FROM json_each(@restrictIds))' : ''}
         ${search ? 'AND (s.title LIKE @q OR cv.name LIKE @q OR cv.publisher LIKE @q)' : ''}
+        AND (${fastChipPred})
         ${FAST_ORDERS[sort]} LIMIT @lim OFFSET @off`).all(idParams)
     : db.prepare(`WITH ${collCtes(libraryScopeSql(library))},
         coll AS (${collLeanCols(guard)} ${COLL_JOINS} ${mem.sql})
