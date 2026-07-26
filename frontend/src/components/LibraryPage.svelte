@@ -235,8 +235,11 @@
     if (!homeMode) return;
     let hadBefore = false;
     try { hadBefore = localStorage.getItem(HAD_RAILS_KEY) === '1'; } catch { /* private mode */ }
-    if (!hadBefore) { railSettled = true; return; }
-    const t = setTimeout(() => { railSettled = true; if (!railHasContent) rememberRails(false); }, 2000);
+    // While unsettled a skeleton shows (never a blank or a welcome flash). A
+    // home that had rails last time waits generously for them; one that
+    // didn't settles quickly to the welcome state — the skeleton just bridges
+    // the first paint either way.
+    const t = setTimeout(() => { railSettled = true; if (!railHasContent) rememberRails(false); }, hadBefore ? 5000 : 1500);
     return () => clearTimeout(t);
   });
   $effect(() => {
@@ -336,6 +339,22 @@
           <div class="libx__empty-art"><Icon name="home" size={26} /></div>
           <div class="libx__empty-title">Welcome back</div>
           <div class="libx__empty-body">Your reading shelves appear here as you read. Pick a library from the sidebar to browse everything in it.</div>
+        </div>
+      {:else if !railHasContent}
+        <!-- Skeleton shelves while the plugin rails fetch — unmounts the moment
+             a real rail lands in the slot above. Two rails mirror what usually
+             renders: 2:3 comic covers, then square audiobook covers. -->
+        <div class="railskel" aria-hidden="true">
+          {#each [{ ratio: 'comic', n: 8 }, { ratio: 'square', n: 8 }] as rail, r}
+            <div class="railskel__rail">
+              <div class="railskel__title" style="animation-delay: {r * 120}ms"></div>
+              <div class="railskel__track">
+                {#each Array(rail.n) as _, i}
+                  <div class="railskel__card railskel__card--{rail.ratio}" style="animation-delay: {(r * 4 + i) * 90}ms"></div>
+                {/each}
+              </div>
+            </div>
+          {/each}
         </div>
       {/if}
     {:else if rail.loaded && !rail.rows.length}
@@ -520,6 +539,29 @@
   .libx__empty-art { width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 15px; background: var(--panel-2); display: grid; place-items: center; color: var(--faint); }
   .libx__empty-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
   .libx__empty-body { font-size: 13px; color: var(--faint); margin: 0 auto; max-width: 320px; line-height: 1.6; }
+
+  /* Skeleton shelves shown while the plugin home rails fetch. Shapes mirror
+     the real rails (title bar + a track of covers) with a soft shimmer, so
+     the wait reads as "your shelves are coming" instead of a blank screen. */
+  .railskel { display: flex; flex-direction: column; gap: 24px; padding: 14px 18px 6px; }
+  .railskel__rail { display: flex; flex-direction: column; gap: 10px; }
+  .railskel__title { width: 148px; height: 15px; border-radius: 5px; }
+  .railskel__track { display: flex; gap: 12px; overflow: hidden; }
+  .railskel__card { flex: 0 0 auto; border-radius: 8px; }
+  .railskel__card--comic { width: 104px; height: 156px; }
+  .railskel__card--square { width: 116px; height: 116px; }
+  .railskel__title, .railskel__card {
+    background: linear-gradient(100deg, var(--panel) 38%, var(--panel-2) 50%, var(--panel) 62%);
+    background-size: 220% 100%;
+    animation: railskel-shimmer 1.4s ease-in-out infinite;
+  }
+  @keyframes railskel-shimmer {
+    from { background-position: 120% 0; }
+    to { background-position: -120% 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .railskel__title, .railskel__card { animation: none; background: var(--panel); }
+  }
 
   @media (max-width: 760px) {
     .libx-grid { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 14px; }
