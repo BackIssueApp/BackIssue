@@ -1248,12 +1248,28 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     res.json(collectionSeries(db, { ...opts, excludeSelfDescribed: true }));
   });
   // Per-filter counts for the library filter chips (independent of the active
-  // filter, so switching chips doesn't change the badges).
-  app.get('/api/collection/counts', (req, res) => res.json(collectionCounts(db, {
-    keys: COLLECTION_CHIP_KEYS,
-    search: req.query.search, includeRestricted: canRestricted(req), userId: req.user.id,
-    library: req.query.library ? Number(req.query.library) : null,
-  })));
+  // filter, so switching chips doesn't change the badges). Accepts the same
+  // facet/collections scope as /api/collection so the SPA can fetch counts in
+  // parallel with the page instead of fusing them into one blocking request.
+  app.get('/api/collection/counts', (req, res) => {
+    const opts = {
+      keys: COLLECTION_CHIP_KEYS,
+      search: req.query.search, includeRestricted: canRestricted(req), userId: req.user.id,
+      library: req.query.library ? Number(req.query.library) : null,
+      collectionsOnly: req.query.collections === '1' || req.query.collections === 'true',
+    };
+    if (req.query.facet) {
+      try {
+        const selection = JSON.parse(req.query.facet);
+        const ctx = { db, userId: req.user.id, includeRestricted: opts.includeRestricted, library: opts.library };
+        const ids = registeredCollectionFilters()
+          .map((f) => { try { return f.resolve(selection, ctx); } catch { return null; } })
+          .find((r) => Array.isArray(r));
+        if (ids) opts.restrictIds = ids;
+      } catch { /* malformed facet param → ignore */ }
+    }
+    res.json(collectionCounts(db, opts));
+  });
 
   // ---- Explicit libraries (named containers with a behavior type) ----
   // Viewing the list only needs library.view; mutations need library.manage

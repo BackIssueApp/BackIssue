@@ -71,15 +71,30 @@ function collectionScope() {
 // filter-independent chip counts. Called on every filter/sort/search/library
 // change (it resets the infinite-scroll window to the top). Best-effort; a
 // failure keeps the last good list and badges.
+let loadSeq = 0; // discards stale responses when the scope changes mid-flight
 export async function loadCollection() {
   rail.loadingMore = false; // cancel any in-flight append's effect from re-appending onto the old set
+  const seq = ++loadSeq;
+  const scope = collectionScope();
+  // The chip counts ride a PARALLEL request: at 300k+ series the count pass is
+  // ~3× the page query itself, so it must never block the first paint of the
+  // grid. Until it lands, total falls back to the page size — loadMore resumes
+  // once the real total arrives.
+  const countsReq = apiGet('/api/collection/counts?' + scope).catch(() => null);
   try {
-    const r = await apiGet('/api/collection?counts=1&offset=0&limit=' + COLLECTION_PAGE + '&' + collectionScope());
+    const r = await apiGet('/api/collection?counts=0&offset=0&limit=' + COLLECTION_PAGE + '&' + scope);
+    if (seq !== loadSeq) return;
     rail.rows = r.rows || [];
     rail.total = r.total ?? rail.rows.length;
-    rail.counts = r.counts || {};
     rail.loaded = true;
   } catch { /* keep the last good list */ }
+  const c = await countsReq;
+  if (c && seq === loadSeq) {
+    rail.counts = c;
+    // counts are filter-independent tallies, so the active chip's tally IS the
+    // filtered total (counts.all when no chip is active).
+    if (typeof c[rail.filter] === 'number') rail.total = c[rail.filter];
+  }
 }
 
 // Fetch the next page and APPEND it — the infinite-scroll grid calls this as the
