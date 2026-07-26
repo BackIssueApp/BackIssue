@@ -6,7 +6,8 @@ import fsp from 'node:fs/promises';
 import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
-import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, collectionPage, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
+import { initCountWorker, workerGetRow } from './countWorker.js';
+import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, collectionPage, buildCollCountSql, collCountRowToResult, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser } from './db.js';
 import { resolveSeriesDir, defaultRootedDir } from './paths.js';
 import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
@@ -1210,7 +1211,32 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // Filter-chip keys — the badges are independent of the active filter, so
   // switching chips never changes them.
   const COLLECTION_CHIP_KEYS = ['all', 'incomplete', 'followed', 'unmonitored', 'problems', 'unmatched', 'manga'];
-  app.get('/api/collection', (req, res) => {
+  // Chip counts run OFF the main thread (worker + its own read-only WAL
+  // connection) behind a short TTL cache. better-sqlite3 is synchronous, and
+  // this is the app's heaviest read: inline it froze the event loop ~0.5-1s at
+  // 320k series, stalling page/cover requests behind it — the "switching
+  // libraries takes seconds" symptom. Cache staleness only affects badge
+  // numbers, never the rows.
+  initCountWorker(config.dbPath);
+  const countsCache = new Map(); // key → { at, promise }
+  const COUNTS_TTL_MS = 30_000;
+  const countsFor = (opts) => {
+    const key = JSON.stringify([opts.userId, opts.includeRestricted, opts.library ?? null, opts.search || '',
+      opts.filter || 'all', opts.restrictIds || null, opts.collectionsOnly || false]);
+    const hit = countsCache.get(key);
+    if (hit && Date.now() - hit.at < COUNTS_TTL_MS) return hit.promise;
+    const promise = (async () => {
+      const { sql, params } = buildCollCountSql(opts);
+      const off = workerGetRow(sql, params);
+      const row = off ? await off : db.prepare(sql).get(params); // sync fallback if the worker is unavailable
+      return collCountRowToResult(opts.keys, row || {});
+    })();
+    promise.catch(() => countsCache.delete(key)); // never cache a failure
+    if (countsCache.size > 200) countsCache.clear(); // search/facet keys are unbounded — cap crudely
+    countsCache.set(key, { at: Date.now(), promise });
+    return promise;
+  };
+  app.get('/api/collection', async (req, res) => {
     const opts = { filter: req.query.filter, search: req.query.search, sort: req.query.sort, includeRestricted: canRestricted(req), userId: req.user.id, library: req.query.library ? Number(req.query.library) : null,
       collectionsOnly: req.query.collections === '1' || req.query.collections === 'true' };
     // Faceted filtering: a plugin (Shelves) resolves the opaque ?facet= selection
@@ -1235,7 +1261,17 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 200));
       const offset = Math.max(0, Number(req.query.offset) || 0);
       const keys = req.query.counts === '0' ? [] : COLLECTION_CHIP_KEYS;
-      return res.json(collectionPage(db, { ...opts, keys, limit, offset }));
+      if (!keys.length) return res.json(collectionPage(db, { ...opts, keys: [], limit, offset }));
+      try {
+        // Rows synchronously (fast-path, ~10ms) while the heavy counts run on
+        // the worker (or come from cache) — same fused response shape.
+        const countsP = countsFor({ ...opts, keys });
+        const page = collectionPage(db, { ...opts, keys: [], limit, offset });
+        const { counts, total } = await countsP;
+        return res.json({ rows: page.rows, counts, total });
+      } catch {
+        return res.json(collectionPage(db, { ...opts, keys, limit, offset })); // sync fallback
+      }
     }
     // Legacy fused shape: the whole set + counts in one scan ({ rows, counts }),
     // preserved for any pre-pagination caller that passes counts without a limit.
@@ -1251,9 +1287,9 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // filter, so switching chips doesn't change the badges). Accepts the same
   // facet/collections scope as /api/collection so the SPA can fetch counts in
   // parallel with the page instead of fusing them into one blocking request.
-  app.get('/api/collection/counts', (req, res) => {
+  app.get('/api/collection/counts', async (req, res) => {
     const opts = {
-      keys: COLLECTION_CHIP_KEYS,
+      keys: COLLECTION_CHIP_KEYS, filter: 'all',
       search: req.query.search, includeRestricted: canRestricted(req), userId: req.user.id,
       library: req.query.library ? Number(req.query.library) : null,
       collectionsOnly: req.query.collections === '1' || req.query.collections === 'true',
@@ -1268,7 +1304,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
         if (ids) opts.restrictIds = ids;
       } catch { /* malformed facet param → ignore */ }
     }
-    res.json(collectionCounts(db, opts));
+    try {
+      res.json((await countsFor(opts)).counts); // worker + cache; same shape as before
+    } catch {
+      res.json(collectionCounts(db, opts)); // sync fallback
+    }
   });
 
   // ---- Explicit libraries (named containers with a behavior type) ----

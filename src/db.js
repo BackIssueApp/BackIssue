@@ -943,10 +943,12 @@ function chipPredicateSql(filter, { guardOuter, seriesTypeList, params }) {
   return '1'; // all / unknown → everything
 }
 
-// One lean SQL pass over the membership set → { counts, total }. counts are
-// filter-INDEPENDENT (each chip tallied over the search set), total honors the
-// active filter. Replaces mapping 150k rows just to count them.
-function collCountPass(db, { keys = [], filter = 'all', search = '', includeRestricted = true, userId = null, library = null, restrictIds = null, collectionsOnly = false } = {}) {
+// Build the one-pass chip-count SQL (+ bound params) over the membership set.
+// Exported separately from execution so the server can run it on a worker
+// thread: better-sqlite3 is synchronous, and this is the app's heaviest read —
+// at 320k series it blocks the event loop for ~0.5-1s, stalling every other
+// request (pages, covers) behind it.
+export function buildCollCountSql({ keys = [], filter = 'all', search = '', includeRestricted = true, userId = null, library = null, restrictIds = null, collectionsOnly = false } = {}) {
   const { selfTypes, params: selfParams, guard } = selfTypeGuard('s.');
   const { guard: guardOuter } = selfTypeGuard('');
   const seriesTypes = [...SERIES_TYPES];
@@ -962,12 +964,25 @@ function collCountPass(db, { keys = [], filter = 'all', search = '', includeRest
     ? `SUM(CASE WHEN (${chipPredicateSql(filter, predCtx)}) THEN 1 ELSE 0 END) "__total"`
     : `COUNT(*) "__total"`;
   selects.push(totalSel);
-  const row = db.prepare(`WITH ${collCtes(libraryScopeSql(library))},
+  const sql = `WITH ${collCtes(libraryScopeSql(library))},
     coll AS (${collLeanCols(guard)} ${COLL_JOINS} ${mem.sql})
-    SELECT ${selects.join(', ')} FROM coll`).get(params) || {};
+    SELECT ${selects.join(', ')} FROM coll`;
+  return { sql, params };
+}
+
+/** Shape a count row (from either thread) into { counts, total }. */
+export function collCountRowToResult(keys, row) {
   const counts = {};
-  for (const k of keys) counts[k] = row[k] || 0;
-  return { counts, total: row.__total || 0 };
+  for (const k of keys) counts[k] = (row && row[k]) || 0;
+  return { counts, total: (row && row.__total) || 0 };
+}
+
+// One lean SQL pass over the membership set → { counts, total }. counts are
+// filter-INDEPENDENT (each chip tallied over the search set), total honors the
+// active filter. Replaces mapping 150k rows just to count them.
+function collCountPass(db, opts = {}) {
+  const { sql, params } = buildCollCountSql(opts);
+  return collCountRowToResult(opts.keys || [], db.prepare(sql).get(params) || {});
 }
 
 // Hydrate the full row shape for a bounded, ordered list of series ids — the
