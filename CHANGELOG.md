@@ -8,6 +8,14 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+- **One remote-media source hook for every media kind.** Plugins that back an
+  on-demand library now register through a single `registerRemoteMediaSource`
+  hook that carries a `mediaType` (books, audiobooks, …) and supplies either a
+  whole-file download or a range-stream for large files. Adding a new on-demand
+  media type no longer needs a new core hook. The original book-only hook stays
+  as a compatibility alias, so existing source plugins keep working unchanged.
+
 ### Changed
 - **The Library grid now loads a page at a time (server-side pagination).**
   Filtering, sorting, searching and the library selector all run in SQL, and the

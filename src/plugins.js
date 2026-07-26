@@ -75,7 +75,7 @@ const indexerProviders = []; // { id, isActive(config), indexers(config, protoco
 const importHandlers = []; // { id, label, scan(ctx), import(candidate, ctx) } — non-comic file types in the Import tool
 const libraryScanners = []; // { type, scan({libraryId}) } — plugin-owned library types index on the same scan actions
 const bookMetadataSources = []; // { id, priority, makeClient(config) } — ebook metadata sources, preferred before the hosted fallback
-const remoteBookSources = []; // { id, label, listPage(config,page), materialize(config,remoteId,opts) } — file-less remote book catalogs cached on read
+const remoteMediaSources = []; // { id, mediaType, label, listPage, materialize?, openStream?, cover?, chapters? } — file-less remote media catalogs (ebooks, audiobooks, …) for on-demand libraries
 
 // Per-plugin catalog for the management page: everything discovered on disk,
 // loaded or not. name → { name, version, description, enabled, loaded, error, counts }.
@@ -245,19 +245,33 @@ export const pluginApi = {
     if (bookMetadataSources.some((s) => s.id === source.id)) return; // idempotent
     bookMetadataSources.push({ priority: 100, ...source, id: String(source.id), plugin: currentLoadingPlugin });
   },
-  // A file-less REMOTE book catalog for the ebooks plugin's on-demand library.
-  // `listPage(config, page)` returns { books:[bookMeta], page, totalPages, total }
-  // where bookMeta = { remote_id, title, author, series, series_index, isbn,
-  // publisher, year, language, description, coverUrl } (coverUrl = a session-
-  // authed URL the browser can use for the cover, e.g. the plugin's own proxy
-  // route). `materialize(config, remoteId, { libraryId, dbPath })` downloads the
-  // book on demand and returns { path }. The ebooks plugin syncs a source's
-  // catalog as metadata-only entries and calls materialize the first time a user
-  // opens one to read. The source knows its own config, so callers pass null.
+  // A file-less REMOTE media catalog for an on-demand library — ONE hook for
+  // every media kind (ebooks, audiobooks, magazines, …). `mediaType` names the
+  // kind; a consuming plugin fetches its sources with
+  // registeredRemoteMediaSources(mediaType). `listPage(config, page)` returns
+  // { items:[meta], page, totalPages, total } (a legacy `books` key is also
+  // accepted). Each meta is { remote_id, title, author, …, coverUrl } — a
+  // session-authed cover URL (the plugin's own proxy). A source provides at
+  // least one way to fetch content:
+  //   • materialize(config, remoteId, { libraryId, dbPath }) -> { path }
+  //     — download the whole file, cached on first read (small files, e.g. EPUB).
+  //   • openStream(config, remoteId, { range }) -> { status, headers, body }
+  //     — range-stream large files on play (e.g. ~1GB m4b), credentials staying
+  //     server-side.
+  // Optional: cover(config, remoteId), chapters(config, remoteId). The source
+  // knows its own config, so callers pass null. Adding a new media type needs a
+  // new mediaType string — never a new hook.
+  registerRemoteMediaSource(source) {
+    if (!source?.id || !source?.mediaType || typeof source.listPage !== 'function') return;
+    if (typeof source.materialize !== 'function' && typeof source.openStream !== 'function') return;
+    if (remoteMediaSources.some((s) => s.id === source.id && s.mediaType === source.mediaType)) return; // idempotent per (id, type)
+    remoteMediaSources.push({ ...source, id: String(source.id), mediaType: String(source.mediaType), plugin: currentLoadingPlugin });
+  },
+  // Back-compat alias — the original book-only hook (mediaType 'ebook').
   registerRemoteBookSource(source) {
     if (!source?.id || typeof source.listPage !== 'function' || typeof source.materialize !== 'function') return;
-    if (remoteBookSources.some((s) => s.id === source.id)) return; // idempotent
-    remoteBookSources.push({ ...source, id: String(source.id), plugin: currentLoadingPlugin });
+    if (remoteMediaSources.some((s) => s.id === source.id && s.mediaType === 'ebook')) return;
+    remoteMediaSources.push({ ...source, id: String(source.id), mediaType: 'ebook', plugin: currentLoadingPlugin });
   },
 };
 
@@ -284,7 +298,10 @@ export function registeredPermissions() { return permissions; }
 export function registeredImportHandlers() { return importHandlers; }
 export function registeredLibraryScanners() { return libraryScanners; }
 export function registeredBookMetadataSources() { return [...bookMetadataSources].sort((a, b) => a.priority - b.priority); }
-export function registeredRemoteBookSources() { return [...remoteBookSources]; }
+export function registeredRemoteMediaSources(mediaType) {
+  return mediaType ? remoteMediaSources.filter((s) => s.mediaType === mediaType) : [...remoteMediaSources];
+}
+export function registeredRemoteBookSources() { return registeredRemoteMediaSources('ebook'); }
 // Absolute path to the plugins directory (for serving plugin client files).
 export function pluginsDir() { return PLUGINS_DIR; }
 
