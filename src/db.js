@@ -202,7 +202,13 @@ function migrate(db) {
   // /api/status polls run per-library counts, a GROUP BY type, and a followed
   // count every tick — all full scans without these. type/library_id are
   // ALTER-added above, so the indexes must be created here, after the columns.
-  db.exec('CREATE INDEX IF NOT EXISTS idx_series_library ON series(library_id)');
+  // (library_id, title) supersedes the old library_id-only index (same prefix)
+  // and additionally lets a title-sorted library page walk the index in order
+  // and stop at LIMIT — a switch into a 179k-row library dropped ~150ms → ~2ms.
+  // The bare title index does the same for the all-libraries view.
+  db.exec('CREATE INDEX IF NOT EXISTS idx_series_lib_title ON series(library_id, title)');
+  db.exec('DROP INDEX IF EXISTS idx_series_library');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_series_title ON series(title)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_series_type ON series(type)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_series_followed ON series(followed) WHERE followed=1');
   const libCols = db.prepare('PRAGMA table_info(libraries)').all().map((c) => c.name);
@@ -1114,6 +1120,12 @@ export function collectionPage(db, { keys = [], filter = 'all', limit = null, of
     return null; // incomplete / problems
   })();
   const fastPath = fastChipPred != null && !collectionsOnly && FAST_ORDERS[sort];
+  // Index steering: a title sort should ride idx_series_lib_title (walk in
+  // order, stop at LIMIT); every other sort must NOT — the composite would
+  // return title-ordered rows that then need a full re-sort, losing the id
+  // walk's early exit. The unary + defeats index use on the library term for
+  // those sorts (standard SQLite planner steering), keeping each at ~1ms.
+  const libTerm = library == null ? '' : (sort === 'title' ? 'AND s.library_id = @lib' : 'AND +s.library_id = @lib');
   const idRows = fastPath
     ? db.prepare(`SELECT s.id FROM series s
         ${search ? 'LEFT JOIN cv_series cv ON cv.comicvine_id=s.cv_id' : ''}
@@ -1122,7 +1134,7 @@ export function collectionPage(db, { keys = [], filter = 'all', limit = null, of
           OR EXISTS(SELECT 1 FROM user_follows xuf WHERE xuf.user_id=@uid AND xuf.series_id=s.id)
           ${selfTypes.length ? `OR (${guard} AND EXISTS(SELECT 1 FROM issues xi WHERE xi.series_id=s.id))` : ''})
         ${includeRestricted ? '' : 'AND s.restricted = 0'}
-        ${library != null ? 'AND s.library_id = @lib' : ''}
+        ${libTerm}
         ${restrictIds ? 'AND s.id IN (SELECT value FROM json_each(@restrictIds))' : ''}
         ${search ? 'AND (s.title LIKE @q OR cv.name LIKE @q OR cv.publisher LIKE @q)' : ''}
         AND (${fastChipPred})
