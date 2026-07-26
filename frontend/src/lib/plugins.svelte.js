@@ -10,6 +10,7 @@ import { iconSvg } from './icons.js';
 import { notify } from './toasts.svelte.js';
 import { auth } from './auth.svelte.js';
 import { detailSelected } from './store.svelte.js';
+import { navigate } from './router.svelte.js';
 
 // Flips when plugin assets have loaded — the Settings page watches it so
 // plugin-injected fields get populated even if Settings was opened first.
@@ -201,6 +202,9 @@ const bi = {
     refreshSourceUI: () => bridgeRefs.refreshSourceUI(),
     async get(path) { return (await fetch(path)).json(); },
     async post(path, body) { return (await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined })).json(); },
+    // Open a series/volume page (same route a library card uses), so a plugin's
+    // home rail or action can navigate to a series it owns.
+    openSeries(id) { navigate('/volume/' + Number(id)); },
   },
 };
 // The server-rendered shell installs a stub BackIssue before any plugin
