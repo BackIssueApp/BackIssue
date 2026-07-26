@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.7.6] — 2026-07-25
+
 ### Added
 - **One remote-media source hook for every media kind.** Plugins that back an
   on-demand library now register through a single `registerRemoteMediaSource`
@@ -67,10 +69,10 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   catalog and `materialize(config, id, opts)` downloads one book on demand.
 - **Pluggable ebook metadata sources (plugin hook).** `registerBookMetadataSource`
   lets a plugin supply a book-metadata source that the ebooks plugin tries
-  BEFORE its built-in hosted fallback (by ascending priority). The Book
-  Warehouse plugin registers as the preferred source, so its richer
-  series/genre data and covers enrich your library when it has the book, with
-  the hosted service filling in the rest.
+  BEFORE its built-in hosted fallback (by ascending priority). A metadata-source
+  plugin can register as the preferred source, so its richer series/genre data
+  and covers enrich your library when it has the book, with the hosted service
+  filling in the rest.
 - **Wanted "Following" filter and star badges are per-user.** The chip now
   filters by your ☆ Follow (matching the series-page star) instead of the
   global auto-download flag — so it no longer shows series you did not
