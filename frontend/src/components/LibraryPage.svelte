@@ -223,11 +223,33 @@
   // change height or gain shelves — watch it, re-measure listTop when shelves
   // appear/hide, and track whether any shelf rendered (drives the home hint).
   let railHasContent = $state(false);
+  // The rails are filled by plugins that fetch asynchronously, so on a fresh
+  // load the slot is briefly empty — showing "Welcome back" for a beat before
+  // the rails pop in. Suppress the empty state until the rails have had a chance
+  // to render: a home that had rails last time waits for them (or a 2s safety
+  // cap); a genuinely empty home shows the welcome immediately.
+  let railSettled = $state(false);
+  const HAD_RAILS_KEY = 'home-had-rails';
+  const rememberRails = (has) => { try { localStorage.setItem(HAD_RAILS_KEY, has ? '1' : '0'); } catch { /* private mode */ } };
+  $effect(() => {
+    if (!homeMode) return;
+    let hadBefore = false;
+    try { hadBefore = localStorage.getItem(HAD_RAILS_KEY) === '1'; } catch { /* private mode */ }
+    if (!hadBefore) { railSettled = true; return; }
+    const t = setTimeout(() => { railSettled = true; if (!railHasContent) rememberRails(false); }, 2000);
+    return () => clearTimeout(t);
+  });
   $effect(() => {
     if (typeof ResizeObserver === 'undefined' || !scroller) return;
     const railEl = scroller.querySelector('#home-plugin-rail');
     if (!railEl) return;
-    const sync = () => { railHasContent = railEl.children.length > 0; measure(); };
+    const sync = () => {
+      const has = railEl.children.length > 0;
+      railHasContent = has;
+      if (has) { railSettled = true; rememberRails(true); }   // rails arrived — reveal, never flash the empty state
+      else if (railSettled) rememberRails(false);             // only record "empty" once settled (not mid-fetch)
+      measure();
+    };
     sync();
     const ro = new ResizeObserver(sync);
     ro.observe(railEl);
@@ -309,7 +331,7 @@
          hidden by CSS while browsing so rails are a Home-only surface. -->
     <div id="home-plugin-rail" class="home-rail"></div>
     {#if homeMode}
-      {#if !railHasContent}
+      {#if railSettled && !railHasContent}
         <div class="libx__empty">
           <div class="libx__empty-art"><Icon name="home" size={26} /></div>
           <div class="libx__empty-title">Welcome back</div>
