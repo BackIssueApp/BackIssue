@@ -7,6 +7,8 @@ downloads/
 *.db-journal
 *.db-shm
 *.db-wal
+# Plugin-maintained cover cache (lives beside the db)
+bw-covers/
 fixtures/
 .superpowers/
 .staging/
