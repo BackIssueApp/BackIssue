@@ -11,6 +11,7 @@ import { notify } from './toasts.svelte.js';
 import { auth } from './auth.svelte.js';
 import { detailSelected } from './store.svelte.js';
 import { navigate } from './router.svelte.js';
+import { status } from './status.svelte.js';
 
 // Flips when plugin assets have loaded — the Settings page watches it so
 // plugin-injected fields get populated even if Settings was opened first.
@@ -205,6 +206,11 @@ const bi = {
     // Open a series/volume page (same route a library card uses), so a plugin's
     // home rail or action can navigate to a series it owns.
     openSeries(id) { navigate('/volume/' + Number(id)); },
+    // The core's already-fetched library list — spares plugin clients their own
+    // /api/status round-trip (the status query is heavy at large catalog sizes,
+    // and duplicating it at boot serialized behind the SPA's own fetch). May be
+    // empty pre-resolution: retry briefly or fall back to fetching.
+    libraries: () => status.libraries || [],
   },
 };
 // The server-rendered shell installs a stub BackIssue before any plugin

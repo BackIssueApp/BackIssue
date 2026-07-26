@@ -829,7 +829,15 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     res.json(listIssues(db, { seriesId: Number(req.params.id) }));
   });
 
-  app.get('/api/status', (req, res) => {
+  // The status ping's db-derived pieces are user-INDEPENDENT (per-user
+  // visibility filters apply afterwards, cheaply) and were recomputed on every
+  // ping AND every SSE signature tick — at 320k series / 400k issues that's the
+  // second-heaviest read in the app, and a cold one gated the whole first paint
+  // at refresh. Cache them briefly; sidebar badges tolerate seconds of staleness.
+  let statusPiecesCache = { at: 0, data: null };
+  const STATUS_PIECES_TTL_MS = 10_000;
+  const statusPieces = () => {
+    if (statusPiecesCache.data && Date.now() - statusPiecesCache.at < STATUS_PIECES_TTL_MS) return statusPiecesCache.data;
     const followedCount = db.prepare('SELECT COUNT(*) n FROM series WHERE followed=1').get().n;
     // Library types in use (same membership rule as the collection view) — the
     // sidebar shows one library entry per type once a second type appears.
@@ -839,22 +847,31 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     const libraryTypes = db.prepare(`SELECT COALESCE(NULLIF(type,''),'comic') t, COUNT(*) n FROM series s
       WHERE s.followed=1 OR s.id IN (SELECT series_id FROM library_files WHERE valid=1)
       GROUP BY t`).all().map((r) => ({ type: r.t, count: r.n }));
+    const data = { counts: countByStatus(db), followedCount, libraryTypes, libraries: listLibraries(db) };
+    statusPiecesCache = { at: Date.now(), data };
+    return data;
+  };
+  app.get('/api/status', (req, res) => {
+    const pieces = statusPieces();
     // A restricted library is invisible (name included) to roles without the
     // mature-content permission — same rule its member series already follow.
-    const libs = listLibraries(db).filter((l) => !l.restricted || canRestricted(req));
+    const libs = pieces.libraries.filter((l) => !l.restricted || canRestricted(req));
     // Active pack grabs are queue rows too (0-day / per-series), so the sidebar
     // badge counts them alongside in-flight issues — same restricted filter the
     // queue list uses, so the badge matches what this user actually sees there.
     const rset = canRestricted(req) ? null : restrictedSeriesIds(db);
     const packsActive = activePackGrabs(db).filter((p) => !rset || p.series_id == null || !rset.has(p.series_id)).length;
-    res.json({ counts: countByStatus(db), packsActive, followedCount, libraryTypes, libraries: libs, version: APP_VERSION, crawl: state.crawl, queue: state.queue, follow: state.follow || { running: false } });
+    res.json({ counts: pieces.counts, packsActive, followedCount: pieces.followedCount, libraryTypes: pieces.libraryTypes, libraries: libs, version: APP_VERSION, crawl: state.crawl, queue: state.queue, follow: state.follow || { running: false } });
+    warmChipCounts(req); // fire-and-forget: pre-warm this user's chip counts on the worker
   });
 
   // Live updates: one SSE stream tells the UI which domains changed so it can
   // re-fetch just those endpoints — replaces its fixed polling loops. Each
   // signature mirrors what the matching GET endpoint serves.
   const hub = createEventHub({
-    status: () => ({ c: countByStatus(db), crawl: state.crawl, q: state.queue }),
+    // Cached pieces (≤10s stale): the signature ticks often, and an uncached
+    // 400k-row GROUP BY per tick is real load at this catalog size.
+    status: () => ({ c: statusPieces().counts, crawl: state.crawl, q: state.queue }),
     queue: () => ({
       // state.queue carries the in-flight download's page/pages — without it,
       // an immediate-source download never ticks the drawer.
@@ -1218,23 +1235,52 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // libraries takes seconds" symptom. Cache staleness only affects badge
   // numbers, never the rows.
   initCountWorker(config.dbPath);
-  const countsCache = new Map(); // key → { at, promise }
+  const countsCache = new Map(); // key → { at, promise, refreshing }
   const COUNTS_TTL_MS = 30_000;
+  const computeCounts = async (opts) => {
+    const { sql, params } = buildCollCountSql(opts);
+    const off = workerGetRow(sql, params);
+    const row = off ? await off : db.prepare(sql).get(params); // sync fallback if the worker is unavailable
+    return collCountRowToResult(opts.keys, row || {});
+  };
+  // Stale-while-revalidate: a cached entry is served IMMEDIATELY no matter its
+  // age — staleness only triggers a background refresh on the worker. Combined
+  // with the boot-time pre-warm below, an interactive request never waits on a
+  // count recompute; the TTL is just the refresh cadence for the badges.
   const countsFor = (opts) => {
     const key = JSON.stringify([opts.userId, opts.includeRestricted, opts.library ?? null, opts.search || '',
       opts.filter || 'all', opts.restrictIds || null, opts.collectionsOnly || false]);
     const hit = countsCache.get(key);
-    if (hit && Date.now() - hit.at < COUNTS_TTL_MS) return hit.promise;
-    const promise = (async () => {
-      const { sql, params } = buildCollCountSql(opts);
-      const off = workerGetRow(sql, params);
-      const row = off ? await off : db.prepare(sql).get(params); // sync fallback if the worker is unavailable
-      return collCountRowToResult(opts.keys, row || {});
-    })();
+    if (hit) {
+      if (Date.now() - hit.at >= COUNTS_TTL_MS && !hit.refreshing) {
+        hit.refreshing = true;
+        computeCounts(opts)
+          .then((v) => countsCache.set(key, { at: Date.now(), promise: Promise.resolve(v) }))
+          .catch(() => { hit.refreshing = false; }); // keep serving stale; retry next hit
+      }
+      return hit.promise;
+    }
+    const promise = computeCounts(opts);
     promise.catch(() => countsCache.delete(key)); // never cache a failure
     if (countsCache.size > 200) countsCache.clear(); // search/facet keys are unbounded — cap crudely
     countsCache.set(key, { at: Date.now(), promise });
     return promise;
+  };
+  // Pre-warm a user's per-library counts the moment they ping /api/status (the
+  // first thing every client does), so by the time they click into a library
+  // the cache is already hot — no cold first switch after a server restart.
+  // Fire-and-forget on the worker; throttled per user to the refresh cadence.
+  const countsWarmedAt = new Map(); // userId → ts
+  const warmChipCounts = (req) => {
+    try {
+      const uid = req.user.id;
+      if (Date.now() - (countsWarmedAt.get(uid) || 0) < COUNTS_TTL_MS) return;
+      countsWarmedAt.set(uid, Date.now());
+      const inclR = canRestricted(req);
+      for (const lib of [null, ...listLibraries(db).map((l) => l.id)]) {
+        countsFor({ keys: COLLECTION_CHIP_KEYS, filter: 'all', search: '', includeRestricted: inclR, userId: uid, library: lib }).catch(() => {});
+      }
+    } catch { /* warming is best-effort */ }
   };
   app.get('/api/collection', async (req, res) => {
     const opts = { filter: req.query.filter, search: req.query.search, sort: req.query.sort, includeRestricted: canRestricted(req), userId: req.user.id, library: req.query.library ? Number(req.query.library) : null,
