@@ -76,6 +76,7 @@ const importHandlers = []; // { id, label, scan(ctx), import(candidate, ctx) } �
 const libraryScanners = []; // { type, scan({libraryId}) } — plugin-owned library types index on the same scan actions
 const bookMetadataSources = []; // { id, priority, makeClient(config) } — ebook metadata sources, preferred before the hosted fallback
 const remoteMediaSources = []; // { id, mediaType, label, listPage, materialize?, openStream?, cover?, chapters? } — file-less remote media catalogs (ebooks, audiobooks, …) for on-demand libraries
+const collectionFilters = []; // { id, resolve(selection, ctx) -> number[] } — resolve a Library facet selection to matching series ids (narrows /api/collection)
 
 // Per-plugin catalog for the management page: everything discovered on disk,
 // loaded or not. name → { name, version, description, enabled, loaded, error, counts }.
@@ -245,6 +246,16 @@ export const pluginApi = {
     if (bookMetadataSources.some((s) => s.id === source.id)) return; // idempotent
     bookMetadataSources.push({ priority: 100, ...source, id: String(source.id), plugin: currentLoadingPlugin });
   },
+  // A Library faceted-filter resolver. `resolve(selection, ctx)` turns the opaque
+  // facet selection the Filters modal produced into an array of matching series
+  // ids; core ANDs those into /api/collection so the real grid is narrowed.
+  // ctx = { db, userId, includeRestricted, library, type }. Return null/[] to
+  // apply no restriction (e.g. the selection is empty or not for this plugin).
+  registerCollectionFilter(filter) {
+    if (!filter?.id || typeof filter.resolve !== 'function') return;
+    if (collectionFilters.some((f) => f.id === filter.id)) return; // idempotent
+    collectionFilters.push({ ...filter, id: String(filter.id), plugin: currentLoadingPlugin });
+  },
   // A file-less REMOTE media catalog for an on-demand library — ONE hook for
   // every media kind (ebooks, audiobooks, magazines, …). `mediaType` names the
   // kind; a consuming plugin fetches its sources with
@@ -298,6 +309,7 @@ export function registeredPermissions() { return permissions; }
 export function registeredImportHandlers() { return importHandlers; }
 export function registeredLibraryScanners() { return libraryScanners; }
 export function registeredBookMetadataSources() { return [...bookMetadataSources].sort((a, b) => a.priority - b.priority); }
+export function registeredCollectionFilters() { return [...collectionFilters]; }
 export function registeredRemoteMediaSources(mediaType) {
   return mediaType ? remoteMediaSources.filter((s) => s.mediaType === mediaType) : [...remoteMediaSources];
 }

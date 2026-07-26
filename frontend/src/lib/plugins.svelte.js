@@ -49,6 +49,15 @@ export function renderSeriesView(view, container, { series, issues, refresh }) {
   } catch (e) { console.warn('plugin series view failed', e); }
 }
 
+// Plugin-provided LIBRARY FILTERS. A plugin that owns a library type can supply
+// facet groups (author / decade / format / status / …) that core's Filters modal
+// renders over the REAL grid — core stays the grid renderer, the plugin is a pure
+// data provider. The matching series are resolved server-side (the plugin's
+// registerCollectionFilter), which narrows /api/collection. Reactive so a
+// provider registered after mount is found.
+export const libraryFilters = $state([]); // [{ types:[...], groups(selection, ctx) }]
+export function libraryFilterFor(type) { return libraryFilters.find((p) => (p.types || []).includes(type)) || null; }
+
 // Issue-cover providers (plugins may serve real covers, e.g. the reader's
 // page-0 thumbnails for owned files). First non-null answer wins.
 export const issueCoverProviders = $state([]);
@@ -108,6 +117,15 @@ const bi = {
     // post(path, body) }.
     registerSeriesView(view) {
       if (view && view.type && typeof view.render === 'function') seriesViews[String(view.type)] = view;
+    },
+    // Supply faceted filters for library types. provider = { types:[...],
+    // groups(selection, ctx) -> Promise<[{ key, label, multi, search?, options:
+    // [{ value, label, count }] }]> }. Core's Filters modal renders the groups
+    // and holds the opaque `selection`; the matching series are resolved on the
+    // server by the plugin's registerCollectionFilter. ctx = { get, post, type,
+    // libraryId }.
+    registerLibraryFilters(provider) {
+      if (provider && Array.isArray(provider.types) && typeof provider.groups === 'function') libraryFilters.push(provider);
     },
     // Provide cover-image URLs for issue cards: fn(issue) → url | null. First
     // non-null provider wins; core falls back to CV art, then a placeholder.

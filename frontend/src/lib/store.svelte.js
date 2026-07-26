@@ -10,7 +10,7 @@ import { notify } from './toasts.svelte.js';
 // grows as the user scrolls). total is the full count for the active filter — the
 // grid shows it and keeps loading pages until rows.length reaches it. counts are
 // the filter-independent chip badges (fetched once, with page 1).
-export const rail = $state({ rows: [], counts: {}, total: 0, filter: 'all', sort: 'title', search: '', library: null, selecting: false, loaded: false, loadingMore: false });
+export const rail = $state({ rows: [], counts: {}, total: 0, filter: 'all', sort: 'title', search: '', library: null, facet: '', collections: false, selecting: false, loaded: false, loadingMore: false });
 // Rows per network page — a few hundred keeps each response a few hundred KB.
 const COLLECTION_PAGE = 200;
 // Shell chrome state (mobile sidebar overlay).
@@ -61,7 +61,9 @@ export async function loadFlags() {
 
 function collectionScope() {
   return 'filter=' + rail.filter + '&sort=' + rail.sort
-    + '&search=' + encodeURIComponent(rail.search) + (rail.library ? '&library=' + rail.library : '');
+    + '&search=' + encodeURIComponent(rail.search) + (rail.library ? '&library=' + rail.library : '')
+    + (rail.facet ? '&facet=' + encodeURIComponent(rail.facet) : '')
+    + (rail.collections ? '&collections=1' : '');
 }
 
 // Load (or reload) the FIRST page of the collection — the server filters, sorts

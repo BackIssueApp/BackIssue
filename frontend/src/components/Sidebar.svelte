@@ -52,7 +52,10 @@
     if (p.get('all')) return 'all';
     return p.get('filter') || '';
   });
-  const laneActive = (key) => isActive('/') && activeLane === key;
+  const laneActive = (key) => isActive('/') && activeLane === key && !collectionsActive;
+  // Collections = the library grid restricted to multi-volume book/audiobook
+  // series (?collections=1); it lives on '/', so it's tracked by its own flag.
+  const collectionsActive = $derived(new URLSearchParams(route.search).get('collections') === '1');
 </script>
 
 <aside class="sidebar" class:is-open={ui.sidebarOpen} aria-label="App sections">
@@ -62,8 +65,10 @@
 
   <nav class="sidenav">
     <div class="sidenav__head">Library</div>
-    <button class="sidenav__item" class:is-active={isActive('/') && !activeLane} onclick={() => go('/')}>
+    <button class="sidenav__item" class:is-active={isActive('/') && !activeLane && !collectionsActive} onclick={() => go('/')}>
       <span class="sidenav__icon"><Icon name="home" /></span> Home</button>
+    <button id="collections-btn" class="sidenav__item" class:is-active={collectionsActive} onclick={() => go('/?collections=1')}>
+      <span class="sidenav__icon"><Icon name="layers" /></span> Collections</button>
     <button id="lists-btn" class="sidenav__item" class:is-active={isActive('/lists')} onclick={() => go('/lists')}>
       <span class="sidenav__icon"><Icon name="list" /></span> Lists</button>
     {#if isTrusted()}

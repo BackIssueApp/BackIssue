@@ -8,6 +8,24 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+- **Filter a library by facets.** A **Filters** button on book/audiobook
+  libraries opens a modal that narrows the grid by author, decade, format, and
+  reading status — each with live counts. It filters the real grid, so sorting,
+  search, and paging keep working within the selection. (The facet data comes
+  from a library plugin; libraries without one simply don't show the button.)
+- **Collections.** A **Collections** entry in the sidebar lists multi-volume
+  book/audiobook series — every series that groups 2+ volumes (box sets) — as a
+  focused view of the Library grid.
+- **Sort by publication year.** The Library sort gains newest- and oldest-first
+  by publication year; books and audiobooks carry the year, and undated titles
+  sort last. Plugins can drive it as the `year` / `year-asc` collection sort.
+
+### Changed
+- The paginated collection query can be narrowed to an arbitrary set of series
+  ids by a plugin-registered `registerCollectionFilter`, which is what backs the
+  Library Filters modal (and the mobile audiobook filters).
+
 ## [0.7.6] — 2026-07-25
 
 ### Added

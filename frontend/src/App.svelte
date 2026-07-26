@@ -105,12 +105,16 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
     const q = p.get('q') || '';
     const sort = p.get('sort') || 'title';
     const library = p.get('library') || '';
-    if (lastRail === filter + '\n' + q + '\n' + sort + '\n' + library) return;
-    lastRail = filter + '\n' + q + '\n' + sort + '\n' + library;
+    const facet = p.get('facet') || '';
+    const collections = p.get('collections') === '1';
+    if (lastRail === filter + '\n' + q + '\n' + sort + '\n' + library + '\n' + facet + '\n' + collections) return;
+    lastRail = filter + '\n' + q + '\n' + sort + '\n' + library + '\n' + facet + '\n' + collections;
     rail.filter = filter;
     rail.search = q;
     rail.sort = sort;
     rail.library = library ? Number(library) : null;
+    rail.facet = facet;
+    rail.collections = collections;
     untrack(() => loadCollection());
   });
 

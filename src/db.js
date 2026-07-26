@@ -873,7 +873,7 @@ function collFullCols(guard) {
 // and corrupt, are gated to the handful of series that can be non-trivial), so it
 // drives id-selection (for a page) and the fused chip counts.
 function collLeanCols(guard) {
-  return `SELECT s.id, s.title, s.type, s.cv_id, s.followed,
+  return `SELECT s.id, s.title, s.type, s.cv_id, s.followed, s.year,
       (mf.series_id IS NOT NULL) my_follow,
       CASE WHEN ${guard} THEN 0 ELSE COALESCE(lf.untagged, 0) END untagged,
       CASE WHEN COALESCE(lf.invalid_count, 0) = 0 THEN 0 ELSE
@@ -887,14 +887,20 @@ function collLeanCols(guard) {
 // A collection MEMBER = followed OR owns a valid file OR the caller personally
 // follows OR (self-described) has catalog issue rows. The optional scope narrows
 // by mature-visibility / library / search. Returns the WHERE fragment + its params.
-function membershipWhere({ guard, selfTypesLen, includeRestricted = true, library = null, search = '' }) {
+function membershipWhere({ guard, selfTypesLen, includeRestricted = true, library = null, search = '', restrictIds = null, collectionsOnly = false }) {
   const sql = `WHERE (s.followed=1 OR COALESCE(lf.file_count, 0) > 0
            OR mf.series_id IS NOT NULL
            ${selfTypesLen ? `OR (${guard} AND COALESCE(iss.bc_total, 0) > 0)` : ''})
       ${includeRestricted ? '' : 'AND s.restricted = 0'}
       ${library != null ? 'AND s.library_id = @lib' : ''}
+      ${restrictIds ? 'AND s.id IN (SELECT value FROM json_each(@restrictIds))' : ''}
+      ${collectionsOnly && selfTypesLen ? `AND ${guard} AND COALESCE(iss.bc_total, 0) >= 2` : ''}
       ${search ? 'AND (s.title LIKE @q OR cv.name LIKE @q OR cv.publisher LIKE @q)' : ''}`;
-  const params = { ...(library != null ? { lib: library } : {}), ...(search ? { q: `%${search}%` } : {}) };
+  const params = {
+    ...(library != null ? { lib: library } : {}),
+    ...(restrictIds ? { restrictIds: JSON.stringify(restrictIds) } : {}),
+    ...(search ? { q: `%${search}%` } : {}),
+  };
   return { sql, params };
 }
 
@@ -905,6 +911,9 @@ const COLL_ORDERS = {
   title: 'ORDER BY title',
   added: 'ORDER BY id DESC',
   missing: 'ORDER BY (cv_total - cv_owned) DESC, title',
+  // Publication year, newest first — books/audiobooks carry it; nulls sort last.
+  year: 'ORDER BY CAST(year AS INTEGER) DESC, title',
+  'year-asc': 'ORDER BY (year IS NULL), CAST(year AS INTEGER) ASC, title',
 };
 
 // SQL translation of every seriesMatchesFilter chip, evaluated over the wrapped
@@ -928,13 +937,13 @@ function chipPredicateSql(filter, { guardOuter, seriesTypeList, params }) {
 // One lean SQL pass over the membership set → { counts, total }. counts are
 // filter-INDEPENDENT (each chip tallied over the search set), total honors the
 // active filter. Replaces mapping 150k rows just to count them.
-function collCountPass(db, { keys = [], filter = 'all', search = '', includeRestricted = true, userId = null, library = null } = {}) {
+function collCountPass(db, { keys = [], filter = 'all', search = '', includeRestricted = true, userId = null, library = null, restrictIds = null, collectionsOnly = false } = {}) {
   const { selfTypes, params: selfParams, guard } = selfTypeGuard('s.');
   const { guard: guardOuter } = selfTypeGuard('');
   const seriesTypes = [...SERIES_TYPES];
   const stParams = {}; seriesTypes.forEach((t, i) => { stParams['ktype' + i] = t; });
   const seriesTypeList = seriesTypes.length ? seriesTypes.map((_, i) => '@ktype' + i).join(',') : `''`;
-  const mem = membershipWhere({ guard, selfTypesLen: selfTypes.length, includeRestricted, library, search });
+  const mem = membershipWhere({ guard, selfTypesLen: selfTypes.length, includeRestricted, library, search, restrictIds, collectionsOnly });
   const params = { uid: userId ?? -1, ...selfParams, ...stParams, ...mem.params };
   const predCtx = { guardOuter, seriesTypeList, params };
   const selects = keys.map((k) => k === 'all'
@@ -1052,7 +1061,7 @@ export function collectionPage(db, { keys = [], filter = 'all', limit = null, of
     const rows = filter && filter !== 'all' ? all.filter((r) => seriesMatchesFilter(r, filter)) : all;
     return { rows, counts, total: rows.length };
   }
-  const { search = '', sort = 'title', includeRestricted = true, userId = null, library = null } = opts;
+  const { search = '', sort = 'title', includeRestricted = true, userId = null, library = null, restrictIds = null, collectionsOnly = false } = opts;
   const cap = Math.max(1, Math.min(500, Number(limit) || 200));
   const off = Math.max(0, Number(offset) || 0);
   // Chip counts + this filter's total, one lean pass — but ONLY when chips are
@@ -1060,7 +1069,7 @@ export function collectionPage(db, { keys = [], filter = 'all', limit = null, of
   // scan (the total/counts don't change between pages of the same filter, and the
   // client already holds them). total is null then; the client keeps page 1's.
   const { counts, total } = keys.length
-    ? collCountPass(db, { keys, filter, search, includeRestricted, userId, library })
+    ? collCountPass(db, { keys, filter, search, includeRestricted, userId, library, restrictIds, collectionsOnly })
     : { counts: {}, total: null };
   // Select the page's ids in sort order (lean scan), then hydrate the full shape.
   const { selfTypes, params: selfParams, guard } = selfTypeGuard('s.');
@@ -1068,7 +1077,7 @@ export function collectionPage(db, { keys = [], filter = 'all', limit = null, of
   const seriesTypes = [...SERIES_TYPES];
   const stParams = {}; seriesTypes.forEach((t, i) => { stParams['ktype' + i] = t; });
   const seriesTypeList = seriesTypes.length ? seriesTypes.map((_, i) => '@ktype' + i).join(',') : `''`;
-  const mem = membershipWhere({ guard, selfTypesLen: selfTypes.length, includeRestricted, library, search });
+  const mem = membershipWhere({ guard, selfTypesLen: selfTypes.length, includeRestricted, library, search, restrictIds, collectionsOnly });
   const idParams = { uid: userId ?? -1, ...selfParams, ...stParams, ...mem.params, lim: cap, off };
   const pred = chipPredicateSql(filter, { guardOuter, seriesTypeList, params: idParams });
   const orderBy = COLL_ORDERS[sort] || COLL_ORDERS.title;

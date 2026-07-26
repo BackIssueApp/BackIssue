@@ -11,6 +11,8 @@
   import { openAddModal } from './AddModal.svelte';
   import { confirmDialog } from './DialogModal.svelte';
   import { isTrusted } from '../lib/auth.svelte.js';
+  import { libraryFilterFor } from '../lib/plugins.svelte.js';
+  import FiltersModal from './FiltersModal.svelte';
   import Icon from '../lib/Icon.svelte';
 
   const FILTERS = [
@@ -32,9 +34,38 @@
   // search, or the all-items view. The grid + its toolbar render only then.
   const browsing = $derived.by(() => {
     const p = new URLSearchParams(route.search);
-    return !!(p.get('library') || p.get('filter') || p.get('q') || p.get('all'));
+    return !!(p.get('library') || p.get('filter') || p.get('q') || p.get('all') || p.get('collections'));
   });
   const homeMode = $derived(!browsing);
+  // "Collections" view: the library grid restricted to multi-volume book/
+  // audiobook series (box sets) — driven by ?collections=1 from the sidebar.
+  const isCollections = $derived(new URLSearchParams(route.search).get('collections') === '1');
+
+  // Faceted filtering: a plugin can supply filters for a library type
+  // (registerLibraryFilters). Core shows a Filters button that opens a modal and
+  // narrows the real grid — the selection is an opaque object stored in the URL's
+  // ?facet= param, resolved to matching series on the server.
+  const currentLibrary = $derived.by(() => {
+    const id = new URLSearchParams(route.search).get('library');
+    return id ? (status.libraries || []).find((l) => String(l.id) === id) || null : null;
+  });
+  const currentType = $derived.by(() => {
+    if (currentLibrary) return currentLibrary.type;
+    const f = new URLSearchParams(route.search).get('filter');
+    return f && ['ebook', 'audiobook', 'manga'].includes(f) ? f : null;
+  });
+  const filterProvider = $derived(currentType ? libraryFilterFor(currentType) : null);
+  let filtersOpen = $state(false);
+  const facetSelection = $derived.by(() => {
+    const f = new URLSearchParams(route.search).get('facet');
+    if (!f) return {};
+    try { return JSON.parse(f); } catch { return {}; }
+  });
+  const facetCount = $derived(Object.values(facetSelection).reduce((n, v) => n + (Array.isArray(v) ? v.length : (v ? 1 : 0)), 0));
+  function applyFacets(sel) {
+    const has = sel && Object.keys(sel).length;
+    setQuery({ facet: has ? JSON.stringify(sel) : null });
+  }
 
   function libQuery(filter) {
     const p = new URLSearchParams(route.search);
@@ -48,7 +79,7 @@
   function libParams() {
     const cur = new URLSearchParams(route.search);
     const p = new URLSearchParams();
-    for (const k of ['filter', 'q', 'sort']) { const v = cur.get(k); if (v) p.set(k, v); }
+    for (const k of ['filter', 'q', 'sort', 'collections']) { const v = cur.get(k); if (v) p.set(k, v); }
     const s = p.toString();
     return s ? '?' + s : '';
   }
@@ -222,7 +253,7 @@
   {#if !homeMode}
   <!-- toolbar: count · filters (with counts) · sort · view · actions -->
   <div class="libx__bar">
-    <span class="libx__count">Library <span id="series-count">{rail.loaded ? fmt(rail.total) : ''}</span></span>
+    <span class="libx__count">{isCollections ? 'Collections' : 'Library'} <span id="series-count">{rail.loaded ? fmt(rail.total) : ''}</span></span>
     <div class="libx__filters">
       {#each FILTERS as f (f.key)}
         {@const n = rail.counts?.[f.key]}
@@ -242,6 +273,11 @@
       <button class="libx__viewbtn" class:is-active={view === 'grid'} title="Poster grid" onclick={() => setView('grid')}><Icon name="grid" size={15} /></button>
       <button class="libx__viewbtn" class:is-active={view === 'list'} title="List" onclick={() => setView('list')}><Icon name="list" size={15} /></button>
     </div>
+    {#if filterProvider}
+      <button class="libx__act" class:is-active={facetCount > 0} title="Filter this library" onclick={() => (filtersOpen = true)}>
+        <Icon name="filter" size={14} /> Filters{#if facetCount}<span class="libx__chip-count">{facetCount}</span>{/if}
+      </button>
+    {/if}
     {#if isTrusted()}
       <button id="coll-select-btn" class="libx__act" class:is-active={rail.selecting} title="Select multiple series for bulk actions" onclick={toggleSelecting}><Icon name="check-square" size={14} /> Select</button>
       <button id="cvmatch-btn" class="libx__act" title={cvTitle} disabled={cvBusy} onclick={startCvMatch}><span class="libx__cvicon"><Icon name="diamond" size={14} /></span>{cvText}</button>
@@ -361,6 +397,9 @@
     {/if}
   </div>
 </section>
+
+<FiltersModal open={filtersOpen} type={currentType} libraryId={currentLibrary?.id ?? null}
+  selection={facetSelection} onapply={applyFacets} onclose={() => (filtersOpen = false)} />
 
 <style>
   .libx { display: flex; flex-direction: column; height: 100%; min-height: 0; }

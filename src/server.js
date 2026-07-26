@@ -15,7 +15,7 @@ import { testIndexer } from './newznab.js';
 import { testClient } from './nzbclients.js';
 import { testTorznabIndexer } from './torznab.js';
 import { testTorrentClient } from './torrentclients.js';
-import { pluginsDir, pluginCatalog, setPluginEnabled, registeredRoutes, registeredPermissions, registeredAuthProviders, registeredCredentialProviders, pluginLibraryTypes, registeredLibraryScanners } from './plugins.js';
+import { pluginsDir, pluginCatalog, setPluginEnabled, registeredRoutes, registeredPermissions, registeredAuthProviders, registeredCredentialProviders, pluginLibraryTypes, registeredLibraryScanners, registeredCollectionFilters } from './plugins.js';
 import { fetchCatalog, installPlugin, uninstallPlugin } from './plugincatalog.js';
 import { logWarn } from './logstore.js';
 import * as users from './users.js';
@@ -1208,7 +1208,21 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // switching chips never changes them.
   const COLLECTION_CHIP_KEYS = ['all', 'incomplete', 'followed', 'unmonitored', 'problems', 'unmatched', 'manga'];
   app.get('/api/collection', (req, res) => {
-    const opts = { filter: req.query.filter, search: req.query.search, sort: req.query.sort, includeRestricted: canRestricted(req), userId: req.user.id, library: req.query.library ? Number(req.query.library) : null };
+    const opts = { filter: req.query.filter, search: req.query.search, sort: req.query.sort, includeRestricted: canRestricted(req), userId: req.user.id, library: req.query.library ? Number(req.query.library) : null,
+      collectionsOnly: req.query.collections === '1' || req.query.collections === 'true' };
+    // Faceted filtering: a plugin (Shelves) resolves the opaque ?facet= selection
+    // into matching series ids that narrow the real grid. Empty/no selection →
+    // null (no restriction); a selection matching nothing → [] (no rows).
+    if (req.query.facet) {
+      try {
+        const selection = JSON.parse(req.query.facet);
+        const ctx = { db, userId: req.user.id, includeRestricted: opts.includeRestricted, library: opts.library };
+        const ids = registeredCollectionFilters()
+          .map((f) => { try { return f.resolve(selection, ctx); } catch { return null; } })
+          .find((r) => Array.isArray(r));
+        if (ids) opts.restrictIds = ids;
+      } catch { /* malformed facet param → ignore */ }
+    }
     // Paginated shape ({ rows, total, counts }): filter/sort/search are pushed
     // into SQL and only a page (limit≤500, default 200) is returned — so the
     // Library grid stays fast at 150k rows. counts=1 (default here) fuses the
