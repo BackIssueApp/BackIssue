@@ -862,7 +862,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     const rset = canRestricted(req) ? null : restrictedSeriesIds(db);
     const packsActive = activePackGrabs(db).filter((p) => !rset || p.series_id == null || !rset.has(p.series_id)).length;
     res.json({ counts: pieces.counts, packsActive, followedCount: pieces.followedCount, libraryTypes: pieces.libraryTypes, libraries: libs, version: APP_VERSION, crawl: state.crawl, queue: state.queue, follow: state.follow || { running: false } });
-    warmChipCounts(req); // fire-and-forget: pre-warm this user's chip counts on the worker
+    warmChipCounts(req, pieces.libraries); // fire-and-forget: pre-warm this user's chip counts on the worker
   });
 
   // Live updates: one SSE stream tells the UI which domains changed so it can
@@ -1271,13 +1271,13 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // the cache is already hot — no cold first switch after a server restart.
   // Fire-and-forget on the worker; throttled per user to the refresh cadence.
   const countsWarmedAt = new Map(); // userId → ts
-  const warmChipCounts = (req) => {
+  const warmChipCounts = (req, libraries) => {
     try {
       const uid = req.user.id;
       if (Date.now() - (countsWarmedAt.get(uid) || 0) < COUNTS_TTL_MS) return;
       countsWarmedAt.set(uid, Date.now());
       const inclR = canRestricted(req);
-      for (const lib of [null, ...listLibraries(db).map((l) => l.id)]) {
+      for (const lib of [null, ...libraries.map((l) => l.id)]) {
         countsFor({ keys: COLLECTION_CHIP_KEYS, filter: 'all', search: '', includeRestricted: inclR, userId: uid, library: lib }).catch(() => {});
       }
     } catch { /* warming is best-effort */ }

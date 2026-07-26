@@ -211,6 +211,10 @@ function migrate(db) {
   db.exec('CREATE INDEX IF NOT EXISTS idx_series_title ON series(title)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_series_type ON series(type)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_series_followed ON series(followed) WHERE followed=1');
+  // restrictedSeriesIds runs per request for non-mature roles (and on several
+  // queue/history routes unconditionally) — a partial index makes it an index
+  // scan of the few restricted rows instead of a 320k-row table scan.
+  db.exec('CREATE INDEX IF NOT EXISTS idx_series_restricted ON series(restricted) WHERE restricted=1');
   const libCols = db.prepare('PRAGMA table_info(libraries)').all().map((c) => c.name);
   if (libCols.length && !libCols.includes('folder_pattern')) db.exec('ALTER TABLE libraries ADD COLUMN folder_pattern TEXT');
   if (libCols.length && !libCols.includes('restricted')) db.exec('ALTER TABLE libraries ADD COLUMN restricted INTEGER NOT NULL DEFAULT 0');
@@ -343,12 +347,16 @@ export function listLibraries(db) {
   // series_count = COLLECTION members only (followed or with files on disk) —
   // the series table also holds catalog rows the user never added, which the
   // collection views filter out; counting those made libraries look huge.
-  // IN-subquery, not a correlated EXISTS: the file-owning set materializes once
-  // (~40k ids) instead of being re-probed for every one of 300k+ series rows —
-  // this ran on every /api/status ping and was ~200ms; now ~4ms.
-  return db.prepare(`SELECT l.*, (SELECT COUNT(*) FROM series s WHERE s.library_id = l.id
-      AND (s.followed=1 OR s.id IN (SELECT series_id FROM library_files WHERE valid=1))) series_count
-    FROM libraries l ORDER BY l.sort_order, l.id`).all();
+  // ONE grouped pass over series for every library's count, not a correlated
+  // per-library subquery: correlated, the planner re-materialized the
+  // file-owning set per library (a Bloom-filter plan measured at ~1.1s per
+  // call on the live connection at 320k series — and this runs on every
+  // status ping). Grouped: ~3ms, identical results.
+  return db.prepare(`SELECT l.*, COALESCE(c.n, 0) series_count FROM libraries l
+    LEFT JOIN (SELECT library_id, COUNT(*) n FROM series s
+      WHERE s.library_id IS NOT NULL AND (s.followed=1 OR s.id IN (SELECT series_id FROM library_files WHERE valid=1))
+      GROUP BY library_id) c ON c.library_id = l.id
+    ORDER BY l.sort_order, l.id`).all();
 }
 export function getLibrary(db, id) {
   return db.prepare('SELECT * FROM libraries WHERE id=?').get(id);
