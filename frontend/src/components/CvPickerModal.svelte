@@ -26,7 +26,7 @@
     // precisely one volume — skip the name search. Bare digits also fall through
     // to a name search underneath, in case they were a title (e.g. "2000 AD").
     const refId = parseCvVolumeRef(q);
-    const isUrl = /4050-\d+/.test(q);
+    const isUrl = isExactCvRef(q);
     m.searching = true; m.results = null; m.pinned = null; m.note = refId ? 'Looking up volume…' : 'Searching ComicVine…';
     let pinned = null;
     if (refId) {
@@ -45,14 +45,16 @@
     try { list = await (await fetch('/api/cv/search?q=' + encodeURIComponent(q))).json(); }
     catch { if (!pinned) { m.searching = false; m.note = 'Search failed.'; return; } }
     if (list.error) list = [];
+    // Everything the server returned, no cutoff: ComicVine lists same-name
+    // volumes oldest-first, so a cap hides exactly the newest series.
     const rows = rankCvResults((Array.isArray(list) ? list : []).filter((v) => v.id !== refId), m.files);
     m.searching = false;
     m.pinned = pinned;
-    m.results = rows.slice(0, 20);
+    m.results = rows;
     m.note = (!rows.length && !pinned) ? 'No volumes found.' : '';
   }
 
-  import { parseCvVolumeRef, rankCvResults } from '../lib/util.js';
+  import { parseCvVolumeRef, isExactCvRef, rankCvResults } from '../lib/util.js';
 </script>
 
 <script>

@@ -1583,8 +1583,14 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   app.get('/api/cv/volume/:id', async (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'invalid id' });
-    try { res.json(await cvVolumeInfo(id)); }
-    catch (e) { res.status(502).json({ error: String(e?.message || e) }); }
+    try {
+      const v = await cvVolumeInfo(id);
+      // Same in-collection flag the search results carry, so a pasted id that's
+      // already owned links to the existing series instead of offering an add.
+      const owned = getSeriesByCvId(db, id);
+      if (owned) { v.inLibrary = true; v.seriesId = owned.id; }
+      res.json(v);
+    } catch (e) { res.status(502).json({ error: String(e?.message || e) }); }
   });
   app.post('/api/collection/add-cv', async (req, res) => {
     const comicvineId = Number(req.body?.comicvineId);

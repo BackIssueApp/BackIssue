@@ -215,6 +215,10 @@ function migrate(db) {
   // queue/history routes unconditionally) — a partial index makes it an index
   // scan of the few restricted rows instead of a 320k-row table scan.
   db.exec('CREATE INDEX IF NOT EXISTS idx_series_restricted ON series(restricted) WHERE restricted=1');
+  // getSeriesByCvId runs 100× per Add-series search (flagging results already
+  // in the collection) — without this index each lookup table-scans, which at
+  // 320k series froze the event loop ~20s per search.
+  db.exec('CREATE INDEX IF NOT EXISTS idx_series_cv ON series(cv_id)');
   const libCols = db.prepare('PRAGMA table_info(libraries)').all().map((c) => c.name);
   if (libCols.length && !libCols.includes('folder_pattern')) db.exec('ALTER TABLE libraries ADD COLUMN folder_pattern TEXT');
   if (libCols.length && !libCols.includes('restricted')) db.exec('ALTER TABLE libraries ADD COLUMN restricted INTEGER NOT NULL DEFAULT 0');

@@ -15,7 +15,7 @@
   import { navigate } from '../lib/router.svelte.js';
   import { loadCollection } from '../lib/store.svelte.js';
   import { notify } from '../lib/toasts.svelte.js';
-  import { fmt } from '../lib/util.js';
+  import { fmt, parseCvVolumeRef, isExactCvRef } from '../lib/util.js';
   import { trapFocus } from '../lib/dom.js';
   import { status } from '../lib/status.svelte.js';
   import Cover from './Cover.svelte';
@@ -45,6 +45,28 @@
     const seq = ++searchSeq;
     if (q.trim().length < 2) { m.results = null; m.error = ''; searching = false; return; }
     searching = true; m.error = ''; needsKey = false;
+
+    // A pasted CV URL, "cv:12345", or bare volume id resolves that exact volume
+    // and pins it first — common names ("Batman") have so many volumes that a
+    // known-right one can be buried anywhere in the results. A URL or cv: tag
+    // means precisely one volume, so skip the name search; bare digits still
+    // search underneath in case they were a title (e.g. "2000 AD").
+    const refId = mangaMode ? null : parseCvVolumeRef(q);
+    let pinned = null;
+    if (refId) {
+      try {
+        const v = await apiGet('/api/cv/volume/' + refId);
+        if (v && !v.error) pinned = { ...v, count_of_issues: v.count_of_issues ?? v.issue_count, _label: 'Add', _busy: false };
+      } catch { /* fall through to the name search */ }
+      if (seq !== searchSeq) return;
+      if (isExactCvRef(q)) {
+        searching = false;
+        m.results = pinned ? [pinned] : [];
+        m.error = pinned ? '' : 'No ComicVine volume with that id.';
+        return;
+      }
+    }
+
     let list;
     try { list = await apiGet('/api/cv/search?q=' + encodeURIComponent(q) + (mangaMode ? '&manga=1' : '')); }
     catch { if (seq === searchSeq) { m.error = 'Search failed — is the app reachable?'; searching = false; } return; }
@@ -55,7 +77,12 @@
       if (/comicvine|api key/i.test(String(list.error))) { needsKey = true; m.error = ''; m.results = null; return; }
       m.error = list.error; m.results = null; return;
     }
-    m.results = (Array.isArray(list) ? list : []).slice(0, 25).map((v) => ({ ...v, _label: 'Add', _busy: false }));
+    // Everything the server returned, no cutoff: ComicVine lists same-name
+    // volumes oldest-first, so a cap hides exactly the newest series (the ones
+    // people most often add). The list scrolls; covers load lazily.
+    const rows = (Array.isArray(list) ? list : []).filter((v) => v.id !== refId)
+      .map((v) => ({ ...v, _label: 'Add', _busy: false }));
+    m.results = pinned ? [pinned, ...rows] : rows;
   }
 
   async function add(v) {
@@ -120,6 +147,7 @@
           <div class="addx__prompt">
             <div class="addx__prompt-art"><Icon name="search" size={20} /></div>
             <div>Type at least 2 characters to search {sourceLabel}.</div>
+            {#if !mangaMode}<div class="addx__tip">Can’t find a series? Paste its ComicVine URL or id (e.g. <code>cv:166619</code>) to jump straight to it.</div>{/if}
           </div>
         {:else if noResults}
           <div class="addx__empty">No series found for “{ql}”.</div>
@@ -198,6 +226,8 @@
 
   .addx__prompt { padding: 44px 20px; text-align: center; color: var(--faint); font-size: 13px; }
   .addx__prompt-art { width: 46px; height: 46px; margin: 0 auto 12px; border-radius: 12px; background: var(--panel-2); display: grid; place-items: center; color: #6f6885; }
+  .addx__tip { margin-top: 10px; font-size: 12px; color: var(--faint); }
+  .addx__tip code { font-size: 11px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
   .addx__empty { padding: 40px; text-align: center; color: var(--faint); font-size: 13px; }
 
   .addx__keycard { margin: 8px; padding: 18px; border: 1px solid rgba(255,194,75,.3); background: rgba(255,194,75,.06); border-radius: 12px; text-align: center; }

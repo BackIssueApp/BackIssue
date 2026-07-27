@@ -106,12 +106,21 @@ export function sanitizeHtml(html) {
   return tpl.innerHTML;
 }
 
-// A pasted ComicVine volume reference: a CV URL (…/4050-72763/) or a bare id.
+// A pasted ComicVine volume reference: a CV URL (…/4050-72763/), a tagged id
+// ("cv:72763"), or a bare id.
 export function parseCvVolumeRef(q) {
   const url = String(q).match(/4050-(\d+)/);
   if (url) return Number(url[1]);
+  const tagged = String(q).trim().match(/^cv:\s*(\d+)$/i);
+  if (tagged) return Number(tagged[1]);
   const bare = String(q).trim().match(/^(\d{2,})$/);
   return bare ? Number(bare[1]) : null;
+}
+
+// Is the reference unambiguous (URL or cv: tag — not bare digits that could be
+// a title like "2000 AD")? Unambiguous refs skip the name search entirely.
+export function isExactCvRef(q) {
+  return /4050-\d+/.test(String(q)) || /^cv:\s*\d+$/i.test(String(q).trim());
 }
 
 // Client-side twin of parseIndexers in src/newznab.js ("name | url | apikey" per

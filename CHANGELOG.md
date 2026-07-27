@@ -8,7 +8,23 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+- **New volumes of long-running names no longer missing from Add search.**
+  The Add-series and Match-to-ComicVine pickers capped results at 25/20, and
+  ComicVine lists same-name volumes oldest-first — so for names like "Batman"
+  the newest series (the ones people most often add) fell below the cutoff and
+  never appeared. Both pickers now show the full result list. (#2)
+- **Add-series search no longer stalls the whole app on big libraries.**
+  Flagging search results already in the collection looked up each of the 100
+  results by ComicVine id without an index — at hundreds of thousands of
+  series that table-scanned for ~20 seconds per search, freezing every other
+  request with it. The lookup is now indexed (instant, and the index applies
+  on upgrade).
+
 ### Added
+- **Search by ComicVine id.** The Add-series search accepts `cv:166619`, a
+  pasted ComicVine URL, or a bare volume id and jumps straight to that volume —
+  the sure route when a name search can't surface the right series. (#2)
 - **Filter a library by facets.** A **Filters** button on book/audiobook
   libraries opens a modal that narrows the grid by author, decade, format, and
   reading status — each with live counts. It filters the real grid, so sorting,
