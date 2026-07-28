@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.7.65] — 2026-07-27
+
 ### Fixed
 - **New volumes of long-running names no longer missing from Add search.**
   The Add-series and Match-to-ComicVine pickers capped results at 25/20, and
