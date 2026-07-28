@@ -8,6 +8,17 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+- **Sidecar metadata (share-safe tagging).** A new **Tag placement** setting
+  (Settings → Metadata → Tagging & files, with a per-library override) writes
+  each comic's ComicInfo metadata to a `.xml` file next to the archive instead
+  of into it. The archive is never modified — its bytes stay identical, so
+  torrents keep seeding and DC-hub share hashes stay valid — and `.cbr`
+  downloads stay `.cbr` instead of being converted for tagging. Sidecars are
+  read everywhere embedded tags are (scans, imports, the untagged filter),
+  follow their file through renames and refiling, and are cleaned up with it
+  on delete. When a file has both, the sidecar wins.
+
 ## [0.7.65] — 2026-07-27
 
 ### Fixed

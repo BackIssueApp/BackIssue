@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import config from './config.js';
 import { poolWithResource } from './pool.js';
-import { convertCbrToCbz, verifyArchive, readArchiveInfo, sniffFormat, repackRarAsZip } from './archive.js';
+import { convertCbrToCbz, verifyArchive, readArchiveInfo, sniffFormat, repackRarAsZip, sidecarPath } from './archive.js';
 import { removeSupersededFiles, indexLibrary } from './library.js';
 import { walkFiles } from './sources/usenet.js';
 import { pruneLibraryFiles, SELF_DESCRIBED_TYPES } from './db.js';
@@ -225,6 +225,9 @@ export async function renameAllFiles(db, onProgress = () => {}) {
     else {
       try {
         await fs.rename(r.path, target);
+        // The sidecar metadata file (same basename, .xml) renames in step.
+        const side = sidecarPath(r.path);
+        if (side !== r.path) await fs.rename(side, sidecarPath(target)).catch(() => {});
         db.prepare('UPDATE library_files SET path=?, name=? WHERE path=?').run(target, path.basename(target), r.path);
         db.prepare('UPDATE issues SET file_path=? WHERE file_path=?').run(target, r.path);
         renamed++;

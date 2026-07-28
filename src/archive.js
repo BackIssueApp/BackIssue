@@ -164,6 +164,24 @@ export async function sniffFormat(p) {
   return null;
 }
 
+// A comic's sidecar metadata file: the same ComicInfo XML, next to the archive
+// with the same basename (Batman 001.cbz → Batman 001.xml). Sidecars exist so
+// tagging never rewrites the archive — the bytes stay identical for seeding
+// (torrents) and share hashing (DC hubs).
+export function sidecarPath(archivePath) {
+  return String(archivePath).replace(/\.[^.\\/]+$/, '.xml');
+}
+
+async function readSidecarInfo(archivePath) {
+  const sp = sidecarPath(archivePath);
+  if (sp === String(archivePath) || !existsSync(sp)) return null;
+  try {
+    const xml = await fs.readFile(sp, 'utf8');
+    if (!/<ComicInfo[\s>]/i.test(xml)) return null; // some other .xml — not ours
+    return parseComicInfo(xml);
+  } catch { return null; }
+}
+
 export async function readArchiveInfo(path) {
   const p = String(path);
   const byExt = /\.cbr$/i.test(p) ? 'cbr' : 'cbz';
@@ -171,7 +189,11 @@ export async function readArchiveInfo(path) {
   // Prefer the sniffed format so a mislabeled file (RAR bytes in a .cbz, etc.)
   // is read with the right decoder instead of being reported corrupt.
   const fmt = (await sniffFormat(p)) ?? byExt;
-  return fmt === 'cbr' ? readRarInfo(p) : readZipInfo(p);
+  const info = await (fmt === 'cbr' ? readRarInfo(p) : readZipInfo(p));
+  // A sidecar wins over embedded metadata: when both exist the sidecar is the
+  // newer intent (written without touching the archive).
+  const side = await readSidecarInfo(p);
+  return side ? { ...info, hasComicInfo: true, comicInfo: side, sidecar: true } : info;
 }
 
 // Convert RAR bytes (a .cbr) into CBZ bytes in memory — THE one cbr→cbz core.

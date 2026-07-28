@@ -20,6 +20,10 @@ export const SETTING_FIELDS = {
   format:              { type: 'enum', values: ['cbz', 'pdf'] },
   windowMode:          { type: 'enum', values: ['visible', 'hidden', 'headless'] },
   tagOnDownload:       { type: 'enum', values: ['off', 'on'] },
+  // Where tags are written: into the archive (default) or as a <basename>.xml
+  // sidecar that leaves the archive byte-identical (seeding/share-safe).
+  // Libraries can override per-library (libraries.tag_placement).
+  tagPlacement:        { type: 'enum', values: ['embed', 'sidecar'] },
   comictaggerPath:     { type: 'string' }, // legacy (ComicTagger removed); tolerated so old settings.json loads
   comicvineKeys:       { type: 'string' },
   cvBaseUrl:           { type: 'string', allowEmpty: true },

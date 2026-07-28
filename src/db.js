@@ -222,6 +222,9 @@ function migrate(db) {
   const libCols = db.prepare('PRAGMA table_info(libraries)').all().map((c) => c.name);
   if (libCols.length && !libCols.includes('folder_pattern')) db.exec('ALTER TABLE libraries ADD COLUMN folder_pattern TEXT');
   if (libCols.length && !libCols.includes('restricted')) db.exec('ALTER TABLE libraries ADD COLUMN restricted INTEGER NOT NULL DEFAULT 0');
+  // Per-library tag placement override: null = global setting, 'embed' |
+  // 'sidecar'. Sidecar keeps archives byte-identical (seeding/share-safe).
+  if (libCols.length && !libCols.includes('tag_placement')) db.exec('ALTER TABLE libraries ADD COLUMN tag_placement TEXT');
   const cvcols = db.prepare('PRAGMA table_info(cv_series)').all().map((c) => c.name);
   if (cvcols.length && !cvcols.includes('site_detail_url')) db.exec('ALTER TABLE cv_series ADD COLUMN site_detail_url TEXT');
   // ComicVine-provided alternative names (its `aliases` field, newline-separated).
@@ -340,12 +343,15 @@ export function libraryFolders(rootFolder) {
 // Named containers with a behavior type (and, later, their own root folder).
 // Assigning a series to a library also sets its type — one decision, so a
 // library's contents always behave like the library says they do.
-export function createLibrary(db, { name, type = 'comic', rootFolder = null, folderPattern = null, restricted = false }) {
+const TAG_PLACEMENTS = ['embed', 'sidecar'];
+const normPlacement = (v) => (TAG_PLACEMENTS.includes(v) ? v : null); // anything else = use the global setting
+
+export function createLibrary(db, { name, type = 'comic', rootFolder = null, folderPattern = null, restricted = false, tagPlacement = null }) {
   if (!String(name || '').trim()) throw new Error('a library needs a name');
   if (!SERIES_TYPES.includes(type)) throw new Error(`unknown series type "${type}"`);
   const ord = (db.prepare('SELECT COALESCE(MAX(sort_order),0)+1 n FROM libraries').get()).n;
-  return db.prepare('INSERT INTO libraries (name, type, root_folder, folder_pattern, restricted, sort_order) VALUES (?,?,?,?,?,?)')
-    .run(String(name).trim(), type, rootFolder || null, folderPattern || null, restricted ? 1 : 0, ord).lastInsertRowid;
+  return db.prepare('INSERT INTO libraries (name, type, root_folder, folder_pattern, restricted, sort_order, tag_placement) VALUES (?,?,?,?,?,?,?)')
+    .run(String(name).trim(), type, rootFolder || null, folderPattern || null, restricted ? 1 : 0, ord, normPlacement(tagPlacement)).lastInsertRowid;
 }
 export function listLibraries(db) {
   // series_count = COLLECTION members only (followed or with files on disk) —
@@ -365,17 +371,18 @@ export function listLibraries(db) {
 export function getLibrary(db, id) {
   return db.prepare('SELECT * FROM libraries WHERE id=?').get(id);
 }
-export function updateLibrary(db, id, { name, type, rootFolder, folderPattern, restricted, sortOrder } = {}) {
+export function updateLibrary(db, id, { name, type, rootFolder, folderPattern, restricted, sortOrder, tagPlacement } = {}) {
   const lib = getLibrary(db, id);
   if (!lib) throw new Error('unknown library');
   if (type != null && !SERIES_TYPES.includes(type)) throw new Error(`unknown series type "${type}"`);
-  db.prepare('UPDATE libraries SET name=?, type=?, root_folder=?, folder_pattern=?, restricted=?, sort_order=? WHERE id=?').run(
+  db.prepare('UPDATE libraries SET name=?, type=?, root_folder=?, folder_pattern=?, restricted=?, sort_order=?, tag_placement=? WHERE id=?').run(
     name != null && String(name).trim() ? String(name).trim() : lib.name,
     type ?? lib.type,
     rootFolder !== undefined ? (rootFolder || null) : lib.root_folder,
     folderPattern !== undefined ? (folderPattern || null) : lib.folder_pattern,
     restricted !== undefined ? (restricted ? 1 : 0) : lib.restricted,
-    sortOrder ?? lib.sort_order, id);
+    sortOrder ?? lib.sort_order,
+    tagPlacement !== undefined ? normPlacement(tagPlacement) : lib.tag_placement, id);
   // A type change re-types the members (the library defines their behavior).
   if (type != null && type !== lib.type) db.prepare('UPDATE series SET type=? WHERE library_id=?').run(type, id);
   // A restricted flag flip re-flags the members — they ride the existing

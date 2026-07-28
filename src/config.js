@@ -59,6 +59,7 @@ const config = {
   windowMode: 'visible',
   // ComicTagger tag-on-download.
   tagOnDownload: 'off',
+  tagPlacement: 'embed', // 'embed' rewrites the archive; 'sidecar' writes <basename>.xml beside it
   comicvineKeys: '',
   // 'hosted' (default: the BackIssue metadata service, zero setup) or
   // 'comicvine' (direct, requires comicvineKeys).

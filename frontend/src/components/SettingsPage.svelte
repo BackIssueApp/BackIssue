@@ -81,7 +81,7 @@
   }
   async function saveLib(l) {
     const rootFolder = (l.folders || []).map((s) => s.trim()).filter(Boolean).join('\n');
-    const r = await apiPost('/api/libraries/' + l.id, { name: l.name, type: l.type, rootFolder: rootFolder || null, folderPattern: l.folder_pattern || null, restricted: !!l.restricted });
+    const r = await apiPost('/api/libraries/' + l.id, { name: l.name, type: l.type, rootFolder: rootFolder || null, folderPattern: l.folder_pattern || null, restricted: !!l.restricted, tagPlacement: l.tag_placement || null });
     if (r.error) return notify(r.error, 'error');
     libs = r.libraries.map(withFolders); notify('Library updated.', 'ok');
   }
@@ -597,6 +597,12 @@
                 <div class="libcard__extras">
                   <label class="field"><span>Folder pattern</span>
                     <input type="text" spellcheck="false" placeholder="blank = global pattern" bind:value={l.folder_pattern} onchange={() => saveLib(l)} title="Per-library folder pattern, e.g. {'{series}'} for a tree without publisher folders" /></label>
+                  <label class="field"><span>Tag placement</span>
+                    <select bind:value={l.tag_placement} onchange={() => saveLib(l)} title="Sidecar writes metadata to a .xml next to each archive and never modifies the file — keeps it byte-identical for seeding and share hashing">
+                      <option value={null}>Global setting</option>
+                      <option value="embed">Embedded (inside the archive)</option>
+                      <option value="sidecar">Sidecar (.xml next to the file)</option>
+                    </select></label>
                 </div>
               </div>
             {/each}
@@ -908,7 +914,11 @@
           <span>Tag on download</span>
           <select id="set-tagOnDownload"><option value="off">Off</option><option value="on">On</option></select>
         </label>
-        <p class="modal__note">ComicInfo.xml is written straight into the CBZ from the metadata source; <code>.cbr</code> downloads are converted to <code>.cbz</code> so they can be tagged.</p>
+        <label class="field">
+          <span>Tag placement</span>
+          <select id="set-tagPlacement"><option value="embed">Embedded (inside the archive)</option><option value="sidecar">Sidecar (.xml next to the file)</option></select>
+        </label>
+        <p class="modal__note">Embedded writes ComicInfo.xml straight into the CBZ (<code>.cbr</code> downloads are converted to <code>.cbz</code> so they can be tagged). Sidecar writes the same metadata to a <code>.xml</code> file next to the archive and never modifies it — keeping files byte-identical for seeding and file-share hashing, and letting <code>.cbr</code> files stay <code>.cbr</code>. Each library can override this in its settings.</p>
       </div>
       <div class="setx-card">
         <h4 class="setx-card__head">Enrichment</h4>

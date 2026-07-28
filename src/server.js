@@ -23,6 +23,7 @@ import * as users from './users.js';
 import * as lists from './lists.js';
 import * as notifications from './notifications.js';
 import { createEventHub } from './events.js';
+import { sidecarPath } from './archive.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // The UI is a built Svelte app — `npm run build` writes it to frontend/dist.
@@ -936,6 +937,8 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     for (const cvid of cvIssueIds) {
       for (const f of db.prepare('SELECT path FROM library_files WHERE cv_issue_id=?').all(cvid)) {
         try { await fsp.unlink(f.path); } catch { /* already gone */ }
+        const side = sidecarPath(f.path);
+        if (side !== f.path) await fsp.unlink(side).catch(() => {});
       }
       db.prepare('DELETE FROM library_files WHERE cv_issue_id=?').run(cvid);
       const ci = getCvIssue(db, cvid);
@@ -948,6 +951,8 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     // written file may not have a library_files row yet).
     for (const p of clearIssuesForRedownload(db, ids)) {
       try { await fsp.unlink(p); } catch { /* already gone */ }
+      const side = sidecarPath(p);
+      if (side !== p) await fsp.unlink(side).catch(() => {});
     }
     queueIssues(db, ids);
     startDownloads(ids);
@@ -1402,7 +1407,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
   });
   app.post('/api/libraries/:id', (req, res) => {
-    try { updateLibrary(db, Number(req.params.id), { name: req.body?.name, type: req.body?.type, rootFolder: req.body?.rootFolder, folderPattern: req.body?.folderPattern, restricted: req.body?.restricted, sortOrder: req.body?.sortOrder }); syncRootsFromLibraries(); const lib = listLibraries(db).find((l) => l.id === Number(req.params.id)); kickLibraryScanners(lib?.id, lib?.type); res.json({ libraries: listLibraries(db) }); }
+    try { updateLibrary(db, Number(req.params.id), { name: req.body?.name, type: req.body?.type, rootFolder: req.body?.rootFolder, folderPattern: req.body?.folderPattern, restricted: req.body?.restricted, sortOrder: req.body?.sortOrder, tagPlacement: req.body?.tagPlacement }); syncRootsFromLibraries(); const lib = listLibraries(db).find((l) => l.id === Number(req.params.id)); kickLibraryScanners(lib?.id, lib?.type); res.json({ libraries: listLibraries(db) }); }
     catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
   });
   app.delete('/api/libraries/:id', (req, res) => { const removed = deleteLibrary(db, Number(req.params.id)); syncRootsFromLibraries(); res.json({ removed, libraries: listLibraries(db) }); });

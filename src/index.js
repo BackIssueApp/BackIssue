@@ -37,6 +37,7 @@ import { torrent as torrentSource } from './sources/torrent.js';
 import { orderedSources } from './sources/index.js';
 import { pickZeroDayGrab } from './zeroday.js';
 import { validateCron } from './cron.js';
+import { sidecarPath } from './archive.js';
 import { notify as notifyRaw } from './notifications.js';
 
 installConsoleCapture(); // mirror console.warn/error into the Logs page buffer
@@ -686,7 +687,11 @@ async function deleteComic(seriesId, { deleteFiles = false } = {}) {
   untrackSeries(db, seriesId); // drop the index + remove from collection (never touches disk)
   let filesDeleted = 0, dirsRemoved = 0;
   if (deleteFiles) {
-    for (const f of fileRows) { try { await fsp.rm(f.path, { force: true }); filesDeleted++; } catch { /* ignore */ } }
+    for (const f of fileRows) {
+      try { await fsp.rm(f.path, { force: true }); filesDeleted++; } catch { /* ignore */ }
+      const side = sidecarPath(f.path);
+      if (side !== f.path) await fsp.rm(side, { force: true }).catch(() => {});
+    }
     const dirs = [...new Set(fileRows.map((f) => f.dir).filter(Boolean))];
     for (const d of dirs) {
       if (String(d).split(/[\\/]/).filter(Boolean).length < 3) continue; // guard: never rm a share/drive root
@@ -1195,7 +1200,11 @@ function recordProgressTagLog(p) {
 // writes the correct name in place (instead of a (chapterId) duplicate).
 async function prepareRedownload(issueIds) {
   const paths = clearIssuesForRedownload(db, issueIds);
-  for (const p of paths) { try { await fsp.rm(p, { force: true }); } catch { /* already gone */ } }
+  for (const p of paths) {
+    try { await fsp.rm(p, { force: true }); } catch { /* already gone */ }
+    const side = sidecarPath(p);
+    if (side !== p) await fsp.rm(side, { force: true }).catch(() => {});
+  }
 }
 
 const app = createApp({

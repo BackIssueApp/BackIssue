@@ -10,7 +10,7 @@ import { detectEdition } from './editions.js';
 import { fileStemFromPattern } from './naming.js';
 import { resolveSeriesDir } from './paths.js';
 import { indexDownloadedFile } from './library.js';
-import { tagCbzBuffer, taggingEnabled, xmlForIssue } from './metatagger.js';
+import { tagCbzBuffer, taggingEnabled, xmlForIssue, writeSidecar, tagPlacementFor } from './metatagger.js';
 import { cbrBufferToCbz } from './archive.js';
 import { makeCvClient } from './cv.js';
 // NOTE: sources/index.js is imported lazily inside runQueue to avoid a module
@@ -120,9 +120,10 @@ function uniquePath(p) {
 // Shared import step for every download source: take a finished comic (buffer or
 // a file on disk), bake in the ComicVine ComicInfo.xml (if provided), and place
 // it in the comic's folder. Returns { path, tagged }.
-export async function finalizeComic({ buffer, srcPath, format = 'cbz', issue, seriesTitle, seriesYear, seriesPath, comicInfoXml = null }) {
+export async function finalizeComic({ buffer, srcPath, format = 'cbz', issue, seriesTitle, seriesYear, seriesPath, comicInfoXml = null, tagPlacement = 'embed' }) {
   let buf = buffer || (srcPath ? await fsp.readFile(srcPath) : null);
   if (!buf) throw new Error('no comic data to finalize');
+  const sidecar = tagPlacement === 'sidecar';
   // Sniff the REAL container from magic bytes, not the source's extension — a
   // source can hand us a .cbr (RAR) or a mislabeled file. A RAR must be repacked
   // to a real zip before we can tag it (tagCbzBuffer is JSZip) or file it as
@@ -133,10 +134,15 @@ export async function finalizeComic({ buffer, srcPath, format = 'cbz', issue, se
     // Repack RAR → CBZ so it can be tagged and read as a zip. A RAR too large
     // to extract in memory (the WASM-heap ceiling) is filed AS-IS: the app
     // reads CBR natively — it just can't be repacked or ComicInfo-tagged.
-    try { buf = await cbrBufferToCbz(buf); format = 'cbz'; }
-    catch (e) {
-      if (!/too large to convert/i.test(String(e?.message))) throw e;
-      format = 'cbr'; // keep the raw RAR bytes; file it as .cbr
+    // Sidecar placement skips the repack entirely: metadata lands next to the
+    // file, so the RAR can stay byte-identical to what the source shared.
+    if (sidecar) format = 'cbr';
+    else {
+      try { buf = await cbrBufferToCbz(buf); format = 'cbz'; }
+      catch (e) {
+        if (!/too large to convert/i.test(String(e?.message))) throw e;
+        format = 'cbr'; // keep the raw RAR bytes; file it as .cbr
+      }
     }
   }
   else if (buf.toString('latin1', 0, 4) === '%PDF') format = 'pdf';          // "%PDF"
@@ -164,8 +170,15 @@ export async function finalizeComic({ buffer, srcPath, format = 'cbz', issue, se
     dest = cid ? dest.replace(/(\.(?:cbz|cbr|pdf))$/i, ` (${cid})$1`) : uniquePath(dest);
   }
   let tagged = false;
-  if (format === 'cbz' && comicInfoXml) { buf = await tagCbzBuffer(buf, comicInfoXml); tagged = true; }
-  await placeFile({ buffer: buf, destPath: dest });
+  if (sidecar) {
+    // Never rewrite the archive: place the exact downloaded bytes, then put
+    // the metadata beside them.
+    await placeFile({ buffer: buf, destPath: dest });
+    if (comicInfoXml && /\.(cbz|cbr)$/i.test(dest)) { await writeSidecar(dest, comicInfoXml); tagged = true; }
+  } else {
+    if (format === 'cbz' && comicInfoXml) { buf = await tagCbzBuffer(buf, comicInfoXml); tagged = true; }
+    await placeFile({ buffer: buf, destPath: dest });
+  }
   return { path: dest, tagged };
 }
 
@@ -206,14 +219,15 @@ export async function buildIssueContext(db, issue, cvClient) {
     try { comicInfoXml = await xmlForIssue(db, cvClient(), series, issue.issue_number); }
     catch (e) { console.warn('comicinfo build failed', issue.title, e?.message || e); }
   }
-  return { series, cv, seriesTitle, seriesNames, publisher, seriesYear, seriesPath, comicInfoXml };
+  const tagPlacement = tagPlacementFor(db, series?.id);
+  return { series, cv, seriesTitle, seriesNames, publisher, seriesYear, seriesPath, comicInfoXml, tagPlacement };
 }
 
 // Shared import tail: place the finished comic, mark the issue done, index it as
 // owned, and emit tag-log/done progress. Used by both the immediate download path
 // and the deferred (usenet) monitor.
 export async function finishImport(db, { issue, ic, fetched, source, onProgress = () => {} }) {
-  const result = await finalizeComic({ ...fetched, issue, seriesTitle: ic.seriesTitle, seriesYear: ic.seriesYear, seriesPath: ic.seriesPath, comicInfoXml: ic.comicInfoXml });
+  const result = await finalizeComic({ ...fetched, issue, seriesTitle: ic.seriesTitle, seriesYear: ic.seriesYear, seriesPath: ic.seriesPath, comicInfoXml: ic.comicInfoXml, tagPlacement: ic.tagPlacement });
   setIssueStatus(db, issue.id, 'done', { filePath: result.path });
   // A cvissue:<id> row IS a specific ComicVine issue — pass that identity through
   // so the index links this file authoritatively (a release's embedded ComicInfo
@@ -225,7 +239,9 @@ export async function finishImport(db, { issue, ic, fetched, source, onProgress 
   if (taggingEnabled()) {
     onProgress({ event: 'tag-result', issue, series: ic.seriesTitle, source, result: {
       outcome: result.tagged ? 'tagged' : 'no-match',
-      reason: result.tagged ? 'ComicVine metadata embedded' : (ic.series?.cv_id ? 'no matching ComicVine issue' : 'series not matched to ComicVine'),
+      reason: result.tagged
+        ? (ic.tagPlacement === 'sidecar' ? 'ComicVine metadata written to sidecar' : 'ComicVine metadata embedded')
+        : (ic.series?.cv_id ? 'no matching ComicVine issue' : 'series not matched to ComicVine'),
       path: result.path,
     } });
   }

@@ -3,7 +3,7 @@ import path from 'node:path';
 import JSZip from 'jszip';
 import { getCvIssue, getCvSeries, setCvIssueDetail, getLibraryFile } from './db.js';
 import { logWarn } from './logstore.js';
-import { convertCbrToCbz } from './archive.js';
+import { convertCbrToCbz, sidecarPath } from './archive.js';
 import { normalizeNumber } from './matcher.js';
 import { cvKey } from './cv.js';
 import config from './config.js';
@@ -151,6 +151,25 @@ export async function writeComicInfo(cbzPath, xml) {
   await fs.rename(tmp, cbzPath);
 }
 
+// Write the same XML as a sidecar next to the archive (atomic temp → rename).
+// The archive is never opened, let alone rewritten — its bytes stay identical,
+// which is the whole point (torrent/DC-share users keep seeding).
+export async function writeSidecar(archivePath, xml) {
+  const dest = sidecarPath(archivePath);
+  const tmp = path.join(path.dirname(dest), `.tag-${process.pid}-${path.basename(dest)}`);
+  await fs.writeFile(tmp, xml, 'utf8');
+  await fs.rename(tmp, dest);
+  return dest;
+}
+
+// Where a file's tags go: its library's override, else the global setting.
+// 'embed' (write into the archive — the long-standing default) | 'sidecar'.
+export function tagPlacementFor(db, seriesId) {
+  const libId = seriesId ? db.prepare('SELECT library_id FROM series WHERE id=?').get(seriesId)?.library_id : null;
+  const lib = libId ? db.prepare('SELECT tag_placement FROM libraries WHERE id=?').get(libId) : null;
+  return lib?.tag_placement || config.tagPlacement || 'embed';
+}
+
 // The XML for an issue about to be downloaded: map its number to the
 // series' CV issue, ensure detail, build. Returns null when unmatched (the
 // download proceeds untagged).
@@ -180,10 +199,15 @@ export async function tagFileFromCv(db, client, filePath) {
   };
   if (!row) return log('error', 'file not in library index');
   if (!row.valid) return log('skipped', 'corrupt archive');
+  // Sidecar placement never touches the archive — no CBR→CBZ conversion (a
+  // .cbr keeps its bytes AND gets metadata, which embedding can't offer).
+  const sidecar = tagPlacementFor(db, row.series_id) === 'sidecar';
   // Tagging writes ComicInfo.xml into a zip, so a .cbr must be converted to .cbz
   // first. Do it here (extracts all entries solid-safe, removes the .cbr), then
   // re-point the index row and tag the new .cbz.
-  if (/\.cbr$/i.test(filePath)) {
+  if (sidecar) {
+    if (!/\.(cbz|cbr)$/i.test(filePath)) return log('skipped', 'not a comic archive');
+  } else if (/\.cbr$/i.test(filePath)) {
     try {
       const { cbzPath } = await convertCbrToCbz(filePath);
       db.prepare('UPDATE library_files SET path=?, name=? WHERE path=?').run(cbzPath, path.basename(cbzPath), filePath);
@@ -209,12 +233,14 @@ export async function tagFileFromCv(db, client, filePath) {
   }
   const xml = buildComicInfoXml({ series: cvSeries, issue });
   try {
-    await writeComicInfo(filePath, xml);
+    if (sidecar) await writeSidecar(filePath, xml);
+    else await writeComicInfo(filePath, xml);
   } catch (e) {
     return log('error', String(e?.message || e));
   }
   // Keep the index consistent with the rewritten file (new size/mtime, tagged).
-  const st = await fs.stat(filePath).catch(() => null);
+  // A sidecar write leaves the archive untouched, so size/mtime don't move.
+  const st = sidecar ? null : await fs.stat(filePath).catch(() => null);
   db.prepare('UPDATE library_files SET has_metadata=1, ci_series=?, ci_number=?, ci_volume=?, ci_title=?, size=COALESCE(?, size), mtime=COALESCE(?, mtime) WHERE path=?')
     .run(cvSeries.name, issue.issue_number, cvSeries.start_year, issue.name, st ? st.size : null, st ? Math.floor(st.mtimeMs) : null, filePath);
   return { outcome: 'tagged' };

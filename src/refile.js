@@ -6,6 +6,7 @@ import path from 'node:path';
 import config from './config.js';
 import { parseRootFolders, seriesFolderName } from './paths.js';
 import { fileStemFromPattern } from './naming.js';
+import { sidecarPath } from './archive.js';
 
 // Series naming fields, preferring ComicVine's clean name/publisher/start-year.
 function seriesForNaming(db, series) {
@@ -69,6 +70,11 @@ function moveFile(from, to) {
   catch (e) {
     if (e.code !== 'EXDEV') throw e;
     fs.copyFileSync(from, to); fs.unlinkSync(from);
+  }
+  // A sidecar metadata file travels with its archive (same basename, .xml).
+  const fromSide = sidecarPath(from);
+  if (fromSide !== from && fs.existsSync(fromSide)) {
+    try { moveFile(fromSide, sidecarPath(to)); } catch { /* metadata is rebuildable */ }
   }
 }
 
