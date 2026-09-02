@@ -29,6 +29,7 @@ export const CORE_PERMISSIONS = [
   { key: 'downloads.grab', label: 'Search & download', description: 'Search sources, queue downloads, cancel queued items', tier: 'trusted', category: 'Library' },
   { key: 'library.manage', label: 'Manage the library', description: 'Add/remove volumes and issues, scan, tag, import, fix matches', tier: 'trusted', category: 'Library' },
   { key: 'library.restricted', label: 'View mature content', description: 'See and read series flagged as mature/restricted (hidden from roles without this)', tier: 'trusted', category: 'Library' },
+  { key: 'lists.share', label: 'Share reading lists', description: 'Publish your reading lists and story arcs so every user can see them', tier: 'trusted', category: 'Library' },
   { key: 'settings.manage', label: 'Settings & indexers', description: 'Change app settings, indexers, and run connection tests', tier: 'admin', category: 'System' },
   { key: 'users.manage', label: 'Users & roles', description: 'Create and manage accounts, roles, and permissions', tier: 'admin', category: 'System' },
   { key: 'plugins.manage', label: 'Plugins & restart', description: 'Enable/disable plugins and restart the app', tier: 'admin', category: 'System' },

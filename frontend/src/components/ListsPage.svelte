@@ -60,6 +60,17 @@
     setQuery({ list: r.id });
     refresh();
   }
+  // Publish/unpublish. Gated on lists.share: sharing puts a list in front of
+  // every user, so it isn't something any account can do.
+  async function toggleShared(l) {
+    const next = !l.public;
+    const r = await apiPost(`/api/lists/${l.id}/public`, { public: next });
+    if (r.error) return notify(r.error, 'error');
+    l.public = next;
+    notify(next ? 'Shared — every user can see this list.' : 'No longer shared.', 'ok');
+    await load();
+  }
+
   async function renameList(l) {
     const name = await inputDialog({ title: 'Rename list', value: l.name, confirmLabel: 'Rename' });
     if (!name || name === l.name) return;
@@ -171,6 +182,7 @@
           <div class="listx__card-top">
             <span class="listx__card-name">{l.name}</span>
             {#if l.arc_cv_id}<span class="listx__card-arc" title="From a ComicVine story arc"><Icon name="diamond" size={13} /></span>{/if}
+            {#if l.public}<span class="listx__card-arc" title={l.mine ? 'Shared with every user' : `Shared by ${l.owner || 'another user'}`}><Icon name="users" size={13} /></span>{/if}
           </div>
           <div class="listx__card-prog">
             <span class="listx__card-track"><span class="listx__card-fill" class:is-done={pct >= 100} style="width:{pct}%"></span></span>
@@ -215,15 +227,21 @@
         <div class="listx__dtitle-wrap">
           <div class="listx__dtitle-row">
             <span class="listx__dtitle">{det.name}</span>
-            {#if isTrusted()}<button class="listx__edit" title="Rename list" onclick={() => renameList(det)}><Icon name="edit" size={15} /></button>{/if}
+            {#if isTrusted() && det.mine !== false}<button class="listx__edit" title="Rename list" onclick={() => renameList(det)}><Icon name="edit" size={15} /></button>{/if}
           </div>
-          <div class="listx__dsummary">{ownedCount}/{rows.length} owned{det.arc_cv_id ? ' · from a ComicVine arc' : ''}</div>
+          <div class="listx__dsummary">{ownedCount}/{rows.length} owned{det.arc_cv_id ? ' · from a ComicVine arc' : ''}{det.mine === false ? ` · shared by ${det.owner || 'another user'}` : ''}{det.public && det.mine !== false ? ' · shared with everyone' : ''}</div>
         </div>
         <div class="listx__dactions">
           {#if missing.length && can('downloads.grab')}
             <button class="listx__dl" onclick={downloadMissing}><Icon name="download" size={15} /> Download missing ({fmt(missing.length)})</button>
           {/if}
-          <button class="listx__del" onclick={() => deleteList(det)}>Delete</button>
+          {#if det.mine !== false && can('lists.share')}
+            <button class="listx__share" onclick={() => toggleShared(det)}
+              title={det.public ? 'Stop sharing this list' : 'Let every user see this list'}>
+              <Icon name="users" size={15} /> {det.public ? 'Shared' : 'Share'}
+            </button>
+          {/if}
+          {#if det.mine !== false}<button class="listx__del" onclick={() => deleteList(det)}>Delete</button>{/if}
         </div>
       </div>
       <div class="listx__dbar"><span class="listx__dbar-track"><span class="listx__dbar-fill" class:is-done={detPct >= 100} style="width:{detPct}%"></span></span><span class="listx__dbar-num">{detPct}% read</span></div>
@@ -317,6 +335,8 @@
   .listx__dsummary { font: 11.5px var(--font-mono); color: var(--faint); margin-top: 3px; }
   .listx__dactions { margin-left: auto; display: flex; gap: 9px; }
   .listx__dl { height: 36px; padding: 0 15px; border: none; background: var(--accent); color: #fff; border-radius: 8px; font: 600 12.5px var(--font-body); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .listx__share { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 13px; border: 1px solid var(--line); background: transparent; color: var(--faint); border-radius: 8px; font: 600 12.5px var(--font-body); cursor: pointer; }
+  .listx__share:hover { color: var(--text); border-color: var(--accent); }
   .listx__del { height: 36px; padding: 0 13px; border: 1px solid rgba(255,90,82,.35); background: transparent; color: var(--red); border-radius: 8px; font: 600 12.5px var(--font-body); cursor: pointer; }
   .listx__dbar { flex: none; padding: 14px 24px; border-bottom: 1px solid #221e2c; display: flex; align-items: center; gap: 14px; }
   .listx__dbar-track { display: block; flex: 1; height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }

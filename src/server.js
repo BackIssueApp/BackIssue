@@ -665,9 +665,19 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     catch (e) { listErr(res, e); }
   });
   app.get('/api/lists/:id', (req, res) => {
-    const l = lists.getList(db, req.user.id, Number(req.params.id));
+    const l = lists.getList(db, req.user.id, Number(req.params.id), { includeRestricted: canRestricted(req) });
     if (!l) return res.status(404).json({ error: 'no such list' });
     res.json(l);
+  });
+  // Publish/unpublish a list for every user. Owner-only (setListPublic) AND
+  // permission-gated: sharing puts a list in front of the whole install, so
+  // it rides lists.share rather than being something any account can do.
+  app.post('/api/lists/:id/public', (req, res) => {
+    if (!users.roleGrants(db, req.user.role, 'lists.share', permCatalog)) {
+      return res.status(403).json({ error: "your role doesn't include the permission: Share reading lists" });
+    }
+    try { res.json({ public: lists.setListPublic(db, req.user.id, Number(req.params.id), !!(req.body || {}).public) }); }
+    catch (e) { listErr(res, e); }
   });
   app.patch('/api/lists/:id', (req, res) => {
     const { name, order } = req.body || {};

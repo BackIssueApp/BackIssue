@@ -21,6 +21,10 @@ export function initListTables(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_rli_list ON reading_list_items(list_id, position);
   `);
+  // Shared lists: a public list is readable by every user (its owner still
+  // owns every edit). Gated on the lists.share permission at the route.
+  const cols = db.prepare('PRAGMA table_info(reading_lists)').all().map((c) => c.name);
+  if (!cols.includes('public')) db.exec('ALTER TABLE reading_lists ADD COLUMN public INTEGER NOT NULL DEFAULT 0');
 }
 
 const owned = (db, listId) => db.prepare(`
@@ -28,24 +32,42 @@ const owned = (db, listId) => db.prepare(`
    WHERE li.list_id = ? AND EXISTS
      (SELECT 1 FROM library_files lf WHERE lf.cv_issue_id = li.cv_issue_id AND lf.valid = 1)`).get(listId).n;
 
+/** Every list this user may SEE: their own, plus anyone's public lists.
+ *  `mine` drives the UI's edit affordances; `owner` names the sharer. */
 export function listLists(db, userId) {
-  return db.prepare(
-    'SELECT id, name, arc_cv_id, created_at FROM reading_lists WHERE user_id = ? ORDER BY created_at DESC',
-  ).all(userId).map((l) => ({
+  const rows = db.prepare(`
+    SELECT id, name, arc_cv_id, created_at, public, user_id, (user_id = ?) AS mine
+      FROM reading_lists
+     WHERE user_id = ? OR public = 1
+     ORDER BY mine DESC, created_at DESC`).all(userId, userId);
+  return rows.map(({ user_id: ownerId, ...l }) => ({
     ...l,
+    public: !!l.public,
+    mine: !!l.mine,
+    // Who shared it — best effort, and never a hard dependency on the users
+    // schema (lists work standalone; the tests open lists tables alone).
+    owner: l.mine ? null : usernameOf(db, ownerId),
     items: db.prepare('SELECT COUNT(*) n FROM reading_list_items WHERE list_id = ?').get(l.id).n,
     owned: owned(db, l.id),
   }));
 }
 
+// Mutations need OWNERSHIP; reads accept a public list too.
+function usernameOf(db, userId) {
+  try { return db.prepare('SELECT username FROM users WHERE id = ?').get(userId)?.username || null; }
+  catch { return null; }
+}
+
 const listRow = (db, userId, id) =>
   db.prepare('SELECT * FROM reading_lists WHERE id = ? AND user_id = ?').get(id, userId);
+const readableRow = (db, userId, id) =>
+  db.prepare('SELECT * FROM reading_lists WHERE id = ? AND (user_id = ? OR public = 1)').get(id, userId);
 
 /** Full detail: items in order with CV metadata, ownership, and the local
  *  series id when the volume is in the library (enables navigation and
  *  per-series download grouping). */
-export function getList(db, userId, id) {
-  const l = listRow(db, userId, id);
+export function getList(db, userId, id, { includeRestricted = true } = {}) {
+  const l = readableRow(db, userId, id);
   if (!l) return null;
   const items = db.prepare(`
     SELECT li.position, li.cv_issue_id,
@@ -60,7 +82,35 @@ export function getList(db, userId, id) {
       LEFT JOIN cv_series cs ON cs.comicvine_id = ci.cv_series_id
       LEFT JOIN series s ON s.cv_id = ci.cv_series_id
      WHERE li.list_id = ? ORDER BY li.position`).all(id);
-  return { id: l.id, name: l.name, arc_cv_id: l.arc_cv_id, created_at: l.created_at, items };
+  // A shared list must not become a way to see mature content you can't
+  // otherwise see: drop restricted items for roles without the permission.
+  const visible = includeRestricted ? items : items.filter((it) => !isRestrictedItem(db, it));
+  return {
+    id: l.id, name: l.name, arc_cv_id: l.arc_cv_id, created_at: l.created_at,
+    public: !!l.public, mine: l.user_id === userId, items: visible,
+  };
+}
+
+/** Is this list item's series flagged restricted? (series row first, then the
+ *  CV series it belongs to — a list can hold issues we don't own yet.) */
+function isRestrictedItem(db, item) {
+  if (item.series_id) {
+    const r = db.prepare('SELECT restricted FROM series WHERE id = ?').get(item.series_id);
+    if (r) return !!r.restricted;
+  }
+  if (item.cv_series_id) {
+    const r = db.prepare('SELECT restricted FROM series WHERE cv_id = ?').get(item.cv_series_id);
+    if (r) return !!r.restricted;
+  }
+  return false;
+}
+
+/** Publish or unpublish a list. Owner-only; the ROUTE additionally gates
+ *  publishing on the lists.share permission. */
+export function setListPublic(db, userId, id, isPublic) {
+  if (!listRow(db, userId, id)) throw new Error('no such list');
+  db.prepare('UPDATE reading_lists SET public = ? WHERE id = ?').run(isPublic ? 1 : 0, id);
+  return !!isPublic;
 }
 
 export function createList(db, userId, name) {

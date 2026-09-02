@@ -9,6 +9,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 ## [Unreleased]
 
 ### Added
+- **Share a reading list with everyone.** A list (or an imported story arc) can
+  be published so every user sees it alongside their own — useful for a house
+  reading order or a curated run. Only the owner can edit or delete a shared
+  list, and publishing rides a new **Share reading lists** permission
+  (`lists.share`, trusted tier) so admins decide who can put a list in front of
+  the whole install. Shared lists never expose mature content to roles that
+  can't otherwise see it.
 - **Sidecar metadata (share-safe tagging).** A new **Tag placement** setting
   (Settings → Metadata → Tagging & files, with a per-library override) writes
   each comic's ComicInfo metadata to a `.xml` file next to the archive instead

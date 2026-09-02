@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../src/db.js';
-import { initListTables, listLists, getList, createList, renameList, deleteList, addItems, removeItem, reorderList, importArcAsList } from '../src/lists.js';
+import { initListTables, listLists, getList, createList, renameList, deleteList, addItems, removeItem, reorderList, importArcAsList, setListPublic } from '../src/lists.js';
 
 function makeDb() {
   const db = openDb(':memory:');
@@ -86,4 +86,69 @@ test('arc import: cover-date order, stub rows inserted, cached rows untouched', 
   assert.equal(cached.description, 'precious cached description');
   const series = db.prepare('SELECT name FROM cv_series WHERE comicvine_id = 500').get();
   assert.equal(series.name, 'Infinity Gauntlet (cached name)');
+});
+
+// ---- shared (public) lists ---------------------------------------------------
+
+test('a public list is readable by everyone but editable only by its owner', () => {
+  const db = makeDb();
+  const id = createList(db, 1, 'Crisis reading order');
+  addItems(db, 1, id, [201, 202]);
+
+  // Private by default — invisible to another user.
+  assert.equal(getList(db, 2, id), null, 'private lists stay private');
+  assert.equal(listLists(db, 2).length, 0);
+
+  setListPublic(db, 1, id, true);
+
+  const seen = getList(db, 2, id);
+  assert.ok(seen, 'a shared list is readable by another user');
+  assert.equal(seen.items.length, 2, 'in full, in order');
+  assert.equal(seen.mine, false, 'and is marked as not theirs');
+  const listed = listLists(db, 2);
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0].public, true);
+  assert.equal(listed[0].mine, false);
+
+  // Every mutation still belongs to the owner alone.
+  assert.throws(() => renameList(db, 2, id, 'hijacked'), /no such list/);
+  assert.throws(() => addItems(db, 2, id, [999]), /no such list/);
+  assert.throws(() => removeItem(db, 2, id, 201), /no such list/);
+  assert.throws(() => reorderList(db, 2, id, [202, 201]), /no such list/);
+  assert.throws(() => deleteList(db, 2, id), /no such list/);
+  assert.throws(() => setListPublic(db, 2, id, false), /no such list/);
+
+  // Unsharing takes it back out of view.
+  setListPublic(db, 1, id, false);
+  assert.equal(getList(db, 2, id), null);
+});
+
+test('the owner still sees their own lists first, with mine set', () => {
+  const db = makeDb();
+  const mine = createList(db, 1, 'Mine');
+  const theirs = createList(db, 2, 'Theirs');
+  setListPublic(db, 2, theirs, true);
+  const rows = listLists(db, 1);
+  assert.deepEqual(rows.map((r) => r.name), ['Mine', 'Theirs'], 'own lists sort first');
+  assert.equal(rows[0].mine, true);
+  assert.equal(rows[1].mine, false);
+  assert.equal(rows[1].owner ?? null, null, 'no users table in this fixture — owner is simply absent');
+  assert.equal(mine !== theirs, true);
+});
+
+test('a shared list never leaks restricted issues to roles without the permission', () => {
+  const db = makeDb();
+  // A restricted series, and an issue of it in a shared list.
+  db.prepare("INSERT INTO series (title, url, type, restricted, cv_id) VALUES ('Adults Only', 'u:1', 'comic', 1, 5000)").run();
+  db.prepare("INSERT INTO cv_series (comicvine_id, name, cached_at) VALUES (5000, 'Adults Only', datetime('now'))").run();
+  db.prepare(`INSERT INTO cv_issues (comicvine_id, cv_series_id, issue_number, cached_at)
+              VALUES (301, 5000, '1', datetime('now'))`).run();
+  const id = createList(db, 1, 'Mixed');
+  addItems(db, 1, id, [301, 302]);
+  setListPublic(db, 1, id, true);
+
+  const full = getList(db, 2, id, { includeRestricted: true });
+  assert.equal(full.items.length, 2, 'a permitted viewer sees everything');
+  const filtered = getList(db, 2, id, { includeRestricted: false });
+  assert.deepEqual(filtered.items.map((i) => i.cv_issue_id), [302], 'restricted item is dropped');
 });
