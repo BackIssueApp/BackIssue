@@ -9,6 +9,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 ## [Unreleased]
 
 ### Added
+- **URL base for download clients.** When a reverse proxy serves qBittorrent
+  (or Transmission/Deluge) under a subpath rather than at the root — common
+  with seedbox providers — set **URL base** on the client and BackIssue talks
+  to `http://host:port/<base>/api/…`. Same field the *arr apps call "URL
+  Base". Blank keeps the previous behaviour exactly. A path typed into the
+  Host field is now understood as a URL base too, instead of producing a
+  broken address like `http://host/qbit:8080`.
 - **Share a reading list with everyone.** A list (or an imported story arc) can
   be published so every user sees it alongside their own — useful for a house
   reading order or a curated run. Only the owner can edit or delete a shared

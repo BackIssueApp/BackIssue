@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { magnetInfohash, torrentInfohash } from '../src/torrenthash.js';
 import { parseTorznabJson, parseTorznab, searchTorznab, testTorznabIndexer } from '../src/torznab.js';
-import { makeQbClient, makeTransmissionClient, makeDelugeClient, makeTorrentClient, qbBaseUrl, trBaseUrl, delugeBaseUrl, testTorrentClient } from '../src/torrentclients.js';
+import { makeQbClient, makeTransmissionClient, makeDelugeClient, makeTorrentClient, qbBaseUrl, trBaseUrl, delugeBaseUrl, testTorrentClient, normalizeUrlBase } from '../src/torrentclients.js';
 import { torrent } from '../src/sources/torrent.js';
 import { createDownloadMonitor } from '../src/downloadmonitor.js';
 import { openDb, upsertSeries, upsertIssue, recordGrab } from '../src/db.js';
@@ -621,4 +621,62 @@ test('torrent source: enablement follows the selected client\'s host', () => {
   assert.equal(torrent.isEnabled({ ...base, torrentClient: 'transmission', qbHost: 'h' }), false);
   assert.equal(torrent.isEnabled({ ...base, torrentClient: 'deluge', delugeHost: 'h' }), true);
   assert.equal(torrent.isEnabled({ ...base, torrentClient: 'deluge' }), false);
+});
+
+// ---- URL base (reverse proxies that serve the client under a subpath) -------
+
+test('normalizeUrlBase accepts every spelling a user might paste', () => {
+  assert.equal(normalizeUrlBase(''), '');
+  assert.equal(normalizeUrlBase(null), '');
+  assert.equal(normalizeUrlBase('   '), '');
+  assert.equal(normalizeUrlBase('qbit'), '/qbit');
+  assert.equal(normalizeUrlBase('/qbit'), '/qbit');
+  assert.equal(normalizeUrlBase('qbit/'), '/qbit');
+  assert.equal(normalizeUrlBase('/qbit/'), '/qbit');
+  assert.equal(normalizeUrlBase('//qbit//'), '/qbit');
+  assert.equal(normalizeUrlBase('/apps/qbit'), '/apps/qbit');
+  // A whole URL pasted in keeps only its path.
+  assert.equal(normalizeUrlBase('https://seedbox.example/qbit'), '/qbit');
+});
+
+test('qbBaseUrl puts the url base after the port, per the *arr convention', () => {
+  assert.equal(qbBaseUrl({ qbHost: 'seedbox.example', qbPort: 8080, qbUrlBase: '/qbit' }),
+    'http://seedbox.example:8080/qbit');
+  assert.equal(qbBaseUrl({ qbHost: 'seedbox.example', qbSsl: true, qbUrlBase: 'qbit' }),
+    'https://seedbox.example/qbit');
+  // No base configured → byte-identical to the old behaviour.
+  assert.equal(qbBaseUrl({ qbHost: 'nas', qbPort: 8080 }), 'http://nas:8080');
+  assert.equal(qbBaseUrl({ qbHost: '' }), '');
+});
+
+test('a path pasted into the HOST field is treated as the url base', () => {
+  // Previously this produced http://seedbox.example/qbit:8080 — a dead URL and
+  // a confusing "cannot connect".
+  assert.equal(qbBaseUrl({ qbHost: 'seedbox.example/qbit', qbPort: 8080 }),
+    'http://seedbox.example:8080/qbit');
+  assert.equal(qbBaseUrl({ qbHost: 'https://seedbox.example/qbit/', qbSsl: true }),
+    'https://seedbox.example/qbit');
+  // Host path and an explicit base combine, in that order.
+  assert.equal(qbBaseUrl({ qbHost: 'host/a', qbPort: 8080, qbUrlBase: 'b' }), 'http://host:8080/a/b');
+});
+
+test('transmission and deluge take a url base too', () => {
+  assert.equal(trBaseUrl({ trHost: 'nas', trPort: 9091, trUrlBase: '/tr' }), 'http://nas:9091/tr');
+  assert.equal(delugeBaseUrl({ delugeHost: 'nas', delugePort: 8112, delugeUrlBase: 'dl' }), 'http://nas:8112/dl');
+});
+
+test('the qBittorrent client actually calls through the url base', async () => {
+  const seen = [];
+  const fetchImpl = async (url, opts) => {
+    seen.push(String(url));
+    if (String(url).endsWith('/api/v2/auth/login')) {
+      return { ok: true, status: 200, text: async () => 'Ok.', headers: { get: () => 'SID=abc; Path=/' } };
+    }
+    return { ok: true, status: 200, text: async () => '[]', json: async () => [], headers: { get: () => null } };
+  };
+  const client = makeQbClient({ qbHost: 'seedbox.example', qbPort: 8080, qbUrlBase: '/qbit', qbUser: 'u', qbPass: 'p' }, { fetchImpl });
+  await client.listByCategory('backissue');
+  assert.ok(seen.some((u) => u === 'http://seedbox.example:8080/qbit/api/v2/auth/login'),
+    `login went through the base: ${seen.join(', ')}`);
+  assert.ok(seen.every((u) => u.startsWith('http://seedbox.example:8080/qbit/')), seen.join(', '));
 });

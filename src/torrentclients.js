@@ -10,23 +10,40 @@
 import { magnetInfohash, torrentInfohash } from './torrenthash.js';
 import { remapClientPath } from './paths.js';
 
-function baseUrl(host, port, ssl) {
+// A URL base ("URL Base" in the *arr apps): the path a reverse proxy serves the
+// client under, e.g. https://seedbox.example/qbit/api/v2/…. Normalized to ''
+// or '/x/y' so every spelling a user might paste — 'qbit', '/qbit', 'qbit/' —
+// behaves the same.
+export function normalizeUrlBase(v) {
+  const p = String(v || '').trim().replace(/^https?:\/\/[^/]*/i, '');
+  const clean = p.split('/').filter(Boolean).join('/');
+  return clean ? `/${clean}` : '';
+}
+
+function baseUrl(host, port, ssl, urlBase = '') {
   const raw = String(host || '').trim();
   if (!raw) return '';
-  const h = raw.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  const noScheme = raw.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  // A path pasted into the HOST field ("seedbox.example/qbit") is treated as a
+  // url base: without this the port would be appended AFTER the path and
+  // produce http://seedbox.example/qbit:8080.
+  const slash = noScheme.indexOf('/');
+  const h = slash === -1 ? noScheme : noScheme.slice(0, slash);
+  const hostPath = slash === -1 ? '' : noScheme.slice(slash);
   const scheme = ssl ? 'https' : 'http';
   const hasPort = /:\d+$/.test(h);
-  return `${scheme}://${h}${hasPort || !port ? '' : ':' + port}`;
+  const origin = `${scheme}://${h}${hasPort || !port ? '' : ':' + port}`;
+  return `${origin}${normalizeUrlBase(hostPath)}${normalizeUrlBase(urlBase)}`;
 }
 
 export function qbBaseUrl(config) {
-  return baseUrl(config.qbHost, config.qbPort, config.qbSsl);
+  return baseUrl(config.qbHost, config.qbPort, config.qbSsl, config.qbUrlBase);
 }
 export function trBaseUrl(config) {
-  return baseUrl(config.trHost, config.trPort, config.trSsl);
+  return baseUrl(config.trHost, config.trPort, config.trSsl, config.trUrlBase);
 }
 export function delugeBaseUrl(config) {
-  return baseUrl(config.delugeHost, config.delugePort, config.delugeSsl);
+  return baseUrl(config.delugeHost, config.delugePort, config.delugeSsl, config.delugeUrlBase);
 }
 
 // The host field that gates the torrent source, per selected client — "is a

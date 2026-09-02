@@ -192,16 +192,19 @@ const config = {
   // Download client: 'qbittorrent', 'transmission', or 'deluge'.
   torrentClient: 'qbittorrent',
   qbHost: '',            // hostname or IP, e.g. nas or 192.168.1.10
+  qbUrlBase: '',         // path prefix when a proxy serves qBittorrent under one, e.g. /qbit
   qbPort: '',            // qBittorrent Web UI port (default 8080)
   qbSsl: false,          // talk to the Web UI over https
   qbUser: '',            // Web UI username
   qbPass: '',            // Web UI password
   trHost: '',            // hostname or IP, e.g. nas or 192.168.1.10
+  trUrlBase: '',         // path prefix when a proxy serves Transmission under one
   trPort: '',            // Transmission RPC port (default 9091)
   trSsl: false,          // talk to the RPC endpoint over https
   trUser: '',            // RPC username (blank if auth is off)
   trPass: '',            // RPC password
   delugeHost: '',        // hostname or IP, e.g. nas or 192.168.1.10
+  delugeUrlBase: '',     // path prefix when a proxy serves Deluge under one
   delugePort: '',        // Deluge web UI port (default 8112)
   delugeSsl: false,      // talk to the web UI over https
   delugePass: '',        // web UI password (Deluge's only credential)

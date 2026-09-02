@@ -427,16 +427,19 @@
   const testQb = () => runTest('qb', '/api/torrent-client/test', () => ({
     torrentClient: v('#set-torrentClient'),
     qbHost: v('#set-qbHost').trim(),
+    qbUrlBase: v('#set-qbUrlBase').trim(),
     qbPort: v('#set-qbPort').trim(),
     qbSsl: checked('#set-qbSsl'),
     qbUser: v('#set-qbUser').trim(),
     qbPass: v('#set-qbPass'),
     trHost: v('#set-trHost').trim(),
+    trUrlBase: v('#set-trUrlBase').trim(),
     trPort: v('#set-trPort').trim(),
     trSsl: checked('#set-trSsl'),
     trUser: v('#set-trUser').trim(),
     trPass: v('#set-trPass'),
     delugeHost: v('#set-delugeHost').trim(),
+    delugeUrlBase: v('#set-delugeUrlBase').trim(),
     delugePort: v('#set-delugePort').trim(),
     delugeSsl: checked('#set-delugeSsl'),
     delugePass: v('#set-delugePass'),
@@ -776,6 +779,7 @@
                 <div class="only-qbittorrent">
                   <label class="field"><span>Host</span><input id="set-qbHost" class="mono" type="text" spellcheck="false" placeholder="nas or 192.168.1.10" /></label>
                   <label class="field"><span>Port</span><input id="set-qbPort" class="mono" type="number" min="1" max="65535" placeholder="8080" /></label>
+                  <label class="field"><span>URL base</span><input id="set-qbUrlBase" class="mono" type="text" spellcheck="false" placeholder="blank, or e.g. /qbittorrent" /></label>
                   <label class="field field--check"><input id="set-qbSsl" type="checkbox" /><span>Use HTTPS</span></label>
                   <label class="field"><span>Username</span><input id="set-qbUser" type="text" spellcheck="false" /></label>
                   <label class="field"><span>Password</span><input id="set-qbPass" type="password" spellcheck="false" /></label>
@@ -783,6 +787,7 @@
                 <div class="only-transmission">
                   <label class="field"><span>Host</span><input id="set-trHost" class="mono" type="text" spellcheck="false" placeholder="nas or 192.168.1.10" /></label>
                   <label class="field"><span>Port</span><input id="set-trPort" class="mono" type="number" min="1" max="65535" placeholder="9091" /></label>
+                  <label class="field"><span>URL base</span><input id="set-trUrlBase" class="mono" type="text" spellcheck="false" placeholder="blank, or e.g. /transmission" /></label>
                   <label class="field field--check"><input id="set-trSsl" type="checkbox" /><span>Use HTTPS</span></label>
                   <label class="field"><span>Username</span><input id="set-trUser" type="text" spellcheck="false" /></label>
                   <label class="field"><span>Password</span><input id="set-trPass" type="password" spellcheck="false" /></label>
@@ -790,6 +795,7 @@
                 <div class="only-deluge">
                   <label class="field"><span>Host</span><input id="set-delugeHost" class="mono" type="text" spellcheck="false" placeholder="nas or 192.168.1.10" /></label>
                   <label class="field"><span>Port</span><input id="set-delugePort" class="mono" type="number" min="1" max="65535" placeholder="8112" /></label>
+                  <label class="field"><span>URL base</span><input id="set-delugeUrlBase" class="mono" type="text" spellcheck="false" placeholder="blank, or e.g. /deluge" /></label>
                   <label class="field field--check"><input id="set-delugeSsl" type="checkbox" /><span>Use HTTPS</span></label>
                   <label class="field"><span>Password</span><input id="set-delugePass" type="password" spellcheck="false" /></label>
                 </div>
