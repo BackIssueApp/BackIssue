@@ -61,6 +61,14 @@ export function parseReleaseName(title) {
   // A marker word left dangling at the series tail ("naruto ch", "vagabond vol",
   // "frieren … - chapter") is part of the number's notation, not the name.
   series = series.replace(/[\s._-]*(?:c|ch|chapter|v|vol|volume)[\s.]*$/i, '');
+  // An INLINE volume marker with its number ("Stumptown v3", "Batman Vol 2") is
+  // a release-naming convention where vN identifies the VOLUME, distinct from
+  // the issue number already extracted — strip it so the series matches its
+  // catalog name. Anchored to a leading separator so a hyphenated name (X-23),
+  // or a name that merely starts with "v", is never touched, and requires the
+  // trailing digits so it only fires on the vN form (the marker-word-only case
+  // is handled just above).
+  series = series.replace(/[\s._-]+v(?:ol(?:ume)?)?\.?\s*\d+\s*$/i, '');
   return { series: series.trim(), number, year };
 }
 

@@ -164,6 +164,26 @@ test('usenet parseReleaseName: series / number / year', () => {
   assert.deepEqual(parseReleaseName('X-Men -1 (1997)'), { series: 'X-Men', number: '-1', year: '1997' });
   // ...but a hyphen inside a series name (X-23) is NOT mistaken for a negative.
   assert.deepEqual(parseReleaseName('X-23 5 (2010)'), { series: 'X-23', number: '5', year: '2010' });
+  // An inline volume marker ("vN", "Vol N") identifies the volume, not the
+  // series — strip it so the series matches its catalog name. (This is the
+  // Stumptown-#6/#7 bug: the only release was "Stumptown v3 007", and the "v3"
+  // left in the series made the strict auto-matcher reject a perfect match.)
+  assert.deepEqual(parseReleaseName('Stumptown v3 007 (2015) (Digital-Empire)'), { series: 'Stumptown', number: '7', year: '2015' });
+  assert.deepEqual(parseReleaseName('Batman v2 012 (2013)'), { series: 'Batman', number: '12', year: '2013' });
+  assert.deepEqual(parseReleaseName('Batman Vol 2 012 (2013)'), { series: 'Batman', number: '12', year: '2013' });
+  // The digits are required: a name that merely contains a volume number stays
+  // intact ("Spider-Man 2099" above), and a hyphenated name isn't touched.
+  assert.deepEqual(parseReleaseName('X-23 v3 001 (2018)'), { series: 'X-23', number: '1', year: '2018' });
+});
+
+test('usenet: an inline volume marker no longer defeats the auto-matcher (Stumptown #7)', () => {
+  // The real-world failure: the indexer carried the issue only as
+  // "Stumptown v3 007", and auto-search found no match while a manual search
+  // (which never applies the strict score filter) surfaced it fine.
+  const want = { series: 'Stumptown', names: ['Stumptown'], number: '7', year: 2014 };
+  assert.notEqual(scoreRelease('Stumptown v3 007 (2015) (Digital-Empire)', want), null);
+  // Still the same issue-number discipline: v3 #6 does not satisfy a want for #7.
+  assert.equal(scoreRelease('Stumptown v3 006 (2014)', want), null);
 });
 
 test('usenet: "-1" (Flashback) issues are searchable and matched, not confused with #1', () => {

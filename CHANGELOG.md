@@ -8,6 +8,16 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Auto-search now matches releases tagged with a volume marker.** A release
+  named like `Stumptown v3 007` carries a `vN` volume marker before the issue
+  number; the parser was leaving it glued to the series name (`Stumptown v3`),
+  so the strict auto-download matcher rejected an otherwise perfect match — an
+  issue would show as unfindable automatically even though a manual search
+  surfaced and downloaded it fine. The marker is now stripped, so `vN` /
+  `Vol N` releases match by series and issue number as expected.
+
 ### Added
 - **URL base for download clients.** When a reverse proxy serves a download
   client under a subpath rather than at the root — common with seedbox
