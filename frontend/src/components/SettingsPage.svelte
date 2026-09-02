@@ -418,6 +418,7 @@
   const testClient = () => runTest('client', '/api/clients/test', () => ({
     nzbClient: v('#set-nzbClient'),
     nzbClientHost: v('#set-nzbClientHost').trim(),
+    nzbClientUrlBase: v('#set-nzbClientUrlBase').trim(),
     nzbClientPort: v('#set-nzbClientPort').trim(),
     nzbClientSsl: checked('#set-nzbClientSsl'),
     nzbClientApiKey: v('#set-nzbClientApiKey').trim(),
@@ -716,6 +717,7 @@
                 </label>
                 <label class="field"><span>Host</span><input id="set-nzbClientHost" class="mono" type="text" spellcheck="false" placeholder="nas or 192.168.1.10" /></label>
                 <label class="field"><span>Port</span><input id="set-nzbClientPort" class="mono" type="number" min="1" max="65535" placeholder="8080" /></label>
+                <label class="field"><span>URL base</span><input id="set-nzbClientUrlBase" class="mono" type="text" spellcheck="false" placeholder="blank, or e.g. /sabnzbd" /></label>
                 <label class="field field--check"><input id="set-nzbClientSsl" type="checkbox" /><span>Use HTTPS</span></label>
                 <div class="only-sabnzbd">
                   <label class="field"><span>API key</span><input id="set-nzbClientApiKey" class="mono" type="text" spellcheck="false" /></label>

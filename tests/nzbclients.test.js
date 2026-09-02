@@ -216,3 +216,56 @@ test('testClient: connection failure is caught', async () => {
   assert.equal(r.ok, false);
   assert.match(r.message, /Connection failed/i);
 });
+
+// ---- URL base (a proxy serving the client under a subpath) -----------------
+
+test('clientBaseUrl: honours a URL base, in every spelling', () => {
+  assert.equal(clientBaseUrl({ nzbClientHost: 'nas', nzbClientPort: 8080, nzbClientUrlBase: '/sabnzbd' }),
+    'http://nas:8080/sabnzbd');
+  assert.equal(clientBaseUrl({ nzbClientHost: 'nas', nzbClientPort: 8080, nzbClientUrlBase: 'sabnzbd' }),
+    'http://nas:8080/sabnzbd');
+  assert.equal(clientBaseUrl({ nzbClientHost: 'nas', nzbClientPort: 8080, nzbClientUrlBase: 'sabnzbd/' }),
+    'http://nas:8080/sabnzbd');
+  // Blank base is byte-identical to the old behaviour.
+  assert.equal(clientBaseUrl({ nzbClientHost: 'nas', nzbClientPort: 8080, nzbClientUrlBase: '' }),
+    'http://nas:8080');
+  // The legacy whole-URL field keeps working, and can take a base too.
+  assert.equal(clientBaseUrl({ nzbClientUrl: 'http://legacy:8080', nzbClientUrlBase: '/sab' }),
+    'http://legacy:8080/sab');
+});
+
+test('clientBaseUrl: a path typed into the HOST field is read as a URL base', () => {
+  // Previously produced http://seedbox.example/sabnzbd:8080 — a dead address.
+  assert.equal(clientBaseUrl({ nzbClientHost: 'seedbox.example/sabnzbd', nzbClientPort: 8080 }),
+    'http://seedbox.example:8080/sabnzbd');
+  assert.equal(clientBaseUrl({ nzbClientHost: 'https://seedbox.example/sabnzbd/', nzbClientSsl: true }),
+    'https://seedbox.example/sabnzbd');
+});
+
+test('sabnzbd calls actually go through the URL base', async () => {
+  const seen = [];
+  const fetchImpl = async (url) => {
+    seen.push(String(url));
+    return { ok: true, json: async () => ({ queue: { version: '4.2.0', slots: [] } }) };
+  };
+  const r = await testClient(
+    { nzbClient: 'sabnzbd', nzbClientHost: 'seedbox.example', nzbClientPort: 8080, nzbClientUrlBase: '/sabnzbd', nzbClientApiKey: 'k' },
+    { fetchImpl },
+  );
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.ok(seen.every((u) => u.startsWith('http://seedbox.example:8080/sabnzbd/api?')), seen.join(', '));
+});
+
+test('nzbget calls actually go through the URL base', async () => {
+  const seen = [];
+  const fetchImpl = async (url) => {
+    seen.push(String(url));
+    return { ok: true, json: async () => ({ result: '21.1' }) };
+  };
+  const r = await testClient(
+    { nzbClient: 'nzbget', nzbClientHost: 'seedbox.example', nzbClientPort: 6789, nzbClientUrlBase: 'nzbget', nzbClientUser: 'u', nzbClientPass: 'p' },
+    { fetchImpl },
+  );
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.ok(seen.every((u) => u === 'http://seedbox.example:6789/nzbget/jsonrpc'), seen.join(', '));
+});

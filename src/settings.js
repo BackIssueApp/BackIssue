@@ -92,6 +92,7 @@ export const SETTING_FIELDS = {
   newznabIndexers:         { type: 'string', allowEmpty: true },
   nzbClient:               { type: 'enum', values: ['sabnzbd', 'nzbget'] },
   nzbClientHost:           { type: 'string', allowEmpty: true },
+  nzbClientUrlBase:        { type: 'string', allowEmpty: true },
   nzbClientPort:           { type: 'int', min: 1, max: 65535 },
   nzbClientSsl:            { type: 'bool' },
   nzbClientUrl:            { type: 'string', allowEmpty: true }, // legacy: migrated to host/port (see loadSettings)

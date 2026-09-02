@@ -5,17 +5,25 @@
 // `path` is the completed folder as the CLIENT sees it; the usenet source maps it
 // onto a locally-readable path via usenetCompleteDir/usenetCompleteDirRemote.
 import { remapClientPath } from './paths.js';
+import { buildClientUrl, normalizeUrlBase } from './clienturl.js';
 
-// Build the client's base URL from host + port (+ ssl). Falls back to a legacy
-// nzbClientUrl if host isn't set, so pre-existing configs keep working.
+// Build the client's base URL from host + port (+ ssl) + an optional URL base
+// (a reverse proxy serving SABnzbd/NZBGet under a subpath — very common in
+// Docker and on seedboxes). Falls back to a legacy nzbClientUrl if host isn't
+// set, so pre-existing configs keep working.
 export function clientBaseUrl(config) {
-  const raw = String(config.nzbClientHost || '').trim();
-  if (!raw) return (config.nzbClientUrl || '').replace(/\/+$/, '');
-  const host = raw.replace(/^https?:\/\//, '').replace(/\/+$/, '');
-  const scheme = config.nzbClientSsl ? 'https' : 'http';
-  const hasPort = /:\d+$/.test(host);
-  const port = config.nzbClientPort;
-  return `${scheme}://${host}${hasPort || !port ? '' : ':' + port}`;
+  if (!String(config.nzbClientHost || '').trim()) {
+    const legacy = (config.nzbClientUrl || '').replace(/\/+$/, '');
+    // The legacy field held a whole URL, path included — keep it verbatim, but
+    // still honour a URL base set alongside it.
+    return legacy ? `${legacy}${normalizeUrlBase(config.nzbClientUrlBase)}` : '';
+  }
+  return buildClientUrl({
+    host: config.nzbClientHost,
+    port: config.nzbClientPort,
+    ssl: config.nzbClientSsl,
+    urlBase: config.nzbClientUrlBase,
+  });
 }
 
 function normalizeStorage(storage, config) {

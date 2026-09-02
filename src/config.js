@@ -168,6 +168,7 @@ const config = {
   // Download client: 'sabnzbd' or 'nzbget'.
   nzbClient: 'sabnzbd',
   nzbClientHost: '',      // hostname or IP, e.g. nas or 192.168.1.10
+  nzbClientUrlBase: '',  // path prefix when a proxy serves the client under one, e.g. /sabnzbd
   nzbClientPort: '',      // SABnzbd default 8080, NZBGet default 6789
   nzbClientSsl: false,    // talk to the client over https
   nzbClientUrl: '',       // legacy: migrated to host/port on load (see settings.js)
