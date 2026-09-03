@@ -28,34 +28,68 @@
   let cblDir = $state([]);       // folder path within the catalog
   let cblQ = $state('');
   let cblResult = $state(null);  // last import summary (shows what couldn't be matched)
+  let cblPage = $state(8);       // how many list cards are shown ("Show more" grows it)
+  let cblDrag = $state(false);   // a file is being dragged over the drop zone
 
   const listId = $derived.by(() => Number(new URLSearchParams(route.search).get('list')) || null);
   const arcOpen = $derived(arcResults !== null && !listId);
   const cblShown = $derived(cblOpen && !listId);
   // "[Marvel] (2006-02) Civil War (Official).cbl" → "Civil War (Official)"
   const cblPretty = (p) => p.split('/').pop().replace(/\.cbl$/i, '').replace(/^\[[^\]]*\]\s*/, '').replace(/^\(\d{4}(?:-\d{2})?(?:-\d{2})?\)\s*/, '');
-  // The catalog is a flat list of repo paths; browse it as folders, or filter
-  // every list at once by words in its path.
-  const cblEntries = $derived.by(() => {
-    if (!cblFiles) return { folders: [], files: [], more: 0 };
-    const q = cblQ.trim().toLowerCase();
-    if (q) {
-      const words = q.split(/\s+/);
-      const hits = cblFiles.filter((p) => { const l = p.toLowerCase(); return words.every((w) => l.includes(w)); });
-      return { folders: [], more: Math.max(0, hits.length - 120),
-        files: hits.slice(0, 120).map((p) => ({ path: p, name: cblPretty(p), where: p.split('/').slice(0, -1).join(' › ') })) };
+  const CBL_PAGE = 8;
+  // Publisher accent for top-level folders and list tiles (theme tokens where
+  // one fits; violet is this page's existing arc accent, orange has no token).
+  const CBL_TONE = { Marvel: 'var(--red)', DC: 'var(--cyan)', Image: 'var(--green)', 'Dark Horse': 'var(--amber)', Vertigo: '#a78bfa', Valiant: '#ff8f3d' };
+  const cblTone = (pub) => CBL_TONE[pub] || 'var(--faint)';
+  // "Marvel/Events/Civil War/[Marvel] (2006-02) Civil War (Official).cbl" →
+  // publisher from the [..] prefix, date from (YYYY-MM), title via cblPretty,
+  // folders by splitting the path. All derived client-side; the API is just paths.
+  const cblParse = (p) => {
+    const base = p.split('/').pop().replace(/\.cbl$/i, '');
+    const segs = p.split('/');
+    // Some lists put a year range in the brackets instead of the publisher
+    // ("[2007-2009] Secret Invasion …"); a bracket that starts with a year is
+    // a date, and the publisher is then the top-level folder.
+    const tag = (base.match(/^\[([^\]]*)\]/) || [, ''])[1];
+    const tagIsDate = /^\d{4}/.test(tag);
+    return {
+      path: p, title: cblPretty(base), dir: segs.slice(0, -1),
+      publisher: (!tagIsDate && tag) || segs[0] || 'Other',
+      date: (base.match(/\((\d{4}(?:-\d{2})?)\)/) || [, ''])[1] || (tagIsDate ? tag : ''),
+    };
+  };
+  const cblAll = $derived((cblFiles || []).map(cblParse));
+  const cblSearching = $derived(!!cblQ.trim());
+  // Catalog lists already imported: their list rows carry the repo path as `source`.
+  const cblImported = $derived(new Set(lists.map((l) => l.source).filter(Boolean)));
+  const cblInDir = (c) => cblDir.every((seg, i) => c.dir[i] === seg);
+  // Sub-folders at the current level (none while searching — search flattens).
+  const cblFolders = $derived.by(() => {
+    if (cblSearching) return [];
+    const map = new Map();
+    for (const c of cblAll) {
+      if (!cblInDir(c)) continue;
+      const next = c.dir[cblDir.length];
+      if (next == null) continue;
+      const e = map.get(next) || { name: next, lists: 0, subs: new Set() };
+      e.lists++;
+      if (c.dir[cblDir.length + 1] != null) e.subs.add(c.dir[cblDir.length + 1]);
+      map.set(next, e);
     }
-    const prefix = cblDir.length ? cblDir.join('/') + '/' : '';
-    const folders = new Map(); const files = [];
-    for (const p of cblFiles) {
-      if (!p.startsWith(prefix)) continue;
-      const rest = p.slice(prefix.length);
-      const cut = rest.indexOf('/');
-      if (cut < 0) files.push({ path: p, name: cblPretty(rest), where: '' });
-      else { const f = rest.slice(0, cut); folders.set(f, (folders.get(f) || 0) + 1); }
-    }
-    return { folders: [...folders].map(([name, n]) => ({ name, n })), files, more: 0 };
+    return [...map.values()].sort((a, b) => b.lists - a.lists).map((e) => ({
+      name: e.name, lists: e.lists, subs: e.subs.size,
+      tone: cblDir.length === 0 ? cblTone(e.name) : '#a78bfa',
+    }));
   });
+  // Lists at exactly this level when browsing; anywhere in the tree when searching.
+  const cblHits = $derived.by(() => {
+    if (cblSearching) {
+      const words = cblQ.trim().toLowerCase().split(/\s+/);
+      return cblAll.filter((c) => { const hay = (c.title + ' ' + c.dir.join(' ')).toLowerCase(); return words.every((w) => hay.includes(w)); });
+    }
+    return cblAll.filter((c) => c.dir.length === cblDir.length && cblInDir(c));
+  });
+  const cblVisible = $derived(cblHits.slice(0, cblPage));
 
   async function refresh() {
     try {
@@ -208,15 +242,28 @@
     const skipped = r.total - r.imported;
     notify(`Imported "${r.name}" — ${fmt(r.imported)} of ${fmt(r.total)} issues${skipped ? ` (${fmt(skipped)} couldn't be matched)` : ''}.`, skipped ? 'error' : 'ok');
     refresh();
-    if (!skipped && !r.truncated) { cblOpen = false; setQuery({ list: r.id }); }
+    // Clean import: go straight to the list, and drop the result so the panel
+    // comes back fresh (with the drop zone) next time it's opened.
+    if (!skipped && !r.truncated) { cblResult = null; cblOpen = false; setQuery({ list: r.id }); }
+  }
+  function cblGo(dir) { cblDir = dir; cblQ = ''; cblPage = CBL_PAGE; }
+  async function importCblText(file) {
+    if (!file || cblBusy) return;
+    if (file.size > 4 * 1024 * 1024) return notify('That file is over the 4 MB limit.', 'error');
+    cblBusy = true; cblResult = null;
+    cblDone(await apiPostText('/api/lists/import-cbl', await file.text(), 'application/xml'));
   }
   async function importCblFile(e) {
     const input = e.currentTarget;
     const file = input.files?.[0];
     input.value = '';
-    if (!file) return;
-    cblBusy = true; cblResult = null;
-    cblDone(await apiPostText('/api/lists/import-cbl', await file.text(), 'application/xml'));
+    await importCblText(file);
+  }
+  // Drop handling is an enhancement on top of the <input type="file"> inside
+  // the label, which keeps the keyboard/screen-reader path intact.
+  async function cblDrop(e) {
+    e.preventDefault(); cblDrag = false;
+    await importCblText(e.dataTransfer?.files?.[0]);
   }
   async function importCatalog(path) {
     cblBusy = true; cblResult = null;
@@ -295,62 +342,109 @@
       </div>
     {:else if cblShown}
       <div class="listx__scroll">
-        <div class="listx__arc">
-          <div class="listx__arc-head"><span class="listx__arc-ico"><Icon name="import" size={16} /></span><div class="listx__arc-title">Import a CBL reading list</div></div>
-          <p class="listx__arc-sub">CBL is a widely used reading-list format. Bring in a file of your own, or pick from the community's 1,700+ curated lists — whole events, character runs and alternate universes, in reading order. Issues you don't own stay in place, so you can download what's missing.</p>
-          <label class="listx__cbl-upload" class:is-busy={cblBusy}>
-            <Icon name="upload" size={15} /> {cblBusy ? 'Importing…' : 'Choose a .cbl file'}
-            <input type="file" accept=".cbl,.xml,text/xml,application/xml" disabled={cblBusy} onchange={importCblFile} />
-          </label>
+        <div class="listx__cbl">
+          <div class="listx__cbl-head">
+            <span class="listx__cbl-ico"><Icon name="import" size={19} /></span>
+            <div>
+              <div class="listx__arc-title">Import a CBL reading list</div>
+              <p class="listx__cbl-sub">CBL is a widely used reading-list format. Bring in a file of your own, or pick from the community's 1,700+ curated lists — whole events, character runs and alternate universes, in reading order. Issues you don't own stay in place, so you can download what's missing.</p>
+            </div>
+          </div>
+
           {#if cblResult}
-            <div class="listx__cbl-result">
-              <div class="listx__cbl-result-head">
-                <span>Imported <b>{cblResult.name}</b> — {fmt(cblResult.imported)} of {fmt(cblResult.total)} issues</span>
-                <button class="listx__arc-import" onclick={() => { cblOpen = false; setQuery({ list: cblResult.id }); }}>Open list</button>
+            {@const skipped = cblResult.total - cblResult.imported}
+            <div class="listx__cbl-result" class:is-clean={!skipped}>
+              <div class="listx__cbl-result-row">
+                <span class="listx__cbl-result-ico"><Icon name={skipped ? 'alert-triangle' : 'check'} size={17} /></span>
+                <div class="listx__cbl-result-text">
+                  <div class="listx__cbl-result-title">Imported “{cblResult.name}”</div>
+                  <div class="listx__cbl-result-sub">{fmt(cblResult.imported)} of {fmt(cblResult.total)} issues in reading order</div>
+                </div>
+                <button class="listx__cbl-ghost" onclick={() => (cblResult = null)}>Dismiss</button>
+                <button class="listx__cbl-primary" onclick={() => { cblOpen = false; setQuery({ list: cblResult.id }); }}>Open list</button>
+              </div>
+              <div class="listx__cbl-tiles">
+                <div class="listx__cbl-tile is-ok"><div class="listx__cbl-tile-n">{fmt(cblResult.imported)}</div><div class="listx__cbl-tile-l">Matched</div></div>
+                <div class="listx__cbl-tile" class:is-warn={skipped > 0}><div class="listx__cbl-tile-n">{fmt(skipped)}</div><div class="listx__cbl-tile-l">Couldn't match</div></div>
               </div>
               {#if cblResult.unmatched?.length}
-                <div class="listx__cbl-unmatched"><span>Couldn't match on ComicVine:</span>
-                  {#each cblResult.unmatched as u}<span class="listx__cbl-miss">{u.series} #{u.number}{u.volume ? ` (${u.volume})` : ''}</span>{/each}
+                <div class="listx__cbl-unmatched">
+                  <div class="listx__cbl-unmatched-head"><Icon name="alert-triangle" size={15} /><span>Not found on ComicVine — these stay out of the list</span></div>
+                  {#each cblResult.unmatched as u}
+                    <div class="listx__cbl-unmatched-row"><span class="listx__cbl-unmatched-label">{u.series} #{u.number}{u.volume ? ` (${u.volume})` : ''}</span><span class="listx__cbl-unmatched-why">{u.reason || 'no match'}</span></div>
+                  {/each}
                 </div>
               {/if}
-              {#if cblResult.truncated}<div class="listx__cbl-unmatched">This list is very long — the first 3,000 books were imported.</div>{/if}
+              {#if cblResult.truncated}<div class="listx__cbl-trunc">This list is very long — the first 3,000 books were imported.</div>{/if}
             </div>
+          {:else}
+            <label class="listx__cbl-drop" class:is-busy={cblBusy} class:is-drag={cblDrag}
+              ondragover={(e) => { e.preventDefault(); if (!cblBusy) cblDrag = true; }}
+              ondragleave={() => (cblDrag = false)} ondrop={cblDrop}>
+              <span class="listx__cbl-drop-ico"><Icon name="upload" size={20} /></span>
+              <span class="listx__cbl-drop-text">
+                <span class="listx__cbl-drop-title">{cblBusy ? 'Importing your list…' : 'Choose a .cbl file'}</span>
+                <span class="listx__cbl-drop-sub">{cblBusy ? 'Matching each book on ComicVine' : 'Or drop one here — .cbl and .xml, up to 4 MB'}</span>
+              </span>
+              {#if cblBusy}<span class="listx__cbl-drop-busy">Importing…</span>{/if}
+              <input type="file" accept=".cbl,.xml,text/xml,application/xml" disabled={cblBusy} onchange={importCblFile} />
+            </label>
           {/if}
+
           <div class="listx__cbl-cathead">
             <span class="listx__cbl-cattitle">Community lists</span>
+            {#if cblFiles?.length}<span class="listx__cbl-catcount">{fmt(cblFiles.length)} lists</span>{/if}
             <a class="listx__cbl-catsrc" href="https://github.com/DieselTech/CBL-ReadingLists" target="_blank" rel="noreferrer">DieselTech/CBL-ReadingLists <Icon name="external-link" size={11} /></a>
           </div>
           <div class="listx__arc-field listx__cbl-filter">
             <Icon name="search" size={15} />
-            <input placeholder="Filter every list, e.g. Civil War" bind:value={cblQ} spellcheck="false" />
+            <input placeholder="Filter every list, e.g. Civil War" bind:value={cblQ} oninput={() => (cblPage = CBL_PAGE)} spellcheck="false" />
           </div>
+          <div class="listx__cbl-crumbs">
+            <button class="listx__cbl-crumb" class:is-cur={!cblDir.length && !cblSearching} onclick={() => cblGo([])}>All publishers</button>
+            {#each cblDir as seg, i}
+              <span class="listx__cbl-sep"><Icon name="chevron-right" size={14} /></span>
+              <button class="listx__cbl-crumb" class:is-cur={i === cblDir.length - 1 && !cblSearching} onclick={() => cblGo(cblDir.slice(0, i + 1))}>{seg}</button>
+            {/each}
+            {#if cblSearching}<span class="listx__cbl-searching">searching all folders</span>{/if}
+          </div>
+
           {#if cblFiles === null}
             <div class="listx__arc-empty">Loading the catalog…</div>
           {:else if cblErr}
-            <div class="listx__arc-empty">{cblErr} <button class="listx__cbl-crumb" onclick={loadCatalog}>Try again</button></div>
+            <div class="listx__cbl-error"><Icon name="alert-triangle" size={15} /><span>{cblErr}</span><button class="listx__cbl-ghost" onclick={loadCatalog}>Try again</button></div>
           {:else}
-            {#if !cblQ.trim()}
-              <div class="listx__cbl-crumbs">
-                <button class="listx__cbl-crumb" class:is-cur={!cblDir.length} onclick={() => (cblDir = [])}>All publishers</button>
-                {#each cblDir as seg, i}
-                  <span class="listx__cbl-sep">›</span>
-                  <button class="listx__cbl-crumb" class:is-cur={i === cblDir.length - 1} onclick={() => (cblDir = cblDir.slice(0, i + 1))}>{seg}</button>
+            {#if cblFolders.length}
+              <div class="listx__cbl-folders">
+                {#each cblFolders as f (f.name)}
+                  <button class="listx__cbl-folder" onclick={() => cblGo([...cblDir, f.name])}>
+                    <span class="listx__cbl-folder-ico" style="--tone:{f.tone}"><Icon name="folder" size={16} /></span>
+                    <span class="listx__cbl-folder-text"><span class="listx__cbl-folder-name">{f.name}</span><span class="listx__cbl-folder-meta">{fmt(f.lists)} list{f.lists === 1 ? '' : 's'}{f.subs ? ` · ${fmt(f.subs)} folder${f.subs === 1 ? '' : 's'}` : ''}</span></span>
+                    <Icon name="chevron-right" size={14} />
+                  </button>
                 {/each}
               </div>
             {/if}
-            {#each cblEntries.folders as f (f.name)}
-              <button class="listx__cbl-row listx__cbl-folder" onclick={() => (cblDir = [...cblDir, f.name])}>
-                <Icon name="folder" size={15} /><span class="listx__cbl-rowname">{f.name}</span><span class="listx__cbl-rowmeta">{fmt(f.n)} list{f.n === 1 ? '' : 's'}</span><Icon name="chevron-right" size={14} />
-              </button>
-            {/each}
-            {#each cblEntries.files as f (f.path)}
-              <div class="listx__cbl-row">
-                <Icon name="list" size={15} /><span class="listx__cbl-rowname">{f.name}{#if f.where}<span class="listx__cbl-where">{f.where}</span>{/if}</span>
-                <button class="listx__arc-import" disabled={cblBusy} onclick={() => importCatalog(f.path)}>Import</button>
-              </div>
-            {/each}
-            {#if cblEntries.more}<div class="listx__arc-empty">…and {fmt(cblEntries.more)} more — narrow the filter.</div>{/if}
-            {#if !cblEntries.folders.length && !cblEntries.files.length}<div class="listx__arc-empty">No lists match “{cblQ}”.</div>{/if}
+            {#if !cblFolders.length && !cblHits.length}
+              <div class="listx__arc-empty">{cblSearching ? `No lists match “${cblQ}”.` : 'This folder has no reading lists.'}</div>
+            {/if}
+            <div class="listx__cbl-cards">
+              {#each cblVisible as c (c.path)}
+                {@const done = cblImported.has(c.path)}
+                <div class="listx__cbl-card">
+                  <span class="listx__cbl-pub" style="--tone:{cblTone(c.publisher)}">{c.publisher.slice(0, 2).toUpperCase()}</span>
+                  <div class="listx__cbl-card-text">
+                    <div class="listx__cbl-card-title">{c.title}</div>
+                    <div class="listx__cbl-card-meta"><span>{c.publisher}</span>{#if c.date}<span class="listx__cbl-dot">·</span><span>{c.date}</span>{/if}{#if c.dir.length > 1}<span class="listx__cbl-dot">·</span><span class="listx__cbl-crumbtxt">{c.dir.slice(1).join(' / ')}</span>{/if}</div>
+                  </div>
+                  {#if done}<span class="listx__cbl-done">Imported</span>{/if}
+                  <button class="listx__cbl-import" class:is-again={done} disabled={cblBusy} onclick={() => importCatalog(c.path)}>{done ? 'Re-import' : 'Import'}</button>
+                </div>
+              {/each}
+            </div>
+            {#if cblHits.length > cblVisible.length}
+              <button class="listx__cbl-more" onclick={() => (cblPage += CBL_PAGE)}>Show more ({fmt(cblHits.length - cblVisible.length)} more)</button>
+            {/if}
           {/if}
         </div>
       </div>
@@ -528,31 +622,83 @@
   .listx__arc-import { height: 34px; padding: 0 15px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); border-radius: 8px; font: 600 12.5px var(--font-body); cursor: pointer; flex: none; }
   .listx__arc-empty { padding: 34px; text-align: center; color: var(--faint); font-size: 13px; }
 
-  .listx__cbl-upload { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 18px; border: 1px dashed var(--line); border-radius: 10px; color: var(--text); font: 600 13px var(--font-body); cursor: pointer; margin-bottom: 18px; }
-  .listx__cbl-upload:hover { border-color: var(--accent); }
-  .listx__cbl-upload.is-busy { opacity: .6; cursor: progress; }
-  .listx__cbl-upload input { display: none; }
-  .listx__cbl-result { border: 1px solid var(--line); border-radius: 11px; padding: 12px 14px; margin-bottom: 18px; font-size: 13px; }
-  .listx__cbl-result-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .listx__cbl-unmatched { color: var(--faint); font-size: 12px; margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-  .listx__cbl-miss { border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; color: var(--text); }
-  .listx__cbl-cathead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 6px 0 10px; }
-  .listx__cbl-cattitle { font-family: var(--font-display); font-size: 15px; letter-spacing: .03em; }
-  .listx__cbl-catsrc { font-size: 12px; color: var(--faint); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+
+  .listx__cbl { max-width: 760px; margin: 0 auto; padding: 22px 24px 60px; }
+  .listx__cbl-head { display: flex; align-items: flex-start; gap: 13px; margin-bottom: 8px; }
+  .listx__cbl-ico { width: 36px; height: 36px; border-radius: 9px; flex: none; display: grid; place-items: center; background: rgba(167,139,250,.15); color: #a78bfa; }
+  .listx__cbl-sub { font-size: 13px; color: var(--muted); margin: 6px 0 0; line-height: 1.6; }
+  .listx__cbl-result { border: 1px solid rgba(255,194,75,.4); background: rgba(255,194,75,.05); border-radius: 13px; padding: 16px 18px; margin-top: 18px; }
+  .listx__cbl-result.is-clean { border-color: rgba(95,211,138,.4); background: rgba(95,211,138,.05); }
+  .listx__cbl-result-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .listx__cbl-result-ico { width: 34px; height: 34px; border-radius: 9px; flex: none; display: grid; place-items: center; color: var(--amber); background: rgba(255,194,75,.13); }
+  .is-clean .listx__cbl-result-ico { color: var(--green); background: rgba(95,211,138,.13); }
+  .listx__cbl-result-text { flex: 1; min-width: 160px; }
+  .listx__cbl-result-title { font-size: 14.5px; font-weight: 600; }
+  .listx__cbl-result-sub { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+  .listx__cbl-primary { height: 36px; padding: 0 16px; border: none; background: var(--accent); color: #fff; border-radius: 8px; font: 600 12.5px var(--font-body); cursor: pointer; flex: none; }
+  .listx__cbl-ghost { height: 32px; padding: 0 13px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); border-radius: 7px; font: 600 12px var(--font-body); cursor: pointer; flex: none; }
+  .listx__cbl-tiles { display: flex; gap: 10px; margin-top: 14px; }
+  .listx__cbl-tile { flex: 1; padding: 11px 13px; background: rgba(255,255,255,.02); border: 1px solid var(--line); border-radius: 10px; }
+  .listx__cbl-tile-n { font: 700 19px var(--font-body); color: var(--green); }
+  .listx__cbl-tile.is-ok { background: rgba(95,211,138,.07); border-color: rgba(95,211,138,.3); }
+  .listx__cbl-tile.is-warn { background: rgba(255,194,75,.07); border-color: rgba(255,194,75,.3); }
+  .listx__cbl-tile.is-warn .listx__cbl-tile-n { color: var(--amber); }
+  .listx__cbl-tile-l { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin-top: 3px; }
+  .listx__cbl-unmatched { margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .listx__cbl-unmatched-head { display: flex; align-items: center; gap: 9px; padding: 10px 13px; background: rgba(255,255,255,.02); border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+  .listx__cbl-unmatched-head :global(svg) { color: var(--amber); flex: none; }
+  .listx__cbl-unmatched-row { display: flex; align-items: center; gap: 10px; padding: 8px 13px; border-bottom: 1px solid var(--line); }
+  .listx__cbl-unmatched-row:last-child { border-bottom: 0; }
+  .listx__cbl-unmatched-label { flex: 1; min-width: 0; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .listx__cbl-unmatched-why { font: 11px var(--font-mono); color: var(--faint); flex: none; }
+  .listx__cbl-trunc { margin-top: 11px; font-size: 12px; color: var(--amber); }
+  .listx__cbl-drop { display: flex; align-items: center; gap: 14px; margin-top: 18px; padding: 18px; border: 1px dashed #4a4266; border-radius: 13px; background: rgba(255,255,255,.012); cursor: pointer; transition: border-color .12s, background .12s; }
+  .listx__cbl-drop:hover, .listx__cbl-drop.is-drag { border-color: var(--accent); background: rgba(255,45,111,.05); }
+  .listx__cbl-drop.is-busy { border-color: var(--accent); cursor: progress; }
+  .listx__cbl-drop input { display: none; }
+  .listx__cbl-drop-ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--panel-2); color: #a78bfa; flex: none; }
+  .listx__cbl-drop-text { flex: 1; min-width: 0; }
+  .listx__cbl-drop-title { display: block; font-size: 14px; font-weight: 600; }
+  .listx__cbl-drop-sub { display: block; font-size: 12.5px; color: var(--faint); margin-top: 3px; }
+  .listx__cbl-drop-busy { font: 12px var(--font-mono); color: var(--accent); flex: none; }
+  .listx__cbl-cathead { display: flex; align-items: baseline; gap: 10px; margin: 26px 0 12px; flex-wrap: wrap; }
+  .listx__cbl-cattitle { font-family: var(--font-display); font-size: 16px; letter-spacing: .03em; }
+  .listx__cbl-catcount { font: 11.5px var(--font-mono); color: var(--faint); }
+  .listx__cbl-catsrc { margin-left: auto; font-size: 11.5px; color: var(--faint); text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
   .listx__cbl-catsrc:hover { color: var(--text); }
-  .listx__cbl-filter { margin-bottom: 12px; }
-  .listx__cbl-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 10px; }
-  .listx__cbl-crumb { background: none; border: none; color: var(--faint); font: 600 12.5px var(--font-body); cursor: pointer; padding: 3px 6px; border-radius: 6px; }
-  .listx__cbl-crumb:hover { color: var(--text); background: rgba(255,255,255,.05); }
-  .listx__cbl-crumb.is-cur { color: var(--text); }
-  .listx__cbl-sep { color: var(--faint); font-size: 12px; }
-  .listx__cbl-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.012); margin-bottom: 8px; color: var(--text); font: 13.5px var(--font-body); text-align: left; box-sizing: border-box; }
-  .listx__cbl-folder { cursor: pointer; }
-  .listx__cbl-folder:hover { border-color: var(--accent); }
-  .listx__cbl-row > :global(svg) { color: var(--faint); flex: none; }
-  .listx__cbl-rowname { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .listx__cbl-where { display: block; font-weight: 400; font-size: 11.5px; color: var(--faint); }
-  .listx__cbl-rowmeta { font-size: 12px; color: var(--faint); flex: none; }
+  .listx__cbl-filter { margin-bottom: 10px; }
+  .listx__cbl-filter input { height: 40px; border-radius: 9px; }
+  .listx__cbl-crumbs { display: flex; align-items: center; gap: 3px; overflow-x: auto; scrollbar-width: none; padding-bottom: 12px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+  .listx__cbl-crumb { height: 30px; padding: 0 10px; border: none; border-radius: 7px; background: transparent; color: var(--muted); font: 600 12.5px var(--font-body); cursor: pointer; white-space: nowrap; flex: none; }
+  .listx__cbl-crumb:hover { color: var(--text); }
+  .listx__cbl-crumb.is-cur { background: var(--panel-2); color: var(--text); }
+  .listx__cbl-sep { color: #4a4458; flex: none; display: flex; }
+  .listx__cbl-searching { margin-left: auto; font: 11px var(--font-mono); color: var(--faint); flex: none; }
+  .listx__cbl-error { padding: 16px; border: 1px solid rgba(255,194,75,.3); background: rgba(255,194,75,.06); border-radius: 11px; display: flex; align-items: center; gap: 11px; font-size: 12.5px; color: var(--amber); }
+  .listx__cbl-error span { flex: 1; }
+  .listx__cbl-folders { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .listx__cbl-folder { display: flex; align-items: center; gap: 11px; padding: 11px 13px; text-align: left; background: rgba(255,255,255,.012); border: 1px solid var(--line); border-radius: 11px; cursor: pointer; color: var(--text); font: 13.5px var(--font-body); transition: background .12s, border-color .12s; }
+  .listx__cbl-folder:hover { border-color: #4a4266; background: rgba(255,255,255,.03); }
+  .listx__cbl-folder > :global(svg) { color: var(--faint); flex: none; }
+  .listx__cbl-folder-ico { width: 32px; height: 32px; border-radius: 8px; flex: none; display: grid; place-items: center; color: var(--tone); background: color-mix(in srgb, var(--tone) 11%, transparent); border: 1px solid color-mix(in srgb, var(--tone) 27%, transparent); }
+  .listx__cbl-folder-text { flex: 1; min-width: 0; }
+  .listx__cbl-folder-name { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .listx__cbl-folder-meta { display: block; font: 11px var(--font-mono); color: var(--faint); margin-top: 3px; }
+  .listx__cbl-cards { display: flex; flex-direction: column; gap: 8px; }
+  .listx__cbl-card { display: flex; align-items: center; gap: 13px; padding: 12px 14px; background: rgba(255,255,255,.012); border: 1px solid var(--line); border-radius: 11px; transition: background .12s, border-color .12s; }
+  .listx__cbl-card:hover { border-color: #4a4266; background: rgba(255,255,255,.03); }
+  .listx__cbl-card:hover .listx__cbl-import { opacity: 1; }
+  .listx__cbl-pub { width: 34px; height: 34px; border-radius: 8px; flex: none; display: grid; place-items: center; font: 700 11px var(--font-mono); color: var(--tone); background: color-mix(in srgb, var(--tone) 11%, transparent); border: 1px solid color-mix(in srgb, var(--tone) 27%, transparent); }
+  .listx__cbl-card-text { flex: 1; min-width: 0; }
+  .listx__cbl-card-title { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .listx__cbl-card-meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; font: 11px var(--font-mono); color: var(--faint); flex-wrap: wrap; }
+  .listx__cbl-dot, .listx__cbl-crumbtxt { color: #6f6885; }
+  .listx__cbl-done { font: 600 10px var(--font-body); text-transform: uppercase; letter-spacing: .04em; color: var(--green); border: 1px solid rgba(95,211,138,.4); border-radius: 5px; padding: 3px 8px; flex: none; }
+  .listx__cbl-import { opacity: .45; height: 32px; padding: 0 14px; border: none; background: var(--accent); color: #fff; border-radius: 7px; font: 600 12px var(--font-body); cursor: pointer; flex: none; transition: opacity .12s; }
+  .listx__cbl-import.is-again { opacity: 1; border: 1px solid var(--line); background: transparent; color: var(--muted); }
+  .listx__cbl-import:disabled { cursor: progress; }
+  .listx__cbl-more { display: block; margin: 14px auto 0; height: 38px; padding: 0 20px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 9px; font: 600 13px var(--font-body); cursor: pointer; }
+  @media (max-width: 900px) { .listx__cbl-folders { grid-template-columns: 1fr; } }
 
   @media (max-width: 820px) {
     .listx { display: block; }

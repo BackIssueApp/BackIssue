@@ -730,7 +730,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     const id = lists.importCblAsList(db, req.user.id, name, issues, source);
     res.json({
       id, name, imported: issues.length, total: parsed.books.length, truncated,
-      unmatched: unmatched.slice(0, 50).map((b) => ({ series: b.series, number: b.number, volume: b.volume })),
+      unmatched: unmatched.slice(0, 50).map((b) => ({ series: b.series, number: b.number, volume: b.volume, reason: b.reason || null })),
     });
   };
   app.post('/api/lists/import-cbl', express.text({ type: '*/*', limit: '4mb' }), async (req, res) => {

@@ -49,7 +49,7 @@ const MAX_FALLBACK_VOLUMES = 40; // name-matching is 1–2 calls per volume; the
 /** Turn parsed books into CV issue objects (the shape importArcAsList /
  *  importCblAsList consume), in file order. Books whose id is unknown to CV
  *  (or absent) are matched by name; whatever still fails is reported in
- *  `unmatched` rather than silently dropped. */
+ *  `unmatched` (each with a short `reason`) rather than silently dropped. */
 export async function resolveBooks(client, books, { log = () => {} } = {}) {
   const list = books.slice(0, MAX_BOOKS);
   const byId = new Map();
@@ -62,15 +62,16 @@ export async function resolveBooks(client, books, { log = () => {} } = {}) {
   const volumeCache = new Map(); // "name|year" → cv volume id | null
   let volumesLookedUp = 0;
   const unmatched = [];
+  const miss = (b, reason) => unmatched.push({ ...b, reason });
   const resolvedFallback = new Map(); // book index → issue
   for (const b of leftovers) {
     const idx = list.indexOf(b);
-    if (!b.series || !b.number) { unmatched.push(b); continue; }
+    if (!b.series || !b.number) { miss(b, b.cvIssue ? 'id not on ComicVine' : 'no series or number'); continue; }
     const key = `${b.series.toLowerCase()}|${b.volume || ''}`;
     let vid = b.cvSeries || null;
     if (!vid && volumeCache.has(key)) vid = volumeCache.get(key);
     if (!vid && !volumeCache.has(key)) {
-      if (volumesLookedUp >= MAX_FALLBACK_VOLUMES) { unmatched.push(b); continue; }
+      if (volumesLookedUp >= MAX_FALLBACK_VOLUMES) { miss(b, 'lookup limit reached'); continue; }
       volumesLookedUp++;
       try {
         const hits = await client.search(b.series);
@@ -84,11 +85,11 @@ export async function resolveBooks(client, books, { log = () => {} } = {}) {
       } catch (e) { log(`CBL: volume lookup failed for "${b.series}": ${e.message}`); vid = null; }
       volumeCache.set(key, vid);
     }
-    if (!vid) { unmatched.push(b); continue; }
+    if (!vid) { miss(b, 'no volume match'); continue; }
     try {
       const issue = await client.findIssue(vid, b.number);
-      if (issue) resolvedFallback.set(idx, issue); else unmatched.push(b);
-    } catch (e) { log(`CBL: issue lookup failed for "${b.series}" #${b.number}: ${e.message}`); unmatched.push(b); }
+      if (issue) resolvedFallback.set(idx, issue); else miss(b, 'issue not in volume');
+    } catch (e) { log(`CBL: issue lookup failed for "${b.series}" #${b.number}: ${e.message}`); miss(b, 'lookup failed'); }
   }
 
   const issues = [];

@@ -14,10 +14,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   reading-list format shared by many comic apps), or browses the community
   catalog of 1,700+ curated lists — whole events, character runs and
   alternate universes, far larger than a single ComicVine story arc — and
-  imports one in a click. Books resolve to ComicVine issues by the ids the
+  imports one in a click. The catalog is browsed like the repo itself:
+  publisher folders with counts, breadcrumbs, lists only at the level you're
+  in, and a search that flattens every folder at once; lists you've already
+  imported are marked. Books resolve to ComicVine issues by the ids the
   files carry (with a name + year + number fallback), the file's own reading
   order is kept, and anything that can't be matched is shown after the
-  import rather than dropped. Download missing, sharing and OPDS work on
+  import — each with the reason — rather than dropped. Download missing, sharing and OPDS work on
   the result like any other list.
 
 ### Fixed
