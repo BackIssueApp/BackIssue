@@ -201,6 +201,28 @@ export function importCblAsList(db, userId, name, issues, source = null) {
   })();
 }
 
+/** Preview a parsed CBL: its books in file order with an `owned` flag from
+ *  the library — nothing is imported and ComicVine is never called (so no
+ *  titles or covers yet; those come with the import's id hydration). */
+export function previewCbl(db, parsed, { name = null, max = 3000 } = {}) {
+  const books = parsed.books.slice(0, max);
+  const q = db.prepare('SELECT 1 FROM library_files WHERE valid = 1 AND cv_issue_id = ? LIMIT 1');
+  const ownedIds = new Set();
+  for (const id of new Set(books.map((b) => b.cvIssue).filter(Boolean))) if (q.get(id)) ownedIds.add(id);
+  const rows = books.map((b, i) => ({
+    n: i + 1, series: b.series, number: b.number, volume: b.volume,
+    hasId: !!b.cvIssue, owned: !!(b.cvIssue && ownedIds.has(b.cvIssue)),
+  }));
+  return {
+    name: name || parsed.name || 'Reading list',
+    total: parsed.books.length,
+    withIds: rows.filter((r) => r.hasId).length,
+    owned: rows.filter((r) => r.owned).length,
+    truncated: Math.max(0, parsed.books.length - rows.length),
+    books: rows,
+  };
+}
+
 export function importArcAsList(db, userId, arc, issues) {
   const sorted = [...issues].sort((a, b) => {
     const ad = a.cover_date || '9999', bd = b.cover_date || '9999';

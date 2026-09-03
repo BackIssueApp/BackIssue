@@ -30,6 +30,9 @@
   let cblResult = $state(null);  // last import summary (shows what couldn't be matched)
   let cblPage = $state(8);       // how many list cards are shown ("Show more" grows it)
   let cblDrag = $state(false);   // a file is being dragged over the drop zone
+  let cblPreview = $state(null); // { name, total, owned, withIds, books, path | xml } — shown before importing
+  let cblPreviewBusy = $state(false);
+  let cblPrevPage = $state(60);
 
   const listId = $derived.by(() => Number(new URLSearchParams(route.search).get('list')) || null);
   const arcOpen = $derived(arcResults !== null && !listId);
@@ -247,23 +250,46 @@
     if (!skipped && !r.truncated) { cblResult = null; cblOpen = false; setQuery({ list: r.id }); }
   }
   function cblGo(dir) { cblDir = dir; cblQ = ''; cblPage = CBL_PAGE; }
-  async function importCblText(file) {
-    if (!file || cblBusy) return;
+  function showPreview(r, src) {
+    cblPreviewBusy = false;
+    if (r.error) return notify(r.error, 'error');
+    cblPreview = { ...r, ...src }; cblPrevPage = 60; cblResult = null;
+  }
+  // A chosen or dropped file is previewed first — its books in order and what
+  // you already own — and only imported from the preview's button.
+  async function previewCblText(file) {
+    if (!file || cblBusy || cblPreviewBusy) return;
     if (file.size > 4 * 1024 * 1024) return notify('That file is over the 4 MB limit.', 'error');
+    const xml = await file.text();
+    cblPreviewBusy = true;
+    showPreview(await apiPostText('/api/lists/cbl-preview', xml, 'application/xml'), { path: null, xml });
+  }
+  async function previewCatalog(path) {
+    if (cblPreviewBusy) return;
+    cblPreviewBusy = true;
+    showPreview(await apiPost('/api/lists/cbl-preview', { path }), { path, xml: null });
+  }
+  async function importPreview() {
+    const p = cblPreview;
+    if (!p || cblBusy) return;
     cblBusy = true; cblResult = null;
-    cblDone(await apiPostText('/api/lists/import-cbl', await file.text(), 'application/xml'));
+    const r = p.path
+      ? await apiPost('/api/lists/import-cbl-catalog', { path: p.path })
+      : await apiPostText('/api/lists/import-cbl', p.xml, 'application/xml');
+    cblPreview = null;
+    cblDone(r);
   }
   async function importCblFile(e) {
     const input = e.currentTarget;
     const file = input.files?.[0];
     input.value = '';
-    await importCblText(file);
+    await previewCblText(file);
   }
   // Drop handling is an enhancement on top of the <input type="file"> inside
   // the label, which keeps the keyboard/screen-reader path intact.
   async function cblDrop(e) {
     e.preventDefault(); cblDrag = false;
-    await importCblText(e.dataTransfer?.files?.[0]);
+    await previewCblText(e.dataTransfer?.files?.[0]);
   }
   async function importCatalog(path) {
     cblBusy = true; cblResult = null;
@@ -378,19 +404,50 @@
               {#if cblResult.truncated}<div class="listx__cbl-trunc">This list is very long — the first 3,000 books were imported.</div>{/if}
             </div>
           {:else}
-            <label class="listx__cbl-drop" class:is-busy={cblBusy} class:is-drag={cblDrag}
+            <label class="listx__cbl-drop" class:is-busy={cblBusy || cblPreviewBusy} class:is-drag={cblDrag}
               ondragover={(e) => { e.preventDefault(); if (!cblBusy) cblDrag = true; }}
               ondragleave={() => (cblDrag = false)} ondrop={cblDrop}>
               <span class="listx__cbl-drop-ico"><Icon name="upload" size={20} /></span>
               <span class="listx__cbl-drop-text">
-                <span class="listx__cbl-drop-title">{cblBusy ? 'Importing your list…' : 'Choose a .cbl file'}</span>
-                <span class="listx__cbl-drop-sub">{cblBusy ? 'Matching each book on ComicVine' : 'Or drop one here — .cbl and .xml, up to 4 MB'}</span>
+                <span class="listx__cbl-drop-title">{cblBusy ? 'Importing your list…' : cblPreviewBusy ? 'Reading your list…' : 'Choose a .cbl file'}</span>
+                <span class="listx__cbl-drop-sub">{cblBusy ? 'Matching each book on ComicVine' : 'Or drop one here — .cbl and .xml, up to 4 MB. You’ll see its books before anything is imported.'}</span>
               </span>
-              {#if cblBusy}<span class="listx__cbl-drop-busy">Importing…</span>{/if}
-              <input type="file" accept=".cbl,.xml,text/xml,application/xml" disabled={cblBusy} onchange={importCblFile} />
+              {#if cblBusy || cblPreviewBusy}<span class="listx__cbl-drop-busy">{cblBusy ? 'Importing…' : 'Reading…'}</span>{/if}
+              <input type="file" accept=".cbl,.xml,text/xml,application/xml" disabled={cblBusy || cblPreviewBusy} onchange={importCblFile} />
             </label>
           {/if}
 
+          {#if cblPreview}
+            {@const pct = cblPreview.total ? Math.round((cblPreview.owned / cblPreview.total) * 100) : 0}
+            {@const noId = cblPreview.total - cblPreview.withIds}
+            <div class="listx__cbl-prev">
+              <div class="listx__cbl-prev-head">
+                <button class="listx__cbl-ghost" onclick={() => (cblPreview = null)}><Icon name="arrow-left" size={14} /> Back</button>
+                <div class="listx__cbl-prev-text">
+                  <div class="listx__cbl-prev-title">{cblPreview.name}</div>
+                  <div class="listx__cbl-prev-meta">{fmt(cblPreview.total)} issues · {fmt(cblPreview.owned)} owned · {fmt(cblPreview.withIds)} with ComicVine ids · {cblPreview.path ? cblPreview.path.split('/').slice(0, -1).join(' / ') : 'from your file'}</div>
+                </div>
+                <button class="listx__cbl-primary" disabled={cblBusy} onclick={importPreview}>{cblBusy ? 'Importing…' : 'Import this list'}</button>
+              </div>
+              <div class="listx__cbl-prev-bar" class:is-done={pct >= 100}><span style="width:{pct}%"></span></div>
+              {#if noId > 0}
+                <div class="listx__cbl-prev-note"><Icon name="alert-triangle" size={14} /><span>{fmt(noId)} book{noId === 1 ? '' : 's'} carr{noId === 1 ? 'ies' : 'y'} no ComicVine id and will be matched by name — {noId === 1 ? 'that is the one' : 'those are the ones'} most likely to be skipped.</span></div>
+              {/if}
+              <div class="listx__cbl-prev-rows">
+                {#each cblPreview.books.slice(0, cblPrevPage) as b (b.n)}
+                  <div class="listx__cbl-prev-row" class:is-owned={b.owned}>
+                    <span class="listx__cbl-prev-n">{b.n}</span>
+                    <span class="listx__cbl-prev-name">{b.series} <b>#{b.number}</b>{b.volume ? ` (${b.volume})` : ''}</span>
+                    {#if b.owned}<span class="listx__cbl-prev-owned">Owned</span>{:else if !b.hasId}<span class="listx__cbl-prev-noid">no id</span>{/if}
+                  </div>
+                {/each}
+              </div>
+              {#if cblPreview.books.length > cblPrevPage}
+                <button class="listx__cbl-more" onclick={() => (cblPrevPage += 120)}>Show more ({fmt(cblPreview.books.length - cblPrevPage)} more)</button>
+              {/if}
+              {#if cblPreview.truncated}<div class="listx__cbl-trunc">Showing the first 3,000 of {fmt(cblPreview.total)} books.</div>{/if}
+            </div>
+          {:else}
           <div class="listx__cbl-cathead">
             <span class="listx__cbl-cattitle">Community lists</span>
             {#if cblFiles?.length}<span class="listx__cbl-catcount">{fmt(cblFiles.length)} lists</span>{/if}
@@ -438,6 +495,7 @@
                     <div class="listx__cbl-card-meta"><span>{c.publisher}</span>{#if c.date}<span class="listx__cbl-dot">·</span><span>{c.date}</span>{/if}{#if c.dir.length > 1}<span class="listx__cbl-dot">·</span><span class="listx__cbl-crumbtxt">{c.dir.slice(1).join(' / ')}</span>{/if}</div>
                   </div>
                   {#if done}<span class="listx__cbl-done">Imported</span>{/if}
+                  <button class="listx__cbl-ghost" disabled={cblPreviewBusy || cblBusy} onclick={() => previewCatalog(c.path)}>Preview</button>
                   <button class="listx__cbl-import" class:is-again={done} disabled={cblBusy} onclick={() => importCatalog(c.path)}>{done ? 'Re-import' : 'Import'}</button>
                 </div>
               {/each}
@@ -445,6 +503,7 @@
             {#if cblHits.length > cblVisible.length}
               <button class="listx__cbl-more" onclick={() => (cblPage += CBL_PAGE)}>Show more ({fmt(cblHits.length - cblVisible.length)} more)</button>
             {/if}
+          {/if}
           {/if}
         </div>
       </div>
@@ -702,6 +761,27 @@
   .listx__cbl-import.is-again { opacity: 1; border: 1px solid var(--line); background: transparent; color: var(--muted); }
   .listx__cbl-import:disabled { cursor: progress; }
   .listx__cbl-more { display: block; margin: 14px auto 0; height: 38px; padding: 0 20px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 9px; font: 600 13px var(--font-body); cursor: pointer; }
+  .listx__cbl-card .listx__cbl-ghost { opacity: .7; }
+  .listx__cbl-card:hover .listx__cbl-ghost { opacity: 1; }
+  .listx__cbl-prev { margin-top: 26px; }
+  .listx__cbl-prev-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .listx__cbl-prev-text { flex: 1; min-width: 200px; }
+  .listx__cbl-prev-title { font-family: var(--font-display); font-size: 17px; letter-spacing: .03em; }
+  .listx__cbl-prev-meta { font: 11.5px var(--font-mono); color: var(--faint); margin-top: 3px; }
+  .listx__cbl-prev-bar { height: 5px; border-radius: 20px; background: var(--panel-2); overflow: hidden; margin-bottom: 12px; }
+  .listx__cbl-prev-bar span { display: block; height: 100%; background: var(--accent); }
+  .listx__cbl-prev-bar.is-done span { background: var(--green); }
+  .listx__cbl-prev-note { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--amber); padding: 10px 13px; border: 1px solid rgba(255,194,75,.3); background: rgba(255,194,75,.06); border-radius: 10px; margin-bottom: 12px; }
+  .listx__cbl-prev-note :global(svg) { flex: none; }
+  .listx__cbl-prev-rows { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .listx__cbl-prev-row { display: flex; align-items: center; gap: 12px; padding: 8px 13px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+  .listx__cbl-prev-row:last-child { border-bottom: 0; }
+  .listx__cbl-prev-n { width: 30px; text-align: right; font: 11px var(--font-mono); color: var(--faint); flex: none; }
+  .listx__cbl-prev-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  .listx__cbl-prev-row.is-owned .listx__cbl-prev-name { color: var(--text); }
+  .listx__cbl-prev-name b { font-weight: 600; color: var(--text); }
+  .listx__cbl-prev-owned { font: 600 10px var(--font-body); text-transform: uppercase; letter-spacing: .04em; color: var(--green); border: 1px solid rgba(95,211,138,.4); border-radius: 5px; padding: 2px 7px; flex: none; }
+  .listx__cbl-prev-noid { font: 11px var(--font-mono); color: var(--amber); flex: none; }
   @media (max-width: 900px) { .listx__cbl-folders { grid-template-columns: 1fr; } }
 
   @media (max-width: 820px) {

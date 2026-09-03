@@ -736,6 +736,18 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   app.post('/api/lists/import-cbl', express.text({ type: '*/*', limit: '4mb' }), async (req, res) => {
     try { await importCbl(req, res, req.body, null); } catch (e) { listErr(res, e); }
   });
+  // Preview before importing: the file's books in reading order plus what
+  // the library already owns. No import, no ComicVine calls.
+  app.post('/api/lists/cbl-preview', express.text({ type: '*/*', limit: '4mb' }), async (req, res) => {
+    try {
+      const fromCatalog = !!req.body && typeof req.body === 'object';
+      const p = fromCatalog ? String(req.body.path || '') : null;
+      const xml = fromCatalog ? await cbl.fetchCatalogCbl(p) : req.body;
+      const parsed = cbl.parseCbl(xml);
+      if (!parsed.books.length) return res.status(400).json({ error: 'that list has no books in it' });
+      res.json(lists.previewCbl(db, parsed, { name: cbl.prettyCblName(parsed.name || p || 'Reading list') }));
+    } catch (e) { listErr(res, e); }
+  });
   app.post('/api/lists/import-cbl-catalog', async (req, res) => {
     try {
       const p = String((req.body || {}).path || '');
