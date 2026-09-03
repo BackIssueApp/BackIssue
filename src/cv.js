@@ -227,32 +227,47 @@ export function makeCvClient(config, { fetchImpl, key, politeMs } = {}) {
     }));
   }
 
-  // The arc's full issue list, hydrated (number, volume, cover date, art) via
-  // the issues list endpoint — one call per 100 issues instead of one each.
+  const ISSUE_LIST_FIELDS = 'id,name,issue_number,cover_date,image,volume';
+  const normIssueRow = (r) => ({
+    id: r.id, name: r.name ?? null, issue_number: r.issue_number ?? null,
+    cover_date: r.cover_date ?? null,
+    image_url: r.image?.medium_url || r.image?.small_url || r.image?.original_url || null,
+    volume: r.volume ? { id: r.volume.id, name: r.volume.name ?? null } : null,
+  });
+
+  // Hydrate a set of issue ids (number, volume, cover date, art) via the issues
+  // list endpoint — one call per 100 ids instead of one each. Ids CV no longer
+  // knows are simply absent from the result.
+  async function issuesByIds(ids) {
+    const issues = [];
+    for (let at = 0; at < ids.length; at += 100) {
+      const chunk = ids.slice(at, at + 100);
+      const page = await list('issues', { filter: `id:${chunk.join('|')}`, fieldList: ISSUE_LIST_FIELDS, limit: 100 });
+      for (const r of page.results) issues.push(normIssueRow(r));
+    }
+    return issues;
+  }
+
+  // One issue of a volume by its number ("1", "1.1", "Annual 1") — the CBL
+  // fallback for books that carry no ComicVine id.
+  async function findIssue(volumeId, number) {
+    const page = await list('issues', {
+      filter: `volume:${Number(volumeId)},issue_number:${String(number).trim()}`,
+      fieldList: ISSUE_LIST_FIELDS, limit: 5,
+    });
+    const want = String(number).trim().toLowerCase();
+    const r = page.results.find((x) => String(x.issue_number ?? '').trim().toLowerCase() === want) || page.results[0];
+    return r ? normIssueRow(r) : null;
+  }
+
+  // The arc's full issue list, hydrated the same way.
   async function storyArcIssues(arcId) {
     const data = await call(`/story_arc/${ARC_PREFIX}-${arcId}/?field_list=id,name,issues,publisher`);
     await sleep(pace);
     const arc = { id: data.results?.id, name: data.results?.name ?? null };
     const stubIds = (data.results?.issues || []).map((i) => i.id).filter(Boolean);
-    const issues = [];
-    for (let at = 0; at < stubIds.length; at += 100) {
-      const chunk = stubIds.slice(at, at + 100);
-      const page = await list('issues', {
-        filter: `id:${chunk.join('|')}`,
-        fieldList: 'id,name,issue_number,cover_date,image,volume',
-        limit: 100,
-      });
-      for (const r of page.results) {
-        issues.push({
-          id: r.id, name: r.name ?? null, issue_number: r.issue_number ?? null,
-          cover_date: r.cover_date ?? null,
-          image_url: r.image?.medium_url || r.image?.small_url || r.image?.original_url || null,
-          volume: r.volume ? { id: r.volume.id, name: r.volume.name ?? null } : null,
-        });
-      }
-    }
-    return { arc, issues };
+    return { arc, issues: await issuesByIds(stubIds) };
   }
 
-  return { search, list, volume, issue, searchArcs, storyArcIssues };
+  return { search, list, volume, issue, searchArcs, storyArcIssues, issuesByIds, findIssue };
 }

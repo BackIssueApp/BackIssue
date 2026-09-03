@@ -25,6 +25,9 @@ export function initListTables(db) {
   // owns every edit). Gated on the lists.share permission at the route.
   const cols = db.prepare('PRAGMA table_info(reading_lists)').all().map((c) => c.name);
   if (!cols.includes('public')) db.exec('ALTER TABLE reading_lists ADD COLUMN public INTEGER NOT NULL DEFAULT 0');
+  // Where an imported list came from (a CBL file, or its path in the community
+  // catalog) — shown as provenance, and lets the UI tell CBL lists apart.
+  if (!cols.includes('source')) db.exec('ALTER TABLE reading_lists ADD COLUMN source TEXT');
 }
 
 const owned = (db, listId) => db.prepare(`
@@ -36,7 +39,7 @@ const owned = (db, listId) => db.prepare(`
  *  `mine` drives the UI's edit affordances; `owner` names the sharer. */
 export function listLists(db, userId) {
   const rows = db.prepare(`
-    SELECT id, name, arc_cv_id, created_at, public, user_id, (user_id = ?) AS mine
+    SELECT id, name, arc_cv_id, source, created_at, public, user_id, (user_id = ?) AS mine
       FROM reading_lists
      WHERE user_id = ? OR public = 1
      ORDER BY mine DESC, created_at DESC`).all(userId, userId);
@@ -44,6 +47,7 @@ export function listLists(db, userId) {
     ...l,
     public: !!l.public,
     mine: !!l.mine,
+    source: l.source || null,
     // Who shared it — best effort, and never a hard dependency on the users
     // schema (lists work standalone; the tests open lists tables alone).
     owner: l.mine ? null : usernameOf(db, ownerId),
@@ -86,7 +90,7 @@ export function getList(db, userId, id, { includeRestricted = true } = {}) {
   // otherwise see: drop restricted items for roles without the permission.
   const visible = includeRestricted ? items : items.filter((it) => !isRestrictedItem(db, it));
   return {
-    id: l.id, name: l.name, arc_cv_id: l.arc_cv_id, created_at: l.created_at,
+    id: l.id, name: l.name, arc_cv_id: l.arc_cv_id, source: l.source || null, created_at: l.created_at,
     public: !!l.public, mine: l.user_id === userId, items: visible,
   };
 }
@@ -173,6 +177,30 @@ export function reorderList(db, userId, id, orderedIds) {
 // hydration per 100 ids. Issues are ordered by cover date (CV's arc stub
 // order is by id — useless as reading order), stub rows are inserted for
 // anything not already cached, and the result becomes a normal list.
+/** A CBL reading list becomes a list in the FILE's order — a curated reading
+ *  order is the point (tie-ins interleaved with the main event), so unlike an
+ *  arc import nothing is re-sorted. `issues` are CV issue objects (as from
+ *  issuesByIds); stub cv_series/cv_issues rows are seeded like the arc path. */
+export function importCblAsList(db, userId, name, issues, source = null) {
+  const insSeries = db.prepare(
+    "INSERT OR IGNORE INTO cv_series (comicvine_id, name, cached_at) VALUES (?, ?, datetime('now'))");
+  const insIssue = db.prepare(`
+    INSERT OR IGNORE INTO cv_issues (comicvine_id, cv_series_id, issue_number, name, cover_date, image_url, cached_at)
+    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`);
+  return db.transaction(() => {
+    for (const i of issues) {
+      if (i.volume?.id) insSeries.run(i.volume.id, i.volume.name || null);
+      insIssue.run(i.id, i.volume?.id || 0, i.issue_number ?? null, i.name ?? null, i.cover_date ?? null, i.image_url ?? null);
+    }
+    const lid = db.prepare('INSERT INTO reading_lists (user_id, name, source) VALUES (?, ?, ?)')
+      .run(userId, String(name || 'Reading list').slice(0, 120), source ? String(source).slice(0, 300) : 'cbl').lastInsertRowid;
+    const ins = db.prepare('INSERT OR IGNORE INTO reading_list_items (list_id, position, cv_issue_id) VALUES (?, ?, ?)');
+    let pos = 0;
+    for (const i of issues) ins.run(lid, ++pos, i.id); // duplicates in the file collapse (PK), order kept
+    return lid;
+  })();
+}
+
 export function importArcAsList(db, userId, arc, issues) {
   const sorted = [...issues].sort((a, b) => {
     const ad = a.cover_date || '9999', bd = b.cover_date || '9999';

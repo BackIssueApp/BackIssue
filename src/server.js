@@ -21,6 +21,7 @@ import { fetchCatalog, installPlugin, uninstallPlugin } from './plugincatalog.js
 import { logWarn } from './logstore.js';
 import * as users from './users.js';
 import * as lists from './lists.js';
+import * as cbl from './cbl.js';
 import * as notifications from './notifications.js';
 import { createEventHub } from './events.js';
 import { sidecarPath } from './archive.js';
@@ -39,7 +40,7 @@ if (process.env.BUILD_CHANNEL && process.env.BUILD_CHANNEL !== 'release') {
   APP_VERSION += `-${process.env.BUILD_CHANNEL}${sha ? '.' + sha : ''}`;
 }
 
-export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, queueProgress, packProgress, cancelGrab, testCvKeys, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, state }) {
+export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, queueProgress, packProgress, cancelGrab, testCvKeys, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, state }) {
   const startDownloads = (arg) => {
     if (!state.queue.running) {
       state.queue.running = true;
@@ -664,6 +665,10 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     try { res.json({ id: lists.createList(db, req.user.id, (req.body || {}).name) }); }
     catch (e) { listErr(res, e); }
   });
+  // Registered ahead of /api/lists/:id so the literal path isn't read as an id.
+  app.get('/api/lists/cbl-catalog', async (req, res) => {
+    try { res.json({ files: await cbl.cblCatalog() }); } catch (e) { listErr(res, e); }
+  });
   app.get('/api/lists/:id', (req, res) => {
     const l = lists.getList(db, req.user.id, Number(req.params.id), { includeRestricted: canRestricted(req) });
     if (!l) return res.status(404).json({ error: 'no such list' });
@@ -709,6 +714,32 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       const { arc, issues } = await arcIssues(Number((req.body || {}).arcId));
       if (!issues.length) return res.status(400).json({ error: 'that arc has no issues on ComicVine' });
       res.json({ id: lists.importArcAsList(db, req.user.id, arc, issues), issues: issues.length });
+    } catch (e) { listErr(res, e); }
+  });
+  // CBL reading lists: a file the user uploads (raw XML body — lists run to
+  // hundreds of KB, past the JSON cap), or one picked from the community
+  // catalog. Both resolve books to ComicVine issues id-first, then import in
+  // the file's own order. Books that can't be matched come back in the
+  // response so the user sees exactly what was skipped.
+  const importCbl = async (req, res, xml, source) => {
+    const parsed = cbl.parseCbl(xml);
+    if (!parsed.books.length) return res.status(400).json({ error: 'that list has no books in it' });
+    const { issues, unmatched, truncated } = await cblResolve(parsed.books);
+    if (!issues.length) return res.status(400).json({ error: 'none of the books could be matched on ComicVine' });
+    const name = cbl.prettyCblName(parsed.name || source || 'Reading list');
+    const id = lists.importCblAsList(db, req.user.id, name, issues, source);
+    res.json({
+      id, name, imported: issues.length, total: parsed.books.length, truncated,
+      unmatched: unmatched.slice(0, 50).map((b) => ({ series: b.series, number: b.number, volume: b.volume })),
+    });
+  };
+  app.post('/api/lists/import-cbl', express.text({ type: '*/*', limit: '4mb' }), async (req, res) => {
+    try { await importCbl(req, res, req.body, null); } catch (e) { listErr(res, e); }
+  });
+  app.post('/api/lists/import-cbl-catalog', async (req, res) => {
+    try {
+      const p = String((req.body || {}).path || '');
+      await importCbl(req, res, await cbl.fetchCatalogCbl(p), p);
     } catch (e) { listErr(res, e); }
   });
   // Vite emits content-hashed files under /assets — safe to cache forever. The

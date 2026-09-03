@@ -3,7 +3,7 @@
   // (from the volume page's "Add to list") or imported from a ComicVine story
   // arc. Two-pane master-detail; a selected list rides ?list=<id>.
   import { goBack, navigate, route, setQuery } from '../lib/router.svelte.js';
-  import { apiGet, apiPost, apiPatch, apiDelete } from '../lib/api.js';
+  import { apiGet, apiPost, apiPatch, apiDelete, apiPostText } from '../lib/api.js';
   import { notify } from '../lib/toasts.svelte.js';
   import { confirmDialog, inputDialog } from './DialogModal.svelte';
   import { issueActions, issueActionsTick, issueCoverProviders } from '../lib/plugins.svelte.js';
@@ -20,9 +20,42 @@
   let arcQ = $state('');
   let arcResults = $state(null); // null = closed panel, [] = searched + empty
   let arcBusy = $state(false);
+  // CBL import: a file of the user's own, or one from the community catalog
+  let cblOpen = $state(false);
+  let cblBusy = $state(false);
+  let cblFiles = $state(null);   // null = not loaded yet
+  let cblErr = $state('');
+  let cblDir = $state([]);       // folder path within the catalog
+  let cblQ = $state('');
+  let cblResult = $state(null);  // last import summary (shows what couldn't be matched)
 
   const listId = $derived.by(() => Number(new URLSearchParams(route.search).get('list')) || null);
   const arcOpen = $derived(arcResults !== null && !listId);
+  const cblShown = $derived(cblOpen && !listId);
+  // "[Marvel] (2006-02) Civil War (Official).cbl" → "Civil War (Official)"
+  const cblPretty = (p) => p.split('/').pop().replace(/\.cbl$/i, '').replace(/^\[[^\]]*\]\s*/, '').replace(/^\(\d{4}(?:-\d{2})?(?:-\d{2})?\)\s*/, '');
+  // The catalog is a flat list of repo paths; browse it as folders, or filter
+  // every list at once by words in its path.
+  const cblEntries = $derived.by(() => {
+    if (!cblFiles) return { folders: [], files: [], more: 0 };
+    const q = cblQ.trim().toLowerCase();
+    if (q) {
+      const words = q.split(/\s+/);
+      const hits = cblFiles.filter((p) => { const l = p.toLowerCase(); return words.every((w) => l.includes(w)); });
+      return { folders: [], more: Math.max(0, hits.length - 120),
+        files: hits.slice(0, 120).map((p) => ({ path: p, name: cblPretty(p), where: p.split('/').slice(0, -1).join(' › ') })) };
+    }
+    const prefix = cblDir.length ? cblDir.join('/') + '/' : '';
+    const folders = new Map(); const files = [];
+    for (const p of cblFiles) {
+      if (!p.startsWith(prefix)) continue;
+      const rest = p.slice(prefix.length);
+      const cut = rest.indexOf('/');
+      if (cut < 0) files.push({ path: p, name: cblPretty(rest), where: '' });
+      else { const f = rest.slice(0, cut); folders.set(f, (folders.get(f) || 0) + 1); }
+    }
+    return { folders: [...folders].map(([name, n]) => ({ name, n })), files, more: 0 };
+  });
 
   async function refresh() {
     try {
@@ -133,7 +166,8 @@
   }
 
   // ---- story-arc import ----
-  function toggleArc() { arcResults = arcResults === null ? [] : null; arcQ = ''; if (arcResults !== null && listId) setQuery({ list: null }); }
+  function toggleArc() {
+    cblOpen = false; arcResults = arcResults === null ? [] : null; arcQ = ''; if (arcResults !== null && listId) setQuery({ list: null }); }
   async function searchArcs() {
     if (!arcQ.trim()) return;
     arcBusy = true;
@@ -152,10 +186,46 @@
     setQuery({ list: r.id });
     refresh();
   }
+  function toggleCbl() {
+    cblOpen = !cblOpen;
+    if (!cblOpen) return;
+    arcResults = null;
+    if (listId) setQuery({ list: null });
+    if (cblFiles === null) loadCatalog();
+  }
+  async function loadCatalog() {
+    cblErr = '';
+    const r = await apiGet('/api/lists/cbl-catalog');
+    if (r.error) { cblErr = r.error; cblFiles = []; return; }
+    cblFiles = r.files || [];
+  }
+  // Both import paths land here. A clean import opens the new list; one with
+  // unmatched books stays on the panel so the skipped issues are visible.
+  function cblDone(r) {
+    cblBusy = false;
+    if (r.error) return notify(r.error, 'error');
+    cblResult = r;
+    const skipped = r.total - r.imported;
+    notify(`Imported "${r.name}" — ${fmt(r.imported)} of ${fmt(r.total)} issues${skipped ? ` (${fmt(skipped)} couldn't be matched)` : ''}.`, skipped ? 'error' : 'ok');
+    refresh();
+    if (!skipped && !r.truncated) { cblOpen = false; setQuery({ list: r.id }); }
+  }
+  async function importCblFile(e) {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    cblBusy = true; cblResult = null;
+    cblDone(await apiPostText('/api/lists/import-cbl', await file.text(), 'application/xml'));
+  }
+  async function importCatalog(path) {
+    cblBusy = true; cblResult = null;
+    cblDone(await apiPost('/api/lists/import-cbl-catalog', { path }));
+  }
 </script>
 
 <section class="scan-page lists-page">
-  <div class="listx" class:has-detail={!!listId || arcOpen}>
+  <div class="listx" class:has-detail={!!listId || arcOpen || cblShown}>
   <!-- RAIL: lists overview -->
   <aside class="listx__rail">
     <div class="listx__rail-head">
@@ -167,6 +237,7 @@
       <div class="listx__rail-actions">
         <button class="listx__new" onclick={createList}><Icon name="plus" size={14} /> New list</button>
         <button class="listx__arcbtn" class:is-on={arcResults !== null} onclick={toggleArc}><Icon name="diamond" size={14} /> Import arc</button>
+        <button class="listx__arcbtn" class:is-on={cblOpen} onclick={toggleCbl}><Icon name="import" size={14} /> Import CBL</button>
       </div>
     </div>
     <div class="listx__rail-scroll">
@@ -178,10 +249,11 @@
       {/if}
       {#each lists as l (l.id)}
         {@const pct = l.items ? Math.round((l.owned / l.items) * 100) : 0}
-        <button class="listx__card" class:is-active={listId === l.id} onclick={() => { arcResults = null; setQuery({ list: l.id }); }}>
+        <button class="listx__card" class:is-active={listId === l.id} onclick={() => { arcResults = null; cblOpen = false; setQuery({ list: l.id }); }}>
           <div class="listx__card-top">
             <span class="listx__card-name">{l.name}</span>
             {#if l.arc_cv_id}<span class="listx__card-arc" title="From a ComicVine story arc"><Icon name="diamond" size={13} /></span>{/if}
+            {#if l.source}<span class="listx__card-arc" title="Imported from a CBL reading list"><Icon name="import" size={13} /></span>{/if}
             {#if l.public}<span class="listx__card-arc" title={l.mine ? 'Shared with every user' : `Shared by ${l.owner || 'another user'}`}><Icon name="users" size={13} /></span>{/if}
           </div>
           <div class="listx__card-prog">
@@ -221,6 +293,67 @@
           {#if arcResults.length === 0 && arcQ.trim()}<div class="listx__arc-empty">No arcs found for “{arcQ}”.</div>{/if}
         </div>
       </div>
+    {:else if cblShown}
+      <div class="listx__scroll">
+        <div class="listx__arc">
+          <div class="listx__arc-head"><span class="listx__arc-ico"><Icon name="import" size={16} /></span><div class="listx__arc-title">Import a CBL reading list</div></div>
+          <p class="listx__arc-sub">CBL is a widely used reading-list format. Bring in a file of your own, or pick from the community's 1,700+ curated lists — whole events, character runs and alternate universes, in reading order. Issues you don't own stay in place, so you can download what's missing.</p>
+          <label class="listx__cbl-upload" class:is-busy={cblBusy}>
+            <Icon name="upload" size={15} /> {cblBusy ? 'Importing…' : 'Choose a .cbl file'}
+            <input type="file" accept=".cbl,.xml,text/xml,application/xml" disabled={cblBusy} onchange={importCblFile} />
+          </label>
+          {#if cblResult}
+            <div class="listx__cbl-result">
+              <div class="listx__cbl-result-head">
+                <span>Imported <b>{cblResult.name}</b> — {fmt(cblResult.imported)} of {fmt(cblResult.total)} issues</span>
+                <button class="listx__arc-import" onclick={() => { cblOpen = false; setQuery({ list: cblResult.id }); }}>Open list</button>
+              </div>
+              {#if cblResult.unmatched?.length}
+                <div class="listx__cbl-unmatched"><span>Couldn't match on ComicVine:</span>
+                  {#each cblResult.unmatched as u}<span class="listx__cbl-miss">{u.series} #{u.number}{u.volume ? ` (${u.volume})` : ''}</span>{/each}
+                </div>
+              {/if}
+              {#if cblResult.truncated}<div class="listx__cbl-unmatched">This list is very long — the first 3,000 books were imported.</div>{/if}
+            </div>
+          {/if}
+          <div class="listx__cbl-cathead">
+            <span class="listx__cbl-cattitle">Community lists</span>
+            <a class="listx__cbl-catsrc" href="https://github.com/DieselTech/CBL-ReadingLists" target="_blank" rel="noreferrer">DieselTech/CBL-ReadingLists <Icon name="external-link" size={11} /></a>
+          </div>
+          <div class="listx__arc-field listx__cbl-filter">
+            <Icon name="search" size={15} />
+            <input placeholder="Filter every list, e.g. Civil War" bind:value={cblQ} spellcheck="false" />
+          </div>
+          {#if cblFiles === null}
+            <div class="listx__arc-empty">Loading the catalog…</div>
+          {:else if cblErr}
+            <div class="listx__arc-empty">{cblErr} <button class="listx__cbl-crumb" onclick={loadCatalog}>Try again</button></div>
+          {:else}
+            {#if !cblQ.trim()}
+              <div class="listx__cbl-crumbs">
+                <button class="listx__cbl-crumb" class:is-cur={!cblDir.length} onclick={() => (cblDir = [])}>All publishers</button>
+                {#each cblDir as seg, i}
+                  <span class="listx__cbl-sep">›</span>
+                  <button class="listx__cbl-crumb" class:is-cur={i === cblDir.length - 1} onclick={() => (cblDir = cblDir.slice(0, i + 1))}>{seg}</button>
+                {/each}
+              </div>
+            {/if}
+            {#each cblEntries.folders as f (f.name)}
+              <button class="listx__cbl-row listx__cbl-folder" onclick={() => (cblDir = [...cblDir, f.name])}>
+                <Icon name="folder" size={15} /><span class="listx__cbl-rowname">{f.name}</span><span class="listx__cbl-rowmeta">{fmt(f.n)} list{f.n === 1 ? '' : 's'}</span><Icon name="chevron-right" size={14} />
+              </button>
+            {/each}
+            {#each cblEntries.files as f (f.path)}
+              <div class="listx__cbl-row">
+                <Icon name="list" size={15} /><span class="listx__cbl-rowname">{f.name}{#if f.where}<span class="listx__cbl-where">{f.where}</span>{/if}</span>
+                <button class="listx__arc-import" disabled={cblBusy} onclick={() => importCatalog(f.path)}>Import</button>
+              </div>
+            {/each}
+            {#if cblEntries.more}<div class="listx__arc-empty">…and {fmt(cblEntries.more)} more — narrow the filter.</div>{/if}
+            {#if !cblEntries.folders.length && !cblEntries.files.length}<div class="listx__arc-empty">No lists match “{cblQ}”.</div>{/if}
+          {/if}
+        </div>
+      </div>
     {:else if det}
       <div class="listx__dhead">
         <button class="listx__iconbtn listx__back" aria-label="Lists" onclick={() => setQuery({ list: null })}><Icon name="arrow-left" size={16} /></button>
@@ -229,7 +362,7 @@
             <span class="listx__dtitle">{det.name}</span>
             {#if isTrusted() && det.mine !== false}<button class="listx__edit" title="Rename list" onclick={() => renameList(det)}><Icon name="edit" size={15} /></button>{/if}
           </div>
-          <div class="listx__dsummary">{ownedCount}/{rows.length} owned{det.arc_cv_id ? ' · from a ComicVine arc' : ''}{det.mine === false ? ` · shared by ${det.owner || 'another user'}` : ''}{det.public && det.mine !== false ? ' · shared with everyone' : ''}</div>
+          <div class="listx__dsummary">{ownedCount}/{rows.length} owned{det.arc_cv_id ? ' · from a ComicVine arc' : det.source ? ' · from a CBL reading list' : ''}{det.mine === false ? ` · shared by ${det.owner || 'another user'}` : ''}{det.public && det.mine !== false ? ' · shared with everyone' : ''}</div>
         </div>
         <div class="listx__dactions">
           {#if missing.length && can('downloads.grab')}
@@ -394,6 +527,32 @@
   .listx__arc-deck { font-size: 12px; color: var(--faint); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .listx__arc-import { height: 34px; padding: 0 15px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); border-radius: 8px; font: 600 12.5px var(--font-body); cursor: pointer; flex: none; }
   .listx__arc-empty { padding: 34px; text-align: center; color: var(--faint); font-size: 13px; }
+
+  .listx__cbl-upload { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 18px; border: 1px dashed var(--line); border-radius: 10px; color: var(--text); font: 600 13px var(--font-body); cursor: pointer; margin-bottom: 18px; }
+  .listx__cbl-upload:hover { border-color: var(--accent); }
+  .listx__cbl-upload.is-busy { opacity: .6; cursor: progress; }
+  .listx__cbl-upload input { display: none; }
+  .listx__cbl-result { border: 1px solid var(--line); border-radius: 11px; padding: 12px 14px; margin-bottom: 18px; font-size: 13px; }
+  .listx__cbl-result-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .listx__cbl-unmatched { color: var(--faint); font-size: 12px; margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .listx__cbl-miss { border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; color: var(--text); }
+  .listx__cbl-cathead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 6px 0 10px; }
+  .listx__cbl-cattitle { font-family: var(--font-display); font-size: 15px; letter-spacing: .03em; }
+  .listx__cbl-catsrc { font-size: 12px; color: var(--faint); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+  .listx__cbl-catsrc:hover { color: var(--text); }
+  .listx__cbl-filter { margin-bottom: 12px; }
+  .listx__cbl-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 10px; }
+  .listx__cbl-crumb { background: none; border: none; color: var(--faint); font: 600 12.5px var(--font-body); cursor: pointer; padding: 3px 6px; border-radius: 6px; }
+  .listx__cbl-crumb:hover { color: var(--text); background: rgba(255,255,255,.05); }
+  .listx__cbl-crumb.is-cur { color: var(--text); }
+  .listx__cbl-sep { color: var(--faint); font-size: 12px; }
+  .listx__cbl-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.012); margin-bottom: 8px; color: var(--text); font: 13.5px var(--font-body); text-align: left; box-sizing: border-box; }
+  .listx__cbl-folder { cursor: pointer; }
+  .listx__cbl-folder:hover { border-color: var(--accent); }
+  .listx__cbl-row > :global(svg) { color: var(--faint); flex: none; }
+  .listx__cbl-rowname { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .listx__cbl-where { display: block; font-weight: 400; font-size: 11.5px; color: var(--faint); }
+  .listx__cbl-rowmeta { font-size: 12px; color: var(--faint); flex: none; }
 
   @media (max-width: 820px) {
     .listx { display: block; }

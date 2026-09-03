@@ -17,6 +17,7 @@ import { findComicFiles, groupSeries, importMetaForFolder } from './scanner.js';
 import { extractYear } from './matcher.js';
 import { poolWithResource } from './pool.js';
 import { makeCvClient, cvKey } from './cv.js';
+import { resolveBooks } from './cbl.js';
 import { tagFileFromCv, ensureCvIssueDetail, fetchAllIssueMetadata } from './metatagger.js';
 import { fetchWeeklyReleases, matchReleases } from './releases.js';
 import { startJob, listJobs, clearFinishedJobs, attachJobsDb } from './jobs.js';
@@ -1216,6 +1217,7 @@ const app = createApp({
   cvIssueInfo,
   arcSearch: (q) => cvClient().searchArcs(q),
   arcIssues: (id) => cvClient().storyArcIssues(id),
+  cblResolve: (books) => resolveBooks(cvClient(), books),
   cleanupSeriesFiles,
   runImportScan,
   runImport,

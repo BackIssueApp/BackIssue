@@ -8,6 +8,18 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+
+- **CBL reading lists.** Lists → **Import CBL** takes a `.cbl` file (the
+  reading-list format shared by many comic apps), or browses the community
+  catalog of 1,700+ curated lists — whole events, character runs and
+  alternate universes, far larger than a single ComicVine story arc — and
+  imports one in a click. Books resolve to ComicVine issues by the ids the
+  files carry (with a name + year + number fallback), the file's own reading
+  order is kept, and anything that can't be matched is shown after the
+  import rather than dropped. Download missing, sharing and OPDS work on
+  the result like any other list.
+
 ### Fixed
 
 - **Auto-search now matches releases tagged with a volume marker.** A release

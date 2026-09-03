@@ -32,6 +32,11 @@ export async function apiPost(path, body) {
   }));
 }
 
+/** POST a raw text body (an uploaded XML file, say) rather than JSON. */
+export async function apiPostText(path, text, contentType = 'text/plain') {
+  return handle(await fetch(path, { method: 'POST', headers: { 'content-type': contentType }, body: text }));
+}
+
 export async function apiPatch(path, body) {
   return handle(await fetch(path, {
     method: 'PATCH',
