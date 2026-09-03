@@ -26,7 +26,9 @@ RUN npm install --omit=dev --omit=optional
 # committed lockfile first: it may have been generated on another OS (e.g.
 # Windows), and npm's optional-deps bug then skips this platform's native
 # bundler binding (@rolldown/binding-*). See npm/cli#4828.
-COPY frontend/package.json ./frontend/
+# .npmrc rides along: it carries legacy-peer-deps, without which a fresh
+# resolve can crash in npm 10 (see the note in frontend/.npmrc).
+COPY frontend/package.json frontend/.npmrc ./frontend/
 RUN rm -f frontend/package-lock.json && npm --prefix frontend install
 COPY frontend ./frontend
 RUN npm --prefix frontend run build
