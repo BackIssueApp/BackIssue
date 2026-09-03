@@ -18,8 +18,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   publisher folders with counts, breadcrumbs, lists only at the level you're
   in, and a search that flattens every folder at once; lists you've already
   imported are marked. Any list can be **previewed** first — its books in
-  reading order, marked with what you already own — and a file you upload
-  is previewed before anything is created. Books resolve to ComicVine issues by the ids the
+  reading order with owned / missing / no-id counts, filters, and same-series
+  runs grouped without reordering — and a file you upload is previewed
+  before anything is created. Books resolve to ComicVine issues by the ids the
   files carry (with a name + year + number fallback), the file's own reading
   order is kept, and anything that can't be matched is shown after the
   import — each with the reason — rather than dropped. Download missing, sharing and OPDS work on

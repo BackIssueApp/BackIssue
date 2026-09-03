@@ -33,6 +33,8 @@
   let cblPreview = $state(null); // { name, total, owned, withIds, books, path | xml } — shown before importing
   let cblPreviewBusy = $state(false);
   let cblPrevPage = $state(60);
+  let cblPrevFilter = $state('all');   // all | missing | noid | owned
+  let cblPrevGroup = $state(true);     // collapse consecutive same-series runs
 
   const listId = $derived.by(() => Number(new URLSearchParams(route.search).get('list')) || null);
   const arcOpen = $derived(arcResults !== null && !listId);
@@ -93,6 +95,31 @@
     return cblAll.filter((c) => c.dir.length === cblDir.length && cblInDir(c));
   });
   const cblVisible = $derived(cblHits.slice(0, cblPage));
+  // Preview figures. `missing` = matched by id but not owned — the number that
+  // answers "what will I get?"; `noId` books will be matched by name on import.
+  const cblPrevNoId = $derived(cblPreview ? cblPreview.total - cblPreview.withIds : 0);
+  const cblPrevMissing = $derived(cblPreview ? Math.max(0, cblPreview.total - cblPreview.owned - cblPrevNoId) : 0);
+  const cblPrevFiltered = $derived.by(() => {
+    if (!cblPreview) return [];
+    const f = cblPrevFilter;
+    return cblPreview.books.filter((b) => f === 'all' ? true : f === 'missing' ? (!b.owned && b.hasId) : f === 'noid' ? !b.hasId : b.owned);
+  });
+  // Group CONSECUTIVE same-series runs only — that's how CBL lists are built,
+  // and it never reorders the reading order (each row keeps its number).
+  const cblPrevRuns = $derived.by(() => {
+    const runs = [];
+    for (const b of cblPrevFiltered.slice(0, cblPrevPage)) {
+      const key = b.series + '|' + (b.volume || '');
+      const last = runs[runs.length - 1];
+      if (cblPrevGroup && last && last.key === key) last.books.push(b);
+      else runs.push({ key, series: b.series, volume: b.volume, books: [b] });
+    }
+    return runs.map((r) => ({
+      ...r, owned: r.books.filter((b) => b.owned).length,
+      range: r.books.length > 1 ? `#${r.books[0].number}–${r.books[r.books.length - 1].number}` : `#${r.books[0].number}`,
+    }));
+  });
+  const cblState = (b) => (b.owned ? 'owned' : b.hasId ? 'missing' : 'byname');
 
   async function refresh() {
     try {
@@ -253,7 +280,7 @@
   function showPreview(r, src) {
     cblPreviewBusy = false;
     if (r.error) return notify(r.error, 'error');
-    cblPreview = { ...r, ...src }; cblPrevPage = 60; cblResult = null;
+    cblPreview = { ...r, ...src }; cblPrevPage = 60; cblPrevFilter = 'all'; cblResult = null;
   }
   // A chosen or dropped file is previewed first — its books in order and what
   // you already own — and only imported from the preview's button.
@@ -367,6 +394,86 @@
         </div>
       </div>
     {:else if cblShown}
+      {#if cblPreview}
+        {@const noId = cblPrevNoId}
+        {@const missing = cblPrevMissing}
+        {@const pct = (n) => (cblPreview.total ? (n / cblPreview.total) * 100 : 0).toFixed(2)}
+        <div class="listx__scroll listx__prevpane">
+          <div class="listx__prev-head">
+            <div class="listx__prev-inner">
+              <div class="listx__prev-top">
+                <button class="listx__prev-back" onclick={() => (cblPreview = null)}><Icon name="arrow-left" size={15} /> Back</button>
+                <div class="listx__prev-titles">
+                  <div class="listx__prev-tags"><span class="listx__prev-pill">Preview</span><span class="listx__prev-prov">{cblPreview.path ? cblPreview.path.split('/').slice(0, -1).join(' / ') : 'from your file'}</span></div>
+                  <div class="listx__prev-name">{cblPreview.name}</div>
+                  <div class="listx__prev-sub">Nothing is imported yet — this is read straight from the file.</div>
+                </div>
+              </div>
+              <div class="listx__prev-stats">
+                <div class="listx__prev-stat" style="--tone:var(--muted)"><div class="listx__prev-stat-l"><span class="listx__prev-dot"></span>Issues</div><div class="listx__prev-stat-v">{fmt(cblPreview.total)}</div></div>
+                <div class="listx__prev-stat" style="--tone:var(--green)"><div class="listx__prev-stat-l"><span class="listx__prev-dot"></span>Already owned</div><div class="listx__prev-stat-v">{fmt(cblPreview.owned)}</div></div>
+                <div class="listx__prev-stat" style="--tone:var(--amber)"><div class="listx__prev-stat-l"><span class="listx__prev-dot"></span>Missing</div><div class="listx__prev-stat-v">{fmt(missing)}</div></div>
+                <div class="listx__prev-stat" style="--tone:{noId ? '#ff8f3d' : 'var(--green)'}"><div class="listx__prev-stat-l"><span class="listx__prev-dot"></span>No ComicVine id</div><div class="listx__prev-stat-v">{fmt(noId)}</div></div>
+              </div>
+              <div class="listx__prev-segbar">
+                {#if cblPreview.owned}<div class="is-owned" style="width:{pct(cblPreview.owned)}%" title="{cblPreview.owned} already in your library"></div>{/if}
+                {#if missing}<div class="is-missing" style="width:{pct(missing)}%" title="{missing} matched but not owned"></div>{/if}
+                {#if noId}<div class="is-byname" style="width:{pct(noId)}%" title="{noId} carry no ComicVine id"></div>{/if}
+              </div>
+              <div class="listx__prev-legend">
+                {#if cblPreview.owned}<span style="--tone:var(--green)"><i></i>Owned <b>{fmt(cblPreview.owned)}</b></span>{/if}
+                {#if missing}<span style="--tone:var(--amber)"><i></i>Missing <b>{fmt(missing)}</b></span>{/if}
+                {#if noId}<span style="--tone:#ff8f3d"><i></i>Matched by name <b>{fmt(noId)}</b></span>{/if}
+              </div>
+              {#if noId > 0}
+                <div class="listx__prev-note"><Icon name="alert-triangle" size={15} /><span>{fmt(noId)} book{noId === 1 ? '' : 's'} carr{noId === 1 ? 'ies' : 'y'} no ComicVine id and will be matched by name — {noId === 1 ? 'that is the one' : 'those are the ones'} most likely to be skipped.</span></div>
+              {/if}
+              <div class="listx__prev-filters">
+                {#each [['all', 'All', cblPreview.total], ['missing', 'Missing', missing], ['noid', 'No id', noId], ['owned', 'Owned', cblPreview.owned]] as [id, label, count] (id)}
+                  <button class="listx__prev-filter" class:is-on={cblPrevFilter === id} onclick={() => { cblPrevFilter = id; cblPrevPage = 60; }}>{label}<span>{fmt(count)}</span></button>
+                {/each}
+                <button class="listx__prev-group" class:is-on={cblPrevGroup} onclick={() => (cblPrevGroup = !cblPrevGroup)}><Icon name="layers" size={13} /> Group by series</button>
+              </div>
+            </div>
+          </div>
+          <div class="listx__prev-body">
+            {#if !cblPrevFiltered.length}
+              <div class="listx__arc-empty">{cblPrevFilter === 'noid' ? 'Every book carries a ComicVine id.' : cblPrevFilter === 'missing' ? 'You already own every matched book.' : 'Nothing to show.'}</div>
+            {/if}
+            {#each cblPrevRuns as r, ri (ri)}
+              {#if cblPrevGroup}
+                <div class="listx__prev-run">
+                  <span class="listx__prev-run-series">{r.series}</span>
+                  {#if r.volume}<span class="listx__prev-run-vol">({r.volume})</span>{/if}
+                  <span class="listx__prev-run-own" class:is-all={r.owned === r.books.length} class:is-some={r.owned > 0 && r.owned < r.books.length}>{r.owned}/{r.books.length} owned</span>
+                  <span class="listx__prev-run-line"></span>
+                  <span class="listx__prev-run-range">{r.range}</span>
+                </div>
+              {/if}
+              {#each r.books as b (b.n)}
+                {@const st = cblState(b)}
+                <div class="listx__prev-row" data-st={st}>
+                  <span class="listx__prev-n">{b.n}</span>
+                  <span class="listx__prev-rdot"></span>
+                  <span class="listx__prev-rname">{#if !cblPrevGroup}<span class="listx__prev-rseries">{b.series} </span>{/if}<b>#{b.number}</b>{#if b.volume}<span class="listx__prev-rvol"> ({b.volume})</span>{/if}</span>
+                  <span class="listx__prev-badge">{st === 'owned' ? 'Owned' : st === 'missing' ? 'Missing' : 'by name'}</span>
+                </div>
+              {/each}
+            {/each}
+            {#if cblPrevFiltered.length > cblPrevPage}
+              <button class="listx__cbl-more" onclick={() => (cblPrevPage += 120)}>Show more ({fmt(cblPrevFiltered.length - cblPrevPage)} more)</button>
+            {/if}
+            {#if cblPreview.truncated}<div class="listx__prev-trunc">This list is very long — previewing the first 3,000 of {fmt(cblPreview.total)} books. The import has the same cap.</div>{/if}
+          </div>
+          <div class="listx__prev-foot">
+            <div class="listx__prev-inner listx__prev-foot-row">
+              <span class="listx__prev-outcome">Imports in reading order · {fmt(cblPreview.withIds)} book{cblPreview.withIds === 1 ? '' : 's'} match by id{noId ? `, ${fmt(noId)} by name` : ''} · {fmt(cblPreview.owned)} already owned</span>
+              <button class="listx__prev-cancel" onclick={() => (cblPreview = null)}>Cancel</button>
+              <button class="listx__prev-import" disabled={cblBusy} onclick={importPreview}><Icon name="import" size={15} /> {cblBusy ? 'Importing…' : 'Import this list'}</button>
+            </div>
+          </div>
+        </div>
+      {:else}
       <div class="listx__scroll">
         <div class="listx__cbl">
           <div class="listx__cbl-head">
@@ -417,37 +524,6 @@
             </label>
           {/if}
 
-          {#if cblPreview}
-            {@const pct = cblPreview.total ? Math.round((cblPreview.owned / cblPreview.total) * 100) : 0}
-            {@const noId = cblPreview.total - cblPreview.withIds}
-            <div class="listx__cbl-prev">
-              <div class="listx__cbl-prev-head">
-                <button class="listx__cbl-ghost" onclick={() => (cblPreview = null)}><Icon name="arrow-left" size={14} /> Back</button>
-                <div class="listx__cbl-prev-text">
-                  <div class="listx__cbl-prev-title">{cblPreview.name}</div>
-                  <div class="listx__cbl-prev-meta">{fmt(cblPreview.total)} issues · {fmt(cblPreview.owned)} owned · {fmt(cblPreview.withIds)} with ComicVine ids · {cblPreview.path ? cblPreview.path.split('/').slice(0, -1).join(' / ') : 'from your file'}</div>
-                </div>
-                <button class="listx__cbl-primary" disabled={cblBusy} onclick={importPreview}>{cblBusy ? 'Importing…' : 'Import this list'}</button>
-              </div>
-              <div class="listx__cbl-prev-bar" class:is-done={pct >= 100}><span style="width:{pct}%"></span></div>
-              {#if noId > 0}
-                <div class="listx__cbl-prev-note"><Icon name="alert-triangle" size={14} /><span>{fmt(noId)} book{noId === 1 ? '' : 's'} carr{noId === 1 ? 'ies' : 'y'} no ComicVine id and will be matched by name — {noId === 1 ? 'that is the one' : 'those are the ones'} most likely to be skipped.</span></div>
-              {/if}
-              <div class="listx__cbl-prev-rows">
-                {#each cblPreview.books.slice(0, cblPrevPage) as b (b.n)}
-                  <div class="listx__cbl-prev-row" class:is-owned={b.owned}>
-                    <span class="listx__cbl-prev-n">{b.n}</span>
-                    <span class="listx__cbl-prev-name">{b.series} <b>#{b.number}</b>{b.volume ? ` (${b.volume})` : ''}</span>
-                    {#if b.owned}<span class="listx__cbl-prev-owned">Owned</span>{:else if !b.hasId}<span class="listx__cbl-prev-noid">no id</span>{/if}
-                  </div>
-                {/each}
-              </div>
-              {#if cblPreview.books.length > cblPrevPage}
-                <button class="listx__cbl-more" onclick={() => (cblPrevPage += 120)}>Show more ({fmt(cblPreview.books.length - cblPrevPage)} more)</button>
-              {/if}
-              {#if cblPreview.truncated}<div class="listx__cbl-trunc">Showing the first 3,000 of {fmt(cblPreview.total)} books.</div>{/if}
-            </div>
-          {:else}
           <div class="listx__cbl-cathead">
             <span class="listx__cbl-cattitle">Community lists</span>
             {#if cblFiles?.length}<span class="listx__cbl-catcount">{fmt(cblFiles.length)} lists</span>{/if}
@@ -504,9 +580,9 @@
               <button class="listx__cbl-more" onclick={() => (cblPage += CBL_PAGE)}>Show more ({fmt(cblHits.length - cblVisible.length)} more)</button>
             {/if}
           {/if}
-          {/if}
         </div>
       </div>
+      {/if}
     {:else if det}
       <div class="listx__dhead">
         <button class="listx__iconbtn listx__back" aria-label="Lists" onclick={() => setQuery({ list: null })}><Icon name="arrow-left" size={16} /></button>
@@ -763,25 +839,66 @@
   .listx__cbl-more { display: block; margin: 14px auto 0; height: 38px; padding: 0 20px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 9px; font: 600 13px var(--font-body); cursor: pointer; }
   .listx__cbl-card .listx__cbl-ghost { opacity: .7; }
   .listx__cbl-card:hover .listx__cbl-ghost { opacity: 1; }
-  .listx__cbl-prev { margin-top: 26px; }
-  .listx__cbl-prev-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-  .listx__cbl-prev-text { flex: 1; min-width: 200px; }
-  .listx__cbl-prev-title { font-family: var(--font-display); font-size: 17px; letter-spacing: .03em; }
-  .listx__cbl-prev-meta { font: 11.5px var(--font-mono); color: var(--faint); margin-top: 3px; }
-  .listx__cbl-prev-bar { height: 5px; border-radius: 20px; background: var(--panel-2); overflow: hidden; margin-bottom: 12px; }
-  .listx__cbl-prev-bar span { display: block; height: 100%; background: var(--accent); }
-  .listx__cbl-prev-bar.is-done span { background: var(--green); }
-  .listx__cbl-prev-note { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--amber); padding: 10px 13px; border: 1px solid rgba(255,194,75,.3); background: rgba(255,194,75,.06); border-radius: 10px; margin-bottom: 12px; }
-  .listx__cbl-prev-note :global(svg) { flex: none; }
-  .listx__cbl-prev-rows { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-  .listx__cbl-prev-row { display: flex; align-items: center; gap: 12px; padding: 8px 13px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
-  .listx__cbl-prev-row:last-child { border-bottom: 0; }
-  .listx__cbl-prev-n { width: 30px; text-align: right; font: 11px var(--font-mono); color: var(--faint); flex: none; }
-  .listx__cbl-prev-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
-  .listx__cbl-prev-row.is-owned .listx__cbl-prev-name { color: var(--text); }
-  .listx__cbl-prev-name b { font-weight: 600; color: var(--text); }
-  .listx__cbl-prev-owned { font: 600 10px var(--font-body); text-transform: uppercase; letter-spacing: .04em; color: var(--green); border: 1px solid rgba(95,211,138,.4); border-radius: 5px; padding: 2px 7px; flex: none; }
-  .listx__cbl-prev-noid { font: 11px var(--font-mono); color: var(--amber); flex: none; }
+  /* ---- CBL preview: sticky header + rows + sticky action bar ---- */
+  .listx__prevpane { display: flex; flex-direction: column; min-height: 100%; }
+  .listx__prev-head { position: sticky; top: 0; z-index: 2; background: var(--ink); border-bottom: 1px solid var(--line); }
+  .listx__prev-inner { max-width: 820px; margin: 0 auto; padding: 16px 24px 0; box-sizing: border-box; width: 100%; }
+  .listx__prev-top { display: flex; align-items: flex-start; gap: 12px; }
+  .listx__prev-back { height: 34px; padding: 0 12px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 8px; font: 600 12.5px var(--font-body); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; flex: none; }
+  .listx__prev-back:hover { color: var(--text); }
+  .listx__prev-titles { flex: 1; min-width: 0; }
+  .listx__prev-tags { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .listx__prev-pill { font: 600 10px var(--font-body); text-transform: uppercase; letter-spacing: .06em; color: #a78bfa; border: 1px solid rgba(167,139,250,.4); border-radius: 5px; padding: 2px 8px; }
+  .listx__prev-prov { font: 11px var(--font-mono); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .listx__prev-name { font-family: var(--font-display); font-size: 22px; letter-spacing: .02em; margin-top: 7px; line-height: 1.15; }
+  .listx__prev-sub { font-size: 12.5px; color: var(--faint); margin-top: 4px; }
+  .listx__prev-stats { display: flex; gap: 9px; margin-top: 15px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .listx__prev-stat { flex: none; min-width: 116px; background: rgba(255,255,255,.015); border: 1px solid var(--line); border-radius: 11px; padding: 10px 13px; }
+  .listx__prev-stat-l { display: flex; align-items: center; gap: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); white-space: nowrap; }
+  .listx__prev-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tone); flex: none; }
+  .listx__prev-stat-v { font: 700 20px var(--font-body); margin-top: 5px; color: var(--tone); }
+  .listx__prev-segbar { display: flex; height: 9px; border-radius: 20px; overflow: hidden; background: var(--panel-2); margin-top: 13px; }
+  .listx__prev-segbar .is-owned { background: var(--green); }
+  .listx__prev-segbar .is-missing { background: var(--amber); }
+  .listx__prev-segbar .is-byname { background: #ff8f3d; }
+  .listx__prev-legend { display: flex; gap: 15px; margin-top: 8px; flex-wrap: wrap; font-size: 11.5px; color: var(--faint); }
+  .listx__prev-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .listx__prev-legend i { width: 8px; height: 8px; border-radius: 2px; background: var(--tone); }
+  .listx__prev-legend b { color: var(--text); }
+  .listx__prev-note { display: flex; gap: 10px; align-items: flex-start; margin-top: 13px; padding: 11px 13px; border: 1px solid rgba(255,194,75,.32); background: rgba(255,194,75,.06); border-radius: 10px; font-size: 12.5px; color: #e8d9b4; line-height: 1.5; }
+  .listx__prev-note :global(svg) { color: var(--amber); flex: none; margin-top: 1px; }
+  .listx__prev-filters { display: flex; gap: 7px; margin-top: 14px; padding-bottom: 12px; overflow-x: auto; scrollbar-width: none; }
+  .listx__prev-filter, .listx__prev-group { display: inline-flex; align-items: center; gap: 7px; height: 31px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--muted); font: 600 12px var(--font-body); cursor: pointer; white-space: nowrap; flex: none; }
+  .listx__prev-filter span { font: 600 10.5px var(--font-mono); color: #6f6885; }
+  .listx__prev-filter.is-on { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .listx__prev-filter.is-on span { color: rgba(255,255,255,.85); }
+  .listx__prev-group { margin-left: auto; }
+  .listx__prev-group.is-on { border-color: #a78bfa; background: rgba(167,139,250,.12); color: #a78bfa; }
+  .listx__prev-body { flex: 1; max-width: 820px; width: 100%; margin: 0 auto; padding: 14px 24px 24px; box-sizing: border-box; }
+  .listx__prev-run { display: flex; align-items: center; gap: 10px; padding: 14px 2px 8px; }
+  .listx__prev-run-series { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .listx__prev-run-vol, .listx__prev-run-own { font: 11px var(--font-mono); color: #6f6885; flex: none; }
+  .listx__prev-run-own.is-all { color: var(--green); }
+  .listx__prev-run-own.is-some { color: var(--amber); }
+  .listx__prev-run-line { flex: 1; height: 1px; background: var(--line); }
+  .listx__prev-run-range { font: 11px var(--font-mono); color: #4a4458; flex: none; }
+  .listx__prev-row { display: flex; align-items: center; gap: 11px; padding: 8px 12px; border-bottom: 1px solid var(--line); --tone: var(--amber); }
+  .listx__prev-row:hover { background: rgba(255,255,255,.03); }
+  .listx__prev-row[data-st="owned"] { --tone: var(--green); }
+  .listx__prev-row[data-st="byname"] { --tone: #ff8f3d; }
+  .listx__prev-row:not([data-st="owned"]) { opacity: .9; }
+  .listx__prev-n { width: 34px; font: 600 11px var(--font-mono); color: #6f6885; flex: none; text-align: right; }
+  .listx__prev-rdot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--tone); }
+  .listx__prev-rname { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .listx__prev-rseries { color: #c3bcd4; margin-right: .35em; }   /* spacing via CSS: inline whitespace is collapsed */
+  .listx__prev-rvol { color: #6f6885; font-weight: 400; margin-left: .35em; }
+  .listx__prev-badge { font: 600 10px var(--font-body); text-transform: uppercase; letter-spacing: .04em; color: var(--tone); border: 1px solid color-mix(in srgb, var(--tone) 33%, transparent); background: color-mix(in srgb, var(--tone) 9%, transparent); border-radius: 5px; padding: 2px 7px; flex: none; }
+  .listx__prev-trunc { margin-top: 14px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 12px; color: var(--faint); text-align: center; }
+  .listx__prev-foot { position: sticky; bottom: 0; z-index: 2; border-top: 1px solid var(--line); background: var(--panel); box-shadow: 0 -10px 28px rgba(0,0,0,.35); }
+  .listx__prev-foot-row { display: flex; align-items: center; gap: 13px; flex-wrap: wrap; padding: 12px 24px; }
+  .listx__prev-outcome { flex: 1; min-width: 200px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .listx__prev-cancel { height: 40px; padding: 0 15px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 9px; font: 600 12.5px var(--font-body); cursor: pointer; }
+  .listx__prev-import { height: 40px; padding: 0 20px; border: none; background: var(--accent); color: #fff; border-radius: 9px; font: 600 13px var(--font-body); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
   @media (max-width: 900px) { .listx__cbl-folders { grid-template-columns: 1fr; } }
 
   @media (max-width: 820px) {
