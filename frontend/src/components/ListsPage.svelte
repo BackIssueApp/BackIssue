@@ -282,9 +282,9 @@
         <span class="listx__rail-count">{loaded ? `${lists.length} list${lists.length === 1 ? '' : 's'}` : ''}</span>
       </div>
       <div class="listx__rail-actions">
-        <button class="listx__new" onclick={createList}><Icon name="plus" size={14} /> New list</button>
-        <button class="listx__arcbtn" class:is-on={arcResults !== null} onclick={toggleArc}><Icon name="diamond" size={14} /> Import arc</button>
-        <button class="listx__arcbtn" class:is-on={cblOpen} onclick={toggleCbl}><Icon name="import" size={14} /> Import CBL</button>
+        <button class="listx__new" title="New list" aria-label="New list" onclick={createList}><Icon name="plus" size={14} /> New</button>
+        <button class="listx__arcbtn" class:is-on={arcResults !== null} title="Import a ComicVine story arc" aria-label="Import arc" onclick={toggleArc}><Icon name="diamond" size={14} /> Arc</button>
+        <button class="listx__arcbtn" class:is-on={cblOpen} title="Import a CBL reading list" aria-label="Import CBL" onclick={toggleCbl}><Icon name="import" size={14} /> CBL</button>
       </div>
     </div>
     <div class="listx__rail-scroll">
@@ -531,10 +531,14 @@
   .listx__iconbtn:hover { color: var(--text); }
   .listx__rail-title { font-family: var(--font-display); font-size: 21px; letter-spacing: .03em; }
   .listx__rail-count { margin-left: auto; font: 11px var(--font-mono); color: var(--faint); }
-  .listx__rail-actions { display: flex; gap: 8px; margin-top: 13px; }
-  .listx__new { flex: 1; height: 36px; border: none; background: var(--accent); color: #fff; border-radius: 8px; font: 600 12.5px var(--font-body); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
-  .listx__arcbtn { height: 36px; padding: 0 13px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 8px; font: 600 12.5px var(--font-body); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-  .listx__arcbtn.is-on { border-color: #a78bfa; background: rgba(167,139,250,.12); color: #a78bfa; }
+  /* Three compact actions (New · Arc · CBL) — short labels so they sit on one
+     row in the 300px rail; the open panel's button takes the accent tint. */
+  .listx__rail-actions { display: flex; gap: 6px; margin-top: 11px; flex-wrap: wrap; }
+  .listx__new, .listx__arcbtn { height: 32px; padding: 0 11px; border: 1px solid var(--line); background: transparent; border-radius: 7px; font: 600 12px var(--font-body); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .listx__new { color: var(--text); }
+  .listx__arcbtn { color: var(--muted); }
+  .listx__new:hover, .listx__arcbtn:hover { color: var(--text); border-color: #4a4266; }
+  .listx__arcbtn.is-on { border-color: var(--accent); background: rgba(255,45,111,.1); color: var(--accent); }
   .listx__rail-scroll { flex: 1; overflow-y: auto; padding: 4px 12px 30px; }
   .listx__rail-empty { padding: 40px 16px; text-align: center; color: var(--faint); font-size: 13px; line-height: 1.55; }
   .listx__rail-empty-art { width: 46px; height: 46px; margin: 0 auto 12px; border-radius: 12px; background: var(--panel-2); display: grid; place-items: center; color: #6f6885; }
