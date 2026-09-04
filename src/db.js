@@ -1308,7 +1308,9 @@ export function seriesCollectionDetail(db, id, userId = null) {
     });
     return {
       series: seriesOut, cv: cvOut, source: 'cv', sourced, issues, superseded,
-      unlinkedFiles: files.filter((f) => f.cv_issue_id == null && f.issue_id == null).map(asFile),
+      // Present on disk but tied to no issue — the UI shows these so a file
+      // that reads as "missing" is explained rather than invisible.
+      unlinkedFiles: files.filter((f) => f.cv_issue_id == null && f.issue_id == null).map((f) => ({ ...asFile(f), ci_number: f.ci_number })),
     };
   }
 

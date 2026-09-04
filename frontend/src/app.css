@@ -1501,6 +1501,17 @@ body.import .import-page { display: flex; flex-direction: column; height: 100%; 
 .unmatched-files__head { font-size: 11px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
 .unmatched-file { font: 12px var(--font-mono); padding: 3px 0; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .unmatched-file.is-bad { color: var(--red); }
+.unlinked { margin-top: 14px; padding: 12px 14px; border: 1px solid rgba(255,194,75,.32); background: rgba(255,194,75,.05); border-radius: 10px; }
+.unlinked__head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--amber); }
+.unlinked__note { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 6px 0 10px; }
+.unlinked__note b { color: var(--text); }
+.unlinked__file { display: flex; align-items: baseline; gap: 12px; padding: 3px 0; }
+.unlinked__name { flex: 1; min-width: 0; font: 12px var(--font-mono); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unlinked__file.is-bad .unlinked__name { color: var(--red); }
+.unlinked__num { font: 11px var(--font-mono); color: var(--faint); flex: none; }
+.unlinked__hint { font-size: 12.5px; color: var(--text); line-height: 1.5; margin: 0 0 10px; padding: 9px 12px; border-left: 3px solid var(--amber); background: rgba(255,194,75,.08); border-radius: 0 8px 8px 0; }
+.unlinked__more { margin-top: 8px; height: 30px; padding: 0 12px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 7px; font: 600 12px var(--font-body); cursor: pointer; }
+.unlinked__more:hover { color: var(--text); }
 .series-cv { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 12px; flex-wrap: wrap; }
 .cv-chip { color: var(--accent); font-weight: 600; text-decoration: none; }
 a.cv-chip:hover { text-decoration: underline; }

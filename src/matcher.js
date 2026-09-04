@@ -39,6 +39,8 @@ export function normalizeNumber(n) {
     const f = parseFloat(s);
     if (Number.isFinite(f)) return String(f);
   }
+  const suffixed = s.match(/^0*(\d+(?:\.\d+)?)(\.?)\s*([A-Za-z]{1,2})$/); // 001a / 1A / 016.HU -> "1a", "16.hu"
+  if (suffixed) return `${String(parseFloat(suffixed[1]))}${suffixed[2] ? '.' : ''}${suffixed[3].toLowerCase()}`;
   return s.toLowerCase();
 }
 

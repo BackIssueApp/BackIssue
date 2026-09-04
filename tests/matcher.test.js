@@ -27,6 +27,10 @@ test('normalizeNumber strips hash, leading zeros, trailing .0', () => {
   assert.equal(normalizeNumber('004'), '4');
   assert.equal(normalizeNumber('4.00'), '4');
   assert.equal(normalizeNumber('4.1'), '4.1');
+  // a letter suffix survives, leading zeros don't: "001a" is ComicVine's "1A"
+  assert.equal(normalizeNumber('001a'), '1a');
+  assert.equal(normalizeNumber('1A'), '1a');
+  assert.equal(normalizeNumber('016.HU'), '16.hu');
   assert.equal(normalizeNumber('Annual 1'), 'annual 1');
 });
 

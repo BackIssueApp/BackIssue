@@ -8,6 +8,20 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Files that were clearly on disk showed their issue as missing.** Three
+  causes, all fixed. Filenames in the *Series (Year) NNN (tags)* style — a
+  common convention for libraries organised by other tools — parsed to no
+  issue number at all, so the file could never be tied to its ComicVine issue.
+  A ComicInfo tag whose `<Number>` didn't match ComicVine's numbering blocked
+  the link even when the filename was fine; the filename is now tried as well.
+  And `001a`-style numbers now match ComicVine's `1A`. The series page also
+  gains an **unmatched files** panel listing any file in the folder that isn't
+  tied to an issue, with the number BackIssue read from it — so the reason is
+  visible instead of the file being silently invisible. Rescanning a series
+  (or the next library scan) relinks existing files; no re-import needed.
+
 ## [0.7.7] — 2026-09-03
 
 ### Added

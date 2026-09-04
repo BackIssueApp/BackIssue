@@ -12,6 +12,7 @@ import { resolveSeriesDir, defaultRootedDir } from './paths.js';
 import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
 import { normalizeNumber } from './matcher.js';
+import { parseIssueFromFilename } from './scanner.js';
 import { testIndexer } from './newznab.js';
 import { testClient } from './nzbclients.js';
 import { testTorznabIndexer } from './torznab.js';
@@ -1481,6 +1482,13 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       const derivable = d.source !== 'unmatched' || row.path || (d.files || []).length;
       d.location = derivable ? resolveSeriesDir(db, row) : null;
       d.defaultLocation = derivable ? defaultRootedDir(db, row) : null;
+    }
+    // Explain unlinked files: the number BackIssue read (tag first, then filename).
+    if (Array.isArray(d.unlinkedFiles)) {
+      d.unlinkedFiles = d.unlinkedFiles.map((f) => {
+        const raw = f.ci_number || parseIssueFromFilename(f.name);
+        return { ...f, number: raw != null && raw !== '' ? normalizeNumber(raw) : null, fromTag: !!f.ci_number };
+      });
     }
     return res.json(d);
   });

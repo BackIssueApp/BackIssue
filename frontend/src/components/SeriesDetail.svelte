@@ -23,6 +23,14 @@
   const s = $derived(detail.series);
   const det = $derived(detail.det);
   const isCv = $derived(!!det && det.source === 'cv' && Array.isArray(det.issues));
+  let showAllUnlinked = $state(false);
+  // Unlinked files whose number is beyond anything this volume has: the
+  // strongest sign the series is matched to the WRONG ComicVine volume.
+  const unlinkedBeyond = $derived.by(() => {
+    if (!isCv || !(det.unlinkedFiles || []).length) return 0;
+    const max = Math.max(0, ...det.issues.map((i) => parseFloat(i.number)).filter(Number.isFinite));
+    return det.unlinkedFiles.filter((f) => Number.isFinite(parseFloat(f.number)) && parseFloat(f.number) > max).length;
+  });
   // Self-described series (plugin library types, e.g. Books): the hero/header
   // renders here like any series, but the issue area belongs to the plugin
   // that owns the type (registerSeriesView) — comic vocabulary (filter chips,
@@ -823,6 +831,27 @@
             <div class="loading">Loading issues…</div>
           {/if}
         </div>
+        {#if isCv && (det.unlinkedFiles || []).length}
+          {@const n = det.unlinkedFiles.length}
+          <!-- Files in this series' folder that match no ComicVine issue. Without
+               this, such a file is invisible and its issue simply reads "missing". -->
+          <div class="unlinked">
+            <div class="unlinked__head"><Icon name="alert-triangle" size={14} /> {fmt(n)} file{n === 1 ? '' : 's'} in this folder {n === 1 ? "isn't" : "aren't"} matched to an issue</div>
+            <div class="unlinked__note">They count as missing until they match. The issue number is read from the file's ComicInfo tag first, then its filename, and looked up in this ComicVine volume — if the volume is the wrong one, use <b>Fix match</b>; if the number is, retag or rename the file, then <b>Scan folder</b>.</div>
+            {#if unlinkedBeyond}
+              <div class="unlinked__hint">{fmt(unlinkedBeyond)} of them {unlinkedBeyond === 1 ? 'has a number' : 'have numbers'} this volume never reaches (it has {fmt(det.issues.length)} issue{det.issues.length === 1 ? '' : 's'}) — this is almost certainly the wrong ComicVine volume. <b>Fix match</b> to the right one and the files link on their own.</div>
+            {/if}
+            {#each (showAllUnlinked ? det.unlinkedFiles : det.unlinkedFiles.slice(0, 40)) as f (f.path)}
+              <div class="unlinked__file" class:is-bad={!f.valid} title={f.path}>
+                <span class="unlinked__name">{f.name}</span>
+                <span class="unlinked__num">{f.number ? `read as #${f.number}${f.fromTag ? ' (from tag)' : ''}` : 'no issue number found'}</span>
+              </div>
+            {/each}
+            {#if !showAllUnlinked && n > 40}
+              <button class="unlinked__more" onclick={() => (showAllUnlinked = true)}>Show all {fmt(n)}</button>
+            {/if}
+          </div>
+        {/if}
       </div>
     </div>
   {/if}

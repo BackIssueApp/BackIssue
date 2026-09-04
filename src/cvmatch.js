@@ -4,9 +4,18 @@ import { parseIssueFromFilename } from './scanner.js';
 import { poolWithResource } from './pool.js';
 
 // A file's issue number: prefer the embedded ComicInfo number, else parse the filename.
-function fileIssueNumber(f) {
-  const n = f.ci_number || parseIssueFromFilename(f.name);
-  return n != null && n !== '' ? normalizeNumber(n) : null;
+// Candidate issue keys for a file, best first: the ComicInfo <Number> tag,
+// then the filename. Both are tried against the volume — a tag that reads
+// "1 (of 6)" or a filename the parser can't read must not, on its own, leave a
+// perfectly good file unlinked (and its issue "missing").
+function fileIssueKeys(f) {
+  const keys = [];
+  for (const n of [f.ci_number, parseIssueFromFilename(f.name)]) {
+    if (n == null || n === '') continue;
+    const k = normalizeNumber(n);
+    if (k && !keys.includes(k)) keys.push(k);
+  }
+  return keys;
 }
 
 // Match a series' owned files to CV issues by number and record cv_issue_id on
@@ -22,9 +31,9 @@ export function linkFilesToCv(db, seriesId, cvSeriesId) {
   const files = db.prepare('SELECT path, ci_number, name FROM library_files WHERE series_id=?').all(seriesId);
   let linked = 0;
   for (const f of files) {
-    const k = fileIssueNumber(f);
-    const cvId = k ? byNum.get(k) : null;
-    linkFileCvIssue(db, f.path, cvId ?? null);
+    let cvId = null;
+    for (const k of fileIssueKeys(f)) { cvId = byNum.get(k) ?? null; if (cvId) break; }
+    linkFileCvIssue(db, f.path, cvId);
     if (cvId) linked++;
   }
   return linked;

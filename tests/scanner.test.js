@@ -89,6 +89,14 @@ test('parseIssueFromFilename reads the number from common library names', () => 
   assert.equal(parseIssueFromFilename('cover.jpg'), null);
   // scene-style names with the number before the (year) + trailing tags
   assert.equal(parseIssueFromFilename('Batman 005 (2016) (Digital) (Group).cbz'), '005');
+  // "Series (Year) NNN (tags)" — the number comes AFTER the year (a common
+  // convention for externally organised libraries); these used to parse to null
+  assert.equal(parseIssueFromFilename('Batman (2016) 012 (Digital) (Zone-Empire).cbz'), '012');
+  assert.equal(parseIssueFromFilename('Batman (2016) #012 (Digital).cbz'), '012');
+  assert.equal(parseIssueFromFilename('Batman (2016) 001a (Digital).cbz'), '001');
+  assert.equal(parseIssueFromFilename('Saga (2012) 001.5 (Digital).cbz'), '001.5');
+  assert.equal(parseIssueFromFilename('Batman (2016) (Digital) (Group).cbz'), null);
+  assert.equal(parseIssueFromFilename('Batman (2016) 44p c2c 012 (Digital).cbz'), '012'); // "44p"/"c2c" are not issue numbers
   // decimal / half-issue numbers survive (dot between digits kept)
   assert.equal(parseIssueFromFilename('Spider-Man 000.5 (1998) (Marvel-Wizard) (c2c) (Raven-DCP).cbz'), '000.5');
   assert.equal(parseIssueFromFilename('Amazing Spider-Man 001.1 (2014).cbz'), '001.1');

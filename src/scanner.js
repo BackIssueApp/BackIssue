@@ -56,6 +56,26 @@ export function parseIssueFromFilename(name) {
     const nonYear = nums.filter((n) => !/^(?:19|20)\d{2}$/.test(n));
     if (nonYear.length) return nonYear[nonYear.length - 1];
   }
+  // "Series (2016) 012 (Digital) (Group)": nothing before the year, so the
+  // issue is the first standalone number AFTER it (tags stripped; a token glued
+  // to letters like "44p" or "c2c" isn't a number, and a letter suffix "001a"
+  // is dropped the same way the head path drops it).
+  if (yearMatch) {
+    const tail = base.slice(yearMatch.index + yearMatch[0].length)
+      .replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')
+      .replace(/_+/g, ' ')
+      .replace(/(?<!\d)\.|\.(?!\d)/g, ' ');
+    const re = /(?<![A-Za-z0-9])(#?)(\d+(?:\.\d+)?)([A-Za-z]?)(?![A-Za-z0-9])/g;
+    let m;
+    while ((m = re.exec(tail))) {
+      const [, hash, num, suffix] = m;
+      if (/^(?:19|20)\d{2}$/.test(num)) continue;
+      // A bare digit+letter token ("44p", "2c") is a page count or tag; a
+      // zero-padded or #-prefixed one ("001a", "#1a") is an issue with a variant letter.
+      if (suffix && !hash && !/^0\d/.test(num)) continue;
+      return num;
+    }
+  }
   return issueNumberFromTitle(base);
 }
 
