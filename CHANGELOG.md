@@ -27,6 +27,10 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   newest/oldest release, or most/fewest wanted; tick rows (shift-click for a
   range) to Want, Don't want or Download them together. Skipping a queued or
   failed issue takes it out of the queue.
+- **Choose the default policy.** Settings → Downloading → **Monitor added
+  series** decides what a series gets when it enters the library (added by
+  hand, Discover, Releases, reading lists, requests, import): All issues,
+  New issues only, or Off. Download on add queues what that policy wants.
 - **Want a whole reading list.** *Want all* on a list makes every issue on it
   wanted: series already in the library get the issues picked, series that
   aren't are added with monitoring off and just those issues picked.

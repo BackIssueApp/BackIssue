@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { openDb, upsertSeries, upsertIssue, upsertCvSeries, upsertCvIssue } from '../src/db.js';
+import { openDb, upsertSeries, upsertIssue, upsertCvSeries, upsertCvIssue, setMonitor } from '../src/db.js';
 import { createApp } from '../src/server.js';
 
 function makeApp() {
@@ -40,7 +40,14 @@ function makeApp() {
     confirmImportCandidate: (id) => { calls.importConfirm = id; return { id, status: 'ready' }; },
     skipImportCandidate: (id) => { calls.importSkip = id; return { id, status: 'skipped' }; },
     cvSetManual: async (id, cvId) => { calls.cvSet = { id, cvId }; return { series: { id }, cv: { id: cvId } }; },
-    addFromCv: async (cvId) => { calls.addedCv = cvId; return { seriesId: 5, outcome: 'created', cvId }; },
+    addFromCv: async (cvId, opts = {}) => {
+      calls.addedCv = cvId;
+      // like the real add: the series gets the requested policy ('none' for a
+      // "for these issues" add), else the default
+      const row = db.prepare('SELECT id FROM series WHERE cv_id=?').get(cvId);
+      if (row) setMonitor(db, row.id, opts.monitor || 'all');
+      return { seriesId: 5, outcome: row ? 'existing' : 'created', cvId };
+    },
     scanSeriesFolder: async (id) => { calls.scanned = id; return { started: true, dir: '/lib/X' }; },
     deleteComic: async (id, opts) => { calls.deleted = { id, ...opts }; return { deleted: true, deletedFiles: opts.deleteFiles ? 3 : 0 }; },
     refreshVolume: async (id) => { calls.refreshed = id; return { ok: true, issues: 7, detail: { issues: [] } }; },
@@ -695,7 +702,7 @@ test('add-cv auto-queues every missing issue of the added volume', async () => {
   const { app, db, calls } = makeApp();
   // what a real addFromCv leaves behind: the local series row (the stub
   // returns seriesId 5) and the CV volume's cached issue list
-  db.prepare("INSERT INTO series (id, title, url) VALUES (5, 'Earth X', 'cv:42')").run();
+  db.prepare("INSERT INTO series (id, title, url, cv_id) VALUES (5, 'Earth X', 'cv:42', 42)").run();
   upsertCvSeries(db, { id: 42, name: 'Earth X' });
   upsertCvIssue(db, { id: 901, cv_series_id: 42, issue_number: '1', name: 'One' });
   upsertCvIssue(db, { id: 902, cv_series_id: 42, issue_number: '2', name: 'Two' });
@@ -717,7 +724,7 @@ test('add-cv auto-queues every missing issue of the added volume', async () => {
 test('add-cv with "only the issues that were asked for" queues just those; off, it still queues everything', async () => {
   const config = (await import('../src/config.js')).default;
   const seed = (db) => {
-    db.prepare("INSERT INTO series (id, title, url) VALUES (5, 'Earth X', 'cv:42')").run();
+    db.prepare("INSERT INTO series (id, title, url, cv_id) VALUES (5, 'Earth X', 'cv:42', 42)").run();
     upsertCvSeries(db, { id: 42, name: 'Earth X' });
     upsertCvIssue(db, { id: 901, cv_series_id: 42, issue_number: '1', name: 'One' });
     upsertCvIssue(db, { id: 902, cv_series_id: 42, issue_number: '2', name: 'Two' });
@@ -737,7 +744,7 @@ test('add-cv with "only the issues that were asked for" queues just those; off, 
       assert.deepEqual(db.prepare("SELECT url FROM issues WHERE status = 'queued' AND url LIKE 'cvissue:%' ORDER BY url").all().map((x) => x.url), ['cvissue:902']);
       // an add with no issue in mind (Library / Discover) still fetches the whole run
       const r2 = await add(`http://localhost:${s.address().port}`, { comicvineId: 42 });
-      assert.equal(r2.scope, 'all');
+      assert.equal(r2.scope, 'policy');
       assert.equal(db.prepare("SELECT COUNT(*) n FROM issues WHERE status = 'queued' AND url LIKE 'cvissue:%'").get().n, 3);
     } finally { s.close(); }
   } finally { config.addDownloadOnlyRequested = false; }
@@ -749,7 +756,7 @@ test('add-cv with "only the issues that were asked for" queues just those; off, 
     try {
       const r = await add(`http://localhost:${s.address().port}`, { comicvineId: 42, cvIssueIds: [902] });
       assert.equal(r.queued, 3);
-      assert.equal(r.scope, 'all');
+      assert.equal(r.scope, 'policy');
     } finally { s.close(); }
   }
 });

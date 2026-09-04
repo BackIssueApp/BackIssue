@@ -659,12 +659,17 @@
           <span class="switch"><input id="set-autoDownloadOnAdd" type="checkbox" /><span class="switch__track"></span></span>
           <span>Download on add</span>
         </label>
-        <p class="modal__note">Adding a series (Library, Discover, Releases, reading lists) immediately queues every issue for download. Off = series add empty and you press "Download missing" yourself.</p>
+        <p class="modal__note">Adding a series (Library, Discover, Releases, reading lists) immediately queues what its monitoring policy wants. Off = series add empty and you press "Download missing" yourself.</p>
+        <label class="field">
+          <span>Monitor added series</span>
+          <select id="set-defaultMonitor"><option value="all">All issues</option><option value="new">New issues only</option><option value="none">Off</option></select>
+        </label>
+        <p class="modal__note">The monitoring policy a series gets when it enters the library — added by hand, from Discover, Releases, reading lists, requests, or an import. <b>All issues</b> keeps the run complete; <b>New issues only</b> wants issues from the newest one onward and leaves the back catalogue alone; <b>Off</b> fetches nothing until you monitor it or pick issues yourself. Any series can be changed later from its ⋯ menu.</p>
         <label class="field field--check">
           <span class="switch"><input id="set-addDownloadOnlyRequested" type="checkbox" /><span class="switch__track"></span></span>
           <span>Only the issues that were asked for</span>
         </label>
-        <p class="modal__note">When a series is added because of specific issues — an entry on a reading list, a release, a CBL import — it arrives with monitoring off and just those issues wanted, so only they are downloaded (now and if a grab fails later). Adding from the Library or Discover still monitors the whole run. Needs "Download on add".</p>
+        <p class="modal__note">When a series is added because of specific issues — an entry on a reading list, a release, a CBL import — it arrives with monitoring off and just those issues wanted, so only they are downloaded (now and if a grab fails later). Adding from the Library or Discover still gets the policy above. Needs "Download on add".</p>
         <label class="field">
           <span>Download format</span>
           <select id="set-format"><option value="cbz">CBZ (with metadata)</option><option value="pdf">PDF</option></select>

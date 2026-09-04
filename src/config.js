@@ -116,6 +116,11 @@ const config = {
   // download the moment a volume is added (Library +Add, Discover, Releases,
   // reading lists). Runs under the adding user's own download permission.
   autoDownloadOnAdd: true,
+  // The monitoring policy a series gets when it enters the library (added by
+  // hand, Discover, Releases, lists, requests, import): 'all' keeps the run
+  // complete, 'new' wants issues from the newest known one onward, 'none'
+  // fetches nothing until the user monitors or picks issues.
+  defaultMonitor: 'all',
   // …but when the add was prompted by SPECIFIC issues (a reading-list entry,
   // a release, a CBL import), queue only those instead of the whole run.
   // Adds with no issue in mind (Library, Discover) still fetch everything.

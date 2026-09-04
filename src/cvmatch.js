@@ -1,5 +1,6 @@
 import { normalizeTitle, extractYear, normalizeNumber } from './matcher.js';
-import { upsertCvSeries, upsertCvIssue, setSeriesCv, seriesNeedingCvMatch, listCvIssues, linkFileCvIssue, getSeriesByCvId, createCvSeries, setFollowed, setMonitor, defaultLibrary, assignSeriesLibrary, getSeriesById, getCvSeries, setSeriesPath, mergeSeriesRows } from './db.js';
+import config from './config.js';
+import { upsertCvSeries, upsertCvIssue, setSeriesCv, seriesNeedingCvMatch, listCvIssues, linkFileCvIssue, getSeriesByCvId, createCvSeries, setFollowed, setMonitor, MONITOR_STATES, defaultLibrary, assignSeriesLibrary, getSeriesById, getCvSeries, setSeriesPath, mergeSeriesRows } from './db.js';
 import { parseIssueFromFilename } from './scanner.js';
 import { normVolume } from './cv.js';
 import { poolWithResource } from './pool.js';
@@ -291,25 +292,28 @@ export async function rematchMismatched(db, client, onProgress = () => {}) {
 
 // Add a series to the collection straight from a ComicVine volume. Always a pure
 // ComicVine series; a download source fills it on demand.
-// `monitor` is the policy a NEW series gets ('all' = keep the run complete).
-// An add that is really "for these issues" passes 'none' and picks them after.
-export async function addSeriesFromCv(db, client, comicvineId, { monitor = 'all' } = {}) {
+// `monitor` is the policy a NEW series gets; unset = the "Monitor added
+// series" setting (config.defaultMonitor). An add that is really "for these
+// issues" passes 'none' and picks them after.
+export async function addSeriesFromCv(db, client, comicvineId, { monitor = null } = {}) {
+  const policy = MONITOR_STATES.includes(monitor) ? monitor : (MONITOR_STATES.includes(config.defaultMonitor) ? config.defaultMonitor : 'all');
   const v = await cacheCvVolume(db, client, comicvineId);
   const year = v.start_year != null ? String(v.start_year) : null;
 
   let seriesId, outcome;
   const already = getSeriesByCvId(db, v.id);
   if (already) {
-    // A plain add re-monitors an existing series; an add for specific issues
-    // leaves its policy alone (the caller picks the issues instead).
-    if (monitor === 'all') setFollowed(db, already.id, true);
+    // Re-adding a series that isn't monitored gives it the default policy; a
+    // series already monitored keeps what it has, and an add for specific
+    // issues ('none') leaves the policy alone (the caller picks the issues).
+    if (policy !== 'none' && (already.monitor || (already.followed ? 'all' : 'none')) === 'none') setMonitor(db, already.id, policy);
     seriesId = already.id; outcome = 'existing';
   } else {
     // Always a pure ComicVine series. Download sources are resolved on demand —
     // never the collection identity — so we never adopt/merge a catalog volume
     // here (that legacy behavior misfiled comics onto fuzzy name matches).
     seriesId = createCvSeries(db, { cvId: v.id, title: v.name, publisher: v.publisher, year, coverUrl: v.image_url });
-    if (monitor !== 'all') setMonitor(db, seriesId, monitor);
+    if (policy !== 'all') setMonitor(db, seriesId, policy);
     // Every new series gets a home immediately (first comic library) — callers
     // with a specific destination (the manga lane, import auto-assign)
     // re-assign right after, which overrides this default.

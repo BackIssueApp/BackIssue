@@ -67,6 +67,7 @@ export const SETTING_FIELDS = {
   backupCron:          { type: 'string', allowEmpty: true },
   backupEnabled:       { type: 'bool' },
   autoDownloadOnAdd:   { type: 'bool' }, // adding a volume queues its issues immediately
+  defaultMonitor:      { type: 'enum', values: ['all', 'new', 'none'] }, // policy for series entering the library
   addDownloadOnlyRequested: { type: 'bool' }, // …only the issues that prompted the add, when known
   zeroDayCron:         { type: 'string', allowEmpty: true },
   zeroDayEnabled:      { type: 'bool' },

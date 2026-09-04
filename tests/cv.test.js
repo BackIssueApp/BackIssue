@@ -8,6 +8,7 @@ test('cvKey takes the first key from legacy multi-key values', () => {
   assert.equal(cvKey(''), '');
 });
 import { scoreCvCandidate, rankCandidates, matchSeriesToCv, runCvMatch, linkFilesToCv, addSeriesFromCv, autoLinkCvSeries, refreshCvVolume, migrateAdoptedSeriesToCv } from '../src/cvmatch.js';
+import config from '../src/config.js';
 import {
   openDb, upsertSeries, upsertIssue, upsertLibraryFile, linkLibraryFile,
   upsertCvSeries, getCvSeries, upsertCvIssue, listCvIssues, setSeriesCv,
@@ -643,4 +644,40 @@ test('scoreCvCandidate penalises a volume with fewer issues than the files on di
   const a = scoreCvCandidate({ title: 'Radiant Black', year: '2021' }, { name: 'Radiant Black', start_year: '2021', count_of_issues: 48 });
   const b = scoreCvCandidate({ title: 'Radiant Black', year: '2021' }, { name: 'Radiant Black', start_year: '2021', count_of_issues: 8 });
   assert.equal(a.score, b.score);
+});
+
+test('addSeriesFromCv: the "Monitor added series" setting decides a new series\' policy; re-adds only lift an unmonitored one', async () => {
+  const db = openDb(':memory:');
+  const client = volumeClient({ id: 40, name: 'Late Start', start_year: '2020', publisher: 'P', count_of_issues: 3, image_url: 'i',
+    issues: [{ id: 401, number: '1', name: 'a' }, { id: 402, number: '2', name: 'b' }, { id: 403, number: '3', name: 'c' }] });
+  const saved = config.defaultMonitor;
+  try {
+    config.defaultMonitor = 'new';
+    let r = await addSeriesFromCv(db, client, 40);
+    let s = getSeriesById(db, r.seriesId);
+    assert.equal(s.monitor, 'new');
+    assert.equal(s.monitor_from, '3', 'watermark = the newest known issue');
+    assert.equal(s.followed, 1);
+    // A "for these issues" add of an existing series leaves the policy alone.
+    r = await addSeriesFromCv(db, client, 40, { monitor: 'none' });
+    assert.equal(r.outcome, 'existing');
+    assert.equal(getSeriesById(db, r.seriesId).monitor, 'new');
+    // An unmonitored existing series is lifted to the default on a plain re-add.
+    db.prepare("UPDATE series SET monitor='none', followed=0 WHERE id=?").run(r.seriesId);
+    config.defaultMonitor = 'all';
+    await addSeriesFromCv(db, client, 40);
+    assert.equal(getSeriesById(db, r.seriesId).monitor, 'all');
+    // 'none' as the default: the series is added but nothing is wanted.
+    config.defaultMonitor = 'none';
+    const client2 = volumeClient({ id: 41, name: 'Quiet', start_year: '2021', publisher: 'P', count_of_issues: 1, image_url: 'i', issues: [{ id: 411, number: '1', name: 'a' }] });
+    r = await addSeriesFromCv(db, client2, 41);
+    s = getSeriesById(db, r.seriesId);
+    assert.equal(s.monitor, 'none');
+    assert.equal(s.followed, 0);
+    // Garbage in the setting falls back to 'all'.
+    config.defaultMonitor = 'paused';
+    const client3 = volumeClient({ id: 42, name: 'Fallback', start_year: '2022', publisher: 'P', count_of_issues: 1, image_url: 'i', issues: [{ id: 421, number: '1', name: 'a' }] });
+    r = await addSeriesFromCv(db, client3, 42);
+    assert.equal(getSeriesById(db, r.seriesId).monitor, 'all');
+  } finally { config.defaultMonitor = saved; }
 });

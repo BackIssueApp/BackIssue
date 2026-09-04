@@ -1737,8 +1737,9 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     try {
       // "For these issues": the series arrives unmonitored with just those
       // issues picked, so automation keeps after exactly what was asked for.
-      // An existing series keeps whatever policy it has; the picks still land.
-      const r = await addFromCv(comicvineId, { monitor: onlyRequested ? 'none' : 'all' });
+      // Otherwise it gets the "Monitor added series" default. An existing
+      // series keeps whatever policy it has; the picks still land.
+      const r = await addFromCv(comicvineId, onlyRequested ? { monitor: 'none' } : {});
       if (onlyRequested && r?.seriesId != null) {
         setIssueWants(db, r.seriesId, wanted, true, { reason: String(req.body?.reason || 'requested').slice(0, 64), userId: req.user.id });
         r.picked = wanted.length;
@@ -1760,27 +1761,28 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       // Adding implies personal interest: the adder follows it automatically
       // (the add itself sets the global monitor flag for automation).
       if (r?.seriesId != null) setUserFollow(db, req.user.id, r.seriesId, true);
-      // Adding implies wanting: queue every missing issue right away. Runs
-      // only under the ADDER's own download permission (a role that may
-      // reshape the library but not download gets the add, nothing more),
-      // and only while the autoDownloadOnAdd setting is on. With ZERO enabled
-      // sources, queueing would just manufacture a wall of failed items — skip
-      // it and tell the client why (r.noSources) so the UI can say so.
+      // Adding implies wanting: queue what the series' policy (and picks)
+      // want right away — every missing issue under 'all', only the newest
+      // under 'new', just the requested issues for a "for these issues" add,
+      // nothing under 'none'. Runs only under the ADDER's own download
+      // permission (a role that may reshape the library but not download gets
+      // the add, nothing more), and only while the autoDownloadOnAdd setting
+      // is on. With ZERO enabled sources, queueing would just manufacture a
+      // wall of failed items — skip it and tell the client why (r.noSources).
       const anySource = (listSources ? listSources() : []).length > 0;
       if (!anySource) r.noSources = true;
       if (config.autoDownloadOnAdd !== false && r.seriesId && anySource
           && users.roleGrants(db, req.user.role, 'downloads.grab', permCatalog)) {
         const missing = db.prepare(`
-          SELECT ci.comicvine_id, ci.issue_number, ci.name FROM cv_issues ci
-           WHERE ci.cv_series_id = ? AND NOT EXISTS
-             (SELECT 1 FROM library_files lf WHERE lf.cv_issue_id = ci.comicvine_id AND lf.valid = 1)
-        `).all(r.cvId).filter((ci) => !onlyRequested || wanted.includes(ci.comicvine_id));
+          SELECT ci.comicvine_id, ci.issue_number, ci.name FROM wanted_issues w
+          JOIN cv_issues ci ON ci.comicvine_id = w.cv_issue_id WHERE w.series_id = ?
+        `).all(r.seriesId);
         const ids = missing.map((ci) => ensureCvIssueRow(db, {
           seriesId: r.seriesId, cvIssueId: ci.comicvine_id, number: ci.issue_number, title: ci.name,
         }));
         if (ids.length) { queueIssues(db, ids); startDownloads(); }
         r.queued = ids.length;
-        r.scope = onlyRequested ? 'requested' : 'all';
+        r.scope = onlyRequested ? 'requested' : 'policy';
       }
       res.json(r);
     } catch (e) {
