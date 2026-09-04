@@ -1661,6 +1661,10 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   app.post('/api/collection/add-cv', async (req, res) => {
     const comicvineId = Number(req.body?.comicvineId);
     if (!comicvineId) return res.status(400).json({ error: 'comicvineId required' });
+    // The issues that prompted this add, when the caller knows them (a list
+    // row, a release, a CBL entry) — with the "only requested" setting on,
+    // download-on-add is scoped to these instead of the whole volume.
+    const wanted = Array.isArray(req.body?.cvIssueIds) ? req.body.cvIssueIds.map(Number).filter(Boolean) : [];
     try {
       const r = await addFromCv(comicvineId);
       // Adding into a library files it there too. A manga-lane add resolves its
@@ -1690,16 +1694,18 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       if (!anySource) r.noSources = true;
       if (config.autoDownloadOnAdd !== false && r.seriesId && anySource
           && users.roleGrants(db, req.user.role, 'downloads.grab', permCatalog)) {
+        const onlyRequested = config.addDownloadOnlyRequested === true && wanted.length > 0;
         const missing = db.prepare(`
           SELECT ci.comicvine_id, ci.issue_number, ci.name FROM cv_issues ci
            WHERE ci.cv_series_id = ? AND NOT EXISTS
              (SELECT 1 FROM library_files lf WHERE lf.cv_issue_id = ci.comicvine_id AND lf.valid = 1)
-        `).all(r.cvId);
+        `).all(r.cvId).filter((ci) => !onlyRequested || wanted.includes(ci.comicvine_id));
         const ids = missing.map((ci) => ensureCvIssueRow(db, {
           seriesId: r.seriesId, cvIssueId: ci.comicvine_id, number: ci.issue_number, title: ci.name,
         }));
         if (ids.length) { queueIssues(db, ids); startDownloads(); }
         r.queued = ids.length;
+        r.scope = onlyRequested ? 'requested' : 'all';
       }
       res.json(r);
     } catch (e) {

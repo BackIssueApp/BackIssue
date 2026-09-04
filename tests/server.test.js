@@ -713,3 +713,43 @@ test('add-cv auto-queues every missing issue of the added volume', async () => {
     assert.ok(calls.downloads.length >= 1, 'the queue worker was kicked');
   } finally { s.close(); }
 });
+
+test('add-cv with "only the issues that were asked for" queues just those; off, it still queues everything', async () => {
+  const config = (await import('../src/config.js')).default;
+  const seed = (db) => {
+    db.prepare("INSERT INTO series (id, title, url) VALUES (5, 'Earth X', 'cv:42')").run();
+    upsertCvSeries(db, { id: 42, name: 'Earth X' });
+    upsertCvIssue(db, { id: 901, cv_series_id: 42, issue_number: '1', name: 'One' });
+    upsertCvIssue(db, { id: 902, cv_series_id: 42, issue_number: '2', name: 'Two' });
+    upsertCvIssue(db, { id: 903, cv_series_id: 42, issue_number: '3', name: 'Three' });
+  };
+  const add = async (base, body) => (await fetch(`${base}/api/collection/add-cv`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json();
+  // ON: a list row for #2 adds the series and queues only #2
+  config.addDownloadOnlyRequested = true;
+  try {
+    const { app, db } = makeApp();
+    seed(db);
+    const s = await listen(app);
+    try {
+      const r = await add(`http://localhost:${s.address().port}`, { comicvineId: 42, cvIssueIds: [902] });
+      assert.equal(r.queued, 1);
+      assert.equal(r.scope, 'requested');
+      assert.deepEqual(db.prepare("SELECT url FROM issues WHERE status = 'queued' AND url LIKE 'cvissue:%' ORDER BY url").all().map((x) => x.url), ['cvissue:902']);
+      // an add with no issue in mind (Library / Discover) still fetches the whole run
+      const r2 = await add(`http://localhost:${s.address().port}`, { comicvineId: 42 });
+      assert.equal(r2.scope, 'all');
+      assert.equal(db.prepare("SELECT COUNT(*) n FROM issues WHERE status = 'queued' AND url LIKE 'cvissue:%'").get().n, 3);
+    } finally { s.close(); }
+  } finally { config.addDownloadOnlyRequested = false; }
+  // OFF (default): the issue ids are ignored and everything missing is queued
+  {
+    const { app, db } = makeApp();
+    seed(db);
+    const s = await listen(app);
+    try {
+      const r = await add(`http://localhost:${s.address().port}`, { comicvineId: 42, cvIssueIds: [902] });
+      assert.equal(r.queued, 3);
+      assert.equal(r.scope, 'all');
+    } finally { s.close(); }
+  }
+});

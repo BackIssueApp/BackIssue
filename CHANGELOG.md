@@ -8,6 +8,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+
+- **Download only the issues you asked for.** Settings → Downloading →
+  **Only the issues that were asked for**: when a series is added because of
+  specific issues — a reading-list entry, a release, a CBL import — only those
+  are queued, instead of every missing issue of the run. Adding from the
+  Library or Discover, where no particular issue was in mind, still fetches
+  everything missing. Off by default, so nothing changes unless you turn it on.
+
 ## [0.7.8] — 2026-09-04
 
 ### Added

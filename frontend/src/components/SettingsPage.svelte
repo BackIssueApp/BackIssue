@@ -660,6 +660,11 @@
           <span>Download on add</span>
         </label>
         <p class="modal__note">Adding a series (Library, Discover, Releases, reading lists) immediately queues every issue for download. Off = series add empty and you press "Download missing" yourself.</p>
+        <label class="field field--check">
+          <span class="switch"><input id="set-addDownloadOnlyRequested" type="checkbox" /><span class="switch__track"></span></span>
+          <span>Only the issues that were asked for</span>
+        </label>
+        <p class="modal__note">When a series is added because of specific issues — an entry on a reading list, a release, a CBL import — download just those, not every missing issue of the run. Adding from the Library or Discover still fetches everything missing. Needs "Download on add".</p>
         <label class="field">
           <span>Download format</span>
           <select id="set-format"><option value="cbz">CBZ (with metadata)</option><option value="pdf">PDF</option></select>

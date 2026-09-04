@@ -207,10 +207,16 @@
   let addingSeries = $state(0); // cv_series_id in flight
   async function addSeries(it) {
     addingSeries = it.cv_series_id;
-    const r = await apiPost('/api/collection/add-cv', { comicvineId: it.cv_series_id });
+    // Every issue of that volume on THIS list is what the user is after — with
+    // "only the issues that were asked for" on, that's all that gets queued.
+    const cvIssueIds = rows.filter((x) => x.cv_series_id === it.cv_series_id && x.cv_issue_id).map((x) => x.cv_issue_id);
+    const r = await apiPost('/api/collection/add-cv', { comicvineId: it.cv_series_id, cvIssueIds });
     addingSeries = 0;
     if (r.error) return notify(r.error, 'error');
-    notify(`Added "${it.series_title || 'series'}" to the library.`, 'ok');
+    const queued = r.queued ? (r.scope === 'requested'
+      ? ` — queued ${fmt(r.queued)} issue${r.queued === 1 ? '' : 's'} from this list`
+      : ` — queued ${fmt(r.queued)} missing issue${r.queued === 1 ? '' : 's'}`) : '';
+    notify(`Added "${it.series_title || 'series'}" to the library${queued}.`, 'ok');
     refresh(); // every item of that series resolves its series_id now
   }
 

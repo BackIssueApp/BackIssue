@@ -116,6 +116,10 @@ const config = {
   // download the moment a volume is added (Library +Add, Discover, Releases,
   // reading lists). Runs under the adding user's own download permission.
   autoDownloadOnAdd: true,
+  // …but when the add was prompted by SPECIFIC issues (a reading-list entry,
+  // a release, a CBL import), queue only those instead of the whole run.
+  // Adds with no issue in mind (Library, Discover) still fetch everything.
+  addDownloadOnlyRequested: false,
   // Scheduled backfill: queue the next batch of missing (wanted) issues of
   // followed series for download each run.
   wantedSearchCron: '0 2 * * *',   // nightly, 2am

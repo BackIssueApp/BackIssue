@@ -165,7 +165,9 @@
   async function addRelease(m) {
     m._adding = true;
     try {
-      const r = await apiPost('/api/collection/add-cv', { comicvineId: m.cvId });
+      // The release IS the issue the user wants — pass it so "only the issues
+      // that were asked for" can scope the download to it.
+      const r = await apiPost('/api/collection/add-cv', { comicvineId: m.cvId, cvIssueIds: m.issueId ? [m.issueId] : [] });
       if (r?.error) { notify('Add failed: ' + r.error, 'error'); m._adding = false; return; }
       m._added = true;
       loadCollection();
