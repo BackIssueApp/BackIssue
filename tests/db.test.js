@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { setSeriesAliases, seriesSearchNames, createCvSeries } from '../src/db.js';
+import { setSeriesAliases, seriesSearchNames, createCvSeries, mergeSeriesRows } from '../src/db.js';
 import {
   openDb, upsertSeries, upsertIssue, listSeries, listIssues,
   setIssueStatus, queueIssues, getNextQueued, countByStatus, getSeriesTitleById,
@@ -836,4 +836,27 @@ test('collectionPage: legacy no-limit call still returns the whole set + counts 
   assert.equal(legacy.rows.length, collectionSeries(db, { filter: 'all', userId: 1 }).length, 'all rows returned');
   assert.equal(legacy.counts.all, legacy.rows.length);
   assert.ok('total' in legacy);
+});
+
+test('mergeSeriesRows folds a second row for the same volume into the folder-backed one', () => {
+  const db = openDb(':memory:');
+  upsertCvSeries(db, { id: 91273, name: 'Batman', start_year: '2016', count_of_issues: 163 });
+  upsertCvIssue(db, { id: 5001, cv_series_id: 91273, number: '1', name: null });
+  const keep = upsertSeries(db, { title: 'Batman', url: 'import:batman-2016' });
+  setSeriesCv(db, keep, 91273);
+  db.prepare('UPDATE series SET path=? WHERE id=?').run('/comics/Batman (2016)', keep);
+  const drop = createCvSeries(db, { cvId: 91273, title: 'Batman', year: '2016' });
+  const p = '/comics/Batman (2016)/Batman 001 (2016).cbz';
+  upsertLibraryFile(db, { path: p, dir: '/comics/Batman (2016)', name: 'Batman 001 (2016).cbz', size: 10, mtime: 1 });
+  linkLibraryFile(db, p, drop, null);
+  linkFileCvIssue(db, p, 5001);
+  db.prepare('INSERT INTO user_follows (user_id, series_id) VALUES (7, ?)').run(drop);
+  assert.equal(mergeSeriesRows(db, keep, drop), true);
+  assert.equal(getSeriesById(db, drop), undefined, 'the twin row is gone');
+  assert.equal(getLibraryFile(db, p).series_id, keep, 'its file now belongs to the keeper');
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM user_follows WHERE series_id=? AND user_id=7').get(keep).n, 1, 'the follow moved');
+  const k = getSeriesById(db, keep);
+  assert.equal(k.followed, 1);
+  assert.equal(k.year, '2016', 'the keeper inherited the year it lacked');
+  assert.equal(k.path, '/comics/Batman (2016)', 'the keeper kept its folder');
 });

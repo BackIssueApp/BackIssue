@@ -1748,6 +1748,32 @@ export function untrackSeries(db, id) {
   return { removed: true, files };
 }
 
+// Fold series row `dropId` into `keepId` — both point at the same ComicVine
+// volume (a copy added straight from ComicVine while the folder-backed row was
+// matched elsewhere). Files, wanted rows, follows, grabs and scan overrides
+// move over; the keeper inherits a folder/year/publisher it lacks, stays
+// followed if either was, and its `cv:` url is brought in line with its
+// volume. The dropped row goes first so the keeper can take its url.
+export function mergeSeriesRows(db, keepId, dropId) {
+  if (keepId === dropId) return false;
+  const keep = getSeriesById(db, keepId), drop = getSeriesById(db, dropId);
+  if (!keep || !drop) return false;
+  db.transaction(() => {
+    db.prepare('UPDATE library_files SET series_id=? WHERE series_id=?').run(keepId, dropId);
+    db.prepare('UPDATE issues SET series_id=? WHERE series_id=?').run(keepId, dropId);
+    db.prepare('INSERT OR IGNORE INTO user_follows (user_id, series_id) SELECT user_id, ? FROM user_follows WHERE series_id=?').run(keepId, dropId);
+    db.prepare('DELETE FROM user_follows WHERE series_id=?').run(dropId);
+    for (const t of ['grabs', 'scan_overrides', 'import_history', 'import_candidates']) {
+      try { db.prepare(`UPDATE ${t} SET series_id=? WHERE series_id=?`).run(keepId, dropId); } catch { /* table or column absent */ }
+    }
+    db.prepare('DELETE FROM series WHERE id=?').run(dropId);
+    db.prepare(`UPDATE series SET followed = MAX(followed, ?), path = COALESCE(path, ?), year = COALESCE(year, ?), publisher = COALESCE(publisher, ?),
+                url = CASE WHEN url LIKE 'cv:%' AND cv_id IS NOT NULL THEN 'cv:' || cv_id ELSE url END WHERE id=?`)
+      .run(drop.followed ? 1 : 0, drop.path || null, drop.year || null, drop.publisher || null, keepId);
+  })();
+  return true;
+}
+
 export function resetDownloading(db) {
   db.prepare("UPDATE issues SET status='pending' WHERE status='downloading'").run();
 }

@@ -39,6 +39,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   the comic instead; and a release that still can't be read is blocklisted
   rather than re-grabbed on every wanted search.
 - **Negative issue numbers** (`#-1` flashback issues) now link.
+- **Two series rows on one ComicVine volume.** A series added straight from
+  ComicVine while the folder's own row was matched to the wrong volume left
+  two rows — and, once the folder row was re-matched, two copies of every
+  file. Matching now folds a twin row into the one being matched (files,
+  wanted issues and follows move over), and **Tools → Merge duplicate
+  series** cleans up pairs that already exist.
 
 ### Added
 

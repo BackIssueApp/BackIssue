@@ -1,5 +1,5 @@
 import { normalizeTitle, extractYear, normalizeNumber } from './matcher.js';
-import { upsertCvSeries, upsertCvIssue, setSeriesCv, seriesNeedingCvMatch, listCvIssues, linkFileCvIssue, getSeriesByCvId, createCvSeries, setFollowed, defaultLibrary, assignSeriesLibrary, getSeriesById, getCvSeries, setSeriesPath } from './db.js';
+import { upsertCvSeries, upsertCvIssue, setSeriesCv, seriesNeedingCvMatch, listCvIssues, linkFileCvIssue, getSeriesByCvId, createCvSeries, setFollowed, defaultLibrary, assignSeriesLibrary, getSeriesById, getCvSeries, setSeriesPath, mergeSeriesRows } from './db.js';
 import { parseIssueFromFilename } from './scanner.js';
 import { normVolume } from './cv.js';
 import { poolWithResource } from './pool.js';
@@ -105,12 +105,47 @@ export async function cacheCvVolume(db, client, cvId) {
   return v;
 }
 
+// One row per ComicVine volume. If another series row already points at
+// this volume (typically a copy added straight from ComicVine while the
+// folder-backed row was mis-matched), fold it into the row being matched —
+// its files, wanted rows and follows move over, and its folder is inherited
+// if ours has none. Returns how many rows were absorbed.
+export function absorbDuplicateRows(db, seriesId, cvId) {
+  let merged = 0;
+  for (const other of db.prepare('SELECT id FROM series WHERE cv_id = ? AND id <> ?').all(cvId, seriesId)) {
+    if (mergeSeriesRows(db, seriesId, other.id)) merged++;
+  }
+  return merged;
+}
+
 // Cache a chosen volume (metadata + issue list) and link the series to it.
+// THE step every match flow goes through (Fix match, auto-match, re-check),
+// so absorbing a twin row here means no flow can leave two rows on a volume.
 export async function cacheAndLink(db, client, seriesId, cvId, { locked = 0 } = {}) {
   const v = await cacheCvVolume(db, client, cvId);
   setSeriesCv(db, seriesId, v.id, { locked });
+  absorbDuplicateRows(db, seriesId, v.id);
   linkFilesToCv(db, seriesId, v.id); // link owned files to CV issues so the rollup is CV-based
   return v;
+}
+
+/** Tool: merge series rows that share a ComicVine volume. The keeper is the
+ *  folder-backed row (else the one with more files, else the older); the
+ *  others fold into it and its files are re-linked. Duplicate COPIES that
+ *  surface afterwards are the Remove duplicates tool's job. */
+export async function mergeDuplicateSeries(db, onProgress = () => {}) {
+  const groups = db.prepare(`SELECT cv_id, GROUP_CONCAT(id) AS ids FROM series WHERE cv_id IS NOT NULL GROUP BY cv_id HAVING COUNT(*) > 1`).all();
+  let done = 0, merged = 0;
+  for (const g of groups) {
+    const rows = g.ids.split(',').map((id) => getSeriesById(db, Number(id))).filter(Boolean);
+    const files = (id) => db.prepare('SELECT COUNT(*) AS n FROM library_files WHERE series_id = ? AND valid = 1').get(id).n;
+    rows.sort((a, b) => ((b.path ? 1 : 0) - (a.path ? 1 : 0)) || (files(b.id) - files(a.id)) || (a.id - b.id));
+    const keep = rows[0];
+    for (const other of rows.slice(1)) if (mergeSeriesRows(db, keep.id, other.id)) merged++;
+    try { linkFilesToCv(db, keep.id, keep.cv_id); } catch { /* skip */ }
+    onProgress({ done: ++done, total: groups.length, message: `${merged} merged` });
+  }
+  return { volumesChecked: groups.length, rowsMerged: merged };
 }
 
 // Legacy hook once used to merge monitored CV-only series into a catalog twin
