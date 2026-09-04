@@ -8,6 +8,22 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.7.8] — 2026-09-04
+
+### Added
+
+- **Dedupe good copies.** A series with two valid copies of the same issue
+  (two downloads, a scan beside a digital release) had no way to tidy up —
+  "Remove duplicates" only covered corrupt copies a good one had replaced.
+  It now removes extra good copies too, keeping the best (tagged first, then
+  the most pages, then the largest), and says which it kept. Tools → Remove
+  duplicate files does the same library-wide, previewing the good-copy part
+  to Logs unless you tick the box.
+- **Tools → Re-check mismatched volumes.** Finds series whose files go beyond
+  their ComicVine volume's last issue and re-matches them with the improved
+  matcher; a clear winner is applied and its files re-linked, the rest are
+  left for Fix match.
+
 ### Fixed
 
 - **Files that were clearly on disk showed their issue as missing.** Three
@@ -45,20 +61,6 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   file. Matching now folds a twin row into the one being matched (files,
   wanted issues and follows move over), and **Tools → Merge duplicate
   series** cleans up pairs that already exist.
-
-### Added
-
-- **Dedupe good copies.** A series with two valid copies of the same issue
-  (two downloads, a scan beside a digital release) had no way to tidy up —
-  "Remove duplicates" only covered corrupt copies a good one had replaced.
-  It now removes extra good copies too, keeping the best (tagged first, then
-  the most pages, then the largest), and says which it kept. Tools → Remove
-  duplicate files does the same library-wide, previewing the good-copy part
-  to Logs unless you tick the box.
-- **Tools → Re-check mismatched volumes.** Finds series whose files go beyond
-  their ComicVine volume's last issue and re-matches them with the improved
-  matcher; a clear winner is applied and its files re-linked, the rest are
-  left for Fix match.
 
 ## [0.7.7] — 2026-09-03
 
