@@ -31,6 +31,16 @@
     const max = Math.max(0, ...det.issues.map((i) => parseFloat(i.number)).filter(Number.isFinite));
     return det.unlinkedFiles.filter((f) => Number.isFinite(parseFloat(f.number)) && parseFloat(f.number) > max).length;
   });
+  // Unlinked files whose number sits INSIDE the volume's range but which the
+  // volume simply doesn't list — ComicVine splits a retitled run into two
+  // volumes (e.g. #1–36 under the old title, #37+ under the new one), so those
+  // issues belong to a sibling volume, not this one.
+  const unlinkedAbsent = $derived.by(() => {
+    if (!isCv || !(det.unlinkedFiles || []).length) return 0;
+    const have = new Set(det.issues.map((i) => String(parseFloat(i.number))));
+    const max = Math.max(0, ...det.issues.map((i) => parseFloat(i.number)).filter(Number.isFinite));
+    return det.unlinkedFiles.filter((f) => { const n = parseFloat(f.number); return Number.isFinite(n) && n <= max && !have.has(String(n)); }).length;
+  });
   // Self-described series (plugin library types, e.g. Books): the hero/header
   // renders here like any series, but the issue area belongs to the plugin
   // that owns the type (registerSeriesView) — comic vocabulary (filter chips,
@@ -840,6 +850,9 @@
             <div class="unlinked__note">They count as missing until they match. The issue number is read from the file's ComicInfo tag first, then its filename, and looked up in this ComicVine volume — if the volume is the wrong one, use <b>Fix match</b>; if the number is, retag or rename the file, then <b>Scan folder</b>.</div>
             {#if unlinkedBeyond}
               <div class="unlinked__hint">{fmt(unlinkedBeyond)} of them {unlinkedBeyond === 1 ? 'has a number' : 'have numbers'} this volume never reaches (it has {fmt(det.issues.length)} issue{det.issues.length === 1 ? '' : 's'}) — this is almost certainly the wrong ComicVine volume. <b>Fix match</b> to the right one and the files link on their own.</div>
+            {/if}
+            {#if unlinkedAbsent}
+              <div class="unlinked__hint">{fmt(unlinkedAbsent)} of them {unlinkedAbsent === 1 ? 'has a number' : 'have numbers'} this volume doesn't list. ComicVine often splits a retitled run into two volumes (the early issues under the old title), so those issues may belong to a sibling volume — add it as its own series. If the list just looks out of date, <b>Refresh metadata</b> re-reads the volume.</div>
             {/if}
             {#each (showAllUnlinked ? det.unlinkedFiles : det.unlinkedFiles.slice(0, 40)) as f (f.path)}
               <div class="unlinked__file" class:is-bad={!f.valid} title={f.path}>
