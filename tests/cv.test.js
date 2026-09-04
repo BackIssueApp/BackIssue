@@ -631,3 +631,16 @@ test('metadata editor: edits lock fields against every sync path until reset', a
   assert.equal(irow.metron_upc, 'X', 'unlocked enrichment field lands');
   assert.equal(irow.description, 'fresh', 'unedited detail field refreshes');
 });
+
+test('scoreCvCandidate penalises a volume with fewer issues than the files on disk', () => {
+  const series = { title: 'Radiant Black', year: '2021', publisher: 'Image', maxIssue: 42 };
+  const run = scoreCvCandidate(series, { name: 'Radiant Black', start_year: '2021', publisher: 'Image', count_of_issues: 48 });
+  const mini = scoreCvCandidate(series, { name: 'Radiant Black', start_year: '2021', publisher: 'Image', count_of_issues: 8 });
+  assert.ok(run.score > mini.score, 'the 48-issue run must outrank the 8-issue mini');
+  assert.match(mini.reason, /too few issues/);
+  assert.match(run.reason, /issue count fits/);
+  // without files there is nothing to compare — identical volumes tie as before
+  const a = scoreCvCandidate({ title: 'Radiant Black', year: '2021' }, { name: 'Radiant Black', start_year: '2021', count_of_issues: 48 });
+  const b = scoreCvCandidate({ title: 'Radiant Black', year: '2021' }, { name: 'Radiant Black', start_year: '2021', count_of_issues: 8 });
+  assert.equal(a.score, b.score);
+});

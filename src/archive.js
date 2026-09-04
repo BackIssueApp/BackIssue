@@ -182,14 +182,32 @@ async function readSidecarInfo(archivePath) {
   } catch { return null; }
 }
 
+// A PDF is not an archive: it's readable if its header is, and its page count
+// is the number of page objects (a whole-file scan — fine at the sizes comics
+// come in, skipped past 256 MB). Feeding PDFs to the ZIP reader flagged every
+// one of them "corrupt: not a zip file".
+async function readPdfInfo(p) {
+  try {
+    const st = await fs.stat(p);
+    let pageCount = null;
+    if (st.size <= 256 * 1024 * 1024) {
+      const n = ((await fs.readFile(p)).toString('latin1').match(/\/Type\s*\/Page(?![s\w])/g) || []).length;
+      if (n > 0) pageCount = n;
+    }
+    return { ok: true, format: 'pdf', pageCount, hasComicInfo: false, comicInfo: null };
+  } catch (e) {
+    return { ok: false, format: 'pdf', error: String(e?.message || e) };
+  }
+}
+
 export async function readArchiveInfo(path) {
   const p = String(path);
-  const byExt = /\.cbr$/i.test(p) ? 'cbr' : 'cbz';
+  const byExt = /\.cbr$/i.test(p) ? 'cbr' : /\.pdf$/i.test(p) ? 'pdf' : 'cbz';
   if (!existsSync(p)) return { ok: false, format: byExt, error: 'missing' };
   // Prefer the sniffed format so a mislabeled file (RAR bytes in a .cbz, etc.)
   // is read with the right decoder instead of being reported corrupt.
   const fmt = (await sniffFormat(p)) ?? byExt;
-  const info = await (fmt === 'cbr' ? readRarInfo(p) : readZipInfo(p));
+  const info = await (fmt === 'pdf' ? readPdfInfo(p) : fmt === 'cbr' ? readRarInfo(p) : readZipInfo(p));
   // A sidecar wins over embedded metadata: when both exist the sidecar is the
   // newer intent (written without touching the archive).
   const side = await readSidecarInfo(p);

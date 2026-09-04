@@ -35,7 +35,7 @@ export function normalizeNumber(n) {
   if (s in FRACTIONS) return String(FRACTIONS[s]);        // ½ -> "0.5"
   const frac = s.match(/^(\d+)\s*\/\s*(\d+)$/);           // 1/2 -> "0.5"
   if (frac) { const v = Number(frac[1]) / Number(frac[2]); if (Number.isFinite(v)) return String(v); }
-  if (/^\d*\.\d+$/.test(s) || /^\d+(?:\.\d+)?$/.test(s)) { // 004 -> "4", .5 -> "0.5", 000.5 -> "0.5", 1.1 -> "1.1"
+  if (/^-?\d*\.\d+$/.test(s) || /^-?\d+(?:\.\d+)?$/.test(s)) { // 004 -> "4", .5 -> "0.5", 000.5 -> "0.5", 1.1 -> "1.1", -1.0 -> "-1"
     const f = parseFloat(s);
     if (Number.isFinite(f)) return String(f);
   }

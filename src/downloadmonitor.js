@@ -217,7 +217,11 @@ export function createDownloadMonitor({ db, onProgress = () => {}, now = () => D
             // A damaged archive is the RELEASE's fault and fails identically
             // on every retry — blacklist it so retry grabs the next-best
             // release. Transient import errors still don't blacklist.
-            if (source === 'usenet' && isCorruptContentError(e)) {
+            // Likewise a release we can't read at all (nothing usable in the
+            // completed folder) — otherwise the wanted search re-grabs the
+            // same NZB forever (one release was fetched 39 times).
+            const unreadable = /can't read completed download|no comic archive or page images/i.test(String(e?.message || e || ''));
+            if (source === 'usenet' && (isCorruptContentError(e) || unreadable)) {
               try {
                 blacklistRelease(db, { source, guid: grab.release_guid, title: grab.title, issueId: grab.issue_id, reason: String(e?.message || e).slice(0, 200) });
                 console.warn(`download monitor: blacklisted corrupt usenet release "${grab.title}"`);

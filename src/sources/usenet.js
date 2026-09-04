@@ -165,8 +165,17 @@ export async function walkFiles(dir) {
 // release of loose page images (no archive at all) is packed into a CBZ so it
 // imports and tags like any other.
 async function importCompleted(srcPath, name) {
-  const st = await fs.stat(srcPath).catch(() => null);
-  const files = st && st.isFile() ? [srcPath] : await walkFiles(srcPath);
+  let root = srcPath;
+  let st = await fs.stat(root).catch(() => null);
+  if (!st) {
+    // The client reported a file we can't see — typically a non-ASCII name
+    // ("Blüdwire") that came back mangled across a network mount. The job's
+    // folder is still there, so look inside it instead of giving up.
+    const parent = path.dirname(srcPath);
+    const pst = await fs.stat(parent).catch(() => null);
+    if (pst?.isDirectory()) { root = parent; st = pst; }
+  }
+  const files = !st ? [] : st.isFile() ? [root] : await walkFiles(root);
   if (!files.length) throw new Error(`can't read completed download ${srcPath} for "${name}"`);
 
   // Every plausible comic, best-first: real comic extensions before generic

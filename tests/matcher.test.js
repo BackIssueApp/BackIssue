@@ -31,6 +31,9 @@ test('normalizeNumber strips hash, leading zeros, trailing .0', () => {
   assert.equal(normalizeNumber('001a'), '1a');
   assert.equal(normalizeNumber('1A'), '1a');
   assert.equal(normalizeNumber('016.HU'), '16.hu');
+  // flashback / negative issues
+  assert.equal(normalizeNumber('-1'), '-1');
+  assert.equal(normalizeNumber('-1.0'), '-1');
   assert.equal(normalizeNumber('Annual 1'), 'annual 1');
 });
 

@@ -21,6 +21,28 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   tied to an issue, with the number BackIssue read from it — so the reason is
   visible instead of the file being silently invisible. Rescanning a series
   (or the next library scan) relinks existing files; no re-import needed.
+- **Auto-match no longer picks a same-name mini over the real run.** Matching
+  now weighs a volume's issue count against the files you have — a 13-issue
+  volume can't be the home of your #14–#163 — and, when the first search
+  isn't conclusive, also asks ComicVine for that year's volumes by name
+  (common titles have hundreds of volumes and the search stops at 100, so
+  the right run could be missing entirely). **Fix match** counts every file
+  on disk, linked or not, so the right volume ranks first.
+- **PDFs were flagged corrupt.** A PDF was being verified as if it were a ZIP
+  ("not a zip file"); it's now recognised as a PDF, with its page count.
+- **A completed download with a non-ASCII name could fail to import forever.**
+  When the download client's reported file can't be read (a name like
+  "Blüdwire" mangled across a network mount), the job folder is searched for
+  the comic instead; and a release that still can't be read is blocklisted
+  rather than re-grabbed on every wanted search.
+- **Negative issue numbers** (`#-1` flashback issues) now link.
+
+### Added
+
+- **Tools → Re-check mismatched volumes.** Finds series whose files go beyond
+  their ComicVine volume's last issue and re-matches them with the improved
+  matcher; a clear winner is applied and its files re-linked, the rest are
+  left for Fix match.
 
 ## [0.7.7] — 2026-09-03
 

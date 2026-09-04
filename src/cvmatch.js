@@ -1,6 +1,7 @@
 import { normalizeTitle, extractYear, normalizeNumber } from './matcher.js';
 import { upsertCvSeries, upsertCvIssue, setSeriesCv, seriesNeedingCvMatch, listCvIssues, linkFileCvIssue, getSeriesByCvId, createCvSeries, setFollowed, defaultLibrary, assignSeriesLibrary, getSeriesById, getCvSeries, setSeriesPath } from './db.js';
 import { parseIssueFromFilename } from './scanner.js';
+import { normVolume } from './cv.js';
 import { poolWithResource } from './pool.js';
 
 // A file's issue number: prefer the embedded ComicInfo number, else parse the filename.
@@ -65,7 +66,17 @@ export function scoreCvCandidate(series, cand) {
     if (sp && cp && (sp === cp || sp.includes(cp) || cp.includes(sp))) score += 15;
   }
 
-  return { score, reason: `${wn === cn ? 'exact' : 'partial'} name, ${yearNote}` };
+  // Issue-count sanity. With files on disk, a volume that ends before our
+  // highest issue number cannot be the right one — the classic false match is
+  // a same-name mini or one-shot from the same year (ComicVine has two 2021
+  // "Radiant Black" volumes: 48 issues and 8). Only the count tells them apart.
+  let issueNote = '';
+  if (series.maxIssue != null && cand.count_of_issues != null) {
+    if (Number(cand.count_of_issues) < series.maxIssue) { score -= 40; issueNote = ', too few issues for your files'; }
+    else { score += 5; issueNote = ', issue count fits'; }
+  }
+
+  return { score, reason: `${wn === cn ? 'exact' : 'partial'} name, ${yearNote}${issueNote}` };
 }
 
 // Rank candidates best-first with a confidence label and an auto-accept flag.
@@ -122,15 +133,80 @@ export async function refreshCvVolume(db, client, seriesId) {
 
 // Match one series: search CV, rank, auto-accept a clear winner.
 // Returns { status: 'matched'|'ambiguous'|'none', cvId?, confidence?, candidates? }.
+/** Highest issue number among a series' valid files (null when it has none) —
+ *  the yardstick for the matcher's issue-count check. */
+export function seriesMaxIssue(db, seriesId) {
+  let max = null;
+  for (const f of db.prepare('SELECT ci_number, name FROM library_files WHERE series_id=? AND valid=1').all(seriesId)) {
+    for (const k of fileIssueKeys(f)) {
+      const n = parseFloat(k);
+      if (Number.isFinite(n) && n > 0 && (max == null || n > max)) max = n;
+    }
+  }
+  return max;
+}
+
+// Common titles have hundreds of ComicVine volumes and the search caps at 100
+// results, so the right run can be missing outright ("Batman" 2016 never made
+// the list). A year lets us ask for that year's volumes BY NAME instead — a
+// filtered listing, not a search — and merge them into the candidates.
+async function withYearVolumes(client, title, year, candidates) {
+  if (typeof client.list !== 'function') return candidates;
+  const seen = new Map(candidates.map((c) => [c.id, c]));
+  try {
+    const page = await client.list('volumes', {
+      filter: `name:${String(title).replace(/,/g, ' ')},start_year:${year}`,
+      fieldList: 'id,name,start_year,count_of_issues,publisher,image,site_detail_url,deck',
+      limit: 100,
+    });
+    for (const r of page.results || []) { const v = normVolume(r); if (v && !seen.has(v.id)) seen.set(v.id, v); }
+  } catch { /* the search results still stand */ }
+  return [...seen.values()];
+}
+
 export async function matchSeriesToCv(db, client, series) {
-  const candidates = await client.search(series.title);
-  const { ranked, best, auto } = rankCandidates(series, candidates);
+  const s = { ...series, maxIssue: series.maxIssue ?? (series.id != null ? seriesMaxIssue(db, series.id) : null) };
+  let candidates = await client.search(s.title);
+  let r = rankCandidates(s, candidates);
+  // A clear winner with the right year and enough issues needs no second
+  // request; anything less gets the year-filtered listing folded in.
+  const year = s.year ? extractYear(String(s.year)) : null;
+  const solid = !!(r.best && r.auto && /year match/.test(r.best.reason) && !/too few/.test(r.best.reason));
+  if (year && !solid) {
+    candidates = await withYearVolumes(client, s.title, year, candidates);
+    r = rankCandidates(s, candidates);
+  }
+  const { ranked, best, auto } = r;
   if (best && auto) {
     await cacheAndLink(db, client, series.id, best.cand.id, { locked: 0 });
     return { status: 'matched', cvId: best.cand.id, confidence: best.confidence };
   }
   if (best) return { status: 'ambiguous', candidates: ranked.slice(0, 5).map((r) => ({ ...r.cand, score: r.score, reason: r.reason })) };
   return { status: 'none', candidates: [] };
+}
+
+/** Tool: re-run matching for series whose files carry numbers beyond their
+ *  matched volume's last issue — the signature of a same-name mini or one-shot
+ *  chosen over the real run. A confident winner re-links the files; anything
+ *  ambiguous is left for Fix match. Manually pinned matches are skipped. */
+export async function rematchMismatched(db, client, onProgress = () => {}) {
+  const suspects = [];
+  for (const s of db.prepare('SELECT * FROM series WHERE cv_id IS NOT NULL AND COALESCE(cv_locked, 0) = 0').all()) {
+    const max = seriesMaxIssue(db, s.id);
+    if (max == null) continue;
+    const top = db.prepare('SELECT MAX(CAST(issue_number AS REAL)) AS m FROM cv_issues WHERE cv_series_id = ?').get(s.cv_id)?.m;
+    if (top != null && max > top) suspects.push({ ...s, maxIssue: max });
+  }
+  let done = 0, rematched = 0, unchanged = 0, ambiguous = 0;
+  for (const s of suspects) {
+    try {
+      const r = await matchSeriesToCv(db, client, s);
+      if (r.status === 'matched') { if (r.cvId !== s.cv_id) rematched++; else unchanged++; }
+      else ambiguous++;
+    } catch { ambiguous++; }
+    onProgress({ done: ++done, total: suspects.length, message: `${rematched} re-matched` });
+  }
+  return { checked: suspects.length, rematched, unchanged, ambiguous };
 }
 
 // Add a series to the collection straight from a ComicVine volume. Always a pure
