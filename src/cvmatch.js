@@ -1,5 +1,5 @@
 import { normalizeTitle, extractYear, normalizeNumber } from './matcher.js';
-import { upsertCvSeries, upsertCvIssue, setSeriesCv, seriesNeedingCvMatch, listCvIssues, linkFileCvIssue, getSeriesByCvId, createCvSeries, setFollowed, defaultLibrary, assignSeriesLibrary, getSeriesById, getCvSeries, setSeriesPath, mergeSeriesRows } from './db.js';
+import { upsertCvSeries, upsertCvIssue, setSeriesCv, seriesNeedingCvMatch, listCvIssues, linkFileCvIssue, getSeriesByCvId, createCvSeries, setFollowed, setMonitor, defaultLibrary, assignSeriesLibrary, getSeriesById, getCvSeries, setSeriesPath, mergeSeriesRows } from './db.js';
 import { parseIssueFromFilename } from './scanner.js';
 import { normVolume } from './cv.js';
 import { poolWithResource } from './pool.js';
@@ -291,20 +291,25 @@ export async function rematchMismatched(db, client, onProgress = () => {}) {
 
 // Add a series to the collection straight from a ComicVine volume. Always a pure
 // ComicVine series; a download source fills it on demand.
-export async function addSeriesFromCv(db, client, comicvineId) {
+// `monitor` is the policy a NEW series gets ('all' = keep the run complete).
+// An add that is really "for these issues" passes 'none' and picks them after.
+export async function addSeriesFromCv(db, client, comicvineId, { monitor = 'all' } = {}) {
   const v = await cacheCvVolume(db, client, comicvineId);
   const year = v.start_year != null ? String(v.start_year) : null;
 
   let seriesId, outcome;
   const already = getSeriesByCvId(db, v.id);
   if (already) {
-    setFollowed(db, already.id, true);
+    // A plain add re-monitors an existing series; an add for specific issues
+    // leaves its policy alone (the caller picks the issues instead).
+    if (monitor === 'all') setFollowed(db, already.id, true);
     seriesId = already.id; outcome = 'existing';
   } else {
     // Always a pure ComicVine series. Download sources are resolved on demand —
     // never the collection identity — so we never adopt/merge a catalog volume
     // here (that legacy behavior misfiled comics onto fuzzy name matches).
     seriesId = createCvSeries(db, { cvId: v.id, title: v.name, publisher: v.publisher, year, coverUrl: v.image_url });
+    if (monitor !== 'all') setMonitor(db, seriesId, monitor);
     // Every new series gets a home immediately (first comic library) — callers
     // with a specific destination (the manga lane, import auto-assign)
     // re-assign right after, which overrides this default.
@@ -342,7 +347,7 @@ export function migrateAdoptedSeriesToCv(db) {
     if (b.path) setSeriesPath(db, cvSeriesId, b.path);
     setFollowed(db, cvSeriesId, true);
     // Demote the catalog row to a plain volume (keeps its reader-URL issues).
-    db.prepare('UPDATE series SET cv_id=NULL, cv_locked=0, followed=0, path=NULL WHERE id=?').run(b.id);
+    db.prepare("UPDATE series SET cv_id=NULL, cv_locked=0, followed=0, monitor='none', monitor_from=NULL, path=NULL WHERE id=?").run(b.id);
     linkFilesToCv(db, cvSeriesId, cvId);
     migrated++;
   }

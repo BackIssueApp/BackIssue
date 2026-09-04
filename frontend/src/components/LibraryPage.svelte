@@ -19,6 +19,7 @@
     { key: 'all', label: 'All' },
     { key: 'incomplete', label: 'Incomplete' },
     { key: 'followed', label: 'Followed' },
+    { key: 'monitored', label: 'Monitored' },
     { key: 'unmonitored', label: 'Not monitored' },
     { key: 'problems', label: 'Problems' },
     { key: 'unmatched', label: 'Unmatched' },
@@ -120,6 +121,25 @@
     const r = await apiPost('/api/collection/bulk', { ids: [...railSelect], action });
     if (r.error) return notify(r.error, 'error');
     notify(action === 'download-missing' ? `Queued ${fmt(r.queued)} issue(s).` : `Done — ${fmt(r.done)} series.`, 'ok');
+    railSelect.clear();
+    loadCollection();
+  }
+
+  // Bulk monitoring policy for the selection: all / new (from each series'
+  // newest known issue) / none.
+  async function monitorSelected(monitor) {
+    if (!railSelect.size) return notify('Select some series first.', 'info');
+    const label = monitor === 'all' ? 'Monitor every issue' : monitor === 'new' ? 'Monitor new issues only' : 'Stop monitoring';
+    if (!(await confirmDialog({
+      title: `${label} for ${railSelect.size} series?`,
+      message: monitor === 'all' ? 'Every missing issue of each series becomes wanted.'
+        : monitor === 'new' ? 'Only issues from each series\u2019 newest known issue onward are wanted — earlier gaps are left alone.'
+        : 'Nothing is fetched automatically for these series. Issues picked by hand stay wanted.',
+      confirmLabel: label,
+    }))) return;
+    const r = await apiPost('/api/collection/bulk', { ids: [...railSelect], action: 'monitor', monitor });
+    if (r.error) return notify(r.error, 'error');
+    notify(`Done — ${fmt(r.done)} series.`, 'ok');
     railSelect.clear();
     loadCollection();
   }
@@ -316,6 +336,13 @@
       <button class="libx__link" onclick={() => bulk('follow')}><Icon name="star" fill size={14} /> Follow</button>
       <button class="libx__link" onclick={() => bulk('unfollow')}><Icon name="star" size={14} /> Unfollow</button>
       <button class="libx__link" onclick={() => bulk('download-missing')}><Icon name="download" size={14} /> Download missing</button>
+      <select class="libx__movesel" title="Monitoring policy for the selected series"
+        onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) monitorSelected(v); }}>
+        <option value="">Monitoring…</option>
+        <option value="all">Monitor every issue</option>
+        <option value="new">Monitor new issues only</option>
+        <option value="none">Stop monitoring</option>
+      </select>
       {#if (status.libraries || []).length}
         <select class="libx__movesel" title="Move the selected series into a library"
           onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v !== '') moveSelected(v === 'default' ? null : Number(v)); }}>
@@ -375,6 +402,7 @@
               <Cover coverUrl={s.matched ? s.cover_url : null} title={s.matched ? s.title : (s.folder || '?')} />
               {#if rail.selecting}<span class="libx-card__check" class:is-on={railSelect.has(s.id)}>{#if railSelect.has(s.id)}<Icon name="check" size={14} />{/if}</span>{/if}
               {#if s.followed}<span class="libx-card__star" title="Followed"><Icon name="star" fill size={15} /></span>{/if}
+              {#if s.matched && s.monitor && s.monitor !== 'all'}<span class="libx-card__mon" title={s.monitor === 'new' ? `Monitoring new issues from #${s.monitor_from ?? '?'}` : 'Not monitored — nothing is fetched automatically'}><Icon name={s.monitor === 'new' ? 'zap' : 'pause'} size={12} /></span>{/if}
               {#if !s.matched}<span class="libx-card__matchchip">match…</span>{/if}
               {#if s.matched}<div class="libx-card__bar"><div class="libx-card__fill" class:is-done={isDone(s)} style="width:{pct(s)}%"></div></div>{/if}
             </div>
@@ -417,6 +445,8 @@
                   {:else if s.on_demand}<span class="libx-badge libx-badge--avail"><Icon name="download" size={12} /> {fmt(s.available)} available</span>
                   {:else if s.total > 0}<span class="libx-badge libx-badge--ok">complete</span>{/if}
                   {#if s.untagged > 0}<span class="libx-badge libx-badge--plain">{fmt(s.untagged)} untagged</span>{/if}
+                  {#if s.monitor === 'new'}<span class="libx-badge libx-badge--plain" title="Only issues from this number onward are wanted">new from #{s.monitor_from ?? '?'}</span>
+                  {:else if s.monitor === 'none' && s.missing > 0}<span class="libx-badge libx-badge--plain" title="Nothing is fetched automatically for this series">not monitored</span>{/if}
                   {#if s.corrupt > 0}<span class="libx-badge libx-badge--warn">{fmt(s.corrupt)} corrupt</span>{/if}
                   {#if s.restricted}<span class="libx-badge libx-badge--plain" title="Mature — hidden from roles without “View mature content”">mature</span>{/if}
                 {/if}
@@ -488,6 +518,7 @@
   .libx-card__check { position: absolute; top: 7px; left: 7px; z-index: 3; width: 22px; height: 22px; border-radius: 6px; border: 2px solid rgba(255,255,255,.7); background: rgba(0,0,0,.35); display: grid; place-items: center; color: #fff; }
   .libx-card__check.is-on { border-color: var(--accent); background: var(--accent); }
   .libx-card__star { position: absolute; top: 7px; right: 7px; z-index: 3; color: var(--amber); filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); display: flex; }
+  .libx-card__mon { position: absolute; top: 7px; left: 7px; z-index: 3; width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; background: rgba(12,10,18,.75); color: var(--muted); border: 1px solid rgba(255,255,255,.12); }
   .libx-card__matchchip { position: absolute; left: 7px; bottom: 12px; z-index: 3; font: 600 10px var(--font-body); text-transform: uppercase; letter-spacing: .04em; color: var(--ink); background: var(--amber); border-radius: 5px; padding: 3px 7px; }
   .libx-card__bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; height: 5px; background: rgba(0,0,0,.5); }
   .libx-card__fill { height: 100%; background: var(--accent); }

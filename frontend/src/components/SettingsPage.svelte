@@ -664,7 +664,7 @@
           <span class="switch"><input id="set-addDownloadOnlyRequested" type="checkbox" /><span class="switch__track"></span></span>
           <span>Only the issues that were asked for</span>
         </label>
-        <p class="modal__note">When a series is added because of specific issues — an entry on a reading list, a release, a CBL import — download just those, not every missing issue of the run. Adding from the Library or Discover still fetches everything missing. Needs "Download on add".</p>
+        <p class="modal__note">When a series is added because of specific issues — an entry on a reading list, a release, a CBL import — it arrives with monitoring off and just those issues wanted, so only they are downloaded (now and if a grab fails later). Adding from the Library or Discover still monitors the whole run. Needs "Download on add".</p>
         <label class="field">
           <span>Download format</span>
           <select id="set-format"><option value="cbz">CBZ (with metadata)</option><option value="pdf">PDF</option></select>

@@ -284,8 +284,8 @@ async function cvIssueInfo(cvIssueId) {
 }
 
 // Add a comic to the collection from a ComicVine volume.
-async function addFromCv(comicvineId) {
-  const r = await addSeriesFromCv(db, cvClient(), comicvineId);
+async function addFromCv(comicvineId, opts = {}) {
+  const r = await addSeriesFromCv(db, cvClient(), comicvineId, opts);
   logInfo(`Added from ComicVine: ${r.title || 'volume ' + comicvineId} (${r.outcome})`, 'collection');
   return r;
 }
@@ -764,14 +764,15 @@ async function usenetGrab({ seriesId, cvIssueId, number, name, nzbUrl, releaseTi
   }
 }
 
-// Scheduled backfill: queue the next batch of wanted (missing) issues of
-// FOLLOWED series for download. Skips anything already moving or previously
-// failed (use Retry Failed for those), so every run makes forward progress
-// without hammering the indexers.
+// Scheduled backfill: queue the next batch of wanted issues (each series'
+// monitoring policy plus its per-issue picks — the wanted_issues view) for
+// download. Skips anything already moving or previously failed (use Retry
+// Failed for those), so every run makes forward progress without hammering
+// the indexers.
 async function runWantedSearch() {
   const job = startJob('wanted-search', 'Search wanted issues');
   const batch = Math.max(1, Number(config.wantedSearchBatch) || 25);
-  const { items, total } = listWantedIssues(db, { followedOnly: true, hideUnreleased: true, limit: 500 });
+  const { items, total } = listWantedIssues(db, { hideUnreleased: true, limit: 500 });
   const ids = [];
   for (const it of items) {
     if (ids.length >= batch) break;
@@ -787,8 +788,8 @@ async function runWantedSearch() {
   return { queued: ids.length, wanted: total };
 }
 
-// Scheduled new-releases lane: queue missing issues of FOLLOWED series that hit
-// the shelves in the last recentSearchDays. Unlike the backfill above, FAILED
+// Scheduled new-releases lane: queue wanted issues that hit the shelves in
+// the last recentSearchDays. Unlike the backfill above, FAILED
 // items are retried on every run while they're inside the window — a comic
 // released yesterday often isn't on the indexers yet, and availability changes
 // daily in week one. Once an issue ages out of the window it stops being
@@ -796,12 +797,12 @@ async function runWantedSearch() {
 async function runRecentSearch() {
   const job = startJob('recent-search', 'Search new releases');
   const days = Math.max(1, Number(config.recentSearchDays) || 14);
-  const { items, total } = listWantedIssues(db, { followedOnly: true, releasedWithinDays: days, limit: 200 });
+  const { items, total } = listWantedIssues(db, { releasedWithinDays: days, limit: 200 });
   const fresh = [], failed = [];
   for (const it of items) {
     // 'pending' is PARKED (a cancelled or interrupted queue entry), not
     // in-flight — inside the new-releases window it gets picked back up:
-    // followed means "keep this complete". Only genuinely moving statuses
+    // wanted means "keep after it". Only genuinely moving statuses
     // (queued/downloading/grabbed/saving/done) are left alone.
     const bucket = it.queue_status === 'failed' ? failed
       : (!it.queue_status || it.queue_status === 'pending') ? fresh
@@ -822,7 +823,7 @@ async function runRecentSearch() {
 }
 
 // RSS watch: poll the indexers' latest-uploads feed (empty-query search) and
-// grab anything matching a missing issue of a followed series. Each item is
+// grab anything matching a wanted issue. Each item is
 // considered once (rss_seen); a match is PINNED to the issue so the queue
 // downloads exactly that release — no re-search. See src/rsswatch.js.
 async function runRssWatch() {

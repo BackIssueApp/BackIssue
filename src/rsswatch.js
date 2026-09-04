@@ -31,11 +31,11 @@ export function markSeen(db, items) {
 }
 
 // ---- wanted index -----------------------------------------------------------
-// Every missing issue of every FOLLOWED series, indexed by normalized series
-// alias → issue number, so each feed item is one parse + one map lookup instead
-// of a scan over tens of thousands of wanted rows.
+// Every wanted issue (each series' monitoring policy + picks), indexed by
+// normalized series alias → issue number, so each feed item is one parse + one
+// map lookup instead of a scan over tens of thousands of wanted rows.
 export function buildWantedIndex(db) {
-  const { items } = listWantedIssues(db, { followedOnly: true, limit: 100000 });
+  const { items } = listWantedIssues(db, { limit: 100000 });
   const bySeries = new Map(); // series_id → { names, numbers: Map(normNumber → wanted) }
   const index = new Map();    // normalized alias → [series entries]
   for (const it of items) {

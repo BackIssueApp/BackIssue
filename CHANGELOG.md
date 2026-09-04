@@ -10,12 +10,45 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Monitoring policies and per-issue picks.** Every series now has a
+  monitoring policy — **All issues**, **New issues from #…**, or **Off** — set
+  from the ⋯ menu on the series page or in bulk from the Library. On top of the
+  policy, any issue can be **picked** or **skipped** by hand (the target button
+  on issue rows and on the Wanted page); a pick always beats the policy, so
+  you can want one issue of a series you don't otherwise monitor, or skip one
+  issue of a run you do. Pressing Download on an issue the policy doesn't want
+  records a pick, so a failed grab keeps being retried. "Wanted" is now one
+  definition shared by the Wanted page, the search schedules and the RSS and
+  announce watchers.
+- **Wanted page: gaps, sorting, bulk selection.** The page shows what
+  automation is going after, with a *picked* marker on issues you asked for
+  and each series' policy; **All gaps** switches to every missing issue,
+  wanted or not, so anything can be wanted with one click. Sort by series,
+  newest/oldest release, or most/fewest wanted; tick rows (shift-click for a
+  range) to Want, Don't want or Download them together. Skipping a queued or
+  failed issue takes it out of the queue.
+- **Want a whole reading list.** *Want all* on a list makes every issue on it
+  wanted: series already in the library get the issues picked, series that
+  aren't are added with monitoring off and just those issues picked.
 - **Download only the issues you asked for.** Settings → Downloading →
   **Only the issues that were asked for**: when a series is added because of
-  specific issues — a reading-list entry, a release, a CBL import — only those
-  are queued, instead of every missing issue of the run. Adding from the
-  Library or Discover, where no particular issue was in mind, still fetches
-  everything missing. Off by default, so nothing changes unless you turn it on.
+  specific issues — a reading-list entry, a release, a CBL import — it arrives
+  with monitoring off and just those issues picked, so only they are
+  downloaded (now, and again if a grab fails). Adding from the Library or
+  Discover, where no particular issue was in mind, still monitors the whole
+  run. Off by default, so nothing changes unless you turn it on.
+
+### Changed
+
+- **Library filters** gain **Monitored** beside **Not monitored**; series
+  monitoring new issues only show *new from #…* in the list view, and the bulk
+  bar has a **Monitoring…** action. The series page shows the policy as a
+  header tag, a **Wanted** count in the completion bar and a **Wanted** issue
+  filter; the old on/off *Auto-download* toggle is replaced by the policy menu.
+- Existing libraries migrate automatically: series that were auto-downloading
+  become **All issues**, everything else **Off** — nothing that was being
+  fetched stops. The Wanted page now defaults to wanted issues; the previous
+  every-gap view is the **All gaps** chip.
 
 ## [0.7.8] — 2026-09-04
 
