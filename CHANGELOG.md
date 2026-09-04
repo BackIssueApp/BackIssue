@@ -26,8 +26,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   volume can't be the home of your #14–#163 — and, when the first search
   isn't conclusive, also asks ComicVine for that year's volumes by name
   (common titles have hundreds of volumes and the search stops at 100, so
-  the right run could be missing entirely). **Fix match** counts every file
-  on disk, linked or not, so the right volume ranks first.
+  the right run could be missing entirely). It also tries the series name
+  and year the files themselves carry in their tags — a short legacy row
+  ("Jeff") that captured the folder of *It's Jeff Infinity Comic* now finds
+  the real volume. **Fix match** counts every file on disk, linked or not, so
+  the right volume ranks first.
 - **PDFs were flagged corrupt.** A PDF was being verified as if it were a ZIP
   ("not a zip file"); it's now recognised as a PDF, with its page count.
 - **A completed download with a non-ASCII name could fail to import forever.**

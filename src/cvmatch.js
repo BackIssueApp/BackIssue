@@ -164,17 +164,60 @@ async function withYearVolumes(client, title, year, candidates) {
   return [...seen.values()];
 }
 
-export async function matchSeriesToCv(db, client, series, { locked = 0 } = {}) {
-  const s = { ...series, maxIssue: series.maxIssue ?? (series.id != null ? seriesMaxIssue(db, series.id) : null) };
-  let candidates = await client.search(s.title);
-  let r = rankCandidates(s, candidates);
-  // A clear winner with the right year and enough issues needs no second
-  // request; anything less gets the year-filtered listing folded in.
+/** The series name the files themselves carry (their ComicInfo Series tag,
+ *  most common value) — the real title when the row's own is wrong, e.g. a
+ *  short legacy catalog row ("Jeff") that hijacked the folder of
+ *  "It's Jeff Infinity Comic". Null when the files carry no tag. */
+/** The start year the files themselves carry — their ComicInfo Volume tag
+ *  (which taggers fill with the volume's year) or the series folder's
+ *  "(YYYY)". Used alongside the tag title: a hijacking row's year is as
+ *  wrong as its name ("Kun-Lun" 2015 holding "Deadly Hands of K'un-Lun" 2026). */
+export function seriesFileYear(db, seriesId) {
+  const row = db.prepare(`SELECT ci_volume, COUNT(*) AS n FROM library_files
+    WHERE series_id = ? AND valid = 1 AND ci_volume GLOB '[12][0-9][0-9][0-9]'
+    GROUP BY ci_volume ORDER BY n DESC LIMIT 1`).get(seriesId);
+  if (row?.ci_volume) return String(row.ci_volume);
+  const dir = db.prepare('SELECT dir FROM library_files WHERE series_id = ? AND valid = 1 LIMIT 1').get(seriesId)?.dir
+    || getSeriesById(db, seriesId)?.path || '';
+  const m = String(dir).match(/\(((?:19|20)\d{2})\)\s*$/);
+  return m ? m[1] : null;
+}
+
+export function seriesTagTitle(db, seriesId) {
+  const row = db.prepare(`SELECT ci_series, COUNT(*) AS n FROM library_files
+    WHERE series_id = ? AND valid = 1 AND ci_series IS NOT NULL AND ci_series <> ''
+    GROUP BY ci_series ORDER BY n DESC LIMIT 1`).get(seriesId);
+  return row?.ci_series || null;
+}
+
+// Search + rank one title; when the first pass isn't a clear, right-year,
+// enough-issues winner, fold in that year's volumes by name and rank again.
+async function rankForTitle(client, s, title) {
+  let candidates = await client.search(title);
+  let r = rankCandidates({ ...s, title }, candidates);
   const year = s.year ? extractYear(String(s.year)) : null;
   const solid = !!(r.best && r.auto && /year match/.test(r.best.reason) && !/too few/.test(r.best.reason));
   if (year && !solid) {
-    candidates = await withYearVolumes(client, s.title, year, candidates);
-    r = rankCandidates(s, candidates);
+    candidates = await withYearVolumes(client, title, year, candidates);
+    r = rankCandidates({ ...s, title }, candidates);
+  }
+  return r;
+}
+
+export async function matchSeriesToCv(db, client, series, { locked = 0 } = {}) {
+  const s = { ...series, maxIssue: series.maxIssue ?? (series.id != null ? seriesMaxIssue(db, series.id) : null) };
+  let r = await rankForTitle(client, s, s.title);
+  // If the files call the series something else, try that name too and keep
+  // whichever ranking produced the stronger winner.
+  // If the files call the series something else, or date it differently,
+  // try what THEY say and keep whichever pass produced the stronger winner.
+  const alt = series.id != null ? seriesTagTitle(db, series.id) : null;
+  const altYear = series.id != null ? seriesFileYear(db, series.id) : null;
+  const nameDiffers = !!alt && normalizeTitle(alt) !== normalizeTitle(s.title);
+  const yearDiffers = !!altYear && String(altYear) !== String(s.year ? extractYear(String(s.year)) : '');
+  if (nameDiffers || yearDiffers) {
+    const r2 = await rankForTitle(client, { ...s, year: altYear || s.year }, alt || s.title);
+    if ((r2.best?.score ?? 0) > (r.best?.score ?? 0)) r = r2;
   }
   const { ranked, best, auto } = r;
   if (best && auto) {
