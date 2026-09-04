@@ -313,6 +313,10 @@ function migrate(db) {
   // Every consumer (Wanted page, automation lanes, RSS/announce watchers,
   // counts, plugins) joins this view, so none of them can drift. Recreated
   // every boot so the definition can evolve without a data migration.
+  // The series gate is two index-able terms (monitor via idx_series_monitor,
+  // rowid IN the picked set) so SQLite's multi-index OR walks only monitored
+  // or picked series — an `OR EXISTS(...)` here probed every one of a 320k-row
+  // on-demand catalog and made the automation lanes ~6× slower.
   db.exec('DROP VIEW IF EXISTS wanted_issues');
   db.exec(`CREATE VIEW wanted_issues AS
     SELECT s.id series_id, ci.comicvine_id cv_issue_id, ci.issue_number,
@@ -321,7 +325,7 @@ function migrate(db) {
       FROM series s
       JOIN cv_issues ci ON ci.cv_series_id = s.cv_id
       LEFT JOIN issue_picks p ON p.cv_issue_id = ci.comicvine_id
-     WHERE (s.monitor <> 'none' OR EXISTS (SELECT 1 FROM issue_picks px WHERE px.series_id = s.id AND px.want = 1))
+     WHERE (s.monitor IN ('all','new') OR s.id IN (SELECT series_id FROM issue_picks WHERE want = 1))
        AND COALESCE(p.want, ${POLICY_WANTS}) = 1
        AND NOT EXISTS (SELECT 1 FROM library_files lf WHERE lf.cv_issue_id = ci.comicvine_id AND lf.valid = 1)`);
   // The Mylar integration is gone — BackIssue replaces it.
@@ -675,8 +679,8 @@ export function listWantedIssues(db, { limit = 200, offset = 0, scope = 'wanted'
     `NOT EXISTS (SELECT 1 FROM library_files lf2 WHERE lf2.cv_issue_id = ci.comicvine_id AND lf2.valid=1)`,
   ];
   // Gaps: a collection series = monitored, owns a file, or has a pick.
-  if (gaps) conds.unshift(`(s.monitor <> 'none' OR EXISTS(SELECT 1 FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1)
-      OR EXISTS(SELECT 1 FROM issue_picks px WHERE px.series_id=s.id AND px.want=1))`);
+  if (gaps) conds.unshift(`(s.monitor IN ('all','new') OR s.id IN (SELECT series_id FROM library_files WHERE valid=1)
+      OR s.id IN (SELECT series_id FROM issue_picks WHERE want=1))`);
   const args = { uid: userId };
   if (!includeRestricted) conds.push('s.restricted = 0');
   if (userFollowedOnly) conds.push('EXISTS(SELECT 1 FROM user_follows uf WHERE uf.series_id = s.id AND uf.user_id = @uid)');
@@ -1813,10 +1817,15 @@ export function readyImportCandidates(db) {
 }
 
 export function setSeriesCv(db, seriesId, cvId, { locked = 0 } = {}) {
+  // Picks belong to the volume's issues: a different volume means they no
+  // longer apply (and would show as phantom "picked issues" on the series).
+  const cur = db.prepare('SELECT cv_id FROM series WHERE id=?').get(seriesId);
+  if (cur && cur.cv_id != null && Number(cur.cv_id) !== Number(cvId)) db.prepare('DELETE FROM issue_picks WHERE series_id=?').run(seriesId);
   return db.prepare('UPDATE series SET cv_id=?, cv_locked=? WHERE id=?').run(cvId, locked ? 1 : 0, seriesId).changes;
 }
 
 export function clearSeriesCv(db, seriesId) {
+  db.prepare('DELETE FROM issue_picks WHERE series_id=?').run(seriesId);
   return db.prepare('UPDATE series SET cv_id=NULL, cv_locked=0 WHERE id=?').run(seriesId).changes;
 }
 
@@ -1845,11 +1854,15 @@ export function untrackSeries(db, id) {
   if (!series) return { removed: false, files: [] };
   const files = db.prepare('SELECT path FROM library_files WHERE series_id=?').all(id).map((r) => r.path);
   db.prepare('DELETE FROM library_files WHERE series_id=?').run(id);
+  // Picks and personal follows go with the series — a stale skip left behind
+  // would silently apply if the same volume were added again.
+  db.prepare('DELETE FROM issue_picks WHERE series_id=?').run(id);
+  db.prepare('DELETE FROM user_follows WHERE series_id=?').run(id);
   if (String(series.url).startsWith('cv:') || SELF_DESCRIBED_TYPES.has(series.type || 'comic')) {
     db.prepare('DELETE FROM issues WHERE series_id=?').run(id);
     db.prepare('DELETE FROM series WHERE id=?').run(id);
   } else {
-    db.prepare('UPDATE series SET followed=0, cv_id=NULL, cv_locked=0, path=NULL WHERE id=?').run(id);
+    db.prepare("UPDATE series SET followed=0, monitor='none', monitor_from=NULL, cv_id=NULL, cv_locked=0, path=NULL WHERE id=?").run(id);
   }
   return { removed: true, files };
 }

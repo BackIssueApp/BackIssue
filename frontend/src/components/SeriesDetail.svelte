@@ -848,7 +848,7 @@
                 {@const state = issueState(i)}
                 {@const cover = issueCoverUrl(i)}
                 <div class="icard"
-                  class:is-corrupt={i.corrupt} class:is-checked={detailSelected.has(i.cv_issue_id)}
+                  class:is-corrupt={i.corrupt} class:is-checked={detailSelected.has(i.cv_issue_id)} class:is-wanted={i.wanted && !i.owned}
                   title={i.corrupt && corruptReason(i) ? 'Corrupt: ' + corruptReason(i) : (i.title || '')}>
                   <div class="icard__art" onclick={() => openIssueInfo(i.cv_issue_id, i.number)} role="button" tabindex="0"
                     onkeydown={(e) => { if (e.key === 'Enter') openIssueInfo(i.cv_issue_id, i.number); }}>
@@ -999,6 +999,9 @@
   .issue__want.is-on { opacity: 1; color: var(--accent); }
   .issue__want.is-on:hover { color: #fff; background: var(--accent); }
   :global(.icard__btn--want.is-on) { color: var(--accent); }
+  /* A wanted (unowned) card carries a small target mark at rest, so the grid
+     reads the same as the list without hovering. */
+  :global(.icard.is-wanted .icard__art::before) { content: ''; position: absolute; left: 7px; bottom: 7px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px rgba(12,10,18,.8); z-index: 2; pointer-events: none; }
   .wantbtn { display: inline-flex; align-items: center; gap: 5px; }
 
   /* Count badge on the issue filter tabs. */

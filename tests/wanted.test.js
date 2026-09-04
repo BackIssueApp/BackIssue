@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   openDb, upsertSeries, setSeriesCv, setFollowed, setMonitor, setIssueWants, clearIssuePicks, wantStates, wantedCounts,
   upsertCvSeries, upsertCvIssue, upsertLibraryFile, linkFileCvIssue, ensureCvIssueRow, setIssueStatus, listWantedIssues,
-  getSeriesById, seriesCollectionDetail, mergeSeriesRows, createCvSeries,
+  getSeriesById, seriesCollectionDetail, mergeSeriesRows, createCvSeries, untrackSeries, clearSeriesCv,
 } from '../src/db.js';
 import { createApp } from '../src/server.js';
 
@@ -265,4 +265,37 @@ test('Following is per-user (☆ stars), not the monitoring policy', async () =>
   const badge = Object.fromEntries(all.items.map((i) => [i.series_title, i.followed]));
   assert.equal(badge['X-Men'], 1);
   assert.equal(badge['Saga'], 0);
+});
+
+test('picks never outlive their series or volume: removal, re-match and unmatch drop them', () => {
+  const { db, saga, xm } = seed();
+  setIssueWants(db, saga, [3], false);          // skip on a monitored series
+  setIssueWants(db, xm, [101], true);            // pick on an unmonitored one
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM issue_picks').get().n, 2);
+  // Removing Saga from the library takes its skip with it — re-adding the
+  // volume later must not silently skip #3.
+  untrackSeries(db, saga);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM issue_picks WHERE cv_issue_id=3').get().n, 0);
+  const again = createCvSeries(db, { cvId: 46568, title: 'Saga' });
+  // (its file left with it, so every issue is a gap again — and none is skipped)
+  assert.deepEqual(listWantedIssues(db).items.filter((i) => i.series_id === again).map((i) => i.issue_number), ['1', '2', '3']);
+  // Fixing X-Men's match to another volume drops picks made for the old one;
+  // re-pointing at the same volume keeps them.
+  setSeriesCv(db, xm, 100, { locked: 1 });
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM issue_picks WHERE series_id=?').get(xm).n, 1);
+  setSeriesCv(db, xm, 999, { locked: 1 });
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM issue_picks WHERE series_id=?').get(xm).n, 0);
+  assert.deepEqual(seriesCollectionDetail(db, xm).picks, { want: 0, skip: 0 });
+  // Unmatching clears them too.
+  setIssueWants(db, xm, [991], true);
+  clearSeriesCv(db, xm);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM issue_picks').get().n, 0);
+});
+
+test('the wanted view only walks monitored or picked series (index-able gate)', () => {
+  const { db } = seed();
+  const plan = db.prepare('EXPLAIN QUERY PLAN SELECT COUNT(*) FROM wanted_issues').all().map((r) => r.detail).join(' | ');
+  assert.match(plan, /MULTI-INDEX OR/);
+  assert.match(plan, /idx_series_monitor/);
+  assert.doesNotMatch(plan, /SCAN series(?! USING)/, 'no full scan of series');
 });
