@@ -510,9 +510,12 @@
 
   // On-disk file count for closeness ranking in the CV picker: files attached to
   // CV issues (matched view) or the raw folder files (unmatched view).
-  const pickerFileCount = $derived(det
-    ? (det.issues || []).reduce((n, i) => n + ((i.files && i.files.length) || 0), 0) + ((det.files && det.files.length) || 0)
-    : 0);
+    // Every file on disk for this series: linked to an issue, or not (an
+  // unlinked file is the usual reason someone is re-matching in the first
+  // place — leaving those out ranked the WRONG volume first).
+  const pickerFileCount = $derived(isCv
+    ? (det.issues || []).reduce((n, i) => n + ((i.files && i.files.length) || 0), 0) + ((det.unlinkedFiles || []).length)
+    : ((det.issues || []).reduce((n, i) => n + ((i.files && i.files.length) || 0), 0) + ((det.files && det.files.length) || 0)));
 
   const cvUrl = $derived(det?.cv
     ? (det.cv.site_detail_url || ('https://comicvine.gamespot.com/volume/4050-' + det.cv.comicvine_id + '/'))
