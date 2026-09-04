@@ -108,11 +108,11 @@ export async function verifyLibrary(db, onProgress = () => {}, { corruptOnly = f
   // confirm fixes (mislabeled formats, off-by-one sizes) cleared them, instead of
   // deep-reading the whole library.
   // Only archives the comic pipeline owns — rows other indexers put here
-  // (e.g. a plugin's ebook files) have their own health story; a zip check
-  // against a PDF would flag perfectly good files corrupt.
+  // (e.g. a plugin's ebook files) have their own health story. PDFs are a
+  // comic format here and verify as PDFs (header + page objects).
   const files = db.prepare(
     corruptOnly ? 'SELECT path FROM library_files WHERE valid=0' : 'SELECT path FROM library_files',
-  ).all().map((r) => r.path).filter((p) => COMIC_RE.test(p) || /\.(zip|rar)$/i.test(p));
+  ).all().map((r) => r.path).filter((p) => COMIC_RE.test(p) || /\.(zip|rar|pdf)$/i.test(p));
   let done = 0, ok = 0, corrupt = 0, missing = 0, repacked = 0, unreachable = 0;
   await eachFile(files, async (p) => {
     try {

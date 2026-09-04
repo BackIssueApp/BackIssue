@@ -280,6 +280,9 @@ export async function repackRarAsZip(path) {
 export async function verifyArchive(path) {
   const info = await readArchiveInfo(path);
   if (!info.ok) return { ok: false, error: info.error };
+  // A PDF has no archive to inflate: a readable header and page objects
+  // (readArchiveInfo scanned them) is the whole check.
+  if (info.format === 'pdf') return { ok: true, skipped: 'pdf' };
   // Use the format readArchiveInfo actually decoded (sniffed), not the extension
   // — a RAR-content .cbz must be verified as RAR, not handed to the zip reader.
   if (info.format === 'cbr') {
