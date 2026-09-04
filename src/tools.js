@@ -6,7 +6,7 @@ import path from 'node:path';
 import config from './config.js';
 import { poolWithResource } from './pool.js';
 import { convertCbrToCbz, verifyArchive, readArchiveInfo, sniffFormat, repackRarAsZip, sidecarPath } from './archive.js';
-import { removeSupersededFiles, indexLibrary } from './library.js';
+import { removeSupersededFiles, removeExtraCopies, indexLibrary } from './library.js';
 import { walkFiles } from './sources/usenet.js';
 import { pruneLibraryFiles, SELF_DESCRIBED_TYPES } from './db.js';
 import { libraryStats } from './db.js';
@@ -89,16 +89,27 @@ export async function convertAllCbr(db, onProgress = () => {}) {
   return { total: files.length, converted, deduped, failed };
 }
 
-// Delete invalid files already superseded by a valid copy of the same issue,
-// across every comic.
-export async function removeAllDuplicates(db, onProgress = () => {}) {
-  const series = db.prepare('SELECT DISTINCT series_id id FROM library_files WHERE series_id IS NOT NULL').all();
-  let done = 0, removed = 0;
+// Duplicate copies across every comic. Invalid files a good copy already
+// superseded are deleted outright; extra GOOD copies of one issue are
+// removed (keeping the best) only with { remove: true } — by default they're
+// previewed to the log, since those are files someone chose to keep.
+export async function removeAllDuplicates(db, onProgress = () => {}, opts = {}) {
+  const series = db.prepare(`SELECT DISTINCT lf.series_id AS id, s.title FROM library_files lf
+    JOIN series s ON s.id = lf.series_id WHERE lf.series_id IS NOT NULL`).all();
+  let done = 0, removed = 0, extraFound = 0, extraRemoved = 0;
   for (const s of series) {
-    try { removed += await removeSupersededFiles(db, s.id); } catch { /* skip */ }
-    onProgress({ done: ++done, total: series.length, message: `${removed} removed` });
+    try {
+      removed += await removeSupersededFiles(db, s.id);
+      const r = await removeExtraCopies(db, s.id, { dryRun: !opts.remove });
+      extraFound += r.removed;
+      if (opts.remove) extraRemoved += r.removed;
+      else for (const n of r.deleted) logWarn(`duplicate copy (preview): ${s.title} — ${n}`, 'tools');
+    } catch { /* skip */ }
+    onProgress({ done: ++done, total: series.length, message: `${removed + extraRemoved} removed${!opts.remove && extraFound ? `, ${extraFound} extra copies previewed` : ''}` });
   }
-  return { seriesChecked: series.length, removed };
+  return opts.remove
+    ? { seriesChecked: series.length, removed: removed + extraRemoved }
+    : { seriesChecked: series.length, removed, extraCopiesPreviewed: extraFound };
 }
 
 // Deep integrity check of every archive; updates valid/error and prunes files

@@ -1231,6 +1231,10 @@ export function seriesCollectionDetail(db, id, userId = null) {
   // safe-to-remove duplicates (see removeSupersededFiles).
   const validCvIds = new Set(files.filter((f) => f.valid && f.cv_issue_id != null).map((f) => f.cv_issue_id));
   const superseded = files.filter((f) => !f.valid && f.cv_issue_id != null && validCvIds.has(f.cv_issue_id)).length;
+  // Extra GOOD copies of one issue (see removeExtraCopies) — also removable.
+  const copies = new Map();
+  for (const f of files) if (f.valid && f.cv_issue_id != null) copies.set(f.cv_issue_id, (copies.get(f.cv_issue_id) || 0) + 1);
+  const duplicates = [...copies.values()].reduce((n, c) => n + Math.max(0, c - 1), 0);
   const cvRow = series.cv_id ? getCvSeries(db, series.cv_id) : null;
   const cvIssues = cvRow ? listCvIssues(db, series.cv_id) : [];
   const sourced = !String(series.url).startsWith('cv:'); // has a real catalog download source
@@ -1307,7 +1311,7 @@ export function seriesCollectionDetail(db, id, userId = null) {
       };
     });
     return {
-      series: seriesOut, cv: cvOut, source: 'cv', sourced, issues, superseded,
+      series: seriesOut, cv: cvOut, source: 'cv', sourced, issues, superseded, duplicates,
       // Present on disk but tied to no issue — the UI shows these so a file
       // that reads as "missing" is explained rather than invisible.
       unlinkedFiles: files.filter((f) => f.cv_issue_id == null && f.issue_id == null).map((f) => ({ ...asFile(f), ci_number: f.ci_number })),
@@ -1349,7 +1353,7 @@ export function seriesCollectionDetail(db, id, userId = null) {
     });
     return {
       series: { ...seriesOut, description: series.description || null },
-      cv: null, source: 'local', sourced: false, matched: true, issues, superseded: 0,
+      cv: null, source: 'local', sourced: false, matched: true, issues, superseded: 0, duplicates: 0,
       unlinkedFiles: files.filter((f) => f.issue_id == null).map(asFile),
     };
   }

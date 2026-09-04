@@ -9,7 +9,7 @@ import { spawn } from 'node:child_process';
 import fsp from 'node:fs/promises';
 import fss from 'node:fs';
 import nodePath from 'node:path';
-import { indexFolderForSeries, reconcileLibrary, removeSupersededFiles } from './library.js';
+import { indexFolderForSeries, reconcileLibrary, removeSupersededFiles, removeExtraCopies } from './library.js';
 import { resolveSeriesDir, parseRootFolders } from './paths.js';
 import { refileLibrary } from './refile.js';
 import { initRssTables, unseenItems, markSeen, buildWantedIndex, matchFeedItems } from './rsswatch.js';
@@ -152,7 +152,7 @@ const TOOLS = {
   'reindex-series': { label: 'Re-index series folders', desc: "For every ComicVine-matched series, re-index its OWN folder and attribute the files there — authoritatively, without fuzzy matching. Fixes files that were attached to the wrong same-named series. (Finding brand-new comics is still 'Scan entire library'.)", run: (op) => reindexSeriesFolders(op) },
   'tag-untagged': { label: 'Tag all untagged files', desc: 'Write ComicVine metadata into every owned file that has none (converts .cbr as needed).', needsCv: true, run: (op) => tagAllUntagged(db, cvClient(), op) },
   'convert-cbr': { label: 'Convert all CBR → CBZ', desc: 'Repack every .cbr as a .cbz so it can be tagged and read consistently.', run: (op) => convertAllCbr(db, op) },
-  'remove-duplicates': { label: 'Remove duplicate files', desc: 'Delete old/corrupt copies that a good copy of the same issue has already replaced.', run: (op) => removeAllDuplicates(db, op) },
+  'remove-duplicates': { label: 'Remove duplicate files', desc: 'Delete duplicate copies of the same issue across every comic. Corrupt copies a good one already replaced go outright. Where two GOOD copies exist, the best is kept — tagged first, then the most pages, then the largest — and the other removed; that part runs as a preview (see Logs → tools for the list) unless you tick the box.', run: (op, opts) => removeAllDuplicates(db, op, opts) },
   'verify': { label: 'Verify archives', desc: 'Deep-check every comic file for corruption and prune ones missing from disk.', run: (op, opts) => verifyLibrary(db, op, opts) },
   'relink-cv': { label: 'Re-link to ComicVine', desc: 'Re-map owned files to ComicVine issues for every matched comic (fixes owned/missing counts).', run: (op) => relinkAllCv(db, op) },
   'rematch-mismatched': { label: 'Re-check mismatched volumes', desc: "Find series whose files go beyond their ComicVine volume's last issue — the sign a same-name mini or one-shot was matched instead of the real run — and re-match them. A clear winner is applied and its files re-linked; anything unclear is left for Fix match on the series page.", needsCv: true, run: (op) => rematchMismatched(db, cvClient(), op) },
@@ -566,8 +566,11 @@ function skipImportCandidate(id) { setImportCandidateStatus(db, id, 'skipped'); 
 
 // Remove duplicate/superseded files (an old corrupt copy left beside a good one).
 async function cleanupSeriesFiles(seriesId) {
-  const removed = await removeSupersededFiles(db, seriesId);
-  if (removed) logInfo(`Removed ${removed} duplicate/superseded file(s) from ${getSeriesById(db, seriesId)?.title || 'series ' + seriesId}`, 'library');
+  const superseded = await removeSupersededFiles(db, seriesId);
+  const extra = await removeExtraCopies(db, seriesId);
+  const removed = superseded + extra.removed;
+  const title = getSeriesById(db, seriesId)?.title || 'series ' + seriesId;
+  if (removed) logInfo(`Removed ${removed} duplicate file(s) from ${title}${extra.removed ? ` — kept: ${extra.kept.join(', ')}; removed: ${extra.deleted.join(', ')}` : ''}`, 'library');
   return { removed, detail: seriesCollectionDetail(db, seriesId) };
 }
 

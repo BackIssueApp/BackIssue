@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import config from './config.js';
 import { findComicFiles, parseIssueFromFilename, COMIC_RE } from './scanner.js';
-import { readArchiveInfo, verifyArchive } from './archive.js';
+import { readArchiveInfo, verifyArchive, sidecarPath } from './archive.js';
 import { upsertLibraryFile, getLibraryFile, pruneLibraryFiles, libraryStats, linkLibraryFile, deleteLibraryFile, getCvIssue } from './db.js';
 import { normalizeNumber } from './matcher.js';
 import { poolWithResource } from './pool.js';
@@ -48,6 +48,38 @@ export async function removeSupersededFiles(db, seriesId) {
     removed++;
   }
   return removed;
+}
+
+// Extra VALID copies of the same ComicVine issue — two good downloads, a scan
+// beside a digital release, a re-grab that superseded nothing. Keeps the best
+// copy (tagged first, then the most pages, then the largest, then the newest)
+// and removes the rest from disk and the index, sidecars included. `dryRun`
+// only reports what would go. Returns the kept and removed file names so the
+// caller can show or log exactly what happened.
+export async function removeExtraCopies(db, seriesId, { dryRun = false } = {}) {
+  const rows = db.prepare(`SELECT path, name, cv_issue_id, has_metadata, page_count, size, mtime FROM library_files
+    WHERE series_id=? AND valid=1 AND cv_issue_id IS NOT NULL`).all(seriesId);
+  const byIssue = new Map();
+  for (const f of rows) { if (!byIssue.has(f.cv_issue_id)) byIssue.set(f.cv_issue_id, []); byIssue.get(f.cv_issue_id).push(f); }
+  const best = (a, b) => ((b.has_metadata ? 1 : 0) - (a.has_metadata ? 1 : 0))
+    || ((b.page_count ?? -1) - (a.page_count ?? -1))
+    || ((b.size ?? 0) - (a.size ?? 0))
+    || ((b.mtime ?? 0) - (a.mtime ?? 0));
+  const kept = [], removed = [];
+  for (const copies of byIssue.values()) {
+    if (copies.length < 2) continue;
+    copies.sort(best);
+    kept.push(copies[0].name);
+    for (const extra of copies.slice(1)) {
+      if (!dryRun) {
+        await fs.unlink(extra.path).catch(() => {});
+        await fs.rm(sidecarPath(extra.path), { force: true }).catch(() => {});
+        deleteLibraryFile(db, extra.path);
+      }
+      removed.push(extra.name);
+    }
+  }
+  return { removed: removed.length, kept, deleted: removed };
 }
 
 // Walk the library, read each new/changed file's metadata + health into

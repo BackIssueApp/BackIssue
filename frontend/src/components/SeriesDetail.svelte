@@ -491,10 +491,13 @@
   async function cleanupDuplicates() {
     if (!s) return;
     // Deletes files from disk — never without an explicit confirmation.
-    const n = det?.superseded || 0;
+    const n = (det?.superseded || 0) + (det?.duplicates || 0);
+    const parts = [];
+    if (det?.superseded) parts.push(`${fmt(det.superseded)} corrupt cop${det.superseded === 1 ? 'y' : 'ies'} already replaced by a good one`);
+    if (det?.duplicates) parts.push(`${fmt(det.duplicates)} extra good cop${det.duplicates === 1 ? 'y' : 'ies'} of an issue you already have (the best copy is kept — tagged first, then the most pages, then the largest)`);
     if (!(await confirmDialog({
       title: `Delete ${fmt(n)} duplicate file${n === 1 ? '' : 's'}?`,
-      message: 'These are corrupt copies already replaced by a good copy of the same issue. The files are deleted from disk.',
+      message: parts.join('; ') + '. The files are deleted from disk.',
       confirmLabel: 'Delete duplicates', danger: true,
     }))) return;
     cleanupBusy = true;
@@ -665,9 +668,10 @@
                         <button class="menu__item" role="menuitem" disabled={tagBusy} title="Write ComicVine metadata into every owned file"
                           onclick={() => { moreOpen = false; notify('Tagging files…', 'info'); tagFiles(); }}><Icon name="tag" /> {tagBusy ? tagText : (untaggedOwned ? `Tag ${fmt(untaggedOwned)} untagged` : 'Tag files')}</button>
                       {/if}
-                      {#if det?.superseded}
-                        <button class="menu__item" role="menuitem" disabled={cleanupBusy} title="Delete old/corrupt files already replaced by a good copy"
-                          onclick={() => { moreOpen = false; cleanupDuplicates(); }}><Icon name="trash" /> {cleanupBusy ? 'Removing…' : `Remove ${fmt(det.superseded)} duplicate${det.superseded === 1 ? '' : 's'}`}</button>
+                      {#if det?.superseded || det?.duplicates}
+                        {@const dupN = (det.superseded || 0) + (det.duplicates || 0)}
+                        <button class="menu__item" role="menuitem" disabled={cleanupBusy} title="Delete extra copies of issues you already have — corrupt ones replaced by a good copy, and second good copies (the best is kept)"
+                          onclick={() => { moreOpen = false; cleanupDuplicates(); }}><Icon name="trash" /> {cleanupBusy ? 'Removing…' : `Remove ${fmt(dupN)} duplicate${dupN === 1 ? '' : 's'}`}</button>
                       {/if}
                     {/if}
                     {#if !isLocal && can('downloads.grab')}
