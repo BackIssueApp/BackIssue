@@ -164,7 +164,7 @@ async function withYearVolumes(client, title, year, candidates) {
   return [...seen.values()];
 }
 
-export async function matchSeriesToCv(db, client, series) {
+export async function matchSeriesToCv(db, client, series, { locked = 0 } = {}) {
   const s = { ...series, maxIssue: series.maxIssue ?? (series.id != null ? seriesMaxIssue(db, series.id) : null) };
   let candidates = await client.search(s.title);
   let r = rankCandidates(s, candidates);
@@ -178,7 +178,7 @@ export async function matchSeriesToCv(db, client, series) {
   }
   const { ranked, best, auto } = r;
   if (best && auto) {
-    await cacheAndLink(db, client, series.id, best.cand.id, { locked: 0 });
+    await cacheAndLink(db, client, series.id, best.cand.id, { locked });
     return { status: 'matched', cvId: best.cand.id, confidence: best.confidence };
   }
   if (best) return { status: 'ambiguous', candidates: ranked.slice(0, 5).map((r) => ({ ...r.cand, score: r.score, reason: r.reason })) };
@@ -188,10 +188,12 @@ export async function matchSeriesToCv(db, client, series) {
 /** Tool: re-run matching for series whose files carry numbers beyond their
  *  matched volume's last issue — the signature of a same-name mini or one-shot
  *  chosen over the real run. A confident winner re-links the files; anything
- *  ambiguous is left for Fix match. Manually pinned matches are skipped. */
+ *  ambiguous is left for Fix match. The lock flag is NOT a filter: the import
+ *  path locks every match it confirms, so it says nothing about intent — the
+ *  files beyond the volume are the evidence. A series keeps its lock state. */
 export async function rematchMismatched(db, client, onProgress = () => {}) {
   const suspects = [];
-  for (const s of db.prepare('SELECT * FROM series WHERE cv_id IS NOT NULL AND COALESCE(cv_locked, 0) = 0').all()) {
+  for (const s of db.prepare('SELECT * FROM series WHERE cv_id IS NOT NULL').all()) {
     const max = seriesMaxIssue(db, s.id);
     if (max == null) continue;
     const top = db.prepare('SELECT MAX(CAST(issue_number AS REAL)) AS m FROM cv_issues WHERE cv_series_id = ?').get(s.cv_id)?.m;
@@ -200,7 +202,7 @@ export async function rematchMismatched(db, client, onProgress = () => {}) {
   let done = 0, rematched = 0, unchanged = 0, ambiguous = 0;
   for (const s of suspects) {
     try {
-      const r = await matchSeriesToCv(db, client, s);
+      const r = await matchSeriesToCv(db, client, s, { locked: s.cv_locked ? 1 : 0 });
       if (r.status === 'matched') { if (r.cvId !== s.cv_id) rematched++; else unchanged++; }
       else ambiguous++;
     } catch { ambiguous++; }
