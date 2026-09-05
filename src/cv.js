@@ -1,3 +1,4 @@
+import { attestHeaders } from './attest.js';
 // The single API key from settings. Legacy settings held a multi-line key
 // list; the first entry wins so old settings.json files keep working.
 export function cvKey(text) {
@@ -61,7 +62,9 @@ export async function ensureInstanceKey(config, base, doFetch) {
     // report identifies a bad Service URL setting on sight.
     const origin = base.trim().replace(/\/+$/, '').replace(/\/api$/i, '');
     const url = `${origin}/api/register`;
-    const resp = await doFetch(url, { method: 'POST', headers: { 'User-Agent': UA } });
+    // The image's release attestation rides along: the service uses it to
+    // tier the instance key (official builds get the full service).
+    const resp = await doFetch(url, { method: 'POST', headers: { 'User-Agent': UA, ...attestHeaders() } });
     if (!resp.ok) {
       instanceKeyPromise = null; // allow retry on the next call
       throw new Error(`metadata service registration failed (HTTP ${resp.status} from ${url})`);
@@ -118,7 +121,7 @@ export function makeCvClient(config, { fetchImpl, key, politeMs } = {}) {
     const url = `${base}${pathAndQuery}${sep}api_key=${encodeURIComponent(apiKey)}&format=json`;
     let resp;
     try {
-      resp = await doFetch(url, { headers: { 'User-Agent': UA } });
+      resp = await doFetch(url, { headers: { 'User-Agent': UA, ...attestHeaders() } });
     } catch (e) {
       if (attempt < 3) { await sleep(500); return call(pathAndQuery, attempt + 1); }
       throw e;

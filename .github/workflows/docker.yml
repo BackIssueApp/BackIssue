@@ -76,6 +76,10 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           # Stamp non-release builds so the app reports e.g. "0.5.0-dev.a1b2c3d"
           # (release tags keep the clean version).
+          # The release-attestation signing key (repo secret BUILD_ATTEST_KEY);
+          # mounted at build time only, never a layer or a build-arg.
+          secrets: |
+            attest_key=${{ secrets.BUILD_ATTEST_KEY }}
           build-args: |
             BUILD_CHANNEL=${{ startsWith(github.ref, 'refs/tags/v') && 'release' || (github.event_name == 'schedule' && 'nightly' || 'dev') }}
             BUILD_SHA=${{ github.sha }}

@@ -8,6 +8,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Changed
+
+- Official images now carry a signed release attestation that the hosted
+  metadata service uses to recognise genuine BackIssue builds. Nothing to
+  configure and nothing changes for users; builds from source keep working
+  on the service's standard tier.
+
 ## [0.7.95] — 2026-09-05
 
 ### Added

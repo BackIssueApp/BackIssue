@@ -73,6 +73,11 @@ ARG BUILD_CHANNEL=release
 ARG BUILD_SHA=""
 ENV BUILD_CHANNEL=$BUILD_CHANNEL
 ENV BUILD_SHA=$BUILD_SHA
+# Release attestation: CI mounts its signing secret (never in the image or
+# the repo); the script writes a signed build.json. Without the secret — a
+# fork, a local build — it writes {} and the app runs unattested.
+COPY tools/attest.mjs ./tools/attest.mjs
+RUN --mount=type=secret,id=attest_key,required=false node tools/attest.mjs > build.json
 
 # Persisted data on the mounted volume: db, settings, downloads, tag staging,
 # AND installed plugins — so catalog plugins survive image updates and are
