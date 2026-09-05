@@ -50,6 +50,12 @@ export function matchReleases(db, releases) {
     const cvId = Number(r.comicid) || null;
     const s = cvId ? tracked.get(cvId) : null;
     const issueId = Number(r.issueid) || null;
+    // The feed's `title` is the walksoftly-style FULL name ("Series (2016) #12"),
+    // not a story title. Only keep it when it says more than series + number,
+    // so it never doubles the series line or gets cached as the issue's name.
+    const full = String(r.title || '').replace(/\s+/g, ' ').trim();
+    const num = String(r.issue ?? '').trim();
+    const story = full && !(num && full.replace(/#\s+/g, '#').endsWith('#' + num)) ? full : null;
     let owned = false, isNew = false;
     if (s) {
       hits++;
@@ -60,7 +66,7 @@ export function matchReleases(db, releases) {
         // (which filters by release date). upsertCvIssue only backfills a
         // missing date, never overwrites one ComicVine already supplied.
         const ship = /^\d{4}-\d{2}-\d{2}/.test(String(r.shipdate || '')) ? String(r.shipdate).slice(0, 10) : null;
-        upsertCvIssue(db, { id: issueId, cv_series_id: cvId, number: r.issue, name: r.title, store_date: ship });
+        upsertCvIssue(db, { id: issueId, cv_series_id: cvId, number: r.issue, name: story, store_date: ship });
         if (isNew) added++;
       }
       owned = issueId ? !!ownedStmt.get(issueId) : false;
@@ -77,7 +83,7 @@ export function matchReleases(db, releases) {
       series: (cv && cv.name) || r.series || 'Comic',
       publisher: (cv && cv.publisher) || r.publisher || null,
       number: r.issue ?? null,
-      title: r.title ?? null,
+      title: story,
       shipdate: r.shipdate ?? null,
       owned, isNew,
       followed: s ? !!s.followed : false,

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { weekOfYear, fetchWeeklyReleases, matchReleases } from '../src/releases.js';
-import { openDb, upsertSeries, upsertCvSeries, upsertCvIssue, setSeriesCv, upsertLibraryFile, linkLibraryFile, linkFileCvIssue, getCvIssue } from '../src/db.js';
+import { openDb, upsertSeries, upsertCvSeries, upsertCvIssue, setSeriesCv, setFollowed, upsertLibraryFile, linkLibraryFile, linkFileCvIssue, getCvIssue } from '../src/db.js';
 
 test('weekOfYear matches strftime %U (Sunday-based)', () => {
   assert.deepEqual(weekOfYear(new Date(Date.UTC(2026, 6, 1))), { week: '26', year: '2026' });
@@ -85,4 +85,22 @@ test('matchReleases seeds the ship date as store_date (feeds the new-releases la
   assert.equal(d(5002), '2026-01-01', 'a real ComicVine date is never overwritten');
   assert.equal(d(5003), '2026-07-08', 'newly seeded issue carries the ship date');
   assert.equal(d(5004), null, 'malformed shipdate stays null');
+});
+
+test('a walksoftly-style full-name title ("Series (2016) #12") is not a story title: not shown, not cached as the name', () => {
+  const db = openDb(':memory:');
+  const sid = upsertSeries(db, { title: 'Action Comics (2016)', url: '/c/ac' });
+  setSeriesCv(db, sid, 91078, { locked: 1 }); setFollowed(db, sid, 1);
+  upsertCvSeries(db, { id: 91078, name: 'Action Comics', publisher: 'DC Comics', start_year: '2016', count_of_issues: 1 });
+  const out = matchReleases(db, [
+    { comicid: 91078, issueid: 5001, issue: '1102', title: 'Action Comics (2016) #1102', publisher: 'DC Comics', shipdate: '2026-09-09', series: 'Action Comics' },
+    { comicid: 91078, issueid: 5002, issue: '1103', title: 'Action Comics (2016) # 1103', publisher: 'DC Comics', shipdate: '2026-09-16', series: 'Action Comics' },
+    { comicid: 91078, issueid: 5003, issue: '1104', title: 'The Last Kryptonian', publisher: 'DC Comics', shipdate: '2026-09-23', series: 'Action Comics' },
+  ]);
+  const byNum = Object.fromEntries(out.releases.map((r) => [r.number, r]));
+  assert.equal(byNum['1102'].title, null);
+  assert.equal(byNum['1103'].title, null, 'a space after # is still the full name');
+  assert.equal(byNum['1104'].title, 'The Last Kryptonian', 'a real story title survives');
+  assert.equal(getCvIssue(db, 5001).name, null, 'the full name is never cached as the issue name');
+  assert.equal(getCvIssue(db, 5003).name, 'The Last Kryptonian');
 });

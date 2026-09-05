@@ -8,6 +8,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+
+- The weekly release feed now carries a full issue name in its title field;
+  the Releases view no longer shows it as a second line under the series, and
+  it is never cached as the issue's story title.
+
 ## [0.7.9] — 2026-09-04
 
 ### Added
