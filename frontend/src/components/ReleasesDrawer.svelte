@@ -10,11 +10,13 @@
   import Badge from './Badge.svelte';
   import { can, isTrusted } from '../lib/auth.svelte.js';
   import Icon from '../lib/Icon.svelte';
+  import { openAddModal } from './AddModal.svelte';
 
   let { active = false } = $props();
 
   let st = $state({ running: false });
   let filter = $state('all'); // 'all' | 'mine'
+  let singles = $state(true); // hide collected editions (trades, hardcovers, omnibuses) by default
   let timer = null;
 
   // Releases queued from this drawer, keyed seriesId#number — shows a live
@@ -81,7 +83,11 @@
 
   const all = $derived(st.releases || []);
   const mineCount = $derived(all.filter((r) => r.tracked).length);
-  const items = $derived(filter === 'mine' ? all.filter((r) => r.tracked) : all);
+  const collectedCount = $derived(all.filter((r) => r.collected).length);
+  const items = $derived((filter === 'mine' ? all.filter((r) => r.tracked) : all).filter((r) => !singles || !r.collected));
+  // Untracked and unresolved: open Add with the series name + start year, which
+  // is what the ComicVine search needs to land on the right volume.
+  const findSeries = (m) => openAddModal({ query: [m.series, m.seriesYear].filter(Boolean).join(' ') });
 
   // Grouped view: your tracked series first as one section, then the rest
   // bucketed by publisher (the list arrives tracked-first, publisher-sorted).
@@ -193,6 +199,10 @@
       <div class="releases-filters" id="releases-filters">
         <button class="filter__btn" class:is-active={filter === 'all'} onclick={() => { filter = 'all'; }}>All</button>
         <button class="filter__btn" class:is-active={filter === 'mine'} onclick={() => { filter = 'mine'; }}>In collection</button>
+        {#if collectedCount}
+          <button class="filter__btn" class:is-active={!singles} title={singles ? `${collectedCount} collected edition${collectedCount === 1 ? '' : 's'} (trades, hardcovers, omnibuses) hidden — click to show` : 'Showing collected editions — click to hide'}
+            onclick={() => { singles = !singles; }}>Collections ({collectedCount})</button>
+        {/if}
         {#if bulkEligible.length}
           <button class="btn btn--ghost btn--sm" disabled={bulkBusy} title="Queue every tracked, unowned release shown (skips ones already queued)" onclick={downloadAllMissing}>
             <Icon name="download" /> {bulkBusy ? 'Queueing…' : `Download all (${bulkEligible.length})`}</button>
@@ -221,10 +231,11 @@
                   {:else}<span class="rel-thumb__ph">#{m.number ?? '?'}</span>{/if}
                 </div>
                 <div class="queue-item__main">
-                  <div class="queue-item__series">{m.series} <span class="rel-num">#{m.number ?? '?'}</span>
-                    {#if m.isNew}<span class="coll-badge coll-badge--cv">new</span>{/if}</div>
+                  <div class="queue-item__series">{m.series}{#if m.seriesYear} <span class="rel-year">({m.seriesYear})</span>{/if}{#if m.volume && m.volume !== '1'} <span class="rel-year">Vol. {m.volume}</span>{/if} <span class="rel-num">#{m.number ?? '?'}</span>
+                    {#if m.isNew}<span class="coll-badge coll-badge--cv">new</span>{/if}
+                    {#if m.collected}<span class="coll-badge" title="A collected edition, not a single issue">{m.type}</span>{/if}</div>
                   {#if m.title}<div class="rel-story">{m.title}</div>{/if}
-                  <div class="queue-item__title">{g.mine && m.publisher ? m.publisher + ' · ' : ''}{m.shipdate || ''}</div>
+                  <div class="queue-item__title">{g.mine && m.publisher ? m.publisher + ' · ' : ''}{m.shipdate ? 'ships ' + m.shipdate : ''}{m.coverdate ? ' · cover ' + m.coverdate : ''}</div>
                 </div>
                 {#if m.tracked}
                   <span>
@@ -240,6 +251,9 @@
                 {:else if m.cvId && isTrusted()}
                   <button class="btn btn--ghost btn--sm" disabled={m._adding}
                     onclick={(e) => { e.stopPropagation(); addRelease(m); }}>{#if m._added}Added{:else if m._adding}Adding…{:else}<Icon name="plus" /> Add{/if}</button>
+                {:else if !m.cvId && isTrusted()}
+                  <!-- Not on ComicVine yet as far as the feed knows: search by name + year. -->
+                  <button class="btn btn--ghost btn--sm" title="Search ComicVine for this series and add it" onclick={(e) => { e.stopPropagation(); findSeries(m); }}><Icon name="search" /> Find</button>
                 {/if}
               </div>
             {/each}

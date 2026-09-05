@@ -98,6 +98,11 @@
   const issues = $derived(hasIssues ? det.issues : []);
   const missingIds = $derived(issues.filter((i) => !i.owned).map((i) => i.cv_issue_id));
   const wantedCount = $derived(issues.filter((i) => i.wanted).length);
+  // What ships next, from the weekly release list (this week + next).
+  const nextShip = $derived.by(() => {
+    const list = (det?.upcoming || []).filter((u) => !u.owned && !u.collected && u.shipdate).sort((a, b) => String(a.shipdate).localeCompare(String(b.shipdate)));
+    return list[0] || null;
+  });
 
   const issueCountLabel = $derived(
     isCv && det.cv ? `${fmt(det.cv.issue_count)} issues`
@@ -606,6 +611,9 @@
           <div class="series-tags">
             <span class="tag" id="series-pub">{s.publisher || 'Unknown publisher'}{det?.cv?.metron_imprint ? ` · ${det.cv.metron_imprint}` : ''}</span>
             <span class="tag tag--mono" id="series-issuecount">{issueCountLabel}</span>
+            {#if isCv && nextShip}
+              <span class="tag" id="series-next" title="From the weekly release list"><Icon name="calendar" size={12} /> Next: #{nextShip.number} · {nextShip.shipdate}</span>
+            {/if}
             {#if isCv}
               <span class="tag mon-tag mon-tag--{monitorKey}" id="series-monitor" title="What download automation fetches for this series — change it under ⋯">
                 <Icon name={monitorKey === 'none' ? 'pause' : monitorKey === 'new' ? 'zap' : 'target'} size={12} /> {monitorText}

@@ -760,3 +760,23 @@ test('add-cv with "only the issues that were asked for" queues just those; off, 
     } finally { s.close(); }
   }
 });
+
+test('releases/download refreshes the volume once when the issue is not cached yet, then explains', async () => {
+  const { app, db, calls } = makeApp();
+  db.prepare("INSERT INTO series (id, title, url, cv_id, followed, monitor) VALUES (9, 'Saga', 'cv:46568', 46568, 1, 'all')").run();
+  upsertCvSeries(db, { id: 46568, name: 'Saga' });
+  upsertCvIssue(db, { id: 1, cv_series_id: 46568, issue_number: '1', name: 'One' });
+  const s = await listen(app);
+  const base = `http://localhost:${s.address().port}`;
+  try {
+    // #1 is cached → queues without a refresh.
+    let r = await fetch(`${base}/api/releases/download`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ seriesId: 9, number: '1' }) });
+    assert.equal((await r.json()).queued, 1);
+    assert.equal(calls.refreshed, undefined);
+    // #2 is not → one refresh attempt, then a plain-language 404.
+    r = await fetch(`${base}/api/releases/download`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ seriesId: 9, number: '2' }) });
+    assert.equal(r.status, 404);
+    assert.equal(calls.refreshed, 9);
+    assert.match((await r.json()).error, /isn't listed on ComicVine yet/);
+  } finally { s.close(); }
+});

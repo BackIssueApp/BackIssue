@@ -4,8 +4,10 @@
 
   const m = $state({ query: '', results: null, error: '' });
 
-  export function openAddModal() {
-    m.query = ''; m.results = null; m.error = '';
+  // `query` pre-fills and runs the search (e.g. a release the library doesn't
+  // track yet — series name + start year finds the right volume first time).
+  export function openAddModal({ query = '' } = {}) {
+    m.query = query; m.results = null; m.error = ''; m.autoSearch = !!query;
     openModal('add');
   }
 </script>
@@ -30,6 +32,7 @@
 
   let searchEl = $state(null);
   $effect(() => { if (open && searchEl) searchEl.focus(); });
+  $effect(() => { if (open && m.autoSearch) { m.autoSearch = false; search(m.query); } });
 
   let timer;
   function onInput() { clearTimeout(timer); timer = setTimeout(() => search(m.query), 200); }

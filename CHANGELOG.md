@@ -8,6 +8,16 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+
+- **Releases, richer.** Collected editions (trades, hardcovers, omnibuses) are
+  hidden by default behind a **Collections** chip; rows show the ship date,
+  cover date, series start year and volume; a release the feed couldn't place
+  on ComicVine gets a **Find** button that opens Add pre-filled with its name
+  and year; downloading a brand-new issue refreshes the series on its own
+  first. The weekly release notice names the first few issues, and a series
+  page shows **Next: #N · date** from this week's and next week's lists.
+
 ### Fixed
 
 - The weekly release feed now carries a full issue name in its title field;

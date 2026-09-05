@@ -1298,14 +1298,21 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
 
   // Queue one tracked weekly release (series + issue number) straight from the
   // Releases drawer.
-  app.post('/api/releases/download', (req, res) => {
+  app.post('/api/releases/download', async (req, res) => {
     const seriesId = Number(req.body?.seriesId);
     const number = String(req.body?.number ?? '');
     const s = getSeriesById(db, seriesId);
     if (!s?.cv_id) return res.status(400).json({ error: 'series not matched to ComicVine' });
     const want = normalizeNumber(number);
-    const ci = listCvIssues(db, s.cv_id).find((x) => normalizeNumber(x.issue_number) === want);
-    if (!ci) return res.status(404).json({ error: `issue #${number} isn't in the ComicVine volume yet — Refresh the series first` });
+    const find = () => listCvIssues(db, s.cv_id).find((x) => normalizeNumber(x.issue_number) === want);
+    let ci = find();
+    // A release-day issue is often newer than the cached volume: refresh the
+    // volume once and look again before giving up.
+    if (!ci && typeof refreshVolume === 'function') {
+      try { await refreshVolume(seriesId); } catch { /* the message below explains */ }
+      ci = find();
+    }
+    if (!ci) return res.status(404).json({ error: `issue #${number} isn't listed on ComicVine yet — try again in a day or two` });
     const id = ensureCvIssueRow(db, { seriesId, cvIssueId: ci.comicvine_id, number: ci.issue_number, title: ci.name });
     setIssueWants(db, seriesId, [ci.comicvine_id], true, { reason: 'release', userId: req.user?.id ?? null });
     queueIssues(db, [id]);
@@ -1524,6 +1531,10 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     const d = seriesCollectionDetail(db, Number(req.params.id), req.user.id);
     if (!d) return res.status(404).json({ error: 'not found' });
     const row = getSeriesById(db, Number(req.params.id));
+    // What ships next for this series, from the weekly release list (this
+    // week + next), so the page can say "Next: #12 · 16 Sep".
+    d.upcoming = (state.releasesUpcoming || []).filter((u) => u.seriesId === Number(req.params.id))
+      .map(({ number, shipdate, issueId, owned, collected, week, year }) => ({ number, shipdate, issueId, owned, collected, week, year }));
     if (row) {
       // For an unmatched comic with no pinned path and no files, the fallback
       // would derive a folder from the source title — show "not set" instead.

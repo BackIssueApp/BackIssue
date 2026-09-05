@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { weekOfYear, fetchWeeklyReleases, matchReleases } from '../src/releases.js';
+import { weekOfYear, fetchWeeklyReleases, matchReleases, shiftWeek, isCollected } from '../src/releases.js';
 import { openDb, upsertSeries, upsertCvSeries, upsertCvIssue, setSeriesCv, setFollowed, upsertLibraryFile, linkLibraryFile, linkFileCvIssue, getCvIssue } from '../src/db.js';
 
 test('weekOfYear matches strftime %U (Sunday-based)', () => {
@@ -103,4 +103,36 @@ test('a walksoftly-style full-name title ("Series (2016) #12") is not a story ti
   assert.equal(byNum['1104'].title, 'The Last Kryptonian', 'a real story title survives');
   assert.equal(getCvIssue(db, 5001).name, null, 'the full name is never cached as the issue name');
   assert.equal(getCvIssue(db, 5003).name, 'The Last Kryptonian');
+});
+
+test('the wider feed fields ride along: type/collected, cover date, series year, volume; cache:false leaves the clone alone', () => {
+  const db = openDb(':memory:');
+  const sid = upsertSeries(db, { title: 'Saga (2012)', url: '/c/saga' });
+  setSeriesCv(db, sid, 46568, { locked: 1 }); setFollowed(db, sid, 1);
+  upsertCvSeries(db, { id: 46568, name: 'Saga', publisher: 'Image', start_year: '2012', count_of_issues: 1 });
+  const feed = [
+    { comicid: 46568, issueid: 777001, issue: '75', title: 'Saga (2012) #75', publisher: 'Image', shipdate: '2026-09-09', coverdate: '2026-11-01', seriesyear: '2012', volume: '1', type: 'Single Issue' },
+    { comicid: 46568, issueid: 777002, issue: '12', title: 'Saga (2012) #12', publisher: 'Image', shipdate: '2026-09-09', coverdate: null, seriesyear: '2012', volume: '1', type: 'Trade Paperback' },
+    { comicid: null, issueid: null, issue: '1', title: 'Vampire Survivors #1', publisher: null, shipdate: '2026-09-09', coverdate: '2026-09-01', seriesyear: '2026', volume: '2', type: null },
+  ];
+  const out = matchReleases(db, feed);
+  const by = (n) => out.releases.find((x) => x.number === n);
+  const a = by('75'), b = by('12'), c = by('1');
+  assert.equal(a.type, 'Single Issue'); assert.equal(a.collected, false); assert.equal(a.coverdate, '2026-11-01'); assert.equal(a.seriesYear, '2012'); assert.equal(a.volume, '1');
+  assert.equal(b.type, 'Trade Paperback'); assert.equal(b.collected, true); assert.equal(b.coverdate, null);
+  assert.equal(c.collected, false); assert.equal(c.type, null); assert.equal(c.seriesYear, '2026'); assert.equal(c.volume, '2');
+  assert.ok(getCvIssue(db, 777001), 'a tracked hit is cached');
+  // A lookahead match must not create issue rows.
+  const dry = matchReleases(db, [{ comicid: 46568, issueid: 777003, issue: '76', publisher: 'Image', shipdate: '2026-09-16' }], { cache: false });
+  assert.equal(dry.releases[0].tracked, true);
+  assert.equal(getCvIssue(db, 777003), undefined, 'not cached');
+  assert.ok(isCollected('Hard Cover') && isCollected('Omnibus') && !isCollected('Limited Series') && !isCollected(null));
+});
+
+test('shiftWeek walks %U weeks across a year boundary', () => {
+  assert.deepEqual(shiftWeek('36', '2026', 1), { week: '37', year: '2026' });
+  // 2026 opens on a Thursday: week 00 is Jan 1–3; the week before it is 2025's week 51 (Dec 21–27).
+  assert.deepEqual(shiftWeek('00', '2026', -1), { week: '51', year: '2025' });
+  assert.deepEqual(shiftWeek('51', '2025', 1), { week: '52', year: '2025' });
+  assert.deepEqual(shiftWeek('52', '2025', 1), { week: '01', year: '2026' }); // week 00 is only Jan 1–3; the first Sunday (Jan 4) starts week 01
 });

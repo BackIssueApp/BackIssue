@@ -18,6 +18,20 @@ export function weekOfYear(date) {
 
 export function currentWeek(now = new Date()) { return weekOfYear(now); }
 
+// The %U week `delta` weeks away from (week, year). Week 00 starts Jan 1; week
+// N≥1 starts at the first Sunday + (N-1) weeks. Same arithmetic as the UI.
+export function shiftWeek(week, year, delta) {
+  const y = Number(year), w = Number(week);
+  const jan1Dow = new Date(Date.UTC(y, 0, 1)).getUTCDay();
+  const anchorYday = w === 0 ? 0 : (7 - jan1Dow) % 7 + (w - 1) * 7;
+  return weekOfYear(new Date(Date.UTC(y, 0, 1 + anchorYday + delta * 7)));
+}
+
+// A release "type" (the provider's series type) that is a collected edition
+// rather than a single issue — the Releases view hides these by default.
+const COLLECTED = /trade|hard ?cover|omnibus|collect|graphic novel|tpb|paperback|compendium/i;
+export const isCollected = (type) => !!type && COLLECTED.test(String(type));
+
 // Fetch the raw release list for a week. Uses the configured proxy if set.
 export async function fetchWeeklyReleases({ week, year } = {}, { fetchImpl } = {}) {
   const cur = currentWeek();
@@ -37,7 +51,7 @@ export async function fetchWeeklyReleases({ week, year } = {}, { fetchImpl } = {
 // track (matched to a ComicVine volume). For tracked hits, cache the issue (so
 // it shows as missing in the collection) and report ownership. Returns the whole
 // list, tracked-first. { releases, total, hits, added }.
-export function matchReleases(db, releases) {
+export function matchReleases(db, releases, { cache = true } = {}) {
   const tracked = new Map(); // cv volume id -> our series row
   for (const s of db.prepare('SELECT id, cv_id, followed FROM series WHERE cv_id IS NOT NULL').all()) {
     tracked.set(s.cv_id, s);
@@ -57,9 +71,13 @@ export function matchReleases(db, releases) {
     const num = String(r.issue ?? '').trim();
     const story = full && !(num && full.replace(/#\s+/g, '#').endsWith('#' + num)) ? full : null;
     let owned = false, isNew = false;
+    // The provider's series type, cover date, volume number and start year —
+    // what tells two same-named runs apart and whether this is a collection.
+    const kind = r.type ? String(r.type).trim() || null : null;
+    const dateOnly = (v) => (/^\d{4}-\d{2}-\d{2}/.test(String(v || '')) ? String(v).slice(0, 10) : null);
     if (s) {
       hits++;
-      if (issueId) {
+      if (issueId && cache) {
         isNew = !getCvIssue(db, issueId);
         // Carry the provider's ship date into the cache as the store date —
         // it's what makes this issue visible to the new-releases search lane
@@ -84,6 +102,10 @@ export function matchReleases(db, releases) {
       publisher: (cv && cv.publisher) || r.publisher || null,
       number: r.issue ?? null,
       title: story,
+      type: kind, collected: isCollected(kind),
+      coverdate: dateOnly(r.coverdate),
+      seriesYear: r.seriesyear != null && String(r.seriesyear) !== '' ? String(r.seriesyear) : null,
+      volume: r.volume != null && String(r.volume) !== '' ? String(r.volume) : null,
       shipdate: r.shipdate ?? null,
       owned, isNew,
       followed: s ? !!s.followed : false,

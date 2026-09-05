@@ -19,7 +19,7 @@ import { poolWithResource } from './pool.js';
 import { makeCvClient, cvKey } from './cv.js';
 import { resolveBooks } from './cbl.js';
 import { tagFileFromCv, ensureCvIssueDetail, fetchAllIssueMetadata } from './metatagger.js';
-import { fetchWeeklyReleases, matchReleases } from './releases.js';
+import { fetchWeeklyReleases, matchReleases, shiftWeek, currentWeek } from './releases.js';
 import { startJob, listJobs, clearFinishedJobs, attachJobsDb } from './jobs.js';
 import { createScheduler } from './scheduler.js';
 import { createDownloadMonitor } from './downloadmonitor.js';
@@ -589,13 +589,36 @@ async function checkReleases({ week, year } = {}) {
       const r = matchReleases(db, releases);
       state.releases = { running: false, week: wk, year: yr, checkedAt: new Date().toISOString(), ...r };
       logInfo(`This week's releases: ${r.total} total, ${r.hits} in your collection, ${r.added} new`, 'releases');
+      // What ships next for each tracked series: this week's tracked entries
+      // plus a look at next week (not cached — a future issue must not become
+      // "wanted" before it exists on ComicVine). Only when checking the
+      // current week; browsing history leaves the lookahead alone.
+      const cur = currentWeek();
+      if (!week || (wk === cur.week && yr === cur.year)) {
+        const pick = (list, w, y) => (list || []).filter((x) => x.tracked && x.seriesId)
+          .map((x) => ({ seriesId: x.seriesId, number: x.number, shipdate: x.shipdate, issueId: x.issueId, owned: x.owned, collected: x.collected, week: w, year: y }));
+        let upcoming = pick(r.releases, wk, yr);
+        try {
+          const nw = shiftWeek(wk, yr, 1);
+          const next = await fetchWeeklyReleases(nw);
+          upcoming = upcoming.concat(pick(matchReleases(db, next.releases, { cache: false }).releases, next.week, next.year));
+        } catch (e) { logWarn(`Next week's releases unavailable: ${e?.message || e}`, 'releases'); }
+        state.releasesUpcoming = upcoming;
+      }
       // Release-day heads-up for followed series — once per week (the check
-      // runs twice daily; dedupe on the week key so it doesn't repeat).
+      // runs twice daily; dedupe on the week key so it doesn't repeat). Names
+      // the first few single issues; collections are left out of the count.
       const wkKey = `${yr}-${wk}`;
       if (r.hits > 0 && lastNotifiedReleaseWeek !== wkKey) {
         lastNotifiedReleaseWeek = wkKey;
+        const singles = (r.releases || []).filter((x) => x.tracked && !x.collected);
+        const named = singles.slice(0, 3).map((x) => `${x.series} #${x.number ?? '?'}`);
+        const more = singles.length - named.length;
+        const n = singles.length || r.hits;
         notifyRaw(db, { type: 'release.week', category: 'release', level: 'info',
-          title: 'New releases this week', body: `${r.hits} issue(s) from series you follow ship this week.`, url: '/releases' });
+          title: 'New releases this week',
+          body: `${n} issue${n === 1 ? '' : 's'} from series you follow ship${n === 1 ? 's' : ''} this week${named.length ? ': ' + named.join(', ') + (more > 0 ? ` and ${more} more` : '') : ''}.`,
+          url: '/releases' });
       }
       job.finish({ releases: r.total, inCollection: r.hits, newIssues: r.added });
     } catch (e) { state.releases = { running: false, error: String(e?.message || e), checkedAt: new Date().toISOString() }; job.fail(e); }
