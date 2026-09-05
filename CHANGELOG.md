@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.7.9] — 2026-09-04
+
 ### Added
 
 - **Monitoring policies and per-issue picks.** Every series now has a
