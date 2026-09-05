@@ -2,7 +2,7 @@
 // Writes the image's release attestation (build.json) to stdout.
 // Run by the Dockerfile with the CI signing secret mounted:
 //   RUN --mount=type=secret,id=attest_key node tools/attest.mjs > build.json
-// Without the secret (a fork, a local build) it prints {} — the app then
+// Without the secret (a source or local build) it prints {} — the app then
 // sends no attestation and runs on the metadata service's limited tier.
 import fs from 'node:fs';
 import path from 'node:path';
