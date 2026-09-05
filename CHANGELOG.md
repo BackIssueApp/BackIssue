@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.7.95] — 2026-09-05
+
 ### Added
 
 - **Releases, richer.** Collected editions (trades, hardcovers, omnibuses) are
