@@ -56,7 +56,7 @@ export function decodeAttestation(value) {
   try { return JSON.parse(Buffer.from(String(value), 'base64url').toString('utf8')); } catch { return null; }
 }
 
-// The image's own attestation, read once. Absent (source checkout, fork,
+// The image's own attestation, read once. Absent (a source checkout or a
 // local build) → null, and no header is sent.
 let loaded;
 export function loadAttestation() {
