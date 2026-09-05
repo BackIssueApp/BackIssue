@@ -29,7 +29,7 @@ import { installConsoleCapture, attachLogDb, listLogs, clearLogs, logInfo, logWa
 import { runCvMatch as runCvMatchLib, cacheAndLink, addSeriesFromCv, refreshCvVolume, refreshAllIssueDetails, rankCandidates, rematchMismatched, mergeDuplicateSeries } from './cvmatch.js';
 import { getSeriesById, seriesCollectionDetail, untrackSeries, getCvIssue, upsertSeries, setSeriesPath,
   ensureCvIssueRow, recordGrab, getGrab, setGrabStatus, setIssueStatus, setSeriesAliases, setSeriesType, listLibraries, libraryFolders, createLibrary, assignSeriesLibrary, seriesSearchNames,
-  clearImportCandidates, upsertImportCandidate, listImportCandidates, getImportCandidate, setImportCandidateMatch, setImportCandidateStatus, readyImportCandidates, listWantedIssues, queueIssues, getCvSeries } from './db.js';
+  clearImportCandidates, upsertImportCandidate, listImportCandidates, getImportCandidate, setImportCandidateMatch, setImportCandidateStatus, readyImportCandidates, listWantedIssues, queueIssues, getCvSeries, fulfilPicks } from './db.js';
 import { parseIndexers, searchNewznab } from './newznab.js';
 import { makeNzbClient } from './nzbclients.js';
 import { parseIndexers as parseTorznab, searchTorznab } from './torznab.js';
@@ -157,6 +157,7 @@ const TOOLS = {
   'relink-cv': { label: 'Re-link to ComicVine', desc: 'Re-map owned files to ComicVine issues for every matched comic (fixes owned/missing counts).', run: (op) => relinkAllCv(db, op) },
   'merge-duplicate-series': { label: 'Merge duplicate series', desc: "Fold together series rows that point at the same ComicVine volume (a copy added straight from ComicVine while the folder's own row was matched elsewhere). The folder-backed row is kept; the other's files, wanted issues and follows move over. Any duplicate copies that surface are then cleared with Remove duplicate files.", run: (op) => mergeDuplicateSeries(db, op) },
   'rematch-mismatched': { label: 'Re-check mismatched volumes', desc: "Find series whose files go beyond their ComicVine volume's last issue — the sign a same-name mini or one-shot was matched instead of the real run — and re-match them. A clear winner is applied and its files re-linked; anything unclear is left for Fix match on the series page.", needsCv: true, run: (op) => rematchMismatched(db, cvClient(), op) },
+  'refresh-series': { label: 'Refresh series metadata', desc: 'Re-pull every matched series\u2019 volume details and issue list from the metadata service — picks up publication status (Ongoing / Ended), enrichment for series cached before it was on, and issues published since. One request a second, so a big library takes a while; if the service rate-limits, it stops cleanly and you run it again.', needsCv: true, run: (op) => refreshAllVolumes(op) },
   'fetch-metadata': { label: 'Download issue metadata', desc: 'Fetch ComicVine detail (descriptions, credits, dates, covers) for every issue in your collection that is missing it. Already-cached issues are skipped; if ComicVine rate-limits, it stops cleanly — just run it again to finish.', needsCv: true, run: (op) => fetchAllIssueMetadata(db, cvClient(), op) },
   'rename-files': { label: 'Rename files to pattern', desc: 'Rename every CV-linked file to your file pattern (same folder — no moves) so imported scene-named files match downloaded ones. Collisions are skipped.', run: (op) => renameAllFiles(db, op) },
   'backup-db': { label: 'Back up database', desc: 'Snapshot the catalog database into backups/ next to it (keeps the newest 5). Safe while the app is in use. Restore: stop the app and copy a snapshot over catalog.db.', run: (op) => backupDatabase(db, config.dbPath, op) },
@@ -302,7 +303,7 @@ async function scanSeriesFolder(seriesId) {
   indexFolderForSeries({
     db, dir, seriesId, cvId: series.cv_id,
     onProgress: (p) => { state.scanFolder = { running: true, seriesId, dir, done: p.done, total: p.total }; job.progress({ done: p.done, total: p.total }); },
-  }).then((r) => { state.scanFolder = { running: false, seriesId, dir, error: r?.error || undefined, pruned: r?.pruned }; if (r?.error) { job.fail(new Error(r.error)); } else { logInfo(`Scanned folder for ${series.title || dir}: ${r?.total || 0} file(s)${r?.pruned ? ', ' + r.pruned + ' pruned' : ''}`, 'library'); job.finish({ files: r?.total, pruned: r?.pruned }); } })
+  }).then((r) => { state.scanFolder = { running: false, seriesId, dir, error: r?.error || undefined, pruned: r?.pruned }; settlePicks(seriesId); if (r?.error) { job.fail(new Error(r.error)); } else { logInfo(`Scanned folder for ${series.title || dir}: ${r?.total || 0} file(s)${r?.pruned ? ', ' + r.pruned + ' pruned' : ''}`, 'library'); job.finish({ files: r?.total, pruned: r?.pruned }); } })
     .catch((e) => { state.scanFolder = { running: false, seriesId, dir, error: String(e?.message || e) }; job.fail(e); });
   return { started: true, dir };
 }
@@ -764,6 +765,45 @@ async function usenetGrab({ seriesId, cvIssueId, number, name, nzbUrl, releaseTi
   }
 }
 
+// A picked issue that has landed on disk: tell whoever asked for it (a
+// targeted notification — only they see it), then the pick retires. Runs
+// after anything that can put a file on disk; the nightly backfill sweeps
+// the whole library as a catch-all.
+function settlePicks(seriesId = null) {
+  let done;
+  try { done = fulfilPicks(db, seriesId); } catch (e) { logWarn(`could not settle picks: ${e?.message || e}`, 'download'); return; }
+  for (const p of done) {
+    if (p.by_user == null) continue;
+    notifyRaw(db, {
+      type: 'pick.arrived', category: 'import', level: 'success',
+      title: 'An issue you asked for is here',
+      body: `${p.series_title || 'Series'} #${p.issue_number ?? '?'}${p.name ? ' — ' + p.name : ''}`,
+      url: `/volume/${p.series_id}`, userId: p.by_user, seriesId: p.series_id,
+    });
+  }
+}
+
+// Every matched series' volume metadata + issue list, re-pulled one request
+// at a time — picks up publication status (Ongoing/Ended) and enrichment for
+// series cached before it was on, and any issues published since. Stops
+// cleanly on a rate limit; rerun to finish.
+async function refreshAllVolumes(op) {
+  const client = cvClient();
+  const ids = db.prepare('SELECT id FROM series WHERE cv_id IS NOT NULL ORDER BY id').all().map((r) => r.id);
+  let done = 0, updated = 0, failed = 0, stopped = 0;
+  for (const id of ids) {
+    try { const r = await refreshCvVolume(db, client, id); if (r?.ok) updated++; else failed++; }
+    catch (e) {
+      failed++;
+      if (/429|rate.?limit|too many/i.test(String(e?.message || e))) { logWarn('Refresh series metadata: rate limited — stopping; run it again later to finish', 'tools'); stopped = ids.length - done - 1; break; }
+    }
+    op({ done: ++done, total: ids.length });
+    await new Promise((r) => setTimeout(r, 900)); // stay polite to the metadata service
+  }
+  settlePicks();
+  return { checked: done, updated, failed, remaining: stopped };
+}
+
 // Scheduled backfill: queue the next batch of wanted issues (each series'
 // monitoring policy plus its per-issue picks — the wanted_issues view) for
 // download. Skips anything already moving or previously failed (use Retry
@@ -771,6 +811,7 @@ async function usenetGrab({ seriesId, cvIssueId, number, name, nzbUrl, releaseTi
 // the indexers.
 async function runWantedSearch() {
   const job = startJob('wanted-search', 'Search wanted issues');
+  settlePicks(); // anything that arrived by other means (scans, packs) retires its pick
   const batch = Math.max(1, Number(config.wantedSearchBatch) || 25);
   const { items, total } = listWantedIssues(db, { hideUnreleased: true, limit: 500 });
   const ids = [];
@@ -1032,6 +1073,7 @@ function grabSourcePack({ source, seriesId, result } = {}) {
       setGrabStatus(db, grabId, 'imported', { importedAt: new Date().toISOString() });
       logInfo(`${source} pack imported: ${summary.imported} new · ${summary.skipped} already owned · ${summary.unmatched} unmatched · ${summary.failed} failed — ${result.title}`, source);
       notifyRaw(db, { type: 'pack.done', category: 'import', level: summary.failed ? 'warn' : 'success', title: 'Pack imported', body: `${result.title} — ${summary.imported} new issue(s)`, seriesId: sid ?? null });
+      settlePicks(sid ?? null);
     } catch (e) {
       setGrabStatus(db, grabId, 'failed', { error: String(e?.message || e) });
       job.fail(e);
@@ -1186,7 +1228,7 @@ async function runDownloads() {
       }
       if (p.event === 'tag-result') recordProgressTagLog(p);
       if (p.event === 'failed') logError(`Download failed: ${p.issue?.title || 'issue ' + p.issue?.id} — ${p.error}`, 'download');
-      else if (p.event === 'done') logInfo(`Downloaded: ${p.issue?.title || 'issue ' + p.issue?.id}${p.source ? ' (' + p.source + ')' : ''}`, 'download');
+      else if (p.event === 'done') { logInfo(`Downloaded: ${p.issue?.title || 'issue ' + p.issue?.id}${p.source ? ' (' + p.source + ')' : ''}`, 'download'); settlePicks(p.issue?.series_id ?? null); }
       else if (p.event === 'grabbed') logInfo(`Grabbed via ${p.source || 'usenet'}: ${p.issue?.title || 'issue ' + p.issue?.id}`, 'download');
     },
   });
@@ -1327,7 +1369,7 @@ const downloadMonitor = createDownloadMonitor({
   db,
   onProgress: (p) => {
     if (p.event === 'tag-result') recordProgressTagLog(p);
-    if (p.event === 'done') { logInfo(`Imported from ${p.source || 'download'}: ${p.issue?.title || 'issue ' + p.issue?.id}`, p.source || 'usenet'); notifyRaw(db, { type: 'import.done', category: 'import', level: 'success', title: 'Downloaded', body: `${p.issue?.title || 'issue'}${p.source ? ' · ' + p.source : ''}`, seriesId: p.issue?.series_id ?? null }); }
+    if (p.event === 'done') { logInfo(`Imported from ${p.source || 'download'}: ${p.issue?.title || 'issue ' + p.issue?.id}`, p.source || 'usenet'); notifyRaw(db, { type: 'import.done', category: 'import', level: 'success', title: 'Downloaded', body: `${p.issue?.title || 'issue'}${p.source ? ' · ' + p.source : ''}`, seriesId: p.issue?.series_id ?? null }); settlePicks(p.issue?.series_id ?? null); }
     if (p.event === 'failed') { logError(`${p.source || 'download'} import failed: ${p.issue?.title || 'issue ' + p.issue?.id} — ${p.error}`, p.source || 'usenet'); notifyRaw(db, { type: 'import.failed', category: 'failure', level: 'error', title: 'Download failed', body: `${p.issue?.title || 'issue'} — ${p.error}`, seriesId: p.issue?.series_id ?? null }); }
     if (p.event === 'pack-start') logInfo(`Post-processing pack — ${p.title}…`, p.source || 'torrent');
     if (p.event === 'pack-import') {

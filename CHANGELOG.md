@@ -31,6 +31,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   series** decides what a series gets when it enters the library (added by
   hand, Discover, Releases, reading lists, requests, import): All issues,
   New issues only, or Off. Download on add queues what that policy wants.
+- **You're told when a picked issue lands.** Whoever picked an issue (by
+  hand, from a list, or through an approved request) gets a notification when
+  it arrives, and the pick retires. Picks whose issue turned up by other means
+  (a scan, a pack) are swept up by the nightly wanted search.
+- **Ongoing / Ended filters** in the Library, from enriched publication
+  status, with the status shown on list rows; and **System → Tools → Refresh
+  series metadata**, which re-pulls every matched series (one request a
+  second, stops cleanly on a rate limit) so older series get that status,
+  enrichment and any issues published since.
 - **Want a whole reading list.** *Want all* on a list makes every issue on it
   wanted: series already in the library get the issues picked, series that
   aren't are added with monitoring off and just those issues picked.

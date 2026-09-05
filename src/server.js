@@ -1345,7 +1345,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
 
   // Filter-chip keys — the badges are independent of the active filter, so
   // switching chips never changes them.
-  const COLLECTION_CHIP_KEYS = ['all', 'incomplete', 'followed', 'monitored', 'unmonitored', 'problems', 'unmatched', 'manga'];
+  const COLLECTION_CHIP_KEYS = ['all', 'incomplete', 'followed', 'monitored', 'unmonitored', 'ongoing', 'ended', 'problems', 'unmatched', 'manga'];
   // Chip counts run OFF the main thread (worker + its own read-only WAL
   // connection) behind a short TTL cache. better-sqlite3 is synchronous, and
   // this is the app's heaviest read: inline it froze the event loop ~0.5-1s at

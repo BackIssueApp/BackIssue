@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   openDb, upsertSeries, setSeriesCv, setFollowed, setMonitor, setIssueWants, clearIssuePicks, wantStates, wantedCounts,
   upsertCvSeries, upsertCvIssue, upsertLibraryFile, linkFileCvIssue, ensureCvIssueRow, setIssueStatus, listWantedIssues,
-  getSeriesById, seriesCollectionDetail, mergeSeriesRows, createCvSeries, untrackSeries, clearSeriesCv,
+  getSeriesById, seriesCollectionDetail, mergeSeriesRows, createCvSeries, untrackSeries, clearSeriesCv, fulfilPicks,
 } from '../src/db.js';
 import { createApp } from '../src/server.js';
 
@@ -298,4 +298,32 @@ test('the wanted view only walks monitored or picked series (index-able gate)', 
   assert.match(plan, /MULTI-INDEX OR/);
   assert.match(plan, /idx_series_monitor/);
   assert.doesNotMatch(plan, /SCAN series(?! USING)/, 'no full scan of series');
+});
+
+test('a pick is fulfilled when its issue lands: reported once with who asked, then retired', () => {
+  const { db, saga, xm } = seed();
+  setIssueWants(db, xm, [101], true, { reason: 'request:9', userId: 7 });   // wanted by user 7
+  setIssueWants(db, saga, [3], false);                                       // a skip
+  assert.deepEqual(fulfilPicks(db), [], 'nothing on disk yet');
+  // X-Men #1 arrives, Saga #3 too.
+  upsertLibraryFile(db, { path: '/x1.cbz', dir: '/', name: 'x1.cbz', size: 1, mtime: 1, valid: 1, series_id: xm });
+  linkFileCvIssue(db, '/x1.cbz', 101);
+  upsertLibraryFile(db, { path: '/s3.cbz', dir: '/', name: 's3.cbz', size: 1, mtime: 1, valid: 1, series_id: saga });
+  linkFileCvIssue(db, '/s3.cbz', 3);
+  const done = fulfilPicks(db, xm);
+  assert.equal(done.length, 1);
+  assert.equal(done[0].by_user, 7);
+  assert.equal(done[0].reason, 'request:9');
+  assert.equal(done[0].series_title, 'X-Men');
+  assert.equal(done[0].issue_number, '1');
+  // Retired: a second pass reports nothing; the skip on Saga is swept by the library-wide pass (silently — not a want).
+  assert.deepEqual(fulfilPicks(db, xm), []);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM issue_picks').get().n, 1);
+  assert.deepEqual(fulfilPicks(db), []);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM issue_picks').get().n, 0);
+  // Detail never counted a pick on an owned issue anyway.
+  setIssueWants(db, saga, [2], false);
+  upsertLibraryFile(db, { path: '/s2.cbz', dir: '/', name: 's2.cbz', size: 1, mtime: 1, valid: 1, series_id: saga });
+  linkFileCvIssue(db, '/s2.cbz', 2);
+  assert.deepEqual(seriesCollectionDetail(db, saga).picks, { want: 0, skip: 0 });
 });

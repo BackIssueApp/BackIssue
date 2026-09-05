@@ -21,6 +21,8 @@
     { key: 'followed', label: 'Followed' },
     { key: 'monitored', label: 'Monitored' },
     { key: 'unmonitored', label: 'Not monitored' },
+    { key: 'ongoing', label: 'Ongoing' },
+    { key: 'ended', label: 'Ended' },
     { key: 'problems', label: 'Problems' },
     { key: 'unmatched', label: 'Unmatched' },
   ];
@@ -445,6 +447,7 @@
                   {:else if s.on_demand}<span class="libx-badge libx-badge--avail"><Icon name="download" size={12} /> {fmt(s.available)} available</span>
                   {:else if s.total > 0}<span class="libx-badge libx-badge--ok">complete</span>{/if}
                   {#if s.untagged > 0}<span class="libx-badge libx-badge--plain">{fmt(s.untagged)} untagged</span>{/if}
+                  {#if s.pub_status && s.pub_status !== 'Ongoing'}<span class="libx-badge libx-badge--plain" title="Publication status (from enriched metadata)">{s.pub_status.toLowerCase()}</span>{/if}
                   {#if s.monitor === 'new'}<span class="libx-badge libx-badge--plain" title="Only issues from this number onward are wanted">new from #{s.monitor_from ?? '?'}</span>
                   {:else if s.monitor === 'none' && s.missing > 0}<span class="libx-badge libx-badge--plain" title="Nothing is fetched automatically for this series">not monitored</span>{/if}
                   {#if s.corrupt > 0}<span class="libx-badge libx-badge--warn">{fmt(s.corrupt)} corrupt</span>{/if}

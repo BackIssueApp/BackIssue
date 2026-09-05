@@ -968,7 +968,7 @@ const COLL_JOINS = `
 // (file_dir, cv_latest) live here, so this select is only ever run for a bounded
 // set of ids (a page), never the whole 150k membership set.
 function collFullCols(guard) {
-  return `SELECT s.id, s.title, s.publisher, s.year, s.cover_url, s.followed, s.monitor, s.monitor_from, s.cv_id, s.cv_locked, s.url, s.restricted, s.type,
+  return `SELECT s.id, s.title, s.publisher, s.year, s.cover_url, s.followed, s.monitor, s.monitor_from, s.cv_id, s.cv_locked, s.url, s.restricted, s.type, cv.metron_status pub_status,
       (mf.series_id IS NOT NULL) my_follow,
       cv.name cv_name, cv.publisher cv_publisher, cv.start_year cv_year, cv.image_url cv_image,
       CASE WHEN ${guard} THEN COALESCE(iss.bc_total, 0) ELSE 0 END bc_total,
@@ -993,7 +993,7 @@ function collFullCols(guard) {
 // and corrupt, are gated to the handful of series that can be non-trivial), so it
 // drives id-selection (for a page) and the fused chip counts.
 function collLeanCols(guard) {
-  return `SELECT s.id, s.title, s.type, s.cv_id, s.followed, s.monitor, s.year,
+  return `SELECT s.id, s.title, s.type, s.cv_id, s.followed, s.monitor, s.year, cv.metron_status pub_status,
       (mf.series_id IS NOT NULL) my_follow,
       CASE WHEN ${guard} THEN 0 ELSE COALESCE(lf.untagged, 0) END untagged,
       CASE WHEN COALESCE(lf.invalid_count, 0) = 0 THEN 0 ELSE
@@ -1048,6 +1048,8 @@ function chipPredicateSql(filter, { guardOuter, seriesTypeList, params }) {
   if (filter === 'followed') return 'my_follow = 1';                                 // per-user star
   if (filter === 'monitored') return 'COALESCE(followed,0) = 1';                     // monitor != none (followed is kept in sync)
   if (filter === 'unmonitored') return 'COALESCE(followed,0) = 0';                   // !monitored
+  if (filter === 'ongoing') return "pub_status = 'Ongoing'";                        // publication status (enriched metadata)
+  if (filter === 'ended') return "pub_status IN ('Completed','Cancelled')";
   if (filter === 'problems') return 'untagged > 0 OR corrupt > 0';
   if (filter === 'unmatched') return `cv_id IS NULL AND COALESCE(${guardOuter},0) = 0`; // !matched
   if (filter === 'comics') return `${effType} NOT IN (${seriesTypeList}) OR ${effType} = 'comic'`;
@@ -1126,7 +1128,7 @@ function mapCollectionRow(r) {
       const owned = r.bc_owned;
       const available = Math.max(0, r.bc_total - owned);
       return {
-        id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, monitor: r.monitor || (r.followed ? 'all' : 'none'), monitor_from: r.monitor_from ?? null, cv_id: null, cv_locked: 0, sourced: false, matched: true, source: 'local',
+        id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, monitor: r.monitor || (r.followed ? 'all' : 'none'), monitor_from: r.monitor_from ?? null, pub_status: r.pub_status || null, cv_id: null, cv_locked: 0, sourced: false, matched: true, source: 'local',
         title: r.title, publisher: r.publisher, year: r.year, cover_url: r.cover_url, restricted: !!r.restricted, type: r.type,
         folder: dirBaseName(r.file_dir), files: r.file_count,
         total: r.bc_total, owned, missing: 0, available, on_demand: available > 0, untagged: 0, corrupt: r.corrupt,
@@ -1134,7 +1136,7 @@ function mapCollectionRow(r) {
       };
     }
     return {
-      id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, monitor: r.monitor || (r.followed ? 'all' : 'none'), monitor_from: r.monitor_from ?? null, cv_id: null, cv_locked: 0, sourced, matched: false, source: 'unmatched',
+      id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, monitor: r.monitor || (r.followed ? 'all' : 'none'), monitor_from: r.monitor_from ?? null, pub_status: r.pub_status || null, cv_id: null, cv_locked: 0, sourced, matched: false, source: 'unmatched',
       title: null, publisher: null, year: null, cover_url: null, restricted: !!r.restricted, type: r.type || 'comic',
       folder: dirBaseName(r.file_dir), files: r.file_count,
       total: 0, owned: 0, missing: 0, available: 0, on_demand: false, untagged: r.untagged, corrupt: r.corrupt,
@@ -1144,7 +1146,7 @@ function mapCollectionRow(r) {
   const total = r.cv_total;
   const owned = Math.min(r.cv_owned, r.cv_total);
   return {
-    id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, monitor: r.monitor || (r.followed ? 'all' : 'none'), monitor_from: r.monitor_from ?? null, cv_id: r.cv_id, cv_locked: r.cv_locked, sourced, matched: true, source: 'cv',
+    id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, monitor: r.monitor || (r.followed ? 'all' : 'none'), monitor_from: r.monitor_from ?? null, pub_status: r.pub_status || null, cv_id: r.cv_id, cv_locked: r.cv_locked, sourced, matched: true, source: 'cv',
     title: r.cv_name || r.title, publisher: r.cv_publisher || null, year: r.cv_year || null, cover_url: r.cv_image || null,
     cv_name: r.cv_name, cv_year: r.cv_year, restricted: !!r.restricted, type: r.type || 'comic',
     total, owned, missing: Math.max(0, total - owned), available: 0, on_demand: false, untagged: r.untagged, corrupt: r.corrupt,
@@ -1295,6 +1297,8 @@ export function seriesMatchesFilter(r, filter) {
     : filter === 'followed' ? !!r.followed
     : filter === 'monitored' ? !!r.monitored
     : filter === 'unmonitored' ? !r.monitored
+    : filter === 'ongoing' ? r.pub_status === 'Ongoing'
+    : filter === 'ended' ? ['Completed', 'Cancelled'].includes(r.pub_status)
     : filter === 'problems' ? (r.untagged > 0 || r.corrupt > 0)
     // Self-described rows are matched by construction — never "unmatched".
     : filter === 'unmatched' ? !r.matched
@@ -1388,7 +1392,7 @@ export function seriesCollectionDetail(db, id, userId = null) {
     const wantedBy = new Map(db.prepare('SELECT cv_issue_id, why, reason FROM wanted_issues WHERE series_id=?').all(id).map((r) => [r.cv_issue_id, r]));
     const pickBy = new Map(db.prepare('SELECT cv_issue_id, want, reason FROM issue_picks WHERE series_id=?').all(id).map((r) => [r.cv_issue_id, r]));
     const picks = { want: 0, skip: 0 };
-    for (const p of pickBy.values()) { if (p.want) picks.want++; else picks.skip++; }
+    for (const [cvid, p] of pickBy) { if (validCvIds.has(cvid)) continue; if (p.want) picks.want++; else picks.skip++; }
     const issues = cvIssues.map((ci) => {
       const fs = filesByCv.get(ci.comicvine_id) || [];
       const bc = bcByNum.get(normalizeNumber(ci.issue_number)); // an in-flight/queued row, if any
@@ -1976,6 +1980,23 @@ export function setIssueWants(db, seriesId, cvIssueIds, want, { reason = 'manual
     parkUnwanted(db, seriesId);
   })();
   return { changed };
+}
+
+// Picks whose issue is now on disk are fulfilled: return the "want" ones (so
+// whoever asked can be told) and drop them all — an owned issue needs no
+// exception, and a stale row would show as a phantom pick on the series.
+// `seriesId` null = the whole library (the nightly sweep).
+export function fulfilPicks(db, seriesId = null) {
+  const rows = db.prepare(`SELECT p.cv_issue_id, p.series_id, p.want, p.reason, p.by_user, ci.issue_number, ci.name,
+      COALESCE(cv.name, s.title) series_title
+    FROM issue_picks p
+    JOIN series s ON s.id = p.series_id
+    LEFT JOIN cv_issues ci ON ci.comicvine_id = p.cv_issue_id
+    LEFT JOIN cv_series cv ON cv.comicvine_id = s.cv_id
+    WHERE ${seriesId != null ? 'p.series_id = ? AND ' : ''}EXISTS (SELECT 1 FROM library_files lf WHERE lf.cv_issue_id = p.cv_issue_id AND lf.valid = 1)`)
+    .all(...(seriesId != null ? [seriesId] : []));
+  if (rows.length) db.prepare('DELETE FROM issue_picks WHERE cv_issue_id IN (SELECT value FROM json_each(?))').run(JSON.stringify(rows.map((r) => r.cv_issue_id)));
+  return rows.filter((r) => r.want === 1);
 }
 
 export function clearIssuePicks(db, seriesId) {
