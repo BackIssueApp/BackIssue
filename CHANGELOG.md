@@ -8,6 +8,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Collected editions never auto-downloaded.** Automatic search for a trade,
+  hardcover or omnibus appended an issue-style number ("Series TPB 001") that
+  no release carries, so it always came up empty while a manual search found it.
+  Collections are now searched by name (plus "v02"-style for later volumes) and
+  a numberless release is accepted for the first volume. Regular runs are
+  unchanged.
+
 ### Changed
 
 - Official images now carry a signed release attestation that the hosted

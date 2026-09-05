@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { orderedSources, allSources } from '../src/sources/index.js';
 import { pluginApi } from '../src/plugins.js';
-import { matchesIssue, buildQuery, parseReleaseName, normalizeSeries, scoreRelease, importCompleted, suspiciouslySmall } from '../src/sources/usenet.js';
+import { matchesIssue, buildQuery, parseReleaseName, normalizeSeries, scoreRelease, importCompleted, suspiciouslySmall, autoQueries, autoTarget } from '../src/sources/usenet.js';
+import { isCollectedSeries, stripEditionSuffix, collectedQueries } from '../src/editions.js';
 import { openDb, upsertSeries, ensureCvIssueRow } from '../src/db.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -240,4 +241,40 @@ test('release matching understands manga chapter/volume tokens', () => {
   assert.equal(matchesIssue('Saga V (2020)', 'Saga', '5'), false);
   assert.equal(matchesIssue('Invincible 012 (2004)', 'Invincible', '12'), true);
   assert.equal(matchesIssue('Invincible 012 (2004)', 'Invincible', '1'), false);
+});
+
+test('collected editions: automatic search drops the issue number and accepts numberless releases', () => {
+  // Detected from the metadata service's series type, or from the name.
+  assert.equal(isCollectedSeries({ kind: 'Trade Paperback' }), true);
+  assert.equal(isCollectedSeries({ kind: 'Single Issue', title: 'Batman' }), false);
+  assert.equal(isCollectedSeries({ title: 'Batman Secret Files TPB' }), true);
+  assert.equal(isCollectedSeries({ title: 'Saga', names: ['Saga', 'Saga Compendium'] }), true);
+  assert.equal(isCollectedSeries({ title: 'Absolute Batman' }), false, 'a series name, not an edition');
+  assert.equal(stripEditionSuffix('Batman Secret Files TPB'), 'Batman Secret Files');
+  assert.equal(stripEditionSuffix('Saga Compendium'), 'Saga');
+  assert.equal(stripEditionSuffix('Batman'), 'Batman');
+  // Queries: bare name for #1, plus a v02 form for later volumes.
+  assert.deepEqual(collectedQueries('Batman Secret Files TPB', { issue_number: '1' }), ['Batman Secret Files TPB']);
+  assert.deepEqual(collectedQueries('Batman Secret Files TPB', { issue_number: '2' }), ['Batman Secret Files TPB', 'Batman Secret Files TPB v02']);
+  const tpb = { seriesTitle: 'Batman Secret Files', seriesNames: ['Batman Secret Files'], cv: { metron_series_type: 'Trade Paperback' }, issue: { issue_number: '1' } };
+  assert.deepEqual(autoQueries('Batman Secret Files', tpb), ['Batman Secret Files']);
+  const single = { seriesTitle: 'Batman', seriesNames: ['Batman'], cv: { metron_series_type: 'Single Issue' }, issue: { issue_number: '1' } };
+  assert.deepEqual(autoQueries('Batman', single), ['Batman 001'], 'regular runs are unchanged');
+  const manga = { seriesTitle: 'Naruto', seriesNames: ['Naruto'], series: { type: 'manga' }, issue: { issue_number: '7' } };
+  assert.deepEqual(autoQueries('Naruto', manga), ['Naruto 007', 'Naruto c007']);
+  // Matching: a collection's release may lack the number and carry the edition word.
+  const t1 = autoTarget(tpb, ['Batman Secret Files']);
+  assert.equal(t1.collected, true);
+  assert.notEqual(scoreRelease('Batman Secret Files TPB (2024) (Digital) (Zone-Empire)', t1), null, 'numberless = volume 1');
+  assert.notEqual(scoreRelease('Batman Secret Files (2024) (Digital)', t1), null);
+  assert.equal(scoreRelease('Batman Secret Files TPB 001 (2024)', t1) != null, true, 'a numbered post still matches');
+  const t2 = autoTarget({ ...tpb, issue: { issue_number: '2' } }, ['Batman Secret Files']);
+  assert.equal(scoreRelease('Batman Secret Files TPB (2024)', t2), null, 'a numberless post is not volume 2');
+  assert.notEqual(scoreRelease('Batman Secret Files TPB v02 (2025)', t2), null);
+  assert.notEqual(scoreRelease('Batman Secret Files Vol 2 (2025)', t2), null);
+  // Regular runs keep the strict rule: no number, no match.
+  const ts = autoTarget(single, ['Batman']);
+  assert.equal(ts.collected, false);
+  assert.equal(scoreRelease('Batman (2016) (Digital)', ts), null);
+  assert.equal(scoreRelease('Batman TPB (2016)', ts), null, 'a trade is not issue #1 of the run');
 });

@@ -6,7 +6,7 @@
 import { parseIndexers, searchTorznab } from '../torznab.js';
 import { resolveIndexers, indexersManaged } from '../indexerproviders.js';
 import { makeTorrentClient, torrentClientHost } from '../torrentclients.js';
-import { scoreRelease, issueToken, suspiciouslySmall, manualQueries, manualTarget } from './usenet.js';
+import { scoreRelease, issueToken, suspiciouslySmall, manualQueries, manualTarget, autoQueries, autoTarget } from './usenet.js';
 
 export const torrent = {
   id: 'torrent',
@@ -24,18 +24,19 @@ export const torrent = {
     if (!indexers.length) return null;
     // Search under every known name for this volume (title + CV/user aliases).
     const names = (ctx.seriesNames && ctx.seriesNames.length) ? ctx.seriesNames : [ctx.seriesTitle];
-    const token = issueToken(ctx.issue);
     const byUrl = new Map();
     for (const name of names) {
-      const query = [name, token].filter(Boolean).join(' ').trim();
-      if (!query) continue;
-      // No category filter: torrent trackers categorize comics inconsistently (many
-      // don't tag them 7030 at all), and our strict series+issue matcher is the real
-      // filter — so search broadly and let scoreRelease reject the noise.
-      const results = await searchTorznab(indexers, query, { cat: '' });
-      for (const r of results) if (r.downloadUrl && !byUrl.has(r.downloadUrl)) byUrl.set(r.downloadUrl, r);
+      // Same query forms as usenet: padded number for a run, bare name (+ "v02")
+      // for a collected edition.
+      for (const query of autoQueries(name, ctx)) {
+        // No category filter: torrent trackers categorize comics inconsistently (many
+        // don't tag them 7030 at all), and our strict series+issue matcher is the real
+        // filter — so search broadly and let scoreRelease reject the noise.
+        const results = await searchTorznab(indexers, query, { cat: '' });
+        for (const r of results) if (r.downloadUrl && !byUrl.has(r.downloadUrl)) byUrl.set(r.downloadUrl, r);
+      }
     }
-    const target = { series: ctx.seriesTitle, names, number: ctx.issue?.issue_number, year: ctx.seriesYear };
+    const target = autoTarget(ctx, names);
     // Keep only true matches (series matches any alias + number) that aren't
     // suspiciously small — public trackers carry tiny fake/malware "comics" with
     // inflated seeders, which would otherwise win the seeder sort. Rank by year

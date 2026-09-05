@@ -1,3 +1,4 @@
+import { isCollectedSeries, stripEditionSuffix, collectedQueries } from '../editions.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import JSZip from 'jszip';
@@ -85,11 +86,18 @@ export function scoreRelease(title, target) {
   // match on the normalized name is what stops "Spider-Man" grabbing "Amazing
   // Spider-Man …".
   const accepted = (target.names && target.names.length ? target.names : [target.series]).map(normalizeSeries).filter(Boolean);
-  if (!accepted.includes(normalizeSeries(p.series))) return null;
+  // A collection's release may carry the edition word the volume name lacks
+  // ("Batman Secret Files TPB" for the volume "Batman Secret Files").
+  const relSeries = normalizeSeries(p.series);
+  const relBare = target.collected ? normalizeSeries(stripEditionSuffix(p.series)) : relSeries;
+  if (!accepted.includes(relSeries) && !accepted.includes(relBare)) return null;
   // Normalize both sides so ½ / 1/2 / 0.5 / 000.5 all compare equal.
   const wantNum = normalizeNumber(target.number);
   if (wantNum !== '') {
-    if (p.number == null || normalizeNumber(p.number) !== wantNum) return null;
+    if (p.number == null) {
+      // A collection posted without a number is its first (or only) volume.
+      if (!(target.collected && wantNum === '1')) return null;
+    } else if (normalizeNumber(p.number) !== wantNum) return null;
   }
   let score = 100;
   const wantYear = String(target.year ?? '').match(/\d{4}/);
@@ -116,6 +124,29 @@ export function suspiciouslySmall(size) {
 // a literal token (releases name it "-1", not "-001"), so it keeps its sign and
 // isn't padded — without it the query would fall back to the bare series name
 // and never surface the issue.
+/** Queries for an automatic search of one issue under one series name: the
+ *  padded-number form for a regular run; for a collected edition the bare name
+ *  (plus "v02"-style for later volumes) — collections are never posted as
+ *  "Series TPB 001". Manga adds the chapter form. */
+export function autoQueries(name, ctx) {
+  if (isCollectedSeries({ kind: ctx.cv?.metron_series_type, title: ctx.seriesTitle, names: ctx.seriesNames })) {
+    return collectedQueries(name, ctx.issue, normalizeNumber);
+  }
+  const token = issueToken(ctx.issue);
+  const out = [[name, token].filter(Boolean).join(' ').trim()];
+  if (ctx.series?.type === 'manga' && token) out.push(`${name} c${token}`);
+  return out.filter(Boolean);
+}
+
+/** The scoring target for an automatic search — flags collections so the
+ *  matcher accepts release names without an issue number. */
+export function autoTarget(ctx, names) {
+  return {
+    series: ctx.seriesTitle, names, number: ctx.issue?.issue_number, year: ctx.seriesYear,
+    collected: isCollectedSeries({ kind: ctx.cv?.metron_series_type, title: ctx.seriesTitle, names }),
+  };
+}
+
 export function issueToken(issue) {
   const norm = normalizeNumber(issue?.issue_number);
   if (/^\d+$/.test(norm)) return norm.padStart(3, '0');
@@ -243,20 +274,18 @@ export const usenet = {
     // Search under every known name for this volume (title + CV/user aliases), so
     // an indexer that lists it as "2000AD" is found even though CV says "2000 AD".
     const names = (ctx.seriesNames && ctx.seriesNames.length) ? ctx.seriesNames : [ctx.seriesTitle];
-    const token = issueToken(ctx.issue);
     const byUrl = new Map();
     for (const name of names) {
-      const queries = [[name, token].filter(Boolean).join(' ').trim()];
-      // Manga releases usually carry a chapter marker ("c1044"), which a plain
-      // number query won't text-match on most indexers — search that form too.
-      if (ctx.series?.type === 'manga' && token) queries.push(`${name} c${token}`);
+      // Regular run: "<name> 001" (+ "c001" for manga); collected edition: the
+      // bare name (+ "v02" for a later volume) — see autoQueries.
+      const queries = autoQueries(name, ctx);
       for (const query of queries) {
         if (!query) continue;
         const results = await searchNewznab(indexers, query, {});
         for (const r of results) if (r.nzbUrl && !byUrl.has(r.nzbUrl)) byUrl.set(r.nzbUrl, r);
       }
     }
-    const target = { series: ctx.seriesTitle, names, number: ctx.issue?.issue_number, year: ctx.seriesYear };
+    const target = autoTarget(ctx, names);
     // Drop releases that previously failed to download — a broken post is very
     // likely to fail again on retry, so skip it and let the next-best win.
     // Best-effort: if the blacklist can't load, search unfiltered rather than fail.
