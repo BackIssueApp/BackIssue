@@ -15,7 +15,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   no release carries, so it always came up empty while a manual search found it.
   Collections are now searched by name (plus "v02"-style for later volumes) and
   a numberless release is accepted for the first volume. Regular runs are
-  unchanged.
+  unchanged. Manual search, and download sources that build on the shared
+  search helpers, follow the same rules.
 
 ### Changed
 

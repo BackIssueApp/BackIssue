@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { orderedSources, allSources } from '../src/sources/index.js';
 import { pluginApi } from '../src/plugins.js';
-import { matchesIssue, buildQuery, parseReleaseName, normalizeSeries, scoreRelease, importCompleted, suspiciouslySmall, autoQueries, autoTarget } from '../src/sources/usenet.js';
+import { matchesIssue, buildQuery, parseReleaseName, normalizeSeries, scoreRelease, importCompleted, suspiciouslySmall, autoQueries, autoTarget, manualQueries, manualTarget } from '../src/sources/usenet.js';
 import { isCollectedSeries, stripEditionSuffix, collectedQueries } from '../src/editions.js';
 import { openDb, upsertSeries, ensureCvIssueRow } from '../src/db.js';
 import fs from 'node:fs';
@@ -277,4 +277,17 @@ test('collected editions: automatic search drops the issue number and accepts nu
   assert.equal(ts.collected, false);
   assert.equal(scoreRelease('Batman (2016) (Digital)', ts), null);
   assert.equal(scoreRelease('Batman TPB (2016)', ts), null, 'a trade is not issue #1 of the run');
+});
+
+test('manual search and the AirDC++-style sources share the collected-edition rules', () => {
+  const tpb = { seriesTitle: 'Batman Secret Files', seriesNames: ['Batman Secret Files'], cv: { metron_series_type: 'Trade Paperback' }, issue: { issue_number: '1' }, seriesYear: '2024' };
+  assert.deepEqual(manualQueries(tpb), ['Batman Secret Files'], 'no "001" for a trade');
+  assert.deepEqual(manualQueries({ ...tpb, issue: { issue_number: '2' } }), ['Batman Secret Files', 'Batman Secret Files v02']);
+  assert.deepEqual(manualQueries({ ...tpb, query: ' my own words ' }), ['my own words'], 'free text wins');
+  const t = manualTarget(tpb);
+  assert.equal(t.collected, true);
+  assert.notEqual(scoreRelease('Batman Secret Files TPB (2024) (Digital).cbz', t), null, 'a numberless file is volume 1');
+  const single = { seriesTitle: 'Batman', seriesNames: ['Batman', 'Batman (2016)'], cv: { metron_series_type: 'Single Issue' }, issue: { issue_number: '7' } };
+  assert.deepEqual(manualQueries(single), ['Batman 007', 'Batman (2016) 007'], 'runs unchanged');
+  assert.equal(manualTarget(single).collected, false);
 });

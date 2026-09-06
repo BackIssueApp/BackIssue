@@ -162,18 +162,18 @@ export function buildQuery(ctx) {
 // + volume year). Used to rank/label results across every source.
 export function manualTarget(ctx) {
   const names = (ctx.seriesNames && ctx.seriesNames.length) ? ctx.seriesNames : [ctx.seriesTitle].filter(Boolean);
-  return { series: ctx.seriesTitle, names, number: ctx.issue?.issue_number, year: ctx.seriesYear };
+  return autoTarget(ctx, names); // a collected edition is flagged here too, so a numberless result can match
 }
 
 // Search queries for a manual search: the user's free-text query verbatim if
-// given, otherwise "<name> <padded-token>" for each known volume name. Sources
+// given, otherwise the automatic queries for each known volume name ("<name>
+// <padded-token>" for a run, the bare name for a collected edition). Sources
 // whose site uses a different number form build their own.
 export function manualQueries(ctx) {
   const q = String(ctx.query || '').trim();
   if (q) return [q];
   const names = (ctx.seriesNames && ctx.seriesNames.length) ? ctx.seriesNames : [ctx.seriesTitle].filter(Boolean);
-  const token = issueToken(ctx.issue);
-  return names.map((n) => [n, token].filter(Boolean).join(' ').trim()).filter(Boolean);
+  return [...new Set(names.flatMap((n) => autoQueries(n, ctx)))].filter(Boolean);
 }
 
 // Recursively list every file under a directory (the client may extract into
