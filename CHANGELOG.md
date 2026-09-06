@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-09-05
+
 ### Fixed
 
 - **The Add button is always on screen.** The library toolbar scrolled
