@@ -17,7 +17,7 @@ import { testIndexer } from './newznab.js';
 import { testClient } from './nzbclients.js';
 import { testTorznabIndexer } from './torznab.js';
 import { testTorrentClient } from './torrentclients.js';
-import { pluginsDir, pluginCatalog, setPluginEnabled, registeredRoutes, registeredPermissions, registeredAuthProviders, registeredCredentialProviders, pluginLibraryTypes, registeredLibraryScanners, registeredCollectionFilters } from './plugins.js';
+import { pluginsDir, pluginCatalog, setPluginEnabled, markPluginPending, pendingPluginChanges, installedOnDisk, registeredRoutes, registeredPermissions, registeredAuthProviders, registeredCredentialProviders, pluginLibraryTypes, registeredLibraryScanners, registeredCollectionFilters } from './plugins.js';
 import { fetchCatalog, installPlugin, uninstallPlugin } from './plugincatalog.js';
 import { logWarn } from './logstore.js';
 import * as users from './users.js';
@@ -840,7 +840,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // plugins register routes/jobs/sources at boot and can't be hot-unloaded).
   app.get('/api/plugins', (req, res) => {
     const plugins = pluginCatalog();
-    res.json({ plugins, restartRequired: plugins.some((p) => p.restartRequired) });
+    res.json({ plugins, restartRequired: plugins.some((p) => p.restartRequired), pending: pendingPluginChanges() });
   });
   // Restart the app process (plugin toggles apply at boot). Under Docker the
   // restart policy revives the container; bare processes re-exec themselves.
@@ -856,23 +856,25 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     if (enabled) disabled.delete(name); else disabled.add(name);
     saveSettings({ disabledPlugins: [...disabled].join(',') });
     const plugins = pluginCatalog();
-    res.json({ plugins, restartRequired: plugins.some((p) => p.restartRequired) });
+    res.json({ plugins, restartRequired: plugins.some((p) => p.restartRequired), pending: pendingPluginChanges() });
   });
 
   // Plugin catalog: the installable first-party plugins offered by the remote
-  // manifest, cross-referenced with what's already on disk.
+  // manifest, cross-referenced with what's on disk NOW (not what this process
+  // loaded at boot) so a just-installed or just-updated plugin reads as such.
   app.get('/api/plugins/catalog', async (req, res) => {
     let available;
     try { available = await fetchCatalog(); }
     catch (e) { return res.status(502).json({ error: 'could not reach the plugin catalog: ' + String(e?.message || e) }); }
-    const installed = new Map(pluginCatalog().map((p) => [p.name, p]));
+    const onDisk = installedOnDisk();
     const plugins = available.map((a) => {
-      const inst = installed.get(a.id);
+      const has = onDisk.has(a.id);
+      const ver = has ? onDisk.get(a.id) : null;
       return {
         id: a.id, name: a.name || a.id, description: a.description || '', version: a.version || null,
-        installed: !!inst,
-        installedVersion: inst?.version || null,
-        updateAvailable: !!(inst && a.version && inst.version && a.version !== inst.version),
+        installed: has,
+        installedVersion: ver,
+        updateAvailable: !!(has && a.version && ver && a.version !== ver),
       };
     });
     res.json({ plugins });
@@ -884,9 +886,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     catch { return res.status(502).json({ error: 'plugin catalog unreachable' }); }
     const entry = available.find((p) => p.id === id);
     if (!entry) return res.status(404).json({ error: 'plugin not found in the catalog' });
+    const wasInstalled = installedOnDisk().has(entry.id);
     try {
       const r = await installPlugin(entry);
-      res.json({ installed: r.id, version: r.version, restartRequired: true });
+      markPluginPending(r.id, wasInstalled ? 'updated' : 'installed', r.version);
+      res.json({ installed: r.id, version: r.version, updated: wasInstalled, restartRequired: true, pending: pendingPluginChanges() });
     } catch (e) {
       res.status(400).json({ error: 'install failed: ' + String(e?.message || e) });
     }
@@ -895,7 +899,8 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     const id = String((req.body || {}).id || '');
     try {
       const r = uninstallPlugin(id);
-      res.json({ removed: r.removed, restartRequired: true });
+      if (r.removed) markPluginPending(id, 'removed');
+      res.json({ removed: r.removed, restartRequired: true, pending: pendingPluginChanges() });
     } catch (e) {
       res.status(400).json({ error: String(e?.message || e) });
     }

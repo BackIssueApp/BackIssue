@@ -384,14 +384,56 @@ export async function loadPluginsFromDir(dir, api = pluginApi, disabled = []) {
   return loaded;
 }
 
+/// Changes made on disk since boot that only take effect at the next start:
+/// name → { action: 'installed' | 'updated' | 'removed', version }. In memory
+/// on purpose — a restart is exactly when it stops being true.
+const pending = new Map();
+export function markPluginPending(name, action, version = null) {
+  pending.set(String(name), { action, version: version || null });
+}
+export function pendingPluginChanges() {
+  return [...pending.entries()].map(([name, p]) => ({ name, ...p }));
+}
+export function clearPluginPending() { pending.clear(); } // test seam
+
+/// What is on disk right now (name → version), independent of what this
+/// process loaded at boot — an install or update lands here immediately.
+export function installedOnDisk(dir = PLUGINS_DIR) {
+  const out = new Map();
+  if (!dir || !fs.existsSync(dir)) return out;
+  for (const name of fs.readdirSync(dir)) {
+    if (name.startsWith('.') || name === 'node_modules') continue;
+    if (!fs.existsSync(path.join(dir, name, 'index.js'))) continue;
+    out.set(name, readMeta(dir, name).version);
+  }
+  return out;
+}
+
 /// The management page's view: every plugin found on disk, with load state and
 /// what it registered. A plugin whose enabled flag differs from its loaded
-/// state needs a restart to apply.
+/// state needs a restart to apply — so does one installed, updated or removed
+/// since boot (this process still runs what it loaded at start). A plugin
+/// installed since boot isn't in the catalog yet; it appears as a placeholder
+/// so the page can show it waiting for the restart.
 export function pluginCatalog() {
-  return [...catalog.values()].map((p) => ({
-    ...p,
-    restartRequired: p.enabled !== p.loaded && !(p.enabled && p.error),
-  }));
+  const rows = [...catalog.values()].map((p) => {
+    const pend = pending.get(p.name) || null;
+    return {
+      ...p,
+      pending: pend?.action || null,
+      pendingVersion: pend?.version || null,
+      restartRequired: !!pend || (p.enabled !== p.loaded && !(p.enabled && p.error)),
+    };
+  });
+  for (const [name, pend] of pending) {
+    if (catalog.has(name) || pend.action === 'removed') continue;
+    rows.push({
+      name, version: pend.version, description: null, enabled: true, loaded: false, error: null,
+      counts: { sources: 0, settings: 0, startups: 0, routes: 0, jobs: 0, assets: 0, permissions: 0, notifiers: 0, indexerProviders: 0, importHandlers: 0 },
+      pending: pend.action, pendingVersion: pend.version, restartRequired: true,
+    });
+  }
+  return rows;
 }
 
 /// Flip a plugin's desired state in the catalog (persistence is the caller's

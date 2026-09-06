@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { pluginApi, registeredSources, loadPluginsFromDir, pluginCatalog, setPluginEnabled } from '../src/plugins.js';
+import { pluginApi, registeredSources, loadPluginsFromDir, pluginCatalog, setPluginEnabled, markPluginPending, pendingPluginChanges, clearPluginPending, installedOnDisk } from '../src/plugins.js';
 
 test('registerSource adds a source and is idempotent by id', () => {
   const before = registeredSources().length;
@@ -83,6 +83,37 @@ test('catalog: disabled plugins are listed but never imported; toggling flags a 
   assert.equal(pluginCatalog().find((p) => p.name === 'omega').restartRequired, true);
   setPluginEnabled('alpha', false);
   assert.equal(pluginCatalog().find((p) => p.name === 'alpha').restartRequired, true);
+  setPluginEnabled('alpha', true);
+
+  // An install, update or removal since boot needs a restart even though the
+  // enabled/loaded flags agree — this process still runs what it loaded.
+  assert.equal(pluginCatalog().find((p) => p.name === 'alpha').restartRequired, false);
+  markPluginPending('alpha', 'updated', '2.2.0');
+  const alpha = pluginCatalog().find((p) => p.name === 'alpha');
+  assert.equal(alpha.restartRequired, true);
+  assert.equal(alpha.pending, 'updated');
+  assert.equal(alpha.pendingVersion, '2.2.0');
+  assert.equal(alpha.version, '2.1.0', 'the running version stays until the restart');
+  // A plugin installed since boot is not in the catalog: it shows as a placeholder waiting for the restart.
+  markPluginPending('gamma', 'installed', '1.0.0');
+  const gamma = pluginCatalog().find((p) => p.name === 'gamma');
+  assert.equal(gamma.pending, 'installed');
+  assert.equal(gamma.loaded, false);
+  assert.equal(gamma.restartRequired, true);
+  markPluginPending('omega', 'removed');
+  assert.equal(pluginCatalog().find((p) => p.name === 'omega').pending, 'removed');
+  assert.deepEqual(pendingPluginChanges().map((c) => `${c.action}:${c.name}`), ['updated:alpha', 'installed:gamma', 'removed:omega']);
+  clearPluginPending();
+  assert.equal(pluginCatalog().find((p) => p.name === 'alpha').restartRequired, false);
+  assert.equal(pluginCatalog().some((p) => p.name === 'gamma'), false);
+
+  // What is on disk now, not what was loaded: an update's new version reads immediately.
+  fs.writeFileSync(path.join(dir, 'alpha', 'package.json'), JSON.stringify({ name: 'alpha', version: '2.2.0' }));
+  fs.mkdirSync(path.join(dir, '.alpha.old-1'));
+  const disk = installedOnDisk(dir);
+  assert.equal(disk.get('alpha'), '2.2.0');
+  assert.equal(disk.has('.alpha.old-1'), false, 'updater leftovers are not plugins');
+  assert.equal(disk.has('README.md'), false);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

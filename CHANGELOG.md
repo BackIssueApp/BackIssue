@@ -10,6 +10,14 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **Installing, updating or removing a plugin now says it needs a restart.**
+  The Plugins page only showed a passing toast, and its restart banner never
+  appeared for those actions (it only tracked enable/disable), so on Docker,
+  with no console to watch, the new or updated plugin silently stayed
+  inactive. The banner now names what is waiting ("Updated Reader to
+  1.4.0 — restart to apply") with the Restart now button, survives leaving
+  the page, and the catalog reflects what is on disk rather than what the
+  running process loaded.
 - **Collected editions never auto-downloaded.** Automatic search for a trade,
   hardcover or omnibus appended an issue-style number ("Series TPB 001") that
   no release carries, so it always came up empty while a manual search found it.

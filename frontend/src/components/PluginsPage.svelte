@@ -13,6 +13,7 @@
 
   let plugins = $state([]);
   let restartRequired = $state(false);
+  let pending = $state([]); // installs/updates/removes since boot, from the server — survives navigation and reloads
   let loaded = $state(false);
 
   // Remote catalog of installable first-party plugins.
@@ -28,6 +29,7 @@
       const r = await apiGet('/api/plugins');
       plugins = r.plugins || [];
       restartRequired = !!r.restartRequired;
+      pending = r.pending || [];
       loaded = true;
     } catch { /* keep last */ }
   }
@@ -50,9 +52,9 @@
     try {
       const r = await apiPost('/api/plugins/install', { id: entry.id });
       if (r.error) throw new Error(r.error);
-      restartRequired = true;
       await refresh(); await loadCatalog();
-      notify(`Installed ${entry.name} — restart BackIssue to activate it.`, 'ok');
+      restartRequired = true; // the server agrees (it recorded the change), but never let a slow refresh hide the banner
+      notify(r.updated ? `Updated ${entry.name} to v${r.version || entry.version} — restart BackIssue to switch to it.` : `Installed ${entry.name} — restart BackIssue to activate it.`, 'ok');
     } catch (e) {
       notify('Install failed: ' + String(e.message || e), 'error');
     } finally {
@@ -78,8 +80,8 @@
     try {
       const r = await apiPost('/api/plugins/uninstall', { id: entry.id });
       if (r.error) throw new Error(r.error);
-      restartRequired = true;
       await refresh(); await loadCatalog();
+      restartRequired = true;
       notify(`Removed ${entry.name} — restart BackIssue to finish.`, 'ok');
     } catch (e) {
       notify('Remove failed: ' + String(e.message || e), 'error');
@@ -121,9 +123,21 @@
   }
 
   const statusOf = (p) => p.error ? 'failed' : p.restartRequired ? 'restart' : p.loaded ? 'running' : 'disabled';
+  const PENDING_LABEL = { installed: 'restart to activate', updated: 'restart to update', removed: 'restart to remove' };
   const statusLabel = (p) => p.error ? 'failed'
+    : p.pending ? PENDING_LABEL[p.pending] || 'restart required'
     : p.restartRequired ? `restart to ${p.enabled ? 'enable' : 'disable'}`
     : p.loaded ? 'running' : 'disabled';
+
+  // The banner names what is waiting: "Installed X 1.2.5, updated Y to 2.0 — restart to apply."
+  const pendingText = $derived.by(() => {
+    const parts = pending.map((c) => c.action === 'installed' ? `installed ${c.name}${c.version ? ' ' + c.version : ''}`
+      : c.action === 'updated' ? `updated ${c.name}${c.version ? ' to ' + c.version : ''}`
+      : `removed ${c.name}`);
+    if (!parts.length) return 'Changes saved — restart BackIssue to apply them. Plugins register routes, jobs and sources at boot.';
+    const list = parts[0].charAt(0).toUpperCase() + parts[0].slice(1) + (parts.length > 1 ? ', ' + parts.slice(1).join(', ') : '');
+    return `${list} — restart BackIssue to apply. Plugins load at boot, so nothing changes until then.`;
+  });
 
   // The catalog and manifests carry no category yet — respect an explicit
   // `category` if a plugin ever declares one, else infer from what it registers
@@ -224,7 +238,7 @@
   {#if restartRequired || restarting}
     <div class="plx__banner">
       <Icon name="alert-triangle" size={16} />
-      <span class="plx__banner-text">{restarting ? 'Restarting BackIssue…' : 'Changes saved — restart BackIssue to apply them. Plugins register routes, jobs and sources at boot.'}</span>
+      <span class="plx__banner-text">{restarting ? 'Restarting BackIssue…' : pendingText}</span>
       <button id="restart-app-btn" class="plx__banner-btn" disabled={restarting} onclick={restartApp}>
         <span class="plx__banner-ico" class:is-spin={restarting}><Icon name="refresh" size={14} /></span>{restarting ? 'Restarting…' : 'Restart now'}</button>
     </div>
