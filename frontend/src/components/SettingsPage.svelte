@@ -187,6 +187,13 @@
     const mount = document.getElementById(mountId);
     if (!mount) return [];
     const out = [];
+    // The rail note is the description's first sentence — whole words, never a
+    // hard cut mid-word (a 48-character slice used to end in "hubs via t").
+    const firstSentence = (text) => {
+      const t = String(text || '').replace(/\s+/g, ' ').trim();
+      const one = (t.match(/^[^.!?]*[.!?]/)?.[0] || t).trim();
+      return one.length > 90 ? one.slice(0, 89).replace(/\s+\S*$/, '') + '…' : one;
+    };
     [...mount.querySelectorAll(':scope > .src-block')].forEach((block, i) => {
       const key = 'plugin:' + (block.id || i);
       block.dataset.setxKey = key;
@@ -194,7 +201,7 @@
       out.push({
         key,
         label: block.querySelector('.src-toggle b')?.textContent?.trim() || 'Plugin',
-        note: block.querySelector('.src-toggle .modal__note')?.textContent?.trim().slice(0, 48) || 'Plugin settings',
+        note: firstSentence(block.querySelector('.src-toggle .modal__note')?.textContent) || 'Plugin settings',
         on: !!sw?.checked,
       });
       if (sw && !sw.dataset.setxWired) { sw.dataset.setxWired = '1'; sw.addEventListener('change', () => syncSourceUI()); }
