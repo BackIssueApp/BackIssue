@@ -8,6 +8,7 @@
   import { notify } from '../lib/toasts.svelte.js';
   import { confirmDialog } from './DialogModal.svelte';
   import Icon from '../lib/Icon.svelte';
+  import { hscroll } from '../lib/hscroll.js';
 
   let { active = false } = $props();
 
@@ -245,7 +246,7 @@
   {/if}
 
   <!-- category tabs -->
-  <div class="plx__tabs">
+  <div class="plx__tabs" use:hscroll>
     {#each CATS as c (c.id)}
       {@const n = catCount(c.id)}
       <button class="plx__tab" class:is-active={cat === c.id} onclick={() => (cat = c.id)}>

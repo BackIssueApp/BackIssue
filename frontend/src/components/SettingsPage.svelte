@@ -9,6 +9,7 @@
   import { confirmDialog } from './DialogModal.svelte';
   import { notify } from '../lib/toasts.svelte.js';
   import Icon from '../lib/Icon.svelte';
+  import { hscroll } from '../lib/hscroll.js';
 
   let { active = false } = $props();
 
@@ -69,7 +70,7 @@
       const r = await apiGet('/api/libraries');
       libs = (r.libraries || []).map(withFolders);
       if (Array.isArray(r.types) && r.types.length) LIB_TYPES = r.types.map((t) => [t.id, t.label]);
-    } catch { /* offline */ }
+    } catch { notify('Could not load your libraries — the list below may be out of date.', 'error'); }
   }
   $effect(() => { if (active) loadLibs(); });
   async function addLib() {
@@ -512,7 +513,7 @@
   </div>
 
   <!-- Tab rail -->
-  <nav class="setx-tabs" aria-label="Settings pages">
+  <nav class="setx-tabs" aria-label="Settings pages" use:hscroll>
     {#each TABS.filter((t) => t.id !== 'plugins' || pluginPanels.length) as t (t.id)}
       <button type="button" class="setx-tab" class:is-active={activeTab === t.id} onclick={() => pickTab(t.id)}>
         <Icon name={t.icon} size={14} /> {t.label}

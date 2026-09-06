@@ -1,3 +1,4 @@
+import { normalizeTitle } from './matcher.js';
 import { attestHeaders } from './attest.js';
 // The single API key from settings. Legacy settings held a multi-line key
 // list; the first entry wins so old settings.json files keep working.
@@ -273,4 +274,40 @@ export function makeCvClient(config, { fetchImpl, key, politeMs } = {}) {
   }
 
   return { search, list, volume, issue, searchArcs, storyArcIssues, issuesByIds, findIssue };
+}
+
+// Publishers whose volumes are what most people mean when they type a title —
+// the user's own library adds to this list (see index.js cvSearch).
+const FAMILIAR_PUBLISHERS = new Set(['dc comics', 'dc', 'marvel', 'marvel comics', 'image', 'image comics', 'dark horse comics', 'dark horse',
+  'idw publishing', 'idw', 'boom! studios', 'boom studios', 'dynamite entertainment', 'dynamite', 'valiant', 'valiant comics', 'oni press',
+  'vertigo', 'wildstorm', 'archie comics', 'archie', 'titan comics', 'titan', 'vault comics', 'aftershock comics', 'ahoy comics', 'mad cave studios',
+  'fantagraphics', 'drawn & quarterly', 'rebellion', '2000 ad', 'viz media', 'viz', 'kodansha comics', 'kodansha', 'yen press', 'seven seas entertainment',
+  'dark horse manga', 'shueisha', 'shogakukan', 'square enix', 'udon', 'zenescope', 'avatar press', 'top shelf', 'abrams comicarts', 'first second']);
+
+/** Order a title search so the volumes people actually mean come first: the
+ *  closest name match, from a familiar (or the user's own) publisher, the
+ *  more recent and the longer-running the better. The metadata service
+ *  returns its own relevance order, which floats translated reprints ("Batman"
+ *  from Panini or Glenat) above the current run. */
+export function rankSearchResults(results, query, { favoured = [] } = {}) {
+  if (!Array.isArray(results)) return results;
+  const want = normalizeTitle(String(query || ''));
+  const fav = new Set([...FAMILIAR_PUBLISHERS, ...favoured.map((p) => String(p || '').toLowerCase().trim())].filter(Boolean));
+  const thisYear = new Date().getFullYear();
+  const score = (v) => {
+    const name = normalizeTitle(String(v.name || ''));
+    let s = 0;
+    if (want && name) {
+      if (name === want) s += 30;
+      else if (name.startsWith(want + ' ') || name.startsWith(want + ':')) s += 18;
+      else if (name.includes(want)) s += 10;
+    }
+    if (fav.has(String(v.publisher || '').toLowerCase().trim())) s += 12;
+    const year = Number(v.start_year) || 0;
+    if (year) s += Math.max(0, 10 - Math.max(0, thisYear - year) / 5); // this year 10 → fifty years ago 0
+    const issues = Number(v.count_of_issues ?? v.issue_count) || 0;
+    s += Math.min(6, Math.log10(issues + 1) * 3);
+    return s;
+  };
+  return results.map((v, i) => ({ v, i, s: score(v) })).sort((a, b) => b.s - a.s || a.i - b.i).map((x) => x.v);
 }

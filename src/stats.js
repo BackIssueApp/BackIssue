@@ -97,6 +97,7 @@ export function collectionStats(db, config = {}, { includeRestricted = true } = 
     FROM library_files`).get();
   const comicvine = {
     keys: cvKey(config.comicvineKeys) ? 1 : 0,
+    source: config.metadataSource === 'comicvine' ? 'comicvine' : 'hosted',
     volumes: cv.volumes || 0,
     issues: cv.issues || 0,
     detailed: cv.detailed || 0,

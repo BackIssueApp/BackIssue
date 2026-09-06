@@ -12,6 +12,7 @@
   import { confirmDialog } from './DialogModal.svelte';
   import { can } from '../lib/auth.svelte.js';
   import Icon from '../lib/Icon.svelte';
+  import { hscroll } from '../lib/hscroll.js';
 
   let { active = false } = $props();
 
@@ -216,7 +217,7 @@
       </div>
     </div>
 
-    <div class="wx__stats">
+    <div class="wx__stats" use:hscroll>
       {#each stats as st (st.label)}
         <div class="wx__stat">
           <div class="wx__stat-lbl"><span class="wx__stat-dot" style="background:{st.tone};"></span>{st.label}</div>
@@ -225,7 +226,7 @@
       {/each}
     </div>
 
-    <div class="wx__chips">
+    <div class="wx__chips" use:hscroll>
       <button class="wx__chip" class:is-active={!gaps} title="What download automation goes after — each series' monitoring policy plus your picks" onclick={() => setQuery({ scope: null })}>Wanted</button>
       <button class="wx__chip" class:is-active={gaps} title="Every missing issue of every series in the library, wanted or not" onclick={() => setQuery({ scope: 'gaps' })}>All gaps</button>
       <span class="wx__chips-sep"></span>
@@ -419,6 +420,11 @@
   .wx__retry { border: 1px solid rgba(255,90,82,.4); background: rgba(255,90,82,.1); color: var(--red); }
   .wx__want { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 7px; border: 1px solid transparent; background: transparent; color: var(--faint); cursor: pointer; flex: none; opacity: .35; transition: opacity .12s, color .12s; }
   .wx__row:hover .wx__want { opacity: 1; }
+  @media (hover: none), (pointer: coarse) {
+    /* Touch: the skip button is always visible and big enough to hit; checkboxes too. */
+    .wx__want { opacity: 1; width: 38px; height: 38px; }
+    .wx__check { width: 20px; height: 20px; }
+  }
   .wx__want:hover { color: var(--text); border-color: var(--line); }
   .wx__want--on { opacity: 1; color: var(--accent); }
 

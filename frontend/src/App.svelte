@@ -1,7 +1,8 @@
 <script>
   import { untrack } from 'svelte';
   import { route, navigate, goBack, OVERLAY_PATHS, activeDrawer } from './lib/router.svelte.js';
-  import { rail, railSelect, loadCollection, openVolume, clearDetail, loadFlags, startOpsTracking } from './lib/store.svelte.js';
+  import { rail, railSelect, detail, loadCollection, openVolume, clearDetail, loadFlags, startOpsTracking } from './lib/store.svelte.js';
+  import Icon from './lib/Icon.svelte';
   import { startStatusPolling } from './lib/status.svelte.js';
   import { startEvents } from './lib/events.svelte.js';
   import { loadClientPlugins } from './lib/plugins.svelte.js';
@@ -57,22 +58,41 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
     '/wanted': 'downloads.grab', '/queue': 'downloads.grab',
     '/releases': 'downloads.grab', '/history': 'downloads.grab',
   };
-  $effect(() => {
-    if (!authed) return;
-    // System bundles Jobs/Tools (system.jobs) and Logs (system.logs) — either
-    // grants access; the page hides the tabs the user can't see.
-    if (route.path === '/system') {
-      if (!can('system.jobs') && !can('system.logs')) navigate('/', { replace: true });
-      return;
-    }
+  // A page the account can't open shows an access notice in place, rather
+  // than silently landing on Home (which read as "the link is broken").
+  // System bundles Jobs/Tools (system.jobs) and Logs (system.logs) — either
+  // grants access; the page hides the tabs the user can't see.
+  const denied = $derived.by(() => {
+    if (!authed) return false;
+    if (route.path === '/system') return !can('system.jobs') && !can('system.logs');
     const need = PAGE_PERMS[route.path];
-    if (need && !can(need)) navigate('/', { replace: true });
+    return !!(need && !can(need));
   });
 
   const overlay = $derived(OVERLAY_PATHS.includes(route.path));
   const volumeId = $derived.by(() => {
     const m = route.path.match(/^\/volume\/(\d+)/);
     return m ? Number(m[1]) : null;
+  });
+  // The URLs this app renders itself. Anything else is a typo or a stale link —
+  // and gets told so, instead of quietly showing Home.
+  const KNOWN_PATHS = new Set(['/', '/system', '/profile', '/jobs', '/tools', '/logs', ...OVERLAY_PATHS]);
+  const unknown = $derived(!volumeId && !KNOWN_PATHS.has(route.path));
+  // Section pages only load their data when they are the page being shown.
+  const page = $derived(denied || unknown ? null : route.path);
+
+  // Browser tab, history and Back button name the page, not just the app.
+  const PAGE_TITLES = {
+    '/settings': 'Settings', '/system': 'System', '/wanted': 'Wanted', '/queue': 'Queue', '/releases': 'Releases',
+    '/history': 'History', '/lists': 'Reading lists', '/import': 'Import', '/stats': 'Stats', '/plugins': 'Plugins',
+    '/users': 'Users', '/profile': 'Profile',
+  };
+  $effect(() => {
+    let name = PAGE_TITLES[route.path] || '';
+    if (volumeId) name = detail.series?.title && detail.series.title !== 'Comic' ? detail.series.title : 'Series';
+    else if (unknown) name = 'Page not found';
+    else if (route.path === '/' && route.search.includes('collections=1')) name = 'Collections';
+    document.title = name ? `${name} · BackIssue` : 'BackIssue';
   });
 
   // Queue/Releases were drawers (?drawer=) for a while — keep old links working.
@@ -90,7 +110,7 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
 
   $effect(() => {
     for (const cls of Object.values(PAGE_CLASSES)) {
-      document.body.classList.toggle(cls, PAGE_CLASSES[route.path] === cls);
+      document.body.classList.toggle(cls, PAGE_CLASSES[page] === cls); // a denied/unknown page shows the notice, not the section
     }
   });
 
@@ -138,8 +158,10 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
     servicesStarted = true;
     startEvents();
     startStatusPolling();
-    startOpsTracking();
-    loadFlags();
+    // Settings and the scan/tag/match progress feeds are admin-side; a viewer
+    // asking for them only produced 403s in the console.
+    if (can('library.manage')) startOpsTracking();
+    if (can('settings.manage')) loadFlags();
     loadClientPlugins();
     loadCollection();
   });
@@ -176,24 +198,35 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
   <div class="shell__main">
     <Header />
     <main class="content">
-      <div class="home">
+      {#if denied || unknown}
+        <div class="nopage" id="nopage">
+          <div class="nopage__card">
+            <div class="nopage__art"><Icon name={denied ? 'shield' : 'search'} size={24} /></div>
+            <div class="nopage__title">{denied ? 'You don’t have access to this page' : 'Page not found'}</div>
+            <div class="nopage__text">{denied ? 'Your account isn’t allowed to open it. Ask an admin if you think it should be.' : 'There is nothing at this address. It may have moved, or the link is wrong.'}</div>
+            <div class="nopage__code">{route.path}</div>
+            <div class="nopage__actions"><button class="btn" onclick={() => navigate('/')}><Icon name="home" size={14} /> Go to Home</button></div>
+          </div>
+        </div>
+      {/if}
+      <div class="home" hidden={denied || unknown}>
         <div class="home__pane" hidden={!!volumeId}><LibraryPage /></div>
         <div class="home__pane" hidden={!volumeId}><SeriesDetail /></div>
       </div>
 
-      <SettingsPage active={route.path === '/settings'} />
-      <SystemPage active={route.path === '/system'} />
-      <WantedPage active={route.path === '/wanted'} />
-      <HistoryPage active={route.path === '/history'} />
-      <StatsPage active={route.path === '/stats'} />
-      <ImportPage active={route.path === '/import'} />
-      <PluginsPage active={route.path === '/plugins'} />
+      <SettingsPage active={page === '/settings'} />
+      <SystemPage active={page === '/system'} />
+      <WantedPage active={page === '/wanted'} />
+      <HistoryPage active={page === '/history'} />
+      <StatsPage active={page === '/stats'} />
+      <ImportPage active={page === '/import'} />
+      <PluginsPage active={page === '/plugins'} />
 
-      <QueuePage active={route.path === '/queue'} />
-      <ReleasesDrawer active={route.path === '/releases'} />
-      <UsersPage active={route.path === '/users'} />
-      <ListsPage active={route.path === '/lists'} />
-      <ProfilePage active={route.path === '/profile'} />
+      <QueuePage active={page === '/queue'} />
+      <ReleasesDrawer active={page === '/releases'} />
+      <UsersPage active={page === '/users'} />
+      <ListsPage active={page === '/lists'} />
+      <ProfilePage active={page === '/profile'} />
     </main>
   </div>
 </div>

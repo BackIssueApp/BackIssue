@@ -5,7 +5,7 @@
   import { isTrusted, can } from '../lib/auth.svelte.js';
   import { apiGet, apiPost } from '../lib/api.js';
   import { notify } from '../lib/toasts.svelte.js';
-  import { fmt, humanBytes, issueMatchesFilter, windowRange } from '../lib/util.js';
+  import { fmt, humanBytes, issueMatchesFilter, windowRange, fmtDay } from '../lib/util.js';
 
   // List-view file columns come from the issue's best readable copy.
   const bestFile = (i) => (i.files || []).find((f) => f.valid) || null;
@@ -595,7 +595,19 @@
 <svelte:window onresize={measure} />
 
 <section class="detail" bind:this={scroller} onscroll={onScroll}>
-  {#if !s}
+  {#if detail.failed}
+    <!-- A deleted, mistyped or restricted series id: say so, instead of a
+         header full of placeholders and a "is the app running?" note. -->
+    <div class="nopage">
+      <div class="nopage__card">
+        <div class="nopage__art"><Icon name={detail.notFound ? 'search' : 'alert-triangle'} size={24} /></div>
+        <div class="nopage__title">{detail.notFound ? 'This series isn’t in your library' : 'Couldn’t load this series'}</div>
+        <div class="nopage__text">{detail.notFound ? 'It may have been removed, or the link is wrong. Search your collection to find it, or add it again.' : 'The app didn’t answer. Check it is running and try again.'}</div>
+        {#if !detail.notFound}<div class="nopage__code">{detail.failReason || ''}</div>{/if}
+        <div class="nopage__actions"><button class="btn" onclick={goBack}><Icon name="arrow-left" size={14} /> Back to library</button></div>
+      </div>
+    </div>
+  {:else if !s}
     <div id="detail-empty" class="empty">
       <div class="empty__art"><Icon name="star" fill /></div>
       <div class="empty__title">Pick a series</div>
@@ -612,7 +624,7 @@
             <span class="tag" id="series-pub">{s.publisher || 'Unknown publisher'}{det?.cv?.metron_imprint ? ` · ${det.cv.metron_imprint}` : ''}</span>
             <span class="tag tag--mono" id="series-issuecount">{issueCountLabel}</span>
             {#if isCv && nextShip}
-              <span class="tag" id="series-next" title="From the weekly release list"><Icon name="calendar" size={12} /> Next: #{nextShip.number} · {nextShip.shipdate}</span>
+              <span class="tag" id="series-next" title="From the weekly release list"><Icon name="calendar" size={12} /> Next: #{nextShip.number} · {fmtDay(nextShip.shipdate)}</span>
             {/if}
             {#if isCv}
               <span class="tag mon-tag mon-tag--{monitorKey}" id="series-monitor" title="What download automation fetches for this series — change it under ⋯">

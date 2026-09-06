@@ -503,7 +503,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       }
     }
     users.authFailed(key);
-    return res.status(401).json({ error: 'wrong username or password' });
+    return res.status(401).json({ error: 'Wrong username or password.' });
   });
   app.post('/api/auth/logout', (req, res) => {
     users.destroySession(db, readCookie(req));

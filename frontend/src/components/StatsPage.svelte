@@ -115,7 +115,7 @@
               </div>
             </div>
             <div class="statx__panel statx__panel--pad">
-              <div class="statx__cvhead"><span class="statx__panel-title">ComicVine</span><span class="statx__cvkey" class:is-off={!cv.keys}>{cv.keys ? 'Key set' : 'No key'}</span></div>
+              <div class="statx__cvhead"><span class="statx__panel-title">{cv.source === 'hosted' ? 'Metadata' : 'ComicVine'}</span><span class="statx__cvkey" class:is-off={cv.source !== 'hosted' && !cv.keys}>{cv.source === 'hosted' ? 'Built-in service' : cv.keys ? 'Key set' : 'No key'}</span></div>
               <div class="statx__cvrows">
                 <div class="statx__cvrow"><span class="statx__cvlbl">Series matched</span><span class="statx__cvval">{fmt(cv.seriesMatched)}</span><span class="statx__cvsub">{fmt(cv.seriesUnmatched)} unmatched</span></div>
                 <div class="statx__cvrow"><span class="statx__cvlbl">Issues cached</span><span class="statx__cvval">{fmt(cv.issues)}</span><span class="statx__cvsub">{spct(cv.detailed, cv.issues)}% detailed</span></div>

@@ -175,3 +175,14 @@ export function issueMatchesFilter(state, filter) {
   if (filter === 'failed') return state === 'failed';
   return true;
 }
+
+/** A day (ISO "2026-09-09" or a Date) as the reader's short local date:
+ *  "Sep 9", with the year only when it isn't this year. Unparseable input
+ *  comes back as given. */
+export function fmtDay(value) {
+  if (!value) return '';
+  const d = value instanceof Date ? value : new Date(String(value).slice(0, 10) + 'T00:00:00');
+  if (isNaN(d)) return String(value);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) });
+}

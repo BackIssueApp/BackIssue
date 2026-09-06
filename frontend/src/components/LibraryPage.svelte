@@ -9,6 +9,7 @@
   import { fmt, humanBytes, windowRange } from '../lib/util.js';
   import Cover from './Cover.svelte';
   import { openAddModal } from './AddModal.svelte';
+  import { hscroll } from '../lib/hscroll.js';
   import { confirmDialog } from './DialogModal.svelte';
   import { isTrusted } from '../lib/auth.svelte.js';
   import { libraryFilterFor } from '../lib/plugins.svelte.js';
@@ -301,7 +302,7 @@
   <!-- toolbar: count · filters (with counts) · sort · view · actions -->
   <div class="libx__bar">
     <span class="libx__count">{isCollections ? 'Collections' : 'Library'} <span id="series-count">{rail.loaded ? fmt(rail.total) : ''}</span></span>
-    <div class="libx__filters">
+    <div class="libx__filters" use:hscroll>
       {#each FILTERS as f (f.key)}
         {@const n = rail.counts?.[f.key]}
         <button class="libx__chip" class:is-active={rail.filter === f.key} onclick={() => pickFilter(f.key)}>
@@ -309,7 +310,7 @@
         </button>
       {/each}
     </div>
-    <div class="libx__spacer"></div>
+    <div class="libx__actions">
     <select id="coll-sort" class="libx__sort" title="Sort the collection" value={rail.sort}
       onchange={(e) => setQuery({ sort: e.currentTarget.value === 'title' ? null : e.currentTarget.value })}>
       <option value="title">A–Z</option>
@@ -326,10 +327,11 @@
       </button>
     {/if}
     {#if isTrusted()}
-      <button id="coll-select-btn" class="libx__act" class:is-active={rail.selecting} title="Select multiple series for bulk actions" onclick={toggleSelecting}><Icon name="check-square" size={14} /> Select</button>
-      <button id="cvmatch-btn" class="libx__act" title={cvTitle} disabled={cvBusy} onclick={startCvMatch}><span class="libx__cvicon"><Icon name="diamond" size={14} /></span>{cvText}</button>
+      <button id="coll-select-btn" class="libx__act" class:is-active={rail.selecting} title="Select multiple series for bulk actions" aria-label="Select" onclick={toggleSelecting}><Icon name="check-square" size={14} /><span class="libx__lbl">Select</span></button>
+      <button id="cvmatch-btn" class="libx__act" title={cvTitle} aria-label={cvText} disabled={cvBusy} onclick={startCvMatch}><span class="libx__cvicon"><Icon name="diamond" size={14} /></span><span class="libx__lbl">{cvText}</span></button>
       <button id="add-series-btn" class="libx__add" onclick={() => openAddModal()}><Icon name="plus" size={15} /> Add</button>
     {/if}
+    </div>
   </div>
 
   {#if rail.selecting}
@@ -367,7 +369,7 @@
         <div class="libx__empty">
           <div class="libx__empty-art"><Icon name="home" size={26} /></div>
           <div class="libx__empty-title">Welcome back</div>
-          <div class="libx__empty-body">Your reading shelves appear here as you read. Pick a library from the sidebar to browse everything in it.</div>
+          <div class="libx__empty-body">Your reading shelves appear here as you read. Pick a library to browse everything in it. Shelves you've hidden can be turned back on from your profile.</div>
         </div>
       {:else if !railHasContent}
         <!-- Skeleton shelves while the plugin rails fetch — unmounts the moment
@@ -477,16 +479,19 @@
 
 <style>
   .libx { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-  .libx__bar { display: flex; align-items: center; gap: 8px; padding: 11px 18px; border-bottom: 1px solid var(--line); flex: none; overflow-x: auto; scrollbar-width: none; }
-  .libx__bar::-webkit-scrollbar { display: none; }
+  /* The bar itself never scrolls: the chip row is the scroll container (with
+     edge fades), and the actions cluster — Add above all — stays on screen at
+     every width. Narrow screens put the actions on their own row. */
+  .libx__bar { display: flex; align-items: center; gap: 8px; padding: 11px 18px; border-bottom: 1px solid var(--line); flex: none; }
+  .libx__actions { display: flex; align-items: center; gap: 8px; flex: none; margin-left: auto; }
+  .libx__lbl { display: inline; }
   .libx__count { font: 13px var(--font-mono); color: var(--faint); white-space: nowrap; flex: none; }
   .libx__count span { color: var(--text); }
-  .libx__filters { display: flex; align-items: center; gap: 6px; flex: none; }
+  .libx__filters { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; padding: 2px 0; }
   .libx__chip { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--muted); font: 600 12.5px var(--font-body); cursor: pointer; white-space: nowrap; flex: none; }
   .libx__chip.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .libx__chip-count { font: 600 10.5px var(--font-mono); background: var(--panel-2); color: var(--faint); border-radius: 999px; padding: 1px 6px; }
   .libx__chip.is-active .libx__chip-count { background: rgba(255,255,255,.2); color: #fff; }
-  .libx__spacer { flex: 1; min-width: 8px; }
   .libx__sort { height: 32px; padding: 0 10px; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; color: var(--text); font: 12.5px var(--font-body); flex: none; }
   .libx__sort:focus { outline: none; border-color: var(--accent); }
   .libx__view { display: flex; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 2px; flex: none; }
@@ -597,7 +602,16 @@
     .railskel__title, .railskel__card { animation: none; background: var(--panel); }
   }
 
+  @media (max-width: 960px) {
+    .libx__lbl { display: none; }
+    .libx__act { padding: 0 11px; }
+  }
   @media (max-width: 760px) {
+    .libx__bar { flex-wrap: wrap; row-gap: 10px; padding: 10px 12px; }
+    .libx__count { display: none; }
+    .libx__filters { order: 2; flex-basis: 100%; }
+    .libx__actions { margin-left: auto; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .libx__sort { max-width: 104px; }
     .libx-grid { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 14px; }
     .libx-list__head, .libx-row { grid-template-columns: 46px 1fr auto 40px; }
     .libx-col--wide { display: none; }

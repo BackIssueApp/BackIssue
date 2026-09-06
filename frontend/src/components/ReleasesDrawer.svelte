@@ -6,10 +6,11 @@
   import { subscribe } from '../lib/events.svelte.js';
   import { loadCollection } from '../lib/store.svelte.js';
   import { notify } from '../lib/toasts.svelte.js';
-  import { fmt, weekOfYear, shiftWeek } from '../lib/util.js';
+  import { fmt, weekOfYear, shiftWeek, fmtAgo, fmtDay } from '../lib/util.js';
   import Badge from './Badge.svelte';
   import { can, isTrusted } from '../lib/auth.svelte.js';
   import Icon from '../lib/Icon.svelte';
+  import { hscroll } from '../lib/hscroll.js';
   import { openAddModal } from './AddModal.svelte';
 
   let { active = false } = $props();
@@ -135,7 +136,8 @@
   const statusText = $derived.by(() => {
     if (st.running) return onThisWeek ? 'Checking this week…' : 'Checking…';
     if (st.error) return 'Error: ' + st.error;
-    const when = st.checkedAt ? ' · checked ' + new Date(st.checkedAt).toLocaleString() : '';
+    const age = st.checkedAt ? Date.now() - new Date(st.checkedAt).getTime() : null;
+    const when = age == null ? '' : ' · checked ' + (age < 60000 ? 'just now' : fmtAgo(age) + ' ago');
     return st.week ? `Week ${st.week}, ${st.year} · ${fmt(all.length)} releases · ${fmt(mineCount)} in your collection${when}` : '';
   });
 
@@ -196,7 +198,7 @@
         <span id="releases-status" class="muted">{statusText}</span>
         <button id="releases-refresh" class="btn btn--ghost" onclick={refresh}>Refresh</button>
       </div>
-      <div class="releases-filters" id="releases-filters">
+      <div class="releases-filters" id="releases-filters" use:hscroll>
         <button class="filter__btn" class:is-active={filter === 'all'} onclick={() => { filter = 'all'; }}>All</button>
         <button class="filter__btn" class:is-active={filter === 'mine'} onclick={() => { filter = 'mine'; }}>In collection</button>
         {#if collectedCount}
@@ -235,7 +237,7 @@
                     {#if m.isNew}<span class="coll-badge coll-badge--cv">new</span>{/if}
                     {#if m.collected}<span class="coll-badge" title="A collected edition, not a single issue">{m.type}</span>{/if}</div>
                   {#if m.title}<div class="rel-story">{m.title}</div>{/if}
-                  <div class="queue-item__title">{g.mine && m.publisher ? m.publisher + ' · ' : ''}{m.shipdate ? 'ships ' + m.shipdate : ''}{m.coverdate ? ' · cover ' + m.coverdate : ''}</div>
+                  <div class="queue-item__title">{g.mine && m.publisher ? m.publisher + ' · ' : ''}{m.shipdate ? 'ships ' + fmtDay(m.shipdate) : ''}{m.coverdate ? ' · cover ' + fmtDay(m.coverdate) : ''}</div>
                 </div>
                 {#if m.tracked}
                   <span>

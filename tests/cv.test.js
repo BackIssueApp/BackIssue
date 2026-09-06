@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeCvClient, normVolume, cvKey } from '../src/cv.js';
+import { makeCvClient, normVolume, cvKey, rankSearchResults } from '../src/cv.js';
 
 test('cvKey takes the first key from legacy multi-key values', () => {
   assert.equal(cvKey('a\nb , c'), 'a'); // old multi-key settings.json still loads
@@ -680,4 +680,27 @@ test('addSeriesFromCv: the "Monitor added series" setting decides a new series\'
     r = await addSeriesFromCv(db, client3, 42);
     assert.equal(getSeriesById(db, r.seriesId).monitor, 'all');
   } finally { config.defaultMonitor = saved; }
+});
+
+test('rankSearchResults: the current run from a familiar publisher outranks translated reprints and odd matches', () => {
+  const raw = [
+    { id: 1, name: 'Batman', start_year: '1940', publisher: 'DC Comics', count_of_issues: 716 },
+    { id: 2, name: 'Batman', start_year: '1975', publisher: 'Murray Comics', count_of_issues: 7 },
+    { id: 3, name: 'Batman', start_year: '1992', publisher: 'Glenat Italia', count_of_issues: 48 },
+    { id: 4, name: 'Batman', start_year: '2007', publisher: 'Panini Verlag', count_of_issues: 65 },
+    { id: 5, name: 'Batman', start_year: '2016', publisher: 'DC Comics', count_of_issues: 160 },
+    { id: 6, name: 'Batman', start_year: '2025', publisher: 'DC Comics', count_of_issues: 12 },
+    { id: 7, name: 'Batman and Robin', start_year: '2023', publisher: 'DC Comics', count_of_issues: 30 },
+    { id: 8, name: 'The Batman Adventures', start_year: '1992', publisher: 'DC Comics', count_of_issues: 36 },
+  ];
+  const ids = rankSearchResults(raw, 'Batman').map((v) => v.id);
+  assert.deepEqual(ids.slice(0, 3), [5, 6, 1], 'current DC runs first, then the classic run');
+  assert.ok(ids.indexOf(4) > ids.indexOf(7) || ids.indexOf(4) > ids.indexOf(1), 'a translated reprint never beats the familiar publisher');
+  assert.ok(ids.indexOf(2) === ids.length - 1 || ids.indexOf(2) >= 5, 'a seven-issue foreign reprint sits near the bottom');
+  // The user's own publishers count as familiar.
+  const mine = rankSearchResults(raw, 'Batman', { favoured: ['Panini Verlag'] }).map((v) => v.id);
+  assert.ok(mine.indexOf(4) < mine.indexOf(3), 'a favoured publisher moves up');
+  // Non-arrays pass through; ties keep the service's order.
+  assert.equal(rankSearchResults(null, 'x'), null);
+  assert.deepEqual(rankSearchResults([{ id: 1, name: 'A' }, { id: 2, name: 'A' }], 'A').map((v) => v.id), [1, 2]);
 });

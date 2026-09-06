@@ -12,6 +12,7 @@
   import { notify } from '../lib/toasts.svelte.js';
   import { can, isTrusted } from '../lib/auth.svelte.js';
   import Icon from '../lib/Icon.svelte';
+  import { hscroll } from '../lib/hscroll.js';
 
   let { active = false } = $props();
 
@@ -193,7 +194,7 @@
     </div>
 
     <!-- Stat strip band -->
-    <div class="qx__band qx__stats">
+    <div class="qx__band qx__stats" use:hscroll>
       <div class="qx__stat"><span class="qx__statchip qx__tone--cyan"><Icon name="zap" size={16} /></span>
         <div><div class="qx__statvalue">{fmt(counts.active)}</div><div class="qx__statlabel">Active</div></div></div>
       <div class="qx__stat"><span class="qx__statchip"><Icon name="clock" size={16} /></span>
@@ -205,7 +206,7 @@
     </div>
 
     <!-- Filter band -->
-    <div class="qx__band qx__filters">
+    <div class="qx__band qx__filters" use:hscroll>
       {#each FILTERS as f (f.key)}
         {@const n = f.key === 'all' ? counts.all : counts[f.key]}
         <button class="qx__tab" class:is-active={filter === f.key} onclick={() => { filter = f.key; }}>

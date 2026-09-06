@@ -16,7 +16,7 @@ import { initRssTables, unseenItems, markSeen, buildWantedIndex, matchFeedItems 
 import { findComicFiles, groupSeries, importMetaForFolder } from './scanner.js';
 import { extractYear } from './matcher.js';
 import { poolWithResource } from './pool.js';
-import { makeCvClient, cvKey } from './cv.js';
+import { makeCvClient, cvKey, rankSearchResults } from './cv.js';
 import { resolveBooks } from './cbl.js';
 import { tagFileFromCv, ensureCvIssueDetail, fetchAllIssueMetadata } from './metatagger.js';
 import { fetchWeeklyReleases, matchReleases, shiftWeek, currentWeek } from './releases.js';
@@ -228,7 +228,15 @@ async function runCvMatchSweep() {
 }
 
 async function cvSearch(q, opts = {}) {
-  return cvClient().search(q, opts);
+  const results = await cvClient().search(q, opts);
+  // The user's own publishers rank alongside the familiar ones — someone with
+  // a shelf of Panini Verlag wants those on top, not buried.
+  let favoured = [];
+  try {
+    favoured = db.prepare(`SELECT publisher FROM series WHERE (followed = 1 OR monitor IN ('all', 'new')) AND publisher IS NOT NULL AND publisher <> ''
+      GROUP BY publisher ORDER BY COUNT(*) DESC LIMIT 12`).all().map((r) => r.publisher);
+  } catch { /* ranking still works on the defaults */ }
+  return rankSearchResults(results, q, { favoured });
 }
 
 // Look up one ComicVine volume by id (for pasting a CV URL/id into the match
@@ -578,7 +586,6 @@ async function cleanupSeriesFiles(seriesId) {
 
 // Check this week's new releases and cross-reference them against tracked
 // comics by ComicVine id; new issues get cached (shown as missing).
-let lastNotifiedReleaseWeek = null; // dedupe the weekly release-day notification
 async function checkReleases({ week, year } = {}) {
   if (state.releases.running) return { busy: true };
   state.releases = { running: true };
@@ -608,9 +615,12 @@ async function checkReleases({ week, year } = {}) {
       // Release-day heads-up for followed series — once per week (the check
       // runs twice daily; dedupe on the week key so it doesn't repeat). Names
       // the first few single issues; collections are left out of the count.
-      const wkKey = `${yr}-${wk}`;
-      if (r.hits > 0 && lastNotifiedReleaseWeek !== wkKey) {
-        lastNotifiedReleaseWeek = wkKey;
+      // Deduped against the notification already stored for this week, so a
+      // restart (deploys, updates) doesn't post it again — the in-memory key
+      // this used to rely on reset every boot.
+      const weekUrl = `/releases?week=${wk}&year=${yr}`;
+      const told = db.prepare("SELECT 1 FROM notifications WHERE type = 'release.week' AND url = ? LIMIT 1").get(weekUrl);
+      if (r.hits > 0 && !told) {
         const singles = (r.releases || []).filter((x) => x.tracked && !x.collected);
         const named = singles.slice(0, 3).map((x) => `${x.series} #${x.number ?? '?'}`);
         const more = singles.length - named.length;
@@ -618,7 +628,7 @@ async function checkReleases({ week, year } = {}) {
         notifyRaw(db, { type: 'release.week', category: 'release', level: 'info',
           title: 'New releases this week',
           body: `${n} issue${n === 1 ? '' : 's'} from series you follow ship${n === 1 ? 's' : ''} this week${named.length ? ': ' + named.join(', ') + (more > 0 ? ` and ${more} more` : '') : ''}.`,
-          url: '/releases' });
+          url: weekUrl });
       }
       job.finish({ releases: r.total, inCollection: r.hits, newIssues: r.added });
     } catch (e) { state.releases = { running: false, error: String(e?.message || e), checkedAt: new Date().toISOString() }; job.fail(e); }

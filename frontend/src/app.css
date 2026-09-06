@@ -32,9 +32,11 @@
   --radius-sm: 7px;
   --shadow: 0 8px 28px rgba(0,0,0,.38);
 
-  --font-display: 'Anton', 'Arial Narrow', 'Haettenschweiler', Impact, sans-serif;
-  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  /* System stacks on purpose: the app ships no web fonts (the CSP allows none),
+     so these are exactly what every install renders with. */
+  --font-display: 'Arial Narrow', 'Haettenschweiler', Impact, 'Helvetica Neue', sans-serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;
 
   --topbar-h: 60px;
 }
@@ -1569,7 +1571,7 @@ a.cv-chip:hover { text-decoration: underline; }
 /* Releases drawer: publisher group headers + cover thumbnails. Rows flow into
    two columns when the drawer is wide (kills the dead middle); group headers
    span the full width. */
-#releases-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); column-gap: 28px; align-content: start; }
+#releases-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr)); column-gap: 28px; align-content: start; }
 .rel-group__head {
   grid-column: 1 / -1;
   display: flex; align-items: baseline; gap: 8px;
@@ -1749,9 +1751,9 @@ textarea.dialog-input { resize: vertical; font-family: var(--font-mono); }
 .setx-rail__item { display: flex; align-items: center; gap: 10px; text-align: left; padding: 10px 11px; border-radius: 9px; cursor: pointer; background: transparent; border: 1px solid var(--line); color: var(--text); }
 .setx-rail__item.is-active { border-color: var(--accent); background: rgba(255,45,111,.08); }
 .setx-rail__icon { color: var(--muted); display: inline-flex; }
-.setx-rail__text { flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.setx-rail__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .setx-rail__text b { font: 500 13.5px var(--font-body); }
-.setx-rail__text span { font-size: 11px; color: var(--faint); }
+.setx-rail__text span { font-size: 11px; color: var(--faint); white-space: normal; overflow-wrap: anywhere; }
 .setx-rail__item .setx-dot { width: 8px; height: 8px; }
 .setx-railwarn { display: flex; gap: 7px; align-items: center; color: var(--amber); font-size: 12px; margin: 4px 2px 0; }
 .setx-detail { min-width: 0; max-width: 600px; }
@@ -1796,9 +1798,9 @@ textarea.dialog-input { resize: vertical; font-family: var(--font-mono); }
 
 /* Sectioned source panels (Libraries-style cards) */
 .setx-srchead { display: flex; align-items: center; gap: 12px; }
-.setx-srchead__text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.setx-srchead__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .setx-srchead__text b { font: 600 14px var(--font-body); }
-.setx-srchead__text span { font-size: 12px; color: var(--faint); }
+.setx-srchead__text span { font-size: 12px; color: var(--faint); white-space: normal; overflow-wrap: anywhere; }
 .setx-panel .src-config.setx-srcbody { display: flex; flex-direction: column; gap: 0; padding: 0; border-top: none; }
 
 /* Plugin source blocks as master-detail panels: hidden in place until their
@@ -1876,3 +1878,23 @@ textarea.dialog-input { resize: vertical; font-family: var(--font-mono); }
 .qx__emptychip { width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 15px; background: var(--panel-2); display: grid; place-items: center; color: var(--faint); }
 .qx__empty b { display: block; font-size: 16px; font-weight: 600; margin-bottom: 6px; }
 .qx__empty p { font-size: 13px; color: var(--faint); margin: 0 auto; max-width: 360px; line-height: 1.6; }
+
+/* ---- Horizontal strips (chip rows, tab strips, stat bands) ----
+   `use:hscroll` (lib/hscroll.js) adds this class and toggles can-left /
+   can-right as the strip scrolls. The edge that has more content fades out,
+   so a clipped chip reads as "scroll for more", not "that's all". A mouse
+   wheel over the strip scrolls it sideways. */
+.hscroll { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; --hs-l: 0px; --hs-r: 0px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--hs-l), #000 calc(100% - var(--hs-r)), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 var(--hs-l), #000 calc(100% - var(--hs-r)), transparent); }
+.hscroll::-webkit-scrollbar { display: none; }
+.hscroll.can-left { --hs-l: 36px; }
+.hscroll.can-right { --hs-r: 36px; }
+
+/* Pages the router can't place: unknown URLs and pages the account can't open. */
+.nopage { display: grid; place-items: center; min-height: 60vh; padding: 24px; }
+.nopage__card { max-width: 420px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.nopage__art { width: 56px; height: 56px; border-radius: 14px; display: grid; place-items: center; background: var(--panel); color: var(--faint); }
+.nopage__title { font: 600 17px var(--font-body); }
+.nopage__text { color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.nopage__code { font: 12px var(--font-mono); color: var(--faint); }

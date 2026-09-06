@@ -10,6 +10,46 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **The Add button is always on screen.** The library toolbar scrolled
+  sideways with a hidden scrollbar, and Add sat at its far end — off-screen at
+  every desktop width, 1920 included. The filter chips now scroll on their
+  own, with the clipped edge fading out (and a mouse wheel scrolls them), while
+  sort, view, Select, Match and Add stay put. On phones the actions get their
+  own row.
+- **Every sideways strip says when there is more.** Wanted stats and chips,
+  plugin categories, settings tabs, queue bands and release filters fade at
+  the edge that has more content instead of cutting a word in half.
+- **Adding a series finds the run you mean.** Search results are ranked:
+  closest name first, then the familiar publishers and the ones already in
+  your library, newer and longer runs ahead of older and shorter ones.
+  "Batman" now leads with the current DC runs instead of translated reprints.
+- **The weekly release notice no longer repeats after a restart.** It is
+  deduped against the notification already stored for that week.
+- **A missing series says so.** A deleted or mistyped series link shows
+  "This series isn't in your library" with a way back, instead of a header of
+  placeholders and "is the app running?". Unknown URLs get a proper
+  not-found page, and a page your account can't open explains that rather
+  than silently showing Home.
+- **The browser tab names the page** ("Wanted · BackIssue", the series
+  title on a series page), so history and tabs make sense.
+- Phones: release rows keep their download button on screen; settings source
+  cards wrap their descriptions; the Wanted skip button and checkboxes are
+  finger-sized; the home page no longer tells you to use a sidebar you
+  can't see.
+- Dates on the Releases page read as local short dates ("ships Sep 9") and
+  the last check as "checked 5m ago". Stats names the built-in metadata
+  service instead of claiming a ComicVine key.
+- The sign-in error is a sentence. A failed library load in Settings is
+  reported instead of swallowed. Viewers no longer trigger forbidden
+  admin-only requests at start-up.
+
+### Changed
+
+- **No more web fonts.** The app linked Google Fonts that its own Content
+  Security Policy blocked, so every install rendered the fallback fonts
+  anyway and logged an error on each page. The link is gone and the system
+  font stacks are now the design.
+
 - **Installing, updating or removing a plugin now says it needs a restart.**
   The Plugins page only showed a passing toast, and its restart banner never
   appeared for those actions (it only tracked enable/disable), so on Docker,
@@ -25,8 +65,6 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   a numberless release is accepted for the first volume. Regular runs are
   unchanged. Manual search, and download sources that build on the shared
   search helpers, follow the same rules.
-
-### Changed
 
 - Official images now carry a signed release attestation that the hosted
   metadata service uses to recognise genuine BackIssue builds. Nothing to

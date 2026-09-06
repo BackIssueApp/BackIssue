@@ -139,8 +139,15 @@ export async function openVolume(id) {
     detailSelected.clear();
   }
   let det = null;
-  try { det = await apiGet('/api/collection/' + id); } catch { /* render error state */ }
-  if (!det || det.error) { detail.series = { id: Number(id), title: 'Comic' }; detail.det = null; detail.failed = true; return; }
+  try { det = await apiGet('/api/collection/' + id); } catch (e) { det = { error: String(e?.message || e || 'request failed') }; }
+  if (!det || det.error) {
+    const reason = String(det?.error || 'no response');
+    detail.series = { id: Number(id), title: 'Comic' }; detail.det = null; detail.failed = true;
+    detail.notFound = /not found|404/i.test(reason); // a missing series reads differently from a dead server
+    detail.failReason = reason;
+    return;
+  }
+  detail.notFound = false; detail.failReason = '';
   const cv = det.cv, sr = det.series || {};
   detail.series = {
     id: Number(id),
