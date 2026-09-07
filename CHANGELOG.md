@@ -10,6 +10,14 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **Mobile library filters answer in milliseconds, not seconds.** The
+  unpaginated collection list the mobile apps use mapped every series row,
+  including the whole on-demand ebook and audiobook catalogs, before
+  dropping the non-comic rows. On a large library that cost about four
+  seconds per filter change. The exclusion now happens in the query.
+
+### Fixed
+
 - **A frozen server restarts itself.** If the main thread stops responding
   for two minutes, or the heap sits at V8's limit for a minute and a half,
   a watchdog thread kills the process so Docker's restart policy brings up

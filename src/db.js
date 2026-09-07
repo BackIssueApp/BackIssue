@@ -1007,10 +1007,11 @@ function collLeanCols(guard) {
 // A collection MEMBER = followed OR owns a valid file OR the caller personally
 // follows OR (self-described) has catalog issue rows. The optional scope narrows
 // by mature-visibility / library / search. Returns the WHERE fragment + its params.
-function membershipWhere({ guard, selfTypesLen, includeRestricted = true, library = null, search = '', restrictIds = null, collectionsOnly = false }) {
+function membershipWhere({ guard, selfTypesLen, includeRestricted = true, library = null, search = '', restrictIds = null, collectionsOnly = false, excludeSelfDescribed = false }) {
   const sql = `WHERE (s.followed=1 OR COALESCE(lf.file_count, 0) > 0
            OR mf.series_id IS NOT NULL
            ${selfTypesLen ? `OR (${guard} AND COALESCE(iss.bc_total, 0) > 0)` : ''})
+      ${excludeSelfDescribed && selfTypesLen ? `AND NOT (${guard})` : ''}
       ${includeRestricted ? '' : 'AND s.restricted = 0'}
       ${library != null ? 'AND s.library_id = @lib' : ''}
       ${restrictIds ? 'AND s.id IN (SELECT value FROM json_each(@restrictIds))' : ''}
@@ -1158,27 +1159,67 @@ function mapCollectionRow(r) {
 // over the whole membership set. Used by the array API (stats/tests/internal
 // callers) and the legacy full-array route. Not paginated: every member is
 // mapped, so prefer collectionPage with a limit for the Library grid.
-function mapCollection(db, { search = '', sort = 'title', includeRestricted = true, userId = null, library = null } = {}) {
+function mapCollection(db, { search = '', sort = 'title', includeRestricted = true, userId = null, library = null, excludeSelfDescribed = false } = {}) {
   const { selfTypes, params: selfParams, guard } = selfTypeGuard('s.');
-  const mem = membershipWhere({ guard, selfTypesLen: selfTypes.length, includeRestricted, library, search });
+  const mem = membershipWhere({ guard, selfTypesLen: selfTypes.length, includeRestricted, library, search, excludeSelfDescribed });
   const orderBy = COLL_ORDERS[sort] || COLL_ORDERS.title;
+  // Scope the per-series rollups (files, issues) the same way as the member
+  // set: without it they aggregate every issue in the catalog, on-demand
+  // ebook and audiobook entries included, for a result that keeps none of them.
+  const excl = excludeSelfDescribed && selfTypes.length;
+  const scopeSql = excl
+    ? `SELECT id FROM series WHERE ${library != null ? 'library_id=@lib AND ' : ''}NOT (${selfTypeGuard('').guard})`
+    : libraryScopeSql(library);
   // Wrap the base select in a `coll` CTE so the ORDER BY resolves cv_total /
   // cv_owned / title against REAL (materialised) columns. Referencing output
   // aliases inside an ORDER BY expression like (cv_total - cv_owned) is not
   // reliably resolved by SQLite — the missing sort silently mis-ordered.
-  const rows = db.prepare(`WITH ${collCtes(libraryScopeSql(library))},
+  const rows = db.prepare(`WITH ${collCtes(scopeSql)},
     coll AS (${collFullCols(guard)} ${COLL_JOINS} ${mem.sql})
     SELECT * FROM coll ${orderBy}`).all({ uid: userId ?? -1, ...selfParams, ...mem.params });
   return rows.map(mapCollectionRow);
 }
 
 export function collectionSeries(db, { filter = 'all', excludeSelfDescribed = false, ...opts } = {}) {
-  let rows = mapCollection(db, opts).filter((r) => seriesMatchesFilter(r, filter));
   // Mobile clients consume the unpaginated array shape and can't yet handle the
-  // on-demand ebook catalog (150k self-described entries), so callers can ask to
-  // drop plugin-owned self-described library types and keep the native comics.
-  if (excludeSelfDescribed) rows = rows.filter((r) => !SELF_DESCRIBED_TYPES.has(r.type || 'comic'));
-  return rows;
+  // on-demand ebook/audiobook catalogs (hundreds of thousands of self-described
+  // entries), so callers can ask to drop plugin-owned self-described library
+  // types and keep the native comics. That set is small, so it is selected by
+  // id first (an indexed walk over the native types) and only those rows are
+  // hydrated, with the file/issue rollups scoped to them. Mapping the whole
+  // catalog and discarding most of it afterwards cost ~4 s per request on a
+  // large library, for a few thousand comics in the answer.
+  if (excludeSelfDescribed && SELF_DESCRIBED_TYPES.size) return nativeCollectionSeries(db, { filter, ...opts });
+  return mapCollection(db, opts).filter((r) => seriesMatchesFilter(r, filter));
+}
+
+// The native (non-self-described) members of the collection, same row shape
+// and membership rule as mapCollection. Ids come off idx_series_type (native
+// types are a handful of values; NULL/'' mean comic), membership is checked
+// with indexed EXISTS probes, then the ids are hydrated in one query whose
+// rollups aggregate only those series.
+function nativeCollectionSeries(db, { filter = 'all', search = '', sort = 'title', includeRestricted = true, userId = null, library = null } = {}) {
+  const { params: selfParams, guard } = selfTypeGuard('s.');
+  const native = SERIES_TYPES.filter((t) => !SELF_DESCRIBED_TYPES.has(t));
+  const ntParams = {}; native.forEach((t, i) => { ntParams['nt' + i] = t; });
+  const nativeList = native.length ? native.map((_, i) => '@nt' + i).join(',') : `'comic'`;
+  const idRows = db.prepare(`SELECT s.id FROM series s
+    WHERE (s.type IS NULL OR s.type = '' OR s.type IN (${nativeList})) AND NOT (${guard})
+      AND (s.followed = 1
+           OR EXISTS (SELECT 1 FROM library_files f WHERE f.series_id = s.id AND f.valid = 1)
+           OR EXISTS (SELECT 1 FROM user_follows uf WHERE uf.series_id = s.id AND uf.user_id = @uid))
+      ${includeRestricted ? '' : 'AND s.restricted = 0'}
+      ${library != null ? 'AND s.library_id = @lib' : ''}
+      ${search ? 'AND (s.title LIKE @q OR EXISTS (SELECT 1 FROM cv_series cv WHERE cv.comicvine_id = s.cv_id AND (cv.name LIKE @q OR cv.publisher LIKE @q)))' : ''}`)
+    .all({ uid: userId ?? -1, ...selfParams, ...ntParams, ...(library != null ? { lib: library } : {}), ...(search ? { q: `%${search}%` } : {}) });
+  if (!idRows.length) return [];
+  const ids = JSON.stringify(idRows.map((r) => r.id));
+  const scope = 'SELECT value FROM json_each(@ids)';
+  const orderBy = COLL_ORDERS[sort] || COLL_ORDERS.title;
+  const rows = db.prepare(`WITH ${collCtes(scope)},
+    coll AS (${collFullCols(guard)} ${COLL_JOINS} WHERE s.id IN (${scope}))
+    SELECT * FROM coll ${orderBy}`).all({ uid: userId ?? -1, ...selfParams, ids });
+  return rows.map(mapCollectionRow).filter((r) => seriesMatchesFilter(r, filter));
 }
 
 // A Library page: rows for one filter/search/sort window (LIMIT/OFFSET), the
