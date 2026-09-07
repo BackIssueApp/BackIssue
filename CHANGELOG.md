@@ -10,6 +10,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **One collection load on reload, not two.** The web app requested the
+  first library page and the chip counts twice at boot.
+
+### Fixed
+
 - **Mobile library filters answer in milliseconds, not seconds.** The
   unpaginated collection list the mobile apps use mapped every series row,
   including the whole on-demand ebook and audiobook catalogs, before

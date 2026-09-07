@@ -163,7 +163,10 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
     if (can('library.manage')) startOpsTracking();
     if (can('settings.manage')) loadFlags();
     loadClientPlugins();
-    loadCollection();
+    // The rail effect above loads the collection as soon as auth resolves
+    // (it watches `authed` too), so a second call here fetched page 1 and
+    // the chip counts twice on every reload — ~200 KB and two round trips
+    // for nothing.
   });
 
   // ---- Keyboard: Escape closes the topmost modal, else backs out of a
