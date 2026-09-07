@@ -64,6 +64,12 @@ ENV BUILD_SHA=$BUILD_SHA
 COPY tools/attest.mjs ./tools/attest.mjs
 RUN --mount=type=secret,id=attest_key,required=false node tools/attest.mjs > build.json
 
+# Same liveness probe as the standard image: a request the app must answer
+# from its event loop, so a wedged process reads as unhealthy on `docker ps`
+# (the in-process watchdog is what actually restarts it).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
 # The entrypoint starts Xvfb (the virtual display) then execs the command, so the
 # headed browser has a screen to render into with no physical display attached.
 ENTRYPOINT ["/app/docker/entrypoint-browser.sh"]

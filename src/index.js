@@ -26,6 +26,7 @@ import { createDownloadMonitor } from './downloadmonitor.js';
 import { tagAllUntagged, convertAllCbr, removeAllDuplicates, verifyLibrary, relinkAllCv, scanEntireLibrary, backupDatabase, renameAllFiles, removeGhostSeries } from './tools.js';
 import { collectionStats } from './stats.js';
 import { installConsoleCapture, attachLogDb, listLogs, clearLogs, logInfo, logWarn, logError, logCounts, logCategories } from './logstore.js';
+import { startWatchdog } from './watchdog.js';
 import { runCvMatch as runCvMatchLib, cacheAndLink, addSeriesFromCv, refreshCvVolume, refreshAllIssueDetails, rankCandidates, rematchMismatched, mergeDuplicateSeries } from './cvmatch.js';
 import { getSeriesById, seriesCollectionDetail, untrackSeries, getCvIssue, upsertSeries, setSeriesPath,
   ensureCvIssueRow, recordGrab, getGrab, setGrabStatus, setIssueStatus, setSeriesAliases, setSeriesType, listLibraries, libraryFolders, createLibrary, assignSeriesLibrary, seriesSearchNames,
@@ -1350,6 +1351,18 @@ const httpServer = app.listen(config.port, () => {
   console.log(`UI ready: http://localhost:${config.port}`);
 });
 scheduler.start();
+
+// A wedged main thread (a runaway loop, or a heap pinned at V8's limit) takes
+// every route and timer down with it and can't even honour SIGTERM. The
+// watchdog worker notices and kills the process, so the supervisor's restart
+// policy brings back a fresh one instead of a silent, hours-long outage.
+// BACKISSUE_WATCHDOG=0 disables it; BACKISSUE_WATCHDOG_STALL_MS tunes it.
+if (process.env.BACKISSUE_WATCHDOG !== '0') {
+  startWatchdog({
+    stallMs: Number(process.env.BACKISSUE_WATCHDOG_STALL_MS) || undefined,
+    log: { info: (m) => logInfo(m, 'app'), warn: (m) => logWarn(m, 'app') },
+  });
+}
 
 // Resume the download queue after a restart. Queued rows survive in the DB
 // but the worker only ever started when NEW work arrived — so a queue that

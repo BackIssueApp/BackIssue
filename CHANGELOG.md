@@ -8,6 +8,16 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A frozen server restarts itself.** If the main thread stops responding
+  for two minutes, or the heap sits at V8's limit for a minute and a half,
+  a watchdog thread kills the process so Docker's restart policy brings up
+  a fresh one, instead of the site silently timing out for hours. Memory
+  use is logged every ten minutes so a leak leaves a trend in the log.
+  `BACKISSUE_WATCHDOG=0` turns it off. The browser image now carries the
+  same health check as the standard one.
+
 ## [0.8.0] — 2026-09-05
 
 ### Fixed
