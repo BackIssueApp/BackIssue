@@ -45,6 +45,21 @@ export function stripEditionSuffix(series) {
   return String(series || '').replace(/[\s._-]*\b(TPB|HC|Omnibus|Graphic Novel|OGN|Compendium|Trade Paperback|Hardcover|Deluxe Edition|Collected Edition|Collection)\b\s*$/i, '').trim();
 }
 
+/** Does this release announce itself as a collected edition, in a way none of
+ *  the series' own names explain?
+ *
+ *  A trade names its volume the way an issue names its number, so "Series Vol.
+ *  12 (TPB)" parses as number 12 and scores exactly like issue #12 — and
+ *  grabbing it files a whole collection under one issue, which then reads as
+ *  done. Only the unambiguous words count: a bare "Vol. 2" can equally mean a
+ *  relaunch, and rejecting those would lose real issues. A series whose OWN
+ *  name carries the word (a volume actually called "… Omnibus") is not
+ *  announcing an edition, so its releases keep matching. */
+export function collectedRelease(title, names = []) {
+  if (!COLLECTED_NAME.test(String(title || ''))) return false;
+  return !names.some((n) => COLLECTED_NAME.test(String(n || '')));
+}
+
 /** Search queries for one collected-edition issue: the bare name, plus the
  *  scene-style volume marker ("v02") when the number is above 1. */
 export function collectedQueries(name, issue, normalize = (n) => String(n ?? '')) {

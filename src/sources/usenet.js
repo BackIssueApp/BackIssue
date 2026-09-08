@@ -1,4 +1,4 @@
-import { isCollectedSeries, stripEditionSuffix, collectedQueries } from '../editions.js';
+import { isCollectedSeries, stripEditionSuffix, collectedQueries, collectedRelease } from '../editions.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import JSZip from 'jszip';
@@ -91,6 +91,12 @@ export function scoreRelease(title, target) {
   const relSeries = normalizeSeries(p.series);
   const relBare = target.collected ? normalizeSeries(stripEditionSuffix(p.series)) : relSeries;
   if (!accepted.includes(relSeries) && !accepted.includes(relBare)) return null;
+  // A single issue is not a collection. When the wanted run is not itself a
+  // collected edition, a release that announces one carries a VOLUME number
+  // where an issue number would be — so it would score identically to the
+  // issue and, once grabbed, file a whole trade under it. Manual search still
+  // lists these: a null score orders them last rather than hiding them.
+  if (!target.collected && collectedRelease(title, target.names?.length ? target.names : [target.series])) return null;
   // Normalize both sides so ½ / 1/2 / 0.5 / 000.5 all compare equal.
   const wantNum = normalizeNumber(target.number);
   if (wantNum !== '') {

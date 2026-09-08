@@ -311,3 +311,46 @@ test('a source is only asked for library types it actually serves', async () => 
   assert.ok(ids('comic').includes('comicsite') && !ids('comic').includes('mangasite'));
   assert.ok(ids('manga').includes('mangasite') && !ids('manga').includes('comicsite'));
 });
+
+test('a collected edition never satisfies a request for a single issue', async () => {
+  const { collectedRelease } = await import('../src/editions.js');
+  // The wanted thing is issue 12 of an ordinary run.
+  const target = { series: 'Saga', names: ['Saga'], number: '12', year: '2012' };
+
+  // A trade names its VOLUME 12 the way an issue names its number, so before
+  // this guard it scored exactly like the issue and could win on ordering.
+  assert.equal(scoreRelease('Saga Vol. 12 (TPB) (2025)', target), null);
+  assert.equal(scoreRelease('Saga Volume 12 Hardcover (2025)', target), null);
+  assert.equal(scoreRelease('Saga 12 (Omnibus) (2025)', target), null);
+
+  // The issue itself is untouched, in either naming style.
+  assert.equal(scoreRelease('Saga #12 (2013)', target), 90);
+  assert.equal(scoreRelease('Saga 012 (2013)', target), 90);
+  assert.equal(scoreRelease('Saga 012 (2012)', target), 120, 'a matching year still scores highest');
+
+  // A bare volume word is ambiguous — a relaunch reads the same — so it is
+  // deliberately NOT treated as a collection; rejecting it would lose issues.
+  assert.equal(scoreRelease('Saga Vol. 12 (2013)', target), 90);
+});
+
+test('a collected run still matches its own releases, including its edition word', () => {
+  // The wanted thing IS a collection: "volume 2" is what to look for.
+  const target = { series: 'Saga Deluxe Edition', names: ['Saga Deluxe Edition'], number: '2', year: '2016', collected: true };
+  assert.ok(scoreRelease('Saga Deluxe Edition v02 (2016)', target) != null);
+  assert.ok(scoreRelease('Saga Deluxe Edition 02 (2016)', target) != null);
+
+  // And a series whose OWN name carries the word keeps matching releases that
+  // repeat it, even when the request is for a numbered entry in that run.
+  const named = { series: 'Batman Secret Files Omnibus', names: ['Batman Secret Files Omnibus'], number: '3', year: '2020' };
+  assert.ok(scoreRelease('Batman Secret Files Omnibus 003 (2020)', named) != null,
+    'the edition word is part of the name, not an announcement');
+});
+
+test('collectedRelease is about the release, judged against the series names', async () => {
+  const { collectedRelease } = await import('../src/editions.js');
+  assert.equal(collectedRelease('Saga Vol. 12 (TPB) (2025)', ['Saga']), true);
+  assert.equal(collectedRelease('Saga #12 (2013)', ['Saga']), false);
+  assert.equal(collectedRelease('Saga Vol. 12 (2013)', ['Saga']), false, 'a bare volume word is not enough');
+  assert.equal(collectedRelease('Batman Omnibus 003', ['Batman Omnibus']), false, 'explained by the series name');
+  assert.equal(collectedRelease('Batman Omnibus 003', ['Batman']), true, 'not explained by the series name');
+});

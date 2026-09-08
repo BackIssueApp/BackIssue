@@ -8,6 +8,17 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A collected edition no longer arrives in place of a single issue.** A trade
+  or omnibus numbers its volume where an issue numbers itself, so a request for
+  issue 12 could be answered with volume 12 of a collection — a much larger
+  file, filed under that issue and marked done, so the real issue was never
+  fetched again. A release that announces itself as a collection is now refused
+  when the series being downloaded is not itself a collected run. Collections
+  still match their own releases, a series whose name carries an edition word
+  is unaffected, and a manual search still lists everything so you can choose.
+
 ### Changed
 
 - **Download sites are managed together, apart from plugins.** A site the app
