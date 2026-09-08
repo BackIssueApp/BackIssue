@@ -5,6 +5,7 @@ import { createApp } from './server.js';
 import config from './config.js';
 import { loadSettings, currentSettings, saveSettings } from './settings.js';
 import { buildSupportPackage } from './support.js';
+import { sendSupportPackage } from './cv.js';
 import { pluginCatalog as supportPluginCatalog, registeredSources as supportSources, registeredNotifiers as supportNotifiers, pluginsDir as supportPluginsDir } from './plugins.js';
 import { listLibraries as supportLibraries, libraryStats as supportLibraryStats, listImportHistory as supportImportHistory } from './db.js';
 import { loadAttestation as supportBuildInfo } from './attest.js';
@@ -1299,6 +1300,20 @@ async function prepareRedownload(issueIds) {
   }
 }
 
+// The support package (System → Tools): built the same way whether it is
+// downloaded or sent to the hosted support service.
+const appVersionNow = () => { try { return JSON.parse(fss.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version; } catch { return '0.0.0'; } };
+const buildSupportPackageNow = () => buildSupportPackage({
+    db, config, settings: currentSettings,
+    version: appVersionNow(),
+    build: supportBuildInfo(),
+    dataDir: nodePath.dirname(config.dbPath || ''), dbPath: config.dbPath || '', pluginsDir: supportPluginsDir(),
+    plugins: supportPluginCatalog, jobs: () => listJobs(60), schedules: () => scheduler.list(),
+    logs: (o) => ({ logs: listLogs(o) }), sources: supportSources, notifiers: supportNotifiers,
+    libraries: () => supportLibraries(db), libraryStats: () => supportLibraryStats(db), state,
+    importHistory: () => supportImportHistory(db, { limit: 100 }).items,
+  });
+
 const app = createApp({
   db, runDownloads, state,
   prepareRedownload,
@@ -1353,16 +1368,11 @@ const app = createApp({
   setScheduleCron,
   runScheduleNow: (key) => scheduler.runNow(key),
   getSettings: currentSettings,
-  supportPackage: () => buildSupportPackage({
-    db, config, settings: currentSettings,
-    version: (() => { try { return JSON.parse(fss.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version; } catch { return '0.0.0'; } })(),
-    build: supportBuildInfo(),
-    dataDir: nodePath.dirname(config.dbPath || ''), dbPath: config.dbPath || '', pluginsDir: supportPluginsDir(),
-    plugins: supportPluginCatalog, jobs: () => listJobs(60), schedules: () => scheduler.list(),
-    logs: (o) => ({ logs: listLogs(o) }), sources: supportSources, notifiers: supportNotifiers,
-    libraries: () => supportLibraries(db), libraryStats: () => supportLibraryStats(db), state,
-    importHistory: () => supportImportHistory(db, { limit: 100 }).items,
-  }),
+  supportPackage: () => buildSupportPackageNow(),
+  supportSend: async ({ note = '' } = {}) => {
+    const pkg = await buildSupportPackageNow();
+    return sendSupportPackage(config, pkg.buffer, { version: appVersionNow(), note });
+  },
   saveSettings,
   requestRestart,
 });

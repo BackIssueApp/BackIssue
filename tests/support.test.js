@@ -5,6 +5,7 @@ import { openDb } from '../src/db.js';
 import { createApp } from '../src/server.js';
 import { registeredRoutes } from '../src/plugins.js';
 import { buildSupportPackage, redactSecrets, redactText, redactValue, describeIndexers } from '../src/support.js';
+import { sendSupportPackage } from '../src/cv.js';
 
 test('redaction: secret-named settings keep only their length, plain ones pass through', () => {
   assert.equal(redactValue('comicvineKeys', 'abcdef0123456789'), '[redacted 16 chars]');
@@ -114,4 +115,30 @@ test('GET /api/support/package answers a zip with a filename, and needs settings
     const zip = await JSZip.loadAsync(buf);
     assert.ok(zip.file('summary.json'));
   } finally { s.close(); }
+});
+
+test('sendSupportPackage: posts the zip with the instance key and returns the code, or the service reason', async () => {
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, init });
+    if (url.endsWith('/api/register')) return { ok: true, status: 200, json: async () => ({ key: 'inst-key-1' }) };
+    if (url.includes('/support/upload')) {
+      if (init.headers['x-api-key'] !== 'inst-key-1') return { ok: false, status: 401, json: async () => ({ error: 'a registered instance key is required' }) };
+      return { ok: true, status: 200, json: async () => ({ code: '7K3M-9Q2X', expires_in_days: 60 }) };
+    }
+    throw new Error('unexpected ' + url);
+  };
+  process.env.METADATA_BASE_OVERRIDE = 'https://svc.example/api';
+  try {
+    const config = { metadataInstanceKey: 'inst-key-1' };
+    const r = await sendSupportPackage(config, Buffer.from('PKzip'), { version: '0.8.0', note: 'covers missing', fetchImpl });
+    assert.deepEqual(r, { code: '7K3M-9Q2X', expiresInDays: 60 });
+    const up = calls.find((c) => c.url.includes('/support/upload'));
+    assert.equal(up.url, 'https://svc.example/api/support/upload?version=0.8.0&note=covers+missing');
+    assert.equal(up.init.method, 'POST');
+    assert.equal(up.init.headers['content-type'], 'application/zip');
+    assert.equal(up.init.body.toString(), 'PKzip');
+    // A refusal surfaces the service's reason.
+    await assert.rejects(() => sendSupportPackage({ metadataInstanceKey: 'wrong' }, Buffer.from('PK'), { fetchImpl }), /did not accept the package: a registered instance key is required/);
+  } finally { delete process.env.METADATA_BASE_OVERRIDE; }
 });

@@ -10,6 +10,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Send to support.** Next to the download, "Send to BackIssue support"
+  uploads the same package to the hosted service, authenticated with the
+  install's own metadata key, and shows a short code to quote in the
+  report. The package is kept for 60 days and only the BackIssue team can
+  open it. An optional note travels with it.
 - **Support package.** System → Tools → Getting help downloads one zip to
   attach to a bug report: version and build, runtime and host, disk and
   database size, settings with every key, password and token redacted,

@@ -245,6 +245,19 @@
     clearTimeout(copyRow._t); copyRow._t = setTimeout(() => { copiedId = ''; }, 1200);
   }
   let supportBusy = $state(false), supportError = $state('');
+  let sendBusy = $state(false), sendNote = $state(''), sendResult = $state(null), codeCopied = $state(false);
+  async function sendSupport() {
+    sendBusy = true; supportError = ''; sendResult = null;
+    try {
+      const r = await apiPost('/api/support/send', { note: sendNote });
+      if (r.error) { supportError = r.error; return; }
+      sendResult = r;
+    } finally { sendBusy = false; }
+  }
+  async function copyCode() {
+    if (!sendResult?.code) return;
+    try { await navigator.clipboard.writeText(sendResult.code); codeCopied = true; setTimeout(() => { codeCopied = false; }, 1500); } catch { /* the code is on screen */ }
+  }
   async function downloadSupport() {
     supportBusy = true; supportError = '';
     try {
@@ -435,8 +448,19 @@
             {#if supportError}
               <div class="sysx__tool-result sysx__tool-result--err"><Icon name="close" size={14} /> {supportError}</div>
             {/if}
+            {#if sendResult?.code}
+              <div class="sysx__tool-result sysx__support-code">
+                <Icon name="check" size={14} />
+                <span>Sent. Quote this code in your report:</span>
+                <code class="sysx__code">{sendResult.code}</code>
+                <button class="sysx__ghost" onclick={copyCode}>{codeCopied ? 'Copied' : 'Copy'}</button>
+                {#if sendResult.expiresInDays}<span class="sysx__muted">kept for {sendResult.expiresInDays} days</span>{/if}
+              </div>
+            {/if}
             <div class="sysx__tool-actions">
-              <button class="sysx__primary" disabled={supportBusy} onclick={downloadSupport}>{supportBusy ? 'Building…' : 'Download support package'}</button>
+              <button class="sysx__primary" disabled={supportBusy || sendBusy} onclick={downloadSupport}>{supportBusy ? 'Building…' : 'Download support package'}</button>
+              <input class="sysx__support-note" placeholder="What's wrong? (optional, goes with the package)" maxlength="200" bind:value={sendNote} disabled={sendBusy} />
+              <button class="sysx__ghost" disabled={supportBusy || sendBusy} onclick={sendSupport}>{sendBusy ? 'Sending…' : 'Send to BackIssue support'}</button>
             </div>
           </div>
         </div>
@@ -653,7 +677,11 @@
   .sysx__tool-meta { font-size: 11.5px; color: var(--faint); margin-top: 6px; }
   .sysx__tool-result { font-size: 12px; color: var(--green); margin-top: 11px; display: flex; align-items: center; gap: 6px; }
   .sysx__tool-result--err { color: var(--red); }
-  .sysx__tool-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .sysx__tool-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
+  .sysx__support-note { flex: 1 1 220px; min-width: 0; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line, #2a2a30); background: var(--panel, #17171b); color: inherit; font: inherit; font-size: 13px; }
+  .sysx__support-code { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .sysx__code { font-size: 15px; font-weight: 700; letter-spacing: 0.08em; padding: 3px 8px; border-radius: 6px; background: var(--panel, #17171b); border: 1px solid var(--line, #2a2a30); }
+  .sysx__muted { opacity: 0.7; font-size: 12px; }
   .sysx__tool-opt { display: flex; align-items: center; gap: 8px; margin-top: 11px; cursor: pointer; font-size: 12px; color: var(--muted); }
   .sysx__tool-opt input { accent-color: var(--accent); width: 15px; height: 15px; }
   .sysx__tool-foot { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line); display: flex; }

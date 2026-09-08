@@ -92,6 +92,38 @@ export async function ensureInstanceKey(config, base, doFetch) {
   })());
 }
 
+/** The hosted metadata service's API base (env override for tests/dev). */
+export function hostedApiBase() {
+  return String(process.env.METADATA_BASE_OVERRIDE || '').trim().replace(/\/+$/, '') || HOSTED_BASE;
+}
+
+/**
+ * Send a support package (the zip from System → Tools) to the hosted service,
+ * authenticated with this install's own instance key, and return the short
+ * code the service answers with. Throws with the service's reason on refusal.
+ */
+export async function sendSupportPackage(config, buffer, { version = '', note = '', fetchImpl } = {}) {
+  const doFetch = fetchImpl || fetch;
+  const base = hostedApiBase();
+  const apiKey = await ensureInstanceKey(config, base, doFetch);
+  const q = new URLSearchParams();
+  if (version) q.set('version', String(version).slice(0, 40));
+  if (note) q.set('note', String(note).slice(0, 200));
+  const url = `${base}/support/upload${q.size ? '?' + q : ''}`;
+  const resp = await doFetch(url, {
+    method: 'POST',
+    headers: { 'User-Agent': UA, 'x-api-key': apiKey, 'content-type': 'application/zip', ...attestHeaders() },
+    body: buffer,
+  });
+  let data = null;
+  try { data = await resp.json(); } catch { data = null; }
+  if (!resp.ok || !data?.code) {
+    const why = data?.error || `HTTP ${resp.status}`;
+    throw new Error(`The support service did not accept the package: ${why}`);
+  }
+  return { code: data.code, expiresInDays: data.expires_in_days ?? null };
+}
+
 export function makeCvClient(config, { fetchImpl, key, politeMs } = {}) {
   // Direct-ComicVine mode is an explicit user preference AND needs a key;
   // otherwise the hosted metadata service (or a self-hosted cvBaseUrl) with a

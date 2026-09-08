@@ -41,7 +41,7 @@ if (process.env.BUILD_CHANNEL && process.env.BUILD_CHANNEL !== 'release') {
   APP_VERSION += `-${process.env.BUILD_CHANNEL}${sha ? '.' + sha : ''}`;
 }
 
-export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, queueProgress, packProgress, cancelGrab, testCvKeys, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, supportPackage, state }) {
+export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, queueProgress, packProgress, cancelGrab, testCvKeys, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, supportPackage, supportSend, state }) {
   const startDownloads = (arg) => {
     if (!state.queue.running) {
       state.queue.running = true;
@@ -1204,6 +1204,19 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       res.send(buffer);
     } catch (e) {
       res.status(500).json({ error: `Could not build the support package: ${e?.message || e}` });
+    }
+  });
+
+  // POST /api/support/send — build the package and hand it to the hosted
+  // support service, which answers with a short code the user quotes in
+  // their report. Same admin permission as the download.
+  app.post('/api/support/send', async (req, res) => {
+    if (!supportSend) return res.status(501).json({ error: 'Sending to support is not available' });
+    try {
+      const note = String(req.body?.note || '').slice(0, 200);
+      res.json(await supportSend({ note }));
+    } catch (e) {
+      res.status(502).json({ error: String(e?.message || e) });
     }
   });
 
