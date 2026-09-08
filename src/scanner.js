@@ -47,9 +47,18 @@ export function parseIssueFromFilename(name) {
   // the ½ promo, "1.1" as a point-one), then take the last non-year number.
   const yearMatch = base.match(/\((?:19|20)\d{2}\)/);
   const head = yearMatch ? base.slice(0, yearMatch.index) : base;
+  // An explicit "#23" IS the issue number, whatever numbers come after it. A
+  // story part or chapter ("… #23 - The Straw Man, Part 5 …") otherwise wins
+  // simply by being last, and the file lands as issue 5.
+  const hashed = head.replace(/\([^)]*\)|\[[^\]]*\]/g, ' ').match(/#\s*(\d+(?:\.\d+)?)/);
+  if (hashed) return hashed[1];
   const cleaned = head
     .replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')
     .replace(/_+/g, ' ')
+    // Same trap without the hash: "Series 023 - Part 5" must not read as 5.
+    // Only these counter words are dropped — a bare trailing number is still
+    // the issue, which is how most scene filenames are written.
+    .replace(/\b(?:part|pt|chapter|ch)\b\s*\.?\s*\d+(?:\.\d+)?/gi, ' ')
     .replace(/(?<!\d)\.|\.(?!\d)/g, ' ');
   const nums = cleaned.match(/\d+(?:\.\d+)?/g);
   if (nums) {

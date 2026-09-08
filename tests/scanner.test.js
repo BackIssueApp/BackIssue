@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseIssueFromFilename, groupSeries, findMissing, findComicFiles, matchCatalogSeries, scanLibrary, issueKey, issueLabel, relinkScanEntry } from '../src/scanner.js';
+import { normalizeNumber } from '../src/matcher.js';
 
 test('scanLibrary honors a saved match override over the fuzzy match', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'lib-'));
@@ -329,4 +330,24 @@ test('importMetaForFolder types a series from ComicInfo Manga tag', async () => 
   assert.equal(meta.series, 'Berserk');
   assert.equal(meta.type, 'manga');
   await fs.rm(dir, { recursive: true, force: true });
+});
+
+test('an explicit issue number wins over a story part in the same filename', () => {
+  // Reported by a user: this file was landing as issue 5, because the parser
+  // took the LAST number before the year and "Part 5" comes after "#23".
+  assert.equal(parseIssueFromFilename('Absolute Batman - #23 - The Straw Man, Part 5 - (Volume.01) - (2024).cbz'), '23');
+  assert.equal(parseIssueFromFilename('Series - #7 - A Title, Part 2 - (2023).cbz'), '7');
+  assert.equal(parseIssueFromFilename('Series - #23 - Chapter 4 - (2024).cbz'), '23');
+  // The same trap without a hash: a counter word is not the issue number.
+  assert.equal(normalizeNumber(parseIssueFromFilename('Series 023 - Part 5 (2024).cbz')), '23');
+  assert.equal(normalizeNumber(parseIssueFromFilename('Series 023 - Pt. 5 (2024).cbz')), '23');
+
+  // Ordinary scene names must keep parsing exactly as before.
+  assert.equal(normalizeNumber(parseIssueFromFilename('Series 012 (2013) (Digital) (Group).cbz')), '12');
+  assert.equal(normalizeNumber(parseIssueFromFilename('Series (2016) 012 (Digital).cbz')), '12');
+  assert.equal(parseIssueFromFilename('Series 000.5 (2013).cbz'), '000.5');
+  assert.equal(parseIssueFromFilename('Series Annual 2 (2019).cbz'), '2');
+  assert.equal(parseIssueFromFilename('Series 5 (2019).cbz'), '5');
+  // A series whose own name ends in a counter word still reads its number.
+  assert.equal(normalizeNumber(parseIssueFromFilename('Part Time Heroes 007 (2021).cbz')), '7');
 });

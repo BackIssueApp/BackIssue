@@ -63,7 +63,7 @@ export async function removeExtraCopies(db, seriesId, { dryRun = false } = {}) {
   for (const f of rows) { if (!byIssue.has(f.cv_issue_id)) byIssue.set(f.cv_issue_id, []); byIssue.get(f.cv_issue_id).push(f); }
   // A ".backup" / "(1)" / "copy" name marks a file some tool duplicated; when
   // copies are otherwise equal the cleanly named one is the one to keep.
-  const messy = (f) => (/\.backup|\(\d+\)\.[a-z]+$|copy/i.test(f.name) ? 1 : 0);
+  const messy = (f) => (/\.backup\b|\(\d+\)\.[a-z]+$|\bcopy\b/i.test(f.name) ? 1 : 0);
   const best = (a, b) => ((b.has_metadata ? 1 : 0) - (a.has_metadata ? 1 : 0))
     || (messy(a) - messy(b))
     || ((b.page_count ?? -1) - (a.page_count ?? -1))
