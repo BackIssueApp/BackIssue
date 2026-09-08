@@ -50,10 +50,13 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV DATA_DIR=/data
 ENV PLUGINS_DIR=/data/plugins
+# Download sites install here. On the mounted volume, like plugins, so an
+# installed site survives an image update and is reachable from the host.
+ENV SOURCES_DIR=/data/sources
 
 # Everything the server reads at runtime: prod deps, the server, its version
 # (from package.json), the built UI, and the entrypoint. Plugins live on the
-# mounted /data volume (PLUGINS_DIR), so none are baked in.
+# mounted /data volume (PLUGINS_DIR / SOURCES_DIR), so none are baked in.
 #
 # Layers are ordered by how often they change, least-often first, so a routine
 # code push republishes only the small tail layers and `docker pull` reports

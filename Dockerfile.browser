@@ -48,6 +48,9 @@ RUN sed -i 's/\r$//' /app/docker/entrypoint-browser.sh && chmod +x /app/docker/e
 ENV NODE_ENV=production
 ENV DATA_DIR=/data
 ENV PLUGINS_DIR=/data/plugins
+# Download sites install here. On the mounted volume, like plugins, so an
+# installed site survives an image update and is reachable from the host.
+ENV SOURCES_DIR=/data/sources
 # No GPU in a container — render WebGL in software (SwiftShader) so the browser
 # fingerprint is complete. A browser reporting no WebGL is itself a bot signal.
 ENV CHROMIUM_EXTRA_ARGS="--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader"

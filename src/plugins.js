@@ -374,6 +374,22 @@ export async function loadPluginsFromDir(dir, api = pluginApi, disabled = [], ki
     if (name.startsWith('.') || name === 'node_modules') continue;
     const entry = path.join(dir, name, 'index.js');
     if (!fs.existsSync(entry)) continue;
+    // A site that moved out of plugins/ and into sources/ leaves the old
+    // plugin installed. Loading it would register nothing (the site is already
+    // there) but its settings panel would still render beside the card the app
+    // draws, putting two of every control on the page. So skip it entirely and
+    // say it can be removed.
+    const superseded = kind === 'plugin' && sources.some((src) => src.id === name);
+    if (superseded) {
+      catalog.set(name, {
+        name, kind, ...readMeta(dir, name),
+        enabled: false, loaded: false, superseded: true,
+        error: null,
+        counts: { sources: 0, settings: 0, startups: 0, routes: 0, jobs: 0, assets: 0, permissions: 0, notifiers: 0, indexerProviders: 0, importHandlers: 0 },
+      });
+      console.log(`Plugin "${name}" is now a download site and is already installed as one — the plugin is not loaded and can be removed.`);
+      continue;
+    }
     if (!disabled.includes(name)) ensurePluginDeps(dir, name); // plugin's own deps (once)
     const info = {
       name,

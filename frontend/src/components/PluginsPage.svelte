@@ -221,9 +221,13 @@
     return out;
   }
 
-  const statusOf = (p) => p.error ? 'failed' : p.restartRequired ? 'restart' : p.loaded ? 'running' : 'disabled';
+  // A plugin whose site is now installed from Download sites is not loaded at
+  // all — it is not "disabled", it has been replaced, and saying so is what
+  // tells someone it is safe to delete.
+  const statusOf = (p) => p.error ? 'failed' : p.superseded ? 'superseded' : p.restartRequired ? 'restart' : p.loaded ? 'running' : 'disabled';
   const PENDING_LABEL = { installed: 'restart to activate', updated: 'restart to update', removed: 'restart to remove' };
   const statusLabel = (p) => p.error ? 'failed'
+    : p.superseded ? 'replaced'
     : p.pending ? PENDING_LABEL[p.pending] || 'restart required'
     : p.restartRequired ? `restart to ${p.enabled ? 'enable' : 'disable'}`
     : p.loaded ? 'running' : 'disabled';
@@ -470,6 +474,9 @@
                 <span class="plx__status plx__status--{st}"><span class="plx__dot"></span>{statusLabel(p)}</span>
               </div>
               {#if p.description}<p class="plx__desc">{p.description}</p>{/if}
+              {#if p.superseded}
+                <div class="plx__note plx__note--card">This is now a download site, and you already have it installed there. The plugin is not loaded — you can remove it.</div>
+              {/if}
               {#if p.error}<div class="plx__err">Load error: {p.error}</div>{/if}
               {#if caps.length && !p.error}
                 <div class="plx__caps">
@@ -479,16 +486,20 @@
                 </div>
               {/if}
               <div class="plx__card-foot">
+                {#if !p.superseded}
                 <label class="plx__toggle">
                   <span class="switch switch--sm"><input type="checkbox" checked={p.enabled} onchange={() => toggle(p)} /><span class="switch__track"></span></span>
                   <span class="plx__toggle-label">{p.enabled ? 'Enabled' : 'Disabled'}</span>
                 </label>
+                {/if}
                 <div class="plx__foot-actions">
-                  {#if upd}
-                    <button class="plx__install plx__install--sm" disabled={busy[upd.id]} onclick={() => install(upd)}>{busy[upd.id] ? '…' : `Update → v${upd.version}`}</button>
-                  {/if}
-                  {#if p.counts?.settings && !p.error}
-                    <button class="plx__configure" onclick={() => navigate('/settings?tab=' + settingsTabFor(p))}>Configure</button>
+                  {#if !p.superseded}
+                    {#if upd}
+                      <button class="plx__install plx__install--sm" disabled={busy[upd.id]} onclick={() => install(upd)}>{busy[upd.id] ? '…' : `Update → v${upd.version}`}</button>
+                    {/if}
+                    {#if p.counts?.settings && !p.error}
+                      <button class="plx__configure" onclick={() => navigate('/settings?tab=' + settingsTabFor(p))}>Configure</button>
+                    {/if}
                   {/if}
                   <button class="plx__uninstall" disabled={busy[p.name]} onclick={() => removeInstalled(p)}>{busy[p.name] ? 'Removing…' : 'Remove'}</button>
                 </div>
@@ -596,6 +607,9 @@
   .plx__btn:disabled { opacity: .55; cursor: default; }
   .plx__btn--go { background: var(--accent); border-color: var(--accent); color: #fff; }
   .plx__btn--danger:hover:not(:disabled) { border-color: var(--red, #e5484d); color: var(--red, #e5484d); }
+  .plx__note--card { display: block; margin: 8px 0 0; padding: 9px 11px; font-size: 12.5px; }
+  .plx__status--superseded { color: var(--muted); }
+  .plx__status--superseded .plx__dot { background: var(--muted); }
   .plx__note { display: flex; align-items: center; gap: 8px; margin: 0 2px 14px; padding: 10px 12px; border-radius: 10px;
     border: 1px solid color-mix(in srgb, var(--amber, #d9a441) 40%, var(--line));
     background: color-mix(in srgb, var(--amber, #d9a441) 10%, transparent); color: var(--text); font-size: 12.5px; }
