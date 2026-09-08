@@ -37,10 +37,14 @@ RUN npm --prefix frontend run build
 FROM node:22-bookworm-slim AS runtime
 
 # gosu lets the entrypoint drop from root to PUID:PGID (Unraid/LinuxServer).
+# tini is PID 1 so the app is not: the kernel ignores a SIGKILL that a
+# container's own init sends itself, which silently disarmed the event-loop
+# watchdog (src/watchdog.js) in every deployment without an init process,
+# and orphaned processes (health-check probes) piled up as zombies.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends gosu libjemalloc2 \
+    && apt-get install -y --no-install-recommends gosu tini libjemalloc2 \
     && rm -rf /var/lib/apt/lists/* \
-    && gosu --version
+    && gosu --version && tini --version
 
 WORKDIR /app
 ENV NODE_ENV=production
@@ -88,5 +92,5 @@ EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-ENTRYPOINT ["/app/docker/entrypoint.sh"]
+ENTRYPOINT ["tini", "--", "/app/docker/entrypoint.sh"]
 CMD ["node", "src/index.js"]

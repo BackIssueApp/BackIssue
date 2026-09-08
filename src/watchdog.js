@@ -46,6 +46,14 @@ export function startWatchdog(opts = {}) {
     execArgv: process.execArgv.filter((a) => !a.startsWith('--input-type')),
   });
   worker.unref(); // never keeps the process alive on its own
+  // PID 1 of a PID namespace (a container without an init process) ignores
+  // a SIGKILL sent from inside that namespace, so the kill below would be a
+  // no-op there — the exact case seen in production: a wedged main thread
+  // survived 51 minutes with the watchdog "armed". Say so up front.
+  if (process.pid === 1) {
+    const msg = 'watchdog: this process is PID 1, so its own SIGKILL is ignored by the kernel and a wedged server cannot be restarted from inside — run the container with an init process (docker run --init, `init: true` in compose, or the official image, which ships tini)';
+    try { log.warn(msg); } catch { /* ignore */ }
+  }
   worker.on('error', (e) => {
     const msg = `watchdog worker failed, the server is running without it: ${e?.message || e}`;
     try { log.warn(msg); } catch { /* ignore */ }

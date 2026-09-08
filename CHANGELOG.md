@@ -8,6 +8,16 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The event-loop watchdog now actually restarts a wedged server in Docker.**
+  The app ran as the container's first process, and the kernel ignores a
+  process's own kill signal in that position, so the watchdog's restart was
+  silently a no-op (a stalled production server survived it for an hour).
+  The official images now start under `tini`, which also reaps the
+  health-check probes that piled up as zombie processes during a stall. A
+  server that still finds itself as PID 1 logs a warning saying how to fix it.
+
 ## [0.8.1] — 2026-09-08
 
 ### Added
