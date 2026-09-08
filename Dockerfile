@@ -38,7 +38,7 @@ FROM node:22-bookworm-slim AS runtime
 
 # gosu lets the entrypoint drop from root to PUID:PGID (Unraid/LinuxServer).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends gosu \
+    && apt-get install -y --no-install-recommends gosu libjemalloc2 \
     && rm -rf /var/lib/apt/lists/* \
     && gosu --version
 

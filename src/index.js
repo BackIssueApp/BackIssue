@@ -127,6 +127,11 @@ try {
 // otherwise vanish silently leaves a reason in the Logs page. Installed right
 // after the log DB is attached so even an early-boot failure is recorded.
 logInfo(`BackIssue started (pid ${process.pid}, node ${process.version})`, 'app');
+// The container entrypoint preloads jemalloc for this process (see the
+// Dockerfiles); children must not inherit it — Chromium in particular brings
+// its own allocator and a preloaded one is not something we have tested.
+delete process.env.LD_PRELOAD;
+
 process.on('uncaughtException', (err) => {
   try { logError(`Uncaught exception — app is stopping: ${err?.stack || err}`, 'app'); } catch { /* ignore */ }
   console.error('Uncaught exception:', err);

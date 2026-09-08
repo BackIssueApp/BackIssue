@@ -10,6 +10,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **Memory no longer climbs after cover and page resizing.** Freed image
+  buffers stayed resident in glibc's allocator; on a large library the
+  server sat at 4 GB after a few bursts of cover renders. The Docker images
+  now run the app with jemalloc, which returns that memory, and fall back
+  to a two-arena malloc where it is missing. Child processes are not
+  preloaded.
+
+### Fixed
+
 - **One collection load on reload, not two.** The web app requested the
   first library page and the chip counts twice at boot.
 

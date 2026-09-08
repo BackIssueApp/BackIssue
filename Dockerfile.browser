@@ -11,7 +11,7 @@ FROM node:22-bookworm
 # Xvfb = the virtual display. Chromium's own libraries are installed by
 # `patchright install --with-deps` below.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends xvfb xauth \
+    && apt-get install -y --no-install-recommends xvfb xauth libjemalloc2 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

@@ -31,4 +31,13 @@ fi
 export HOME="$DATA_DIR"
 umask "$UMASK_VAL"
 
+# Image work (sharp/libvips) through glibc's malloc leaves the freed memory
+# in per-thread arenas: measured on a production library, 100 cover resizes
+# kept ~600 MB resident for good and it climbed with every burst to 4 GB+.
+# jemalloc gives it back (same run settles at ~300 MB), which is sharp's own
+# advice for glibc systems. The app removes LD_PRELOAD from its environment
+# on startup so child processes (browser, unrar, ffmpeg) are not preloaded.
+JEMALLOC="$(ls /usr/lib/*/libjemalloc.so.2 2>/dev/null | head -n 1)"
+if [ -n "$JEMALLOC" ]; then export LD_PRELOAD="$JEMALLOC"; else export MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX:-2}"; fi
+
 exec gosu "$PUID:$PGID" "$@"
