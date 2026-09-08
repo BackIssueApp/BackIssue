@@ -34,6 +34,12 @@ export const SETTING_FIELDS = {
   // use; not user-facing).
   metadataInstanceKey: { type: 'string', allowEmpty: true },
   cvEnrich:            { type: 'bool' },
+  // One FlareSolverr for every source that needs to get past Cloudflare —
+  // it is a service the user runs, not a property of any one site, so asking
+  // for it per source made people configure the same URL repeatedly.
+  flaresolverrUrl:     { type: 'string', allowEmpty: true },
+  // Where the installable download sites are listed (the plugin catalog's twin).
+  sourceCatalogUrl:    { type: 'string', allowEmpty: true },
   // Manga search content ceiling (each level includes the ones below it).
   mangaRating:         { type: 'enum', values: ['safe', 'suggestive', 'erotica', 'pornographic'] },
   disabledPlugins:     { type: 'string', allowEmpty: true }, // comma-separated plugin names skipped at boot
@@ -199,6 +205,21 @@ export function loadSettings() {
       config[enabledKey] = true;
     }
     config[hoursKey] = 0; // consumed — cron + enabled are the source of truth now
+  }
+  // FlareSolverr moved from a per-source setting to one shared setting. Seed
+  // it from whatever a source already had, so an existing install keeps
+  // working without anyone retyping it.
+  if (!config.flaresolverrUrl) {
+    const prior = Object.keys(config).find((k) => /FlaresolverrUrl$/.test(k) && k !== 'flaresolverrUrl' && config[k]);
+    if (prior) {
+      config.flaresolverrUrl = config[prior];
+      // Write just this one key back, so the shared field shows the address
+      // instead of looking unset. Everything else on disk is left alone.
+      try {
+        const onDisk = JSON.parse(fs.readFileSync(FILE, 'utf8'));
+        if (!onDisk.flaresolverrUrl) fs.writeFileSync(FILE, JSON.stringify({ ...onDisk, flaresolverrUrl: config.flaresolverrUrl }, null, 2));
+      } catch { /* first run, or a read-only data dir: memory is enough */ }
+    }
   }
   // The download client used to be a single URL; it's now host + port (+ ssl).
   // Migrate any old value so the fields populate and downstream keeps working.

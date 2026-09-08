@@ -41,7 +41,7 @@ if (process.env.BUILD_CHANNEL && process.env.BUILD_CHANNEL !== 'release') {
   APP_VERSION += `-${process.env.BUILD_CHANNEL}${sha ? '.' + sha : ''}`;
 }
 
-export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, queueProgress, packProgress, cancelGrab, testCvKeys, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, supportPackage, supportSend, supportSendMobile, state }) {
+export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, listSourceCards, testSource, sourceCatalog, installSource: installSourceFn, uninstallSource: uninstallSourceFn, queueProgress, packProgress, cancelGrab, testCvKeys, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, supportPackage, supportSend, supportSendMobile, state }) {
   const startDownloads = (arg) => {
     if (!state.queue.running) {
       state.queue.running = true;
@@ -254,6 +254,9 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     [/\/test$/, 'settings.manage'],
     [/^\/api\/users/, 'users.manage'], [/^\/api\/roles/, 'users.manage'], [/^\/api\/permissions$/, 'users.manage'],
     [/^\/api\/plugins(?!\/client)/, 'plugins.manage'], [/^\/api\/restart$/, 'plugins.manage'],
+    // Installing or removing a download site changes what the app runs, so it
+    // sits at the same bar as plugins. Reading the list of sites does not.
+    [/^\/api\/sources\/(catalog|install|uninstall)$/, 'plugins.manage'],
     [/^\/api\/jobs/, 'system.jobs'], [/^\/api\/schedules/, 'system.jobs'], [/^\/api\/tools/, 'system.jobs'],
     [/^\/api\/logs/, 'system.logs'],
     // Import, and the folder picker it uses (which lists server directories), are
@@ -900,6 +903,24 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       res.status(400).json({ error: 'install failed: ' + String(e?.message || e) });
     }
   });
+  // Download sites: the same catalog → install → remove flow as plugins, into
+  // sources/ instead of plugins/. Kept beside them so the two stay in step.
+  app.get('/api/sources/catalog', async (req, res) => {
+    if (!sourceCatalog) return res.json({ sources: [], error: 'not available' });
+    try { res.json(await sourceCatalog()); }
+    catch (e) { res.status(502).json({ error: 'could not reach the download-site catalog: ' + String(e?.message || e) }); }
+  });
+  app.post('/api/sources/install', async (req, res) => {
+    if (!installSourceFn) return res.status(501).json({ error: 'installing sites is not available' });
+    try { res.json(await installSourceFn(String((req.body || {}).id || ''))); }
+    catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
+  });
+  app.post('/api/sources/uninstall', async (req, res) => {
+    if (!uninstallSourceFn) return res.status(501).json({ error: 'removing sites is not available' });
+    try { res.json(await uninstallSourceFn(String((req.body || {}).id || ''))); }
+    catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
+  });
+
   app.post('/api/plugins/uninstall', (req, res) => {
     const id = String((req.body || {}).id || '');
     try {
@@ -1134,7 +1155,14 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     statsCache.set(inclR, { at: Date.now(), data });
     res.json(data);
   });
-  app.get('/api/sources', (req, res) => res.json({ sources: listSources ? listSources() : [] }));
+  app.get('/api/sources', (req, res) => res.json({ sources: listSources ? listSources() : [], cards: listSourceCards ? listSourceCards() : [] }));
+  // Connection test for a toolkit-defined source, against the posted (unsaved)
+  // form values. Matches the `/test$` → settings.manage access rule.
+  app.post('/api/sources/:id/test', async (req, res) => {
+    if (!testSource) return res.json({ ok: false, message: 'not available' });
+    try { res.json(await testSource(String(req.params.id), req.body || {})); }
+    catch (e) { res.json({ ok: false, message: String(e?.message || e) }); }
+  });
   // Import history — what was added and from where (newest first, paged).
   app.get('/api/history', (req, res) => {
     const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 200));

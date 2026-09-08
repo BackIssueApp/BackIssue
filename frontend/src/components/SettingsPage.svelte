@@ -1,5 +1,5 @@
 <script>
-  import { untrack } from 'svelte';
+  import { untrack, tick } from 'svelte';
   import { goBack, navigate, route } from '../lib/router.svelte.js';
   import { apiGet, apiPost, apiDelete } from '../lib/api.js';
   import { flags } from '../lib/store.svelte.js';
@@ -41,6 +41,29 @@
   let srcOn = $state({ usenet: false, torrent: false }); // live toggle state (pre-save)
   let srcManaged = $state(false); // an indexer-provider plugin (e.g. Prowlarr) is managing the indexer lists
   let enabledSourceCount = $state(0);
+  // Sources defined through the toolkit (api.defineSource): the server sends
+  // their settings cards, and this page renders them — a site plugin ships no
+  // client code. kitOn mirrors each card's toggle for the rail dot.
+  let kitCards = $state([]);
+  let kitOn = $state({});
+  let kitTests = $state({});
+  const kitNote = (text) => {
+    const t = String(text || '').replace(/\s+/g, ' ').trim();
+    const one = (t.match(/^[^.!?]*[.!?]/)?.[0] || t).trim();
+    return one.length > 90 ? one.slice(0, 89).replace(/\s+\S*$/, '') + '…' : (one || 'Download source');
+  };
+  async function testKitSource(c) {
+    kitTests[c.id] = { cls: 'is-testing', text: 'Testing…' };
+    const body = { [c.id + 'Enabled']: !!root.querySelector('#set-' + c.id + 'Enabled')?.checked };
+    for (const f of c.fields) {
+      const el = root.querySelector('#set-' + f.key);
+      if (el) body[f.key] = f.type === 'bool' ? !!el.checked : (f.type === 'int' ? Number(el.value) : String(el.value).trim());
+    }
+    let r;
+    try { r = await apiPost('/api/sources/' + c.id + '/test', body); }
+    catch (e) { r = { ok: false, message: String(e) }; }
+    kitTests[c.id] = { cls: r.ok ? 'is-ok' : 'is-bad', icon: r.ok ? 'check' : 'close', text: r.message, ok: !!r.ok };
+  }
   let dirtySections = $state(new Set()); // tab ids with unsaved edits
   let filterQuery = $state('');
   let loadedSettings = $state({});       // last-loaded settings (Overview reads it)
@@ -170,7 +193,9 @@
     // An indexer-provider plugin (e.g. Prowlarr) may be managing the lists.
     srcManaged = BackIssue._indexerManagedHooks.some((fn) => { try { return !!fn(); } catch { return false; } });
     const pluginEnabled = BackIssue._sourceSyncHooks.map((fn) => { try { return !!fn(); } catch { return false; } });
-    enabledSourceCount = [usenet, torrent, ...pluginEnabled].filter(Boolean).length;
+    const kitEnabled = kitCards.map((c) => !!root.querySelector('#set-' + c.id + 'Enabled')?.checked);
+    kitOn = Object.fromEntries(kitCards.map((c, i) => [c.id, kitEnabled[i]]));
+    enabledSourceCount = [usenet, torrent, ...pluginEnabled, ...kitEnabled].filter(Boolean).length;
     anySourceOn = enabledSourceCount > 0;
     wireSourceCards();
     scanPluginBlocks();
@@ -242,12 +267,15 @@
   }
 
   async function openSettings() {
-    const s = await apiGet('/api/settings');
+    const [s, srcInfo] = await Promise.all([apiGet('/api/settings'), apiGet('/api/sources').catch(() => ({}))]);
     loadedSettings = s || {};
+    // Toolkit source cards must exist in the DOM before the form is filled.
+    kitCards = srcInfo?.cards || [];
+    await tick();
     applySettingsToForm(s);
     indexerList = parseIndexerString(s.newznabIndexers);
     torznabList = parseIndexerString(s.torznabIndexers);
-    try { sourceOrder = (await apiGet('/api/sources')).sources || []; } catch { sourceOrder = []; }
+    sourceOrder = srcInfo?.sources || [];
     for (const cb of BackIssue._settingsHooks) { try { cb(s); } catch { /* ignore */ } }
     syncSourceUI();
     syncMetaUI();
@@ -684,6 +712,8 @@
         </label>
         <label class="field"><span>Simultaneous downloads</span><input id="set-downloadConcurrency" type="number" min="1" max="16" /></label>
         <p class="modal__note">How many issues download at once. Higher is faster but more likely to trip a source's rate limits. Applies to the next download.</p>
+        <label class="field"><span>FlareSolverr URL</span><input id="set-flaresolverrUrl" type="text" spellcheck="false" placeholder="http://flaresolverr:8191/v1" /></label>
+        <p class="modal__note">Some download sites sit behind Cloudflare. <b>FlareSolverr</b> (a small companion service you run — <code>ghcr.io/flaresolverr/flaresolverr</code>) gets past the challenge; point this at its <code>/v1</code> endpoint. Every source that needs it shares this one setting. Leave blank if none of your sources are behind Cloudflare.</p>
       </div>
     </div>
 
@@ -693,6 +723,9 @@
         <div class="setx-rail">
           {@render railItem('src', 'usenet', 'download', 'Usenet', 'Newznab + SABnzbd/NZBGet', srcOn.usenet ? 'green' : 'muted')}
           {@render railItem('src', 'torrent', 'download', 'Torrents', 'Torznab + torrent client', srcOn.torrent ? 'green' : 'muted')}
+          {#each kitCards as c (c.id)}
+            {@render railItem('src', 'kit:' + c.id, 'download', c.label, kitNote(c.description), kitOn[c.id] ? 'green' : 'muted')}
+          {/each}
           {#each pluginSrc as pb (pb.key)}
             {@render railItem('src', pb.key, 'download', pb.label, pb.note, pb.on ? 'green' : 'muted')}
           {/each}
@@ -850,6 +883,44 @@
               </div>
             </div>
           </div>
+
+          {#each kitCards as c (c.id)}
+            <div class="setx-panel" class:is-active={srcPanel === 'kit:' + c.id}>
+              <div class="setx-card setx-srchead">
+                <label class="switch"><input id="set-{c.id}Enabled" type="checkbox" disabled={!!c.unavailable} onchange={syncSourceUI} /><span class="switch__track"></span></label>
+                <div class="setx-srchead__text">
+                  <b>{c.label}</b>
+                  <span>{c.description || 'Download source.'}</span>
+                </div>
+                <span class="setx-dot setx-dot--{c.unavailable ? 'muted' : kitOn[c.id] ? 'green' : 'muted'}"></span>
+              </div>
+              <div class="src-config setx-srcbody">
+                <div class="setx-card">
+                  {#if c.unavailable}
+                    <p class="modal__note"><Icon name="alert-triangle" size={14} /> {c.unavailable}</p>
+                  {:else if c.cloudflare}
+                    <p class="modal__note">This site is behind Cloudflare, so it uses the <b>FlareSolverr URL</b> from <b>Settings → Downloading</b>{#if c.browser === 'fallback'}; on the browser build it can also fall back to the built-in browser{/if}.</p>
+                  {/if}
+                  {#each c.fields as f (f.key)}
+                    {#if f.type === 'bool'}
+                      <label class="field field--check"><span class="switch"><input id="set-{f.key}" type="checkbox" /><span class="switch__track"></span></span><span>{f.label}</span></label>
+                    {:else if f.type === 'int'}
+                      <label class="field"><span>{f.label}</span><input id="set-{f.key}" type="number" placeholder={f.placeholder || (f.default ?? '')} /></label>
+                    {:else}
+                      <label class="field"><span>{f.label}</span><input id="set-{f.key}" type="text" spellcheck="false" placeholder={f.placeholder || (f.default ?? '')} /></label>
+                    {/if}
+                    {#if f.note}<p class="modal__note">{f.note}</p>{/if}
+                  {/each}
+                  {#if c.testable}
+                    <div class="client-test">
+                      <button class="btn btn--ghost" type="button" onclick={() => testKitSource(c)}>Test connection</button>
+                      {#if kitTests[c.id]}<span class="client-status {kitTests[c.id].cls}">{#if kitTests[c.id].icon}<Icon name={kitTests[c.id].icon} /> {/if}{kitTests[c.id].text}</span>{/if}
+                    </div>
+                  {/if}
+                </div>
+              </div>
+            </div>
+          {/each}
 
           <div class="setx-panel" class:is-active={srcPanel === 'priority'}>
             <h3 class="setx-panel__title">Source priority</h3>

@@ -17,13 +17,21 @@
   let pending = $state([]); // installs/updates/removes since boot, from the server — survives navigation and reloads
   let loaded = $state(false);
 
-  // Remote catalog of installable first-party plugins.
+  // Remote catalog of installable download sites and first-party plugins.
   let catalog = $state([]);
   let catalogError = $state('');
   let busy = $state({}); // plugin id → true while installing/removing
 
   let cat = $state('all'); // active category tab
   let q = $state('');       // search text
+
+  // The page shows one of two things: plugins, or the download sites the app
+  // can install. Sites are their own world — installed into sources/, switched
+  // on in Settings — so they get a view rather than a section in the list.
+  let view = $state('plugins');          // 'plugins' | 'sources'
+  let srcCatalog = $state([]);           // installable sites, from the catalog
+  let srcCatalogError = $state('');
+  let srcFilter = $state('all');         // all | comics | manga
 
   async function refresh() {
     try {
@@ -46,7 +54,97 @@
     }
   }
 
-  $effect(() => { if (active) { refresh(); loadCatalog(); } });
+  async function loadSourceCatalog() {
+    try {
+      const r = await apiGet('/api/sources/catalog');
+      srcCatalog = r.sources || [];
+      srcCatalogError = r.error ? String(r.error) : '';
+    } catch {
+      srcCatalog = [];
+      srcCatalogError = 'Could not reach the download-site catalog.';
+    }
+  }
+
+  $effect(() => { if (active) { refresh(); loadCatalog(); loadSourceCatalog(); } });
+
+  // ---- download sites ------------------------------------------------------
+  // What is installed comes from the app (it loaded them); what is on offer
+  // comes from the catalog. A site can be in either or both.
+  const installedSites = $derived(plugins.filter((p) => p.kind === 'source'));
+  const siteRows = $derived((() => {
+    const byId = new Map();
+    for (const p of installedSites) {
+      byId.set(p.name, {
+        id: p.name, name: p.name, description: p.description || '', version: p.version || null,
+        installed: true, error: p.error || null, loaded: !!p.loaded,
+        content: null, requires: null, updateAvailable: false, catalogVersion: null,
+      });
+    }
+    for (const c of srcCatalog) {
+      const row = byId.get(c.id) || { id: c.id, installed: false, error: null, loaded: false };
+      byId.set(c.id, {
+        ...row,
+        name: c.name || row.name || c.id,
+        description: c.description || row.description || '',
+        version: row.version || c.version || null,
+        content: c.content || null,
+        requires: c.requires || null,
+        catalogVersion: c.version || null,
+        updateAvailable: !!c.updateAvailable,
+      });
+    }
+    return [...byId.values()].sort((a, b) => Number(b.installed) - Number(a.installed) || a.name.localeCompare(b.name));
+  })());
+  const siteFilters = $derived([
+    { id: 'all', label: 'All', count: siteRows.length },
+    { id: 'comics', label: 'Comics', count: siteRows.filter((r) => r.content === 'comics').length },
+    { id: 'manga', label: 'Manga', count: siteRows.filter((r) => r.content === 'manga').length },
+  ].filter((f) => f.id === 'all' || f.count));
+  const sitesVis = $derived(siteRows
+    .filter((r) => srcFilter === 'all' || r.content === srcFilter)
+    .filter((r) => !ql || `${r.name} ${r.description}`.toLowerCase().includes(ql)));
+  const sitesInstalled = $derived(sitesVis.filter((r) => r.installed));
+  const sitesAvailable = $derived(sitesVis.filter((r) => !r.installed));
+  const siteUpdates = $derived(siteRows.filter((r) => r.updateAvailable).length);
+
+  async function installSite(row) {
+    busy = { ...busy, [row.id]: true };
+    try {
+      const r = await apiPost('/api/sources/install', { id: row.id });
+      if (r?.error) return notify(r.error, 'error');
+      notify(`${row.name} installed — restart to start using it.`, 'ok');
+      await refresh();
+      await loadSourceCatalog();
+    } catch (e) {
+      notify(`Could not install ${row.name}: ${String(e)}`, 'error');
+    } finally {
+      busy = { ...busy, [row.id]: false };
+    }
+  }
+
+  async function removeSite(row) {
+    const ok = await confirmDialog({
+      title: `Remove ${row.name}?`,
+      body: 'The site is deleted from this install. Anything already downloaded from it stays in your library.',
+      confirmText: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
+    busy = { ...busy, [row.id]: true };
+    try {
+      const r = await apiPost('/api/sources/uninstall', { id: row.id });
+      if (r?.error) return notify(r.error, 'error');
+      notify(`${row.name} removed — restart to finish.`, 'ok');
+      await refresh();
+      await loadSourceCatalog();
+    } catch (e) {
+      notify(`Could not remove ${row.name}: ${String(e)}`, 'error');
+    } finally {
+      busy = { ...busy, [row.id]: false };
+    }
+  }
+
+  const configureSite = () => navigate('/settings?tab=sources');
 
   async function install(entry) {
     busy = { ...busy, [entry.id]: true };
@@ -178,15 +276,19 @@
   const flt = (x) => matchCat(x) && matchQ(x);
 
   // Category counts over the whole dataset (installed + not-yet-installed).
-  const pool = $derived([...plugins, ...catalog.filter((c) => !c.installed)]);
+  const pool = $derived([...plugins.filter((p) => p.kind !== 'source'), ...catalog.filter((c) => !c.installed)]);
   const catCount = (id) => id === 'all' ? pool.length : pool.filter((x) => categoryOf(x) === id).length;
 
-  const installedVis = $derived(plugins.filter(flt));
+  // Download sites live in sources/, maintained together rather than one
+  // plugin each, so they get their own section instead of crowding the list.
+  const bundledSources = $derived(plugins.filter((p) => p.kind === 'source'));
+  const sourcesVis = $derived(bundledSources.filter(matchQ));
+  const installedVis = $derived(plugins.filter((p) => p.kind !== 'source').filter(flt));
   // Available lists only what ISN'T installed — an installed plugin lives in
   // the Installed section (its available-update, if any, surfaces there).
   const catalogVis = $derived(catalog.filter((c) => !c.installed).filter(flt));
-  const isEmpty = $derived(loaded && !installedVis.length && !catalogVis.length);
-  const nRunning = $derived(plugins.filter((p) => p.loaded).length);
+  const isEmpty = $derived(loaded && !installedVis.length && !catalogVis.length && !sourcesVis.length);
+  const nRunning = $derived(plugins.filter((p) => p.kind !== 'source' && p.loaded).length);
 
   // Match an installed plugin to its catalog entry (by name) so an available
   // update can be offered right on the Installed card.
@@ -228,10 +330,21 @@
   <!-- header -->
   <div class="plx__head">
     <h2 class="plx__title">Plugins</h2>
-    <span class="plx__summary">{loaded ? `${plugins.length} installed · ${nRunning} running` : ''}</span>
+    <span class="plx__summary">{loaded ? (view === 'sources'
+      ? `${sitesInstalled.length} site${sitesInstalled.length === 1 ? '' : 's'} installed`
+      : `${installedVis.length + (plugins.length - installedVis.length - installedSites.length)} installed · ${nRunning} running`) : ''}</span>
+    <div class="plx__views">
+      <button class="plx__view" class:is-active={view === 'plugins'} onclick={() => (view = 'plugins')}>
+        <Icon name="puzzle" size={15} />Plugins
+      </button>
+      <button class="plx__view" class:is-active={view === 'sources'} onclick={() => (view = 'sources')}>
+        <Icon name="download" size={15} />Download sites
+        {#if siteUpdates}<span class="plx__view-badge">{siteUpdates}</span>{/if}
+      </button>
+    </div>
     <div class="plx__search">
       <Icon name="search" size={16} />
-      <input placeholder="Search plugins…" bind:value={q} spellcheck="false" />
+      <input placeholder={view === 'sources' ? 'Search sites…' : 'Search plugins…'} bind:value={q} spellcheck="false" />
     </div>
   </div>
 
@@ -245,7 +358,17 @@
     </div>
   {/if}
 
-  <!-- category tabs -->
+  <!-- category tabs (plugins) / content filters (sites) -->
+  {#if view === 'sources'}
+    <div class="plx__tabs" use:hscroll>
+      {#each siteFilters as f (f.id)}
+        <button class="plx__tab" class:is-active={srcFilter === f.id} onclick={() => (srcFilter = f.id)}>
+          <Icon name={f.id === 'comics' ? 'book' : f.id === 'manga' ? 'book-open' : 'download'} size={15} />{f.label}
+          {#if f.count}<span class="plx__tab-count">{f.count}</span>{/if}
+        </button>
+      {/each}
+    </div>
+  {:else}
   <div class="plx__tabs" use:hscroll>
     {#each CATS as c (c.id)}
       {@const n = catCount(c.id)}
@@ -254,6 +377,7 @@
       </button>
     {/each}
   </div>
+  {/if}
 
   <!-- body -->
   <div class="plx__scroll">
@@ -268,6 +392,66 @@
         </div>
       {/if}
 
+      {#if view === 'sources'}
+        {#if srcCatalogError}
+          <div class="plx__note"><Icon name="alert-triangle" size={14} /> {srcCatalogError}</div>
+        {/if}
+        {#if !sitesVis.length}
+          <div class="plx__empty">
+            <div class="plx__empty-art"><Icon name="download" size={26} /></div>
+            <div class="plx__empty-title">{ql || srcFilter !== 'all' ? 'No matching sites' : 'No download sites yet'}</div>
+            <p class="plx__empty-note">Sites are where issues and chapters come from. Install one here, then switch it on in <b>Settings → Sources</b>.</p>
+          </div>
+        {/if}
+
+        {#each [{ key: 'installed', label: 'Installed', rows: sitesInstalled }, { key: 'available', label: 'Available', rows: sitesAvailable }] as group (group.key)}
+          {#if group.rows.length}
+            <div class="plx__section">
+              <span class="plx__section-name">{group.label}</span>
+              <span class="plx__section-count">{group.rows.length}</span>
+            </div>
+            <div class="plx__sites">
+              {#each group.rows as sRow (sRow.id)}
+                <div class="plx__site" class:is-failed={!!sRow.error}>
+                  <div class="plx__site-ico"><Icon name="download" size={18} /></div>
+                  <div class="plx__site-main">
+                    <div class="plx__site-title">
+                      <span class="plx__name">{sRow.name}</span>
+                      {#if sRow.version}<span class="plx__ver">v{sRow.version}</span>{/if}
+                      {#if sRow.content}<span class="plx__site-tag">{sRow.content}</span>{/if}
+                      {#if sRow.updateAvailable}<span class="plx__site-upd">Update to v{sRow.catalogVersion}</span>{/if}
+                    </div>
+                    {#if sRow.description}<p class="plx__desc">{sRow.description}</p>{/if}
+                    {#if sRow.requires === 'flaresolverr'}
+                      <p class="plx__site-note"><Icon name="alert-triangle" size={13} /> Behind Cloudflare — set the FlareSolverr URL in Settings → Downloading.</p>
+                    {/if}
+                    {#if sRow.error}<div class="plx__err">Load error: {sRow.error}</div>{/if}
+                  </div>
+                  <div class="plx__site-actions">
+                    {#if sRow.installed}
+                      <button class="plx__btn" onclick={configureSite}>Configure</button>
+                      {#if sRow.updateAvailable}
+                        <button class="plx__btn plx__btn--go" disabled={!!busy[sRow.id]} onclick={() => installSite(sRow)}>
+                          {busy[sRow.id] ? 'Updating…' : 'Update'}
+                        </button>
+                      {/if}
+                      <button class="plx__btn plx__btn--danger" disabled={!!busy[sRow.id]} onclick={() => removeSite(sRow)}>
+                        {busy[sRow.id] ? 'Removing…' : 'Remove'}
+                      </button>
+                    {:else}
+                      <button class="plx__btn plx__btn--go" disabled={!!busy[sRow.id]} onclick={() => installSite(sRow)}>
+                        {busy[sRow.id] ? 'Installing…' : 'Install'}
+                      </button>
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        {/each}
+      {/if}
+
+      {#if view === 'plugins'}
       {#if installedVis.length}
         <div class="plx__section"><span class="plx__section-name">Installed</span><span class="plx__section-count">{installedVis.length} shown</span></div>
         <div class="plx__grid">
@@ -348,6 +532,7 @@
           {/each}
         </div>
       {/if}
+      {/if}
     </div>
   </div>
 </main>
@@ -380,7 +565,46 @@
   .plx__scroll { flex: 1; overflow-y: auto; padding: 20px 18px 60px; }
   .plx__inner { max-width: 960px; margin: 0 auto; }
 
+  /* The view switch: plugins, or the sites the app downloads from. */
+  .plx__views { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
+  .plx__view { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border: none; border-radius: 8px;
+    background: transparent; color: var(--muted); font: 600 12.5px var(--font-body); cursor: pointer; white-space: nowrap; }
+  .plx__view:hover { color: var(--text); }
+  .plx__view.is-active { background: var(--accent); color: #fff; }
+  .plx__view-badge { min-width: 18px; padding: 1px 5px; border-radius: 999px; background: var(--amber, #d9a441); color: #1a1520;
+    font: 700 11px var(--font-mono); text-align: center; }
+
+  /* A download site reads as a row: what it is on the left, what you can do on
+     the right. Rows suit a list that grows to dozens better than cards do. */
+  .plx__sites { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .plx__site { display: flex; align-items: flex-start; gap: 12px; padding: 13px 14px; border: 1px solid var(--line);
+    border-radius: 12px; background: var(--panel); }
+  .plx__site.is-failed { border-color: color-mix(in srgb, var(--red, #e5484d) 45%, var(--line)); }
+  .plx__site-ico { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 9px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+  .plx__site-main { flex: 1; min-width: 0; }
+  .plx__site-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+  .plx__site-tag { padding: 1px 7px; border-radius: 999px; background: var(--panel-2); color: var(--muted);
+    font: 600 10.5px var(--font-body); text-transform: uppercase; letter-spacing: .04em; }
+  .plx__site-upd { padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, var(--amber, #d9a441) 20%, transparent);
+    color: var(--amber, #d9a441); font: 600 11px var(--font-body); }
+  .plx__site-note { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+  .plx__site-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+  .plx__btn { padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2);
+    color: var(--text); font: 600 12.5px var(--font-body); cursor: pointer; }
+  .plx__btn:hover:not(:disabled) { border-color: var(--accent); }
+  .plx__btn:disabled { opacity: .55; cursor: default; }
+  .plx__btn--go { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .plx__btn--danger:hover:not(:disabled) { border-color: var(--red, #e5484d); color: var(--red, #e5484d); }
+  .plx__note { display: flex; align-items: center; gap: 8px; margin: 0 2px 14px; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--amber, #d9a441) 40%, var(--line));
+    background: color-mix(in srgb, var(--amber, #d9a441) 10%, transparent); color: var(--text); font-size: 12.5px; }
+  .plx__empty-note { margin: 6px 0 0; max-width: 52ch; font-size: 12.5px; color: var(--muted); }
+
   .plx__section { display: flex; align-items: baseline; gap: 10px; margin: 4px 2px 12px; }
+  .plx__sectionnote { margin: -6px 2px 12px; font-size: 12.5px; color: var(--muted); max-width: 70ch; }
+  .plx__cfg { font: 600 12.5px var(--font-body); color: var(--accent); text-decoration: none; }
+  .plx__cfg:hover { text-decoration: underline; }
   .plx__section--gap { margin-top: 26px; }
   .plx__section-name { font-family: var(--font-display); font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: #c4bdd4; }
   .plx__section-count { font-size: 12px; color: var(--faint); }
@@ -439,6 +663,10 @@
 
   @media (max-width: 760px) {
     .plx__grid { grid-template-columns: 1fr; }
+    .plx__site { flex-wrap: wrap; }
+    .plx__site-actions { width: 100%; justify-content: flex-end; }
+    .plx__views { width: 100%; }
+    .plx__view { flex: 1; justify-content: center; }
     .plx__search { display: none; }
   }
 </style>

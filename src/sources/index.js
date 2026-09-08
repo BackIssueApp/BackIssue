@@ -24,4 +24,22 @@ export function orderedSources(config) {
     .sort((a, b) => rank(a.id) - rank(b.id));
 }
 
+/**
+ * Can this source serve that library type? A source declares the types it
+ * covers (a comics site does not carry audiobooks; a manga site does not carry
+ * western comics); one that declares nothing serves everything, which is what
+ * the indexer-backed built-ins do. An unknown type is not filtered — better a
+ * pointless search than a silently skipped one.
+ */
+export function sourceservesType(source, type) {
+  const t = String(type || '').toLowerCase();
+  if (!t || !Array.isArray(source?.types) || !source.types.length) return true;
+  return source.types.includes(t);
+}
+
+/** The enabled sources, in priority order, that can serve this library type. */
+export function sourcesForType(config, type) {
+  return orderedSources(config).filter((s) => sourceservesType(s, type));
+}
+
 export { usenet, torrent };

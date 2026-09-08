@@ -16,6 +16,10 @@ debug/
 settings.json
 # External plugins (private download sources) live here, each its own repo.
 plugins/
+# Download sites live in their own repository, cloned into sources/.
+sources/
+# Rendered page images the reader keeps on disk — generated data, not source.
+cache/
 
 # Docs (internal)
 docs/

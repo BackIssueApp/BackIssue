@@ -14,7 +14,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import yauzl from 'yauzl';
 import config from './config.js';
-import { pluginsDir } from './plugins.js';
+import { pluginsDir, sourcesDir } from './plugins.js';
 
 const UA = 'comic-metadata-client/1.0';
 const execFileP = promisify(execFile);
@@ -44,6 +44,13 @@ export function catalogUrl() {
   return config.pluginCatalogUrl || 'https://data.backissue.app/plugins/catalog.json';
 }
 
+/// Download sites are catalogued and installed the same way plugins are, into
+/// sources/ instead of plugins/. Everything below takes a directory so the two
+/// share one download → verify → stage → swap path.
+export function sourceCatalogUrl() {
+  return config.sourceCatalogUrl || 'https://data.backissue.app/sources/catalog.json';
+}
+
 // A plugin id is also a folder name — keep it to a safe charset.
 function safeId(id) {
   const clean = String(id || '').replace(/[^a-z0-9_-]/gi, '');
@@ -53,12 +60,18 @@ function safeId(id) {
 
 // Fetch the remote catalog: { plugins: [{ id, name, description, version,
 // download, sha256? }] }. Returns the validated plugin entries.
-export async function fetchCatalog({ fetchImpl = fetch } = {}) {
-  const resp = await fetchImpl(catalogUrl(), { headers: { 'User-Agent': UA } });
+export async function fetchCatalog({ fetchImpl = fetch, url = catalogUrl(), key = 'plugins' } = {}) {
+  const resp = await fetchImpl(url, { headers: { 'User-Agent': UA } });
   if (!resp.ok) throw new Error(`catalog request failed (HTTP ${resp.status})`);
   const data = await resp.json();
-  const list = Array.isArray(data?.plugins) ? data.plugins : [];
+  const list = Array.isArray(data?.[key]) ? data[key] : [];
   return list.filter((p) => p && p.id && p.download);
+}
+
+/// The download sites on offer: same entry shape, plus `content` (what the site
+/// carries) and `requires` (e.g. a FlareSolverr service) for the page to show.
+export async function fetchSourceCatalog({ fetchImpl = fetch } = {}) {
+  return fetchCatalog({ fetchImpl, url: sourceCatalogUrl(), key: 'sources' });
 }
 
 // Extract a zip buffer into `destDir`, guarding every entry against path
@@ -111,9 +124,8 @@ function resolveBundleRoot(dir) {
 // Download, verify, extract and install one catalog entry into plugins/<id>/.
 // Returns { id, version }. Throws on any failure, leaving the existing install
 // (if any) untouched — the new copy is staged in a temp dir and swapped in last.
-export async function installPlugin(entry, { fetchImpl = fetch, npmInstall = defaultNpmInstall } = {}) {
+export async function installPlugin(entry, { fetchImpl = fetch, npmInstall = defaultNpmInstall, dir = pluginsDir(), what = 'plugin' } = {}) {
   const id = safeId(entry?.id);
-  const dir = pluginsDir();
   fs.mkdirSync(dir, { recursive: true });
   const dest = path.join(dir, id);
   const staging = path.join(dir, `.${id}.installing`);
@@ -134,7 +146,7 @@ export async function installPlugin(entry, { fetchImpl = fetch, npmInstall = def
     await extractZip(buf, staging);
     const src = resolveBundleRoot(staging);
     if (!fs.existsSync(path.join(src, 'index.js'))) {
-      throw new Error('bundle has no index.js — not a valid plugin');
+      throw new Error(`bundle has no index.js — not a valid ${what}`);
     }
     // Swap into place last so a failure never leaves a half-written install.
     // The old install is RENAMED aside, not deleted: on Windows a loaded
@@ -171,10 +183,18 @@ export async function installPlugin(entry, { fetchImpl = fetch, npmInstall = def
 }
 
 // Remove an installed plugin's folder. Returns { removed }.
-export function uninstallPlugin(id) {
+export function uninstallPlugin(id, { dir = pluginsDir() } = {}) {
   const clean = safeId(id);
-  const dest = path.join(pluginsDir(), clean);
+  const dest = path.join(dir, clean);
   if (!fs.existsSync(dest)) return { removed: false };
   fs.rmSync(dest, { recursive: true, force: true });
   return { removed: true };
+}
+
+/// Install one download site into sources/<id>/, and remove one.
+export async function installSource(entry, opts = {}) {
+  return installPlugin(entry, { ...opts, dir: sourcesDir(), what: 'source' });
+}
+export function uninstallSource(id) {
+  return uninstallPlugin(id, { dir: sourcesDir() });
 }

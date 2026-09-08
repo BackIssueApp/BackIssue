@@ -9,6 +9,7 @@
 // The plugins/ directory is OPTIONAL. Its absence is the normal state for the
 // public distribution; the app runs fully without any external plugin.
 import fs from 'node:fs';
+import { defineSource } from './sourcekit/define.js';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -17,6 +18,11 @@ import { SERIES_TYPES, SELF_DESCRIBED_TYPES } from './db.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PLUGINS_DIR = process.env.PLUGINS_DIR || path.join(root, 'plugins');
+// Download sites live in sources/, kept together in their own repository
+// rather than one plugin each: a few dozen of them would bury the plugins
+// page, and they share the same toolkit and release cadence. A site whose code
+// must live elsewhere is still a plugin under plugins/.
+const SOURCES_DIR = process.env.SOURCES_DIR || path.join(root, 'sources');
 
 // Let plugins that live OUTSIDE the app tree (e.g. Docker's
 // PLUGINS_DIR=/data/plugins) reach core. Plugins reach it two ways, both of
@@ -62,6 +68,7 @@ function ensurePluginDeps(dir, name) {
 }
 
 const sources = [];
+const sourceCards = []; // settings cards of defineSource() sources — see registeredSourceCards
 const settings = [];   // { key: spec } objects, merged into SETTING_FIELDS
 const startups = [];   // async ({ db, config }) => optional handle; run once at boot
 const routes = [];     // { method, path, handler } express routes
@@ -93,9 +100,26 @@ export const pluginApi = {
   // A download source (find/fetch or find/grab). See src/sources/usenet.js.
   registerSource(source) {
     if (!source?.id) throw new Error('registerSource: a source needs an id');
-    if (sources.some((s) => s.id === source.id)) return; // idempotent — ignore dupes
+    if (sources.some((s) => s.id === source.id)) {
+      // This site is already installed. Say so once, so a redundant copy is
+      // obvious rather than silently inert.
+      if (currentLoadingPlugin) console.log(`Source "${source.id}" is already installed — the copy in ${currentLoadingPlugin} is ignored and can be removed.`);
+      return;
+    }
     sources.push(source);
     bump('sources');
+  },
+  // A download source from a short site description (src/sourcekit/define.js):
+  // the toolkit supplies HTTP, Cloudflare, pacing, release scoring, archive
+  // normalisation, page assembly, the settings card and a Test button; the
+  // definition supplies search() and resolve(). Registers the source, its
+  // settings fields and its settings card in one call. Returns the source.
+  defineSource(def) {
+    const source = defineSource(def);
+    pluginApi.registerSource(source);
+    pluginApi.registerSettings(source.settingsFields);
+    if (!sourceCards.some((c) => c.id === source.id)) sourceCards.push({ ...source.card, plugin: currentLoadingPlugin });
+    return source;
   },
   // Settings field specs (same shape as SETTING_FIELDS), merged so the plugin's
   // config keys survive validation and persist. e.g. { myKey: { type: 'bool' } }.
@@ -298,6 +322,7 @@ let currentLoadingPlugin = null;
 export function registeredAuthProviders() { return authProviders; }
 export function registeredCredentialProviders() { return credentialProviders; }
 export function registeredSources() { return sources; }
+export function registeredSourceCards() { return [...sourceCards]; }
 export function registeredSettings() { return Object.assign({}, ...settings); }
 export function registeredStartups() { return startups; }
 export function registeredNotifiers() { return notifiers; }
@@ -332,7 +357,7 @@ function readMeta(dir, name) {
 // imported. Not memoized — the caller controls invocation. A plugin that
 // throws is logged, cataloged with its error, and skipped, never fatal.
 // Returns the names loaded.
-export async function loadPluginsFromDir(dir, api = pluginApi, disabled = []) {
+export async function loadPluginsFromDir(dir, api = pluginApi, disabled = [], kind = 'plugin') {
   const loaded = [];
   if (!dir || !fs.existsSync(dir)) return loaded;
   linkCoreModules(dir); // shared core deps resolvable from plugins outside the app tree
@@ -352,6 +377,7 @@ export async function loadPluginsFromDir(dir, api = pluginApi, disabled = []) {
     if (!disabled.includes(name)) ensurePluginDeps(dir, name); // plugin's own deps (once)
     const info = {
       name,
+      kind,
       ...readMeta(dir, name),
       enabled: !disabled.includes(name),
       loaded: false,
@@ -360,7 +386,7 @@ export async function loadPluginsFromDir(dir, api = pluginApi, disabled = []) {
     };
     catalog.set(name, info);
     if (!info.enabled) {
-      console.log(`Plugin disabled (skipped): ${name}`);
+      console.log(`${kind === 'source' ? 'Source' : 'Plugin'} disabled (skipped): ${name}`);
       continue;
     }
     try {
@@ -375,7 +401,7 @@ export async function loadPluginsFromDir(dir, api = pluginApi, disabled = []) {
       try { await register(api); } finally { currentLoadingPlugin = null; }
       info.loaded = true;
       loaded.push(name);
-      console.log(`Loaded plugin: ${name}`);
+      console.log(`Loaded ${kind}: ${name}`);
     } catch (e) {
       info.error = String(e?.message || e);
       console.warn(`plugin "${name}" failed to load:`, info.error);
@@ -466,3 +492,13 @@ export function loadPlugins() {
   if (!loadPromise) loadPromise = loadPluginsFromDir(PLUGINS_DIR, pluginApi, disabledPluginNames());
   return loadPromise;
 }
+
+/// The download sites installed in sources/. Loaded BEFORE plugins, so a site
+/// that also exists as a plugin keeps the one from sources/ and the plugin's
+/// duplicate registration is ignored (with a line in the log).
+let sourcesPromise = null;
+export function loadBundledSources() {
+  if (!sourcesPromise) sourcesPromise = loadPluginsFromDir(SOURCES_DIR, pluginApi, disabledPluginNames(), 'source');
+  return sourcesPromise;
+}
+export function sourcesDir() { return SOURCES_DIR; }

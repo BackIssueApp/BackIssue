@@ -6,6 +6,7 @@ import config from './config.js';
 import { loadSettings, currentSettings, saveSettings } from './settings.js';
 import { buildSupportPackage } from './support.js';
 import { sendSupportPackage } from './cv.js';
+import { registeredSourceCards, registeredSources, loadBundledSources } from './plugins.js';
 import { pluginCatalog as supportPluginCatalog, registeredSources as supportSources, registeredNotifiers as supportNotifiers, pluginsDir as supportPluginsDir } from './plugins.js';
 import { listLibraries as supportLibraries, libraryStats as supportLibraryStats, listImportHistory as supportImportHistory } from './db.js';
 import { loadAttestation as supportBuildInfo } from './attest.js';
@@ -50,6 +51,7 @@ import { notify as notifyRaw } from './notifications.js';
 installConsoleCapture(); // mirror console.warn/error into the Logs page buffer
 // Load plugins BEFORE settings so plugin-registered config fields (e.g. a private
 // source's credentials) survive validation of the saved settings.json.
+await loadBundledSources(); // the download sites shipped with the app
 await loadPlugins();
 loadSettings(); // merge persisted settings over config defaults before anything runs
 
@@ -1025,13 +1027,18 @@ async function searchSources({ query, seriesId, cvIssueId, number } = {}) {
   const names = seriesId ? seriesSearchNames(db, Number(seriesId)) : [];
   const ctx = {
     config, db, query: query || '',
+    series,                       // its type gates which sources are asked
     seriesTitle: series?.title || null,
     seriesNames: names,
     seriesYear: series?.year || null,
     issue: { issue_number: number },
     cvIssueId,
   };
-  const sources = orderedSources(config).filter((s) => typeof s.manualSearch === 'function');
+  // Only sources that serve this library type: asking a manga site for a
+  // western comic (or the reverse) is a slow request that cannot match.
+  const { sourceservesType } = await import('./sources/index.js');
+  const sources = orderedSources(config)
+    .filter((s) => typeof s.manualSearch === 'function' && sourceservesType(s, series?.type));
   if (!sources.length) return { results: [], searched: [], errors: [], sources: [] };
   const searched = new Set();
   const errors = [];
@@ -1146,13 +1153,17 @@ async function searchPacks({ seriesId, query } = {}) {
   const { orderedSources } = await import('./sources/index.js');
   const ctx = {
     config, db, query: query || '',
+    series,                       // its type gates which sources are asked
     seriesTitle: series.title, seriesNames: seriesSearchNames(db, sid), seriesYear: series.year,
     issue: {}, // no issue number → series-name search surfaces packs
   };
   // Pack-capable = has fetchPack (in-app packs) OR is deferred (client + monitor
-  // processPack). Immediate sources without fetchPack have no packs.
+  // processPack). Immediate sources without fetchPack have no packs. A source
+  // that does not serve this library type is skipped outright.
+  const { sourceservesType } = await import('./sources/index.js');
   const sources = orderedSources(config).filter((s) =>
-    typeof s.manualSearch === 'function' && (typeof s.fetchPack === 'function' || s.kind === 'deferred'));
+    typeof s.manualSearch === 'function' && (typeof s.fetchPack === 'function' || s.kind === 'deferred')
+    && sourceservesType(s, series?.type));
   if (!sources.length) return { results: [], errors: [], sources: [] };
   const errors = [], results = [];
   await Promise.all(sources.map(async (s) => {
@@ -1335,6 +1346,48 @@ const app = createApp({
   refileState,
   stats: (opts) => collectionStats(db, config, opts),
   listSources: () => orderedSources(config).map((s) => ({ id: s.id, label: s.label || s.id })),
+  // Settings cards of toolkit-defined sources (enabled or not), and their
+  // connection test — the UI renders the card, so a site plugin needs no client code.
+  listSourceCards: () => registeredSourceCards(),
+  // Download sites: what can be installed, and installing/removing one.
+  sourceCatalog: async () => {
+    const { fetchSourceCatalog } = await import('./plugincatalog.js');
+    const { installedOnDisk, sourcesDir } = await import('./plugins.js');
+    const available = await fetchSourceCatalog();
+    const onDisk = installedOnDisk(sourcesDir());
+    return {
+      sources: available.map((a) => {
+        const installedVersion = onDisk.get(a.id) ?? null;
+        return {
+          id: a.id, name: a.name || a.id, description: a.description || '',
+          content: a.content || null, requires: a.requires || null,
+          version: a.version || null, installed: onDisk.has(a.id), installedVersion,
+          updateAvailable: !!(onDisk.has(a.id) && a.version && installedVersion && a.version !== installedVersion),
+        };
+      }),
+    };
+  },
+  installSource: async (id) => {
+    const { fetchSourceCatalog, installSource } = await import('./plugincatalog.js');
+    const { markPluginPending, installedOnDisk, sourcesDir, pendingPluginChanges } = await import('./plugins.js');
+    const entry = (await fetchSourceCatalog()).find((s) => s.id === id);
+    if (!entry) throw new Error('that download site is not in the catalog');
+    const wasInstalled = installedOnDisk(sourcesDir()).has(entry.id);
+    const r = await installSource(entry);
+    markPluginPending(r.id, wasInstalled ? 'updated' : 'installed', r.version);
+    return { installed: r.id, version: r.version, restartRequired: true, pending: pendingPluginChanges() };
+  },
+  uninstallSource: async (id) => {
+    const { uninstallSource } = await import('./plugincatalog.js');
+    const { markPluginPending, pendingPluginChanges } = await import('./plugins.js');
+    const r = uninstallSource(id);
+    if (r.removed) markPluginPending(id, 'removed');
+    return { removed: r.removed, restartRequired: true, pending: pendingPluginChanges() };
+  },
+  testSource: async (id, overrides) => {
+    const s = registeredSources().find((x) => x.id === id && typeof x.test === 'function');
+    return s ? s.test(overrides || {}) : { ok: false, message: 'unknown source' };
+  },
   queueProgress: () => downloadMonitor.getProgress(),
   packProgress: () => ({ ...downloadMonitor.getPackProgress(), ...Object.fromEntries(inAppPackProgress) }),
   cancelGrab: cancelActiveGrab,
