@@ -90,6 +90,11 @@ export async function buildSupportPackage(opts = {}) {
     plugins = () => [], jobs = () => [], schedules = () => [], logs = () => ({ logs: [] }),
     sources = () => [], notifiers = () => [], libraries = () => [], libraryStats = () => null,
     importHistory = () => [], state = {}, now = () => new Date(),
+    // lite: what a non-admin may send (from a mobile app): version, runtime
+    // and counts, no settings, no folders, no indexers, no server log.
+    lite = false,
+    // extraFiles: { name: text } added as-is (a mobile diagnostics report).
+    extraFiles = {},
   } = opts;
   const generatedAt = now().toISOString();
   const errors = [];
@@ -183,7 +188,15 @@ export async function buildSupportPackage(opts = {}) {
     return rows.map((e) => `${new Date(e.ts).toISOString()} [${e.level}] ${e.category || ''} ${redactText(e.message)}${e.detail ? '\n  ' + redactText(String(e.detail)).replace(/\n/g, '\n  ') : ''}`).join('\n') + '\n';
   }) || '';
 
-  const readme = `BackIssue support package
+  if (lite) {
+    delete summary.runtime.env;
+    summary.paths = null;
+    summary.disk = [];
+    summary.counts = { seriesByType: summary.counts.seriesByType, collectionSeries: summary.counts.collectionSeries, issuesByStatus: summary.counts.issuesByStatus, files: summary.counts.files };
+    summary.lite = true;
+  }
+  const extra = Object.entries(extraFiles || {}).filter(([n, t]) => /^[\w.-]+$/.test(n) && typeof t === 'string');
+  const readme = `BackIssue support package${lite ? ' (lite: sent by a non-admin, from a mobile app)' : ''}
 Generated ${generatedAt} by BackIssue ${version}.
 
 What is inside
@@ -196,6 +209,9 @@ What is inside
   queue.json      issues currently queued, downloading or failed
   history.json    the last 100 import history rows and the last 100 grabs
   logs.txt        the last 2,000 application log entries
+${extra.map(([n]) => `  ${n.padEnd(15)} sent by the mobile app: device, app build, server host, connection and playback failures`).join('\n')}${lite ? `
+Lite package: settings.json, libraries.json (folders), sources.json (indexers), history.json and logs.txt are
+omitted because the sender is not an administrator of this server.` : ''}
 
 What is NOT inside
   No comic files, covers or pages. No user names, e-mail addresses or password hashes.
@@ -208,14 +224,15 @@ Please attach the whole zip to your bug report or support thread.
   const zip = new JSZip();
   zip.file('README.txt', readme);
   zip.file('summary.json', JSON.stringify(summary, null, 2));
-  zip.file('settings.json', JSON.stringify(settingsOut, null, 2));
-  zip.file('plugins.json', JSON.stringify(pluginsOut, null, 2));
-  zip.file('libraries.json', JSON.stringify(librariesOut, null, 2));
-  zip.file('sources.json', JSON.stringify(sourcesOut, null, 2));
-  zip.file('jobs.json', JSON.stringify(jobsOut, null, 2));
-  zip.file('queue.json', JSON.stringify(queueOut, null, 2));
-  zip.file('history.json', JSON.stringify(historyOut, null, 2));
-  zip.file('logs.txt', logLines);
+  if (!lite) zip.file('settings.json', JSON.stringify(settingsOut, null, 2));
+  zip.file('plugins.json', JSON.stringify(lite ? { disabled: pluginsOut?.disabled || [], installed: (pluginsOut?.installed || []).map((p) => ({ name: p.name, version: p.version, enabled: p.enabled, loaded: p.loaded, error: p.error ? 'yes' : null })) } : pluginsOut, null, 2));
+  zip.file('libraries.json', JSON.stringify(lite ? (librariesOut || []).map((l) => ({ id: l.id, name: l.name, type: l.type, series_count: l.series_count })) : librariesOut, null, 2));
+  if (!lite) zip.file('sources.json', JSON.stringify(sourcesOut, null, 2));
+  zip.file('jobs.json', JSON.stringify(lite ? { schedules: jobsOut?.schedules || [] } : jobsOut, null, 2));
+  zip.file('queue.json', JSON.stringify(lite ? { failed: (queueOut || []).filter((q) => q.status === 'failed').length, active: (queueOut || []).filter((q) => q.status !== 'failed').length } : queueOut, null, 2));
+  if (!lite) zip.file('history.json', JSON.stringify(historyOut, null, 2));
+  if (!lite) zip.file('logs.txt', logLines);
+  for (const [n, t] of extra) zip.file(n, t.slice(0, 512 * 1024));
   const buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
   const stamp = generatedAt.replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z').replace('T', '-');
   const filename = `backissue-support-${version}-${stamp}.zip`;

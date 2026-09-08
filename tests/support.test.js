@@ -142,3 +142,52 @@ test('sendSupportPackage: posts the zip with the instance key and returns the co
     await assert.rejects(() => sendSupportPackage({ metadataInstanceKey: 'wrong' }, Buffer.from('PK'), { fetchImpl }), /did not accept the package: a registered instance key is required/);
   } finally { delete process.env.METADATA_BASE_OVERRIDE; }
 });
+
+test('lite package: no settings, folders, indexers, history or log; extra files ride along', async () => {
+  const db = openDb(':memory:');
+  const { buffer } = await buildSupportPackage({
+    db, version: '1.0.0', lite: true,
+    settings: () => ({ comicvineKeys: 'cvkey-000000' }),
+    libraries: () => [{ id: 1, name: 'Comics', type: 'comic', series_count: 3, root_folder: '/srv/private/comics' }],
+    logs: () => ({ logs: [{ ts: 1, level: 'error', category: 'x', message: 'private path /srv/private/comics' }] }),
+    extraFiles: { 'mobile.json': JSON.stringify({ platform: 'ios', app: '1.0 (18)' }), '../evil': 'nope' },
+  });
+  const zip = await JSZip.loadAsync(buffer);
+  for (const absent of ['settings.json', 'sources.json', 'history.json', 'logs.txt', '../evil']) assert.equal(zip.file(absent), null, `${absent} absent`);
+  assert.ok(zip.file('mobile.json'));
+  const summary = JSON.parse(await zip.file('summary.json').async('string'));
+  assert.equal(summary.lite, true);
+  assert.equal(summary.paths, null);
+  assert.equal(summary.runtime.env, undefined);
+  const libs = JSON.parse(await zip.file('libraries.json').async('string'));
+  assert.deepEqual(libs, [{ id: 1, name: 'Comics', type: 'comic', series_count: 3 }]);
+  for (const name of Object.keys(zip.files)) {
+    const text = await zip.file(name).async('string');
+    assert.ok(!text.includes('/srv/private') && !text.includes('cvkey-000000'), `${name} carries nothing private`);
+  }
+  assert.match(await zip.file('README.txt').async('string'), /lite: sent by a non-admin/);
+});
+
+test('POST /api/support/mobile sends a lite package for a viewer and a full one for an admin', async () => {
+  const db = openDb(':memory:');
+  const sent = [];
+  const app = createApp({
+    db, state: { queue: {} },
+    getSettings: () => ({}), saveSettings: (b) => b,
+    prepareRedownload: async () => {}, runDownloads: async () => {},
+    pluginRoutes: registeredRoutes(),
+    supportSendMobile: async ({ report, full, user }) => { sent.push({ report, full, user }); return { code: 'AAAA-2222', expiresInDays: 60 }; },
+  });
+  const s = await new Promise((res) => { const x = app.listen(0, () => res(x)); });
+  const base = `http://localhost:${s.address().port}`;
+  try {
+    // Open mode: the implicit local admin.
+    const r = await fetch(`${base}/api/support/mobile`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ platform: 'android', app: '0.5.1', events: [] }) });
+    assert.equal(r.status, 200);
+    assert.deepEqual(await r.json(), { code: 'AAAA-2222', expiresInDays: 60 });
+    assert.equal(sent[0].report.platform, 'android');
+    assert.equal(sent[0].full, true, 'the open-mode local user is an admin');
+    const big = await fetch(`${base}/api/support/mobile`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ blob: 'x'.repeat(400 * 1024) }) });
+    assert.equal(big.status, 413);
+  } finally { s.close(); }
+});

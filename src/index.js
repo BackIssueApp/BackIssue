@@ -1303,7 +1303,8 @@ async function prepareRedownload(issueIds) {
 // The support package (System → Tools): built the same way whether it is
 // downloaded or sent to the hosted support service.
 const appVersionNow = () => { try { return JSON.parse(fss.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version; } catch { return '0.0.0'; } };
-const buildSupportPackageNow = () => buildSupportPackage({
+const buildSupportPackageNow = (extra = {}) => buildSupportPackage({
+    ...extra,
     db, config, settings: currentSettings,
     version: appVersionNow(),
     build: supportBuildInfo(),
@@ -1371,6 +1372,13 @@ const app = createApp({
   supportPackage: () => buildSupportPackageNow(),
   supportSend: async ({ note = '' } = {}) => {
     const pkg = await buildSupportPackageNow();
+    return sendSupportPackage(config, pkg.buffer, { version: appVersionNow(), note });
+  },
+  supportSendMobile: async ({ report = {}, full = false, user = null } = {}) => {
+    const mobile = { ...report, sentBy: user ? { id: user.id, role: user.role } : null, serverVersion: appVersionNow() };
+    const pkg = await buildSupportPackageNow({ lite: !full, extraFiles: { 'mobile.json': JSON.stringify(mobile, null, 2) } });
+    const label = [report.platform, report.app].filter(Boolean).join(' ');
+    const note = `mobile${label ? ' ' + label : ''}${report.note ? ': ' + String(report.note) : ''}`.slice(0, 200);
     return sendSupportPackage(config, pkg.buffer, { version: appVersionNow(), note });
   },
   saveSettings,

@@ -10,6 +10,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Diagnostics from the mobile apps.** A phone signed in to the server can
+  send its own diagnostics report (device, app build, connection and
+  playback failures) through the server, which wraps it into a support
+  package and returns a code. An admin's phone sends the full package; any
+  other user's phone sends a lite one with no settings, folders, indexers or
+  server log.
 - **Send to support.** Next to the download, "Send to BackIssue support"
   uploads the same package to the hosted service, authenticated with the
   install's own metadata key, and shows a short code to quote in the
