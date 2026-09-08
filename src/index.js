@@ -6,7 +6,7 @@ import config from './config.js';
 import { loadSettings, currentSettings, saveSettings } from './settings.js';
 import { buildSupportPackage } from './support.js';
 import { pluginCatalog as supportPluginCatalog, registeredSources as supportSources, registeredNotifiers as supportNotifiers, pluginsDir as supportPluginsDir } from './plugins.js';
-import { listLibraries as supportLibraries, libraryStats as supportLibraryStats } from './db.js';
+import { listLibraries as supportLibraries, libraryStats as supportLibraryStats, listImportHistory as supportImportHistory } from './db.js';
 import { loadAttestation as supportBuildInfo } from './attest.js';
 import { loadPlugins, registeredStartups, registeredRoutes, registeredJobs, registeredClientAssets, registeredImportHandlers } from './plugins.js';
 import { spawn } from 'node:child_process';
@@ -1361,6 +1361,7 @@ const app = createApp({
     plugins: supportPluginCatalog, jobs: () => listJobs(60), schedules: () => scheduler.list(),
     logs: (o) => ({ logs: listLogs(o) }), sources: supportSources, notifiers: supportNotifiers,
     libraries: () => supportLibraries(db), libraryStats: () => supportLibraryStats(db), state,
+    importHistory: () => supportImportHistory(db, { limit: 100 }).items,
   }),
   saveSettings,
   requestRestart,

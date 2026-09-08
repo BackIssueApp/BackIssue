@@ -4,7 +4,7 @@ import JSZip from 'jszip';
 import { openDb } from '../src/db.js';
 import { createApp } from '../src/server.js';
 import { registeredRoutes } from '../src/plugins.js';
-import { buildSupportPackage, redactSecrets, redactText, redactValue } from '../src/support.js';
+import { buildSupportPackage, redactSecrets, redactText, redactValue, describeIndexers } from '../src/support.js';
 
 test('redaction: secret-named settings keep only their length, plain ones pass through', () => {
   assert.equal(redactValue('comicvineKeys', 'abcdef0123456789'), '[redacted 16 chars]');
@@ -17,6 +17,11 @@ test('redaction: secret-named settings keep only their length, plain ones pass t
   assert.equal(redactValue('cvBaseUrl', 'https://data.example'), 'https://data.example');
   assert.equal(redactValue('authorName', 'Jane'), 'Jane');         // "auth" inside "author" is not a credential
   assert.equal(redactValue('trustProxy', true), true);
+  // Indexer lists carry the key as the third field of each line.
+  assert.equal(redactValue('newznabIndexers', 'NZBGeek|https://api.nzbgeek.info|abcd1234\n# note\nOther|https://o.example|'),
+    'NZBGeek|https://api.nzbgeek.info| [redacted 8 chars]\n# note\nOther|https://o.example|');
+  assert.deepEqual(describeIndexers('NZBGeek|https://api.nzbgeek.info|abcd1234\nOther|https://o.example|'),
+    [{ name: 'NZBGeek', url: 'https://api.nzbgeek.info', keyLength: 8 }, { name: 'Other', url: 'https://o.example', keyLength: 0 }]);
 });
 
 test('redaction: secrets inside strings are blanked wherever they appear', () => {
@@ -32,8 +37,8 @@ test('buildSupportPackage: every section lands in the zip, secrets are gone, fai
   const db = openDb(':memory:');
   const { buffer, filename, manifest } = await buildSupportPackage({
     db,
-    config: { disabledPlugins: 'foo, bar' },
-    settings: () => ({ comicvineKeys: 'cvkey-000000', qbHost: 'nas', qbPass: 'pw', cvBaseUrl: 'https://data.example' }),
+    config: { disabledPlugins: 'foo, bar', usenetEnabled: true, newznabIndexers: 'Geek|https://api.geek.example|KEY-ABC-123' },
+    settings: () => ({ comicvineKeys: 'cvkey-000000', qbHost: 'nas', qbPass: 'pw', cvBaseUrl: 'https://data.example', newznabIndexers: 'Geek|https://api.geek.example|KEY-ABC-123' }),
     version: '9.9.9',
     build: { version: '9.9.9', commit: 'abcdef1234567890', channel: 'release', built_at: '2026-09-07T00:00:00Z', sig: 'x' },
     dataDir: process.cwd(), dbPath: ':memory:', pluginsDir: 'plugins',
@@ -73,6 +78,9 @@ test('buildSupportPackage: every section lands in the zip, secrets are gone, fai
   const plugins = JSON.parse(await zip.file('plugins.json').async('string'));
   assert.deepEqual(plugins.disabled, ['foo', 'bar']);
   assert.equal(plugins.installed[0].version, '1.8.2');
+  const sources = JSON.parse(await zip.file('sources.json').async('string'));
+  assert.deepEqual(sources.newznab.indexers, [{ name: 'Geek', url: 'https://api.geek.example', keyLength: 11 }]);
+  assert.equal(settings.newznabIndexers, 'Geek|https://api.geek.example| [redacted 11 chars]');
   const logs = await zip.file('logs.txt').async('string');
   assert.ok(logs.includes('apikey=[redacted]'), 'query-string key blanked in logs');
   assert.ok(!logs.includes('TOPSECRET'));
@@ -80,7 +88,7 @@ test('buildSupportPackage: every section lands in the zip, secrets are gone, fai
   // Nothing anywhere in the zip carries the raw secrets.
   for (const name of Object.keys(zip.files)) {
     const text = await zip.file(name).async('string');
-    assert.ok(!text.includes('cvkey-000000') && !text.includes('TOPSECRET'), `${name} leaks no secret`);
+    assert.ok(!text.includes('cvkey-000000') && !text.includes('TOPSECRET') && !text.includes('KEY-ABC-123'), `${name} leaks no secret`);
   }
 });
 

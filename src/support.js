@@ -17,10 +17,25 @@ export const SECRET_KEY_RE = /(key|keys|pass|passwd|password|token|secret|cookie
 const KEEP_KEY_RE = /^(passwordLoginDisabled|metadataSource|keepSharing|.*(Enabled|Disabled|Events|Mode|Hours|Cron|Count|Path|Dir|Placement|Url|Host|Port|Ssl|UrlBase|Base|Kind|Provider|Name|Label))$/;
 
 export function redactValue(key, value) {
-  if (typeof value === 'string' && value.length && SECRET_KEY_RE.test(String(key)) && !KEEP_KEY_RE.test(String(key))) {
-    return `[redacted ${value.length} chars]`;
+  if (typeof value !== 'string' || !value.length) return value;
+  // Indexer lists are "name|url|apikey" lines: keep the name and host, blank the key.
+  if (/indexers$/i.test(String(key))) {
+    return value.split(/\r?\n/).map((line) => {
+      const parts = line.split('|');
+      if (parts.length >= 3 && parts[2].trim()) parts[2] = ` [redacted ${parts[2].trim().length} chars]`;
+      return parts.join('|');
+    }).join('\n');
   }
+  if (SECRET_KEY_RE.test(String(key)) && !KEEP_KEY_RE.test(String(key))) return `[redacted ${value.length} chars]`;
   return value;
+}
+
+/** "name|url|apikey" lines → [{ name, url, keyLength }] with the key dropped. */
+export function describeIndexers(str) {
+  return String(str || '').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).map((line) => {
+    const [name, url, apiKey] = line.split('|').map((s) => (s || '').trim());
+    return { name: name || url || '', url: url || '', keyLength: (apiKey || '').length };
+  }).filter((i) => i.url);
 }
 
 // Secrets that hide inside strings: query parameters (apikey=…, token=…),
@@ -74,7 +89,7 @@ export async function buildSupportPackage(opts = {}) {
     dataDir = '', dbPath = '', pluginsDir = '',
     plugins = () => [], jobs = () => [], schedules = () => [], logs = () => ({ logs: [] }),
     sources = () => [], notifiers = () => [], libraries = () => [], libraryStats = () => null,
-    state = {}, now = () => new Date(),
+    importHistory = () => [], state = {}, now = () => new Date(),
   } = opts;
   const generatedAt = now().toISOString();
   const errors = [];
@@ -133,6 +148,7 @@ export async function buildSupportPackage(opts = {}) {
       sessions: q1('SELECT COUNT(*) n FROM sessions')?.n ?? null,
       apiKeys: q1('SELECT COUNT(*) n FROM api_keys')?.n ?? null,
       notifications: q1('SELECT COUNT(*) n FROM notifications')?.n ?? null,
+      blocklist: q1('SELECT COUNT(*) n FROM release_blacklist')?.n ?? null,
     },
     state: redactSecrets({ queue: state.queue || null, crawl: state.crawl || null }),
     errors,
@@ -152,10 +168,14 @@ export async function buildSupportPackage(opts = {}) {
   const sourcesOut = section('sources', () => ({
     sources: sources().map((s) => ({ id: s.id, label: s.label ?? null, enabled: typeof s.isEnabled === 'function' ? !!s.isEnabled(config) : null, immediate: !!s.immediate })),
     notifiers: notifiers().map((n) => ({ id: n.id ?? n.key ?? null, label: n.label ?? null })),
-    indexers: redactSecrets(q("SELECT name, url, enabled, kind FROM indexers") || []),
+    newznab: { enabled: !!config.usenetEnabled, client: config.nzbClient || null, indexers: describeIndexers(config.newznabIndexers) },
+    torznab: { enabled: !!config.torrentEnabled, client: config.torrentClient || null, indexers: describeIndexers(config.torznabIndexers) },
   }));
-  const historyOut = section('history', () => redactSecrets(q('SELECT * FROM history ORDER BY id DESC LIMIT 100') || []));
-  const queueOut = section('queue', () => redactSecrets(q("SELECT id, series_id, issue_number, status, source, updated_at FROM issues WHERE status IN ('queued','downloading','grabbed','tagging','failed') ORDER BY id DESC LIMIT 200") || []));
+  const historyOut = section('history', () => redactSecrets({
+    imports: importHistory(),
+    grabs: q('SELECT id, issue_id, source, client, category, title, status FROM grabs ORDER BY id DESC LIMIT 100') || [],
+  }));
+  const queueOut = section('queue', () => redactSecrets(q("SELECT id, series_id, issue_number, status, error FROM issues WHERE status IN ('queued','downloading','grabbed','tagging','failed') ORDER BY id DESC LIMIT 200") || []));
 
   const logLines = section('logs', () => {
     const r = logs({ level: 'all', category: 'all', limit: 2000 });
@@ -174,7 +194,7 @@ What is inside
   sources.json    download sources, indexers and notification channels (names and hosts only)
   jobs.json       recent jobs and the schedule table
   queue.json      issues currently queued, downloading or failed
-  history.json    the last 100 download history rows
+  history.json    the last 100 import history rows and the last 100 grabs
   logs.txt        the last 2,000 application log entries
 
 What is NOT inside
