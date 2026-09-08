@@ -8,6 +8,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+
+- **Support package.** System → Tools → Getting help downloads one zip to
+  attach to a bug report: version and build, runtime and host, disk and
+  database size, settings with every key, password and token redacted,
+  installed plugins, libraries, jobs and schedules, queued and failed
+  downloads, recent history and the last two thousand log entries with
+  secrets blanked. No comics, user names or e-mail addresses are included.
+
 ### Fixed
 
 - **Memory no longer climbs after cover and page resizing.** Freed image

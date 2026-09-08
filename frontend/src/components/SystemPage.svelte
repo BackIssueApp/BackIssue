@@ -244,6 +244,26 @@
     copiedId = id;
     clearTimeout(copyRow._t); copyRow._t = setTimeout(() => { copiedId = ''; }, 1200);
   }
+  let supportBusy = $state(false), supportError = $state('');
+  async function downloadSupport() {
+    supportBusy = true; supportError = '';
+    try {
+      const r = await fetch('/api/support/package');
+      if (!r.ok) {
+        let msg = `Server error (HTTP ${r.status})`;
+        try { msg = (await r.json()).error || msg; } catch { /* keep */ }
+        supportError = msg;
+        return;
+      }
+      const name = (r.headers.get('content-disposition') || '').match(/filename="([^"]+)"/)?.[1] || 'backissue-support.zip';
+      const url = URL.createObjectURL(await r.blob());
+      const a = document.createElement('a');
+      a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { supportError = String(e?.message || e); }
+    finally { supportBusy = false; }
+  }
   function exportLogs() {
     const lines = shownLogs.map((e) => `${new Date(e.ts).toISOString()} [${e.level}] ${e.category || ''} ${e.message}${e.detail ? '\n  ' + String(e.detail).replace(/\n/g, '\n  ') : ''}`);
     const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/plain' });
@@ -401,7 +421,28 @@
           </div>
         </div>
 
+        <!-- support package -->
+        <div class="sysx__h">Getting help</div>
+        <div class="sysx__tools-grid">
+          <div class="sysx__tool">
+            <div class="sysx__tool-head">
+              <div class="sysx__tool-ico"><Icon name="download" size={18} /></div>
+              <div class="sysx__tool-id">
+                <div class="sysx__tool-name">Support package</div>
+                <p class="sysx__tool-desc">One zip to attach to a bug report: version and build, runtime, settings, plugins, libraries, jobs, recent downloads and the log. API keys, passwords and tokens are redacted; no comics, user names or e-mail addresses are included.</p>
+              </div>
+            </div>
+            {#if supportError}
+              <div class="sysx__tool-result sysx__tool-result--err"><Icon name="close" size={14} /> {supportError}</div>
+            {/if}
+            <div class="sysx__tool-actions">
+              <button class="sysx__primary" disabled={supportBusy} onclick={downloadSupport}>{supportBusy ? 'Building…' : 'Download support package'}</button>
+            </div>
+          </div>
+        </div>
+
         <!-- tool grid -->
+        <div class="sysx__h">Maintenance</div>
         <div class="sysx__tools-grid">
           {#each st?.catalog || [] as t (t.id)}
             <div class="sysx__tool" class:is-running={runningTool === t.id}>
@@ -612,6 +653,7 @@
   .sysx__tool-meta { font-size: 11.5px; color: var(--faint); margin-top: 6px; }
   .sysx__tool-result { font-size: 12px; color: var(--green); margin-top: 11px; display: flex; align-items: center; gap: 6px; }
   .sysx__tool-result--err { color: var(--red); }
+  .sysx__tool-actions { display: flex; gap: 8px; margin-top: 10px; }
   .sysx__tool-opt { display: flex; align-items: center; gap: 8px; margin-top: 11px; cursor: pointer; font-size: 12px; color: var(--muted); }
   .sysx__tool-opt input { accent-color: var(--accent); width: 15px; height: 15px; }
   .sysx__tool-foot { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line); display: flex; }

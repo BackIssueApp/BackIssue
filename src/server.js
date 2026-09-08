@@ -41,7 +41,7 @@ if (process.env.BUILD_CHANNEL && process.env.BUILD_CHANNEL !== 'release') {
   APP_VERSION += `-${process.env.BUILD_CHANNEL}${sha ? '.' + sha : ''}`;
 }
 
-export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, queueProgress, packProgress, cancelGrab, testCvKeys, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, state }) {
+export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, queueProgress, packProgress, cancelGrab, testCvKeys, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, supportPackage, state }) {
   const startDownloads = (arg) => {
     if (!state.queue.running) {
       state.queue.running = true;
@@ -244,6 +244,8 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // without being able to reshape the library).
   const PERM_RULES = [
     [/^\/api\/settings/, 'settings.manage'], [/^\/api\/indexers/, 'settings.manage'],
+    // The support package carries settings (redacted) and logs — admin only.
+    [/^\/api\/support/, 'settings.manage'],
     // Connection tests reach arbitrary hosts with credentials (SSRF + probing)
     // — admin only. Routes are named <thing>/test, so match /test at the end.
     [/\/test$/, 'settings.manage'],
@@ -1189,6 +1191,22 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       userId: req.user?.id ?? 0, // drives the ☆ badge column too
     }));
   });
+  // ---- Support package ----
+  // One zip with version, runtime, settings (secrets redacted), plugins,
+  // libraries, jobs, recent downloads and the log — what a bug report needs.
+  app.get('/api/support/package', async (req, res) => {
+    if (!supportPackage) return res.status(501).json({ error: 'Support package not available' });
+    try {
+      const { buffer, filename } = await supportPackage();
+      res.set('Content-Type', 'application/zip');
+      res.set('Content-Disposition', `attachment; filename="${filename}"`);
+      res.set('Cache-Control', 'no-store');
+      res.send(buffer);
+    } catch (e) {
+      res.status(500).json({ error: `Could not build the support package: ${e?.message || e}` });
+    }
+  });
+
   app.get('/api/tools', (req, res) => res.json(toolsState()));
   app.post('/api/tools/:tool', (req, res) => res.json(runTool(req.params.tool, req.body || {})));
 

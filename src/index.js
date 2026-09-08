@@ -4,6 +4,10 @@ import { processPack } from './pack.js';
 import { createApp } from './server.js';
 import config from './config.js';
 import { loadSettings, currentSettings, saveSettings } from './settings.js';
+import { buildSupportPackage } from './support.js';
+import { pluginCatalog as supportPluginCatalog, registeredSources as supportSources, registeredNotifiers as supportNotifiers, pluginsDir as supportPluginsDir } from './plugins.js';
+import { listLibraries as supportLibraries, libraryStats as supportLibraryStats } from './db.js';
+import { loadAttestation as supportBuildInfo } from './attest.js';
 import { loadPlugins, registeredStartups, registeredRoutes, registeredJobs, registeredClientAssets, registeredImportHandlers } from './plugins.js';
 import { spawn } from 'node:child_process';
 import fsp from 'node:fs/promises';
@@ -1349,6 +1353,15 @@ const app = createApp({
   setScheduleCron,
   runScheduleNow: (key) => scheduler.runNow(key),
   getSettings: currentSettings,
+  supportPackage: () => buildSupportPackage({
+    db, config, settings: currentSettings,
+    version: (() => { try { return JSON.parse(fss.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version; } catch { return '0.0.0'; } })(),
+    build: supportBuildInfo(),
+    dataDir: nodePath.dirname(config.dbPath || ''), dbPath: config.dbPath || '', pluginsDir: supportPluginsDir(),
+    plugins: supportPluginCatalog, jobs: () => listJobs(60), schedules: () => scheduler.list(),
+    logs: (o) => ({ logs: listLogs(o) }), sources: supportSources, notifiers: supportNotifiers,
+    libraries: () => supportLibraries(db), libraryStats: () => supportLibraryStats(db), state,
+  }),
   saveSettings,
   requestRestart,
 });
