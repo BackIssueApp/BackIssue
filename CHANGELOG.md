@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-09-08
+
 ### Added
 
 - **Diagnostics from the mobile apps.** A phone signed in to the server can
