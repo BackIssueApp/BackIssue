@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-09-08
+
 ### Fixed
 
 - **A collected edition no longer arrives in place of a single issue.** A trade
