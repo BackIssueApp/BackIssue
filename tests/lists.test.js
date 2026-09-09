@@ -61,6 +61,26 @@ test('lists: ownership joins — owned counts come from valid library files', ()
   assert.equal(l.items[1].owned, 0);
 });
 
+test('lists: series_count counts distinct volumes, not issues', () => {
+  const db = makeDb();
+  db.exec(`
+    INSERT INTO cv_series (comicvine_id, name) VALUES (900, 'Saga'), (901, 'Nailbiter');
+    INSERT INTO cv_issues (comicvine_id, cv_series_id, issue_number, image_url) VALUES
+      (101, 900, '1', 'a.jpg'), (102, 900, '2', NULL), (103, 901, '1', 'b.jpg');
+  `);
+  const id = createList(db, 1, 'Crossover');
+  // 104 is an issue we've never cached: no CV row, so no volume to count.
+  addItems(db, 1, id, [101, 102, 103, 104]);
+  const overview = listLists(db, 1)[0];
+  assert.equal(overview.items, 4);
+  assert.equal(overview.series_count, 2, 'two volumes across four items');
+  assert.deepEqual(overview.covers, ['a.jpg', 'b.jpg'], 'covers follow list order, blanks skipped');
+
+  // An empty list reports zero rather than going undefined on the client.
+  const empty = createList(db, 1, 'Nothing yet');
+  assert.equal(listLists(db, 1).find((x) => x.id === empty).series_count, 0);
+});
+
 test('arc import: cover-date order, stub rows inserted, cached rows untouched', () => {
   const db = makeDb();
   // one issue already richly cached — the import must not overwrite it

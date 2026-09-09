@@ -687,9 +687,17 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     const l = lists.getList(db, req.user.id, Number(req.params.id), { includeRestricted: canRestricted(req) });
     if (!l) return res.status(404).json({ error: 'not found' });
     const reason = `list:${l.id}`;
+    // Optional subset: the mobile "GET" on one missing issue wants exactly that
+    // issue, not the whole list. Absent (or empty) body = every unowned item,
+    // which is what "get all the gaps" has always meant.
+    const requested = (req.body || {}).cvIssueIds;
+    const only = Array.isArray(requested) && requested.length
+      ? new Set(requested.map(Number).filter(Boolean))
+      : null;
     const byVolume = new Map();
     for (const it of l.items) {
       if (!it.cv_series_id || !it.cv_issue_id || it.owned) continue;
+      if (only && !only.has(it.cv_issue_id)) continue;
       if (!byVolume.has(it.cv_series_id)) byVolume.set(it.cv_series_id, { seriesId: it.series_id || null, ids: [] });
       byVolume.get(it.cv_series_id).ids.push(it.cv_issue_id);
     }

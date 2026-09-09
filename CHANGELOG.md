@@ -8,6 +8,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+
+- Reading lists now report how many volumes they span and the first few covers,
+  so a list is recognisable before you open it.
+- Filling a reading list's gaps can target specific issues instead of every
+  unowned one in the list.
+
 ## [0.8.2] - 2026-09-08
 
 ### Fixed

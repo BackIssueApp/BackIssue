@@ -35,6 +35,25 @@ const owned = (db, listId) => db.prepare(`
    WHERE li.list_id = ? AND EXISTS
      (SELECT 1 FROM library_files lf WHERE lf.cv_issue_id = li.cv_issue_id AND lf.valid = 1)`).get(listId).n;
 
+/** The first few covers in list order — enough for the index's cover fan, so a
+ *  list is recognisable before you open it. Issues we've never cached, and
+ *  cached ones with no art, simply don't contribute. */
+const firstCovers = (db, listId, n = 3) => db.prepare(`
+  SELECT ci.image_url
+    FROM reading_list_items li
+    JOIN cv_issues ci ON ci.comicvine_id = li.cv_issue_id
+   WHERE li.list_id = ? AND ci.image_url IS NOT NULL AND ci.image_url <> ''
+   ORDER BY li.position LIMIT ?`).all(listId, n).map((r) => r.image_url);
+
+/** How many distinct volumes a list spans — the "3 series" in a list's
+ *  subtitle, and the thing that makes a cross-series run legible at a glance.
+ *  Issues we've never cached have no cv_series_id; they simply don't count. */
+const seriesCount = (db, listId) => db.prepare(`
+  SELECT COUNT(DISTINCT ci.cv_series_id) n
+    FROM reading_list_items li
+    JOIN cv_issues ci ON ci.comicvine_id = li.cv_issue_id
+   WHERE li.list_id = ? AND ci.cv_series_id IS NOT NULL`).get(listId).n;
+
 /** Every list this user may SEE: their own, plus anyone's public lists.
  *  `mine` drives the UI's edit affordances; `owner` names the sharer. */
 export function listLists(db, userId) {
@@ -53,6 +72,8 @@ export function listLists(db, userId) {
     owner: l.mine ? null : usernameOf(db, ownerId),
     items: db.prepare('SELECT COUNT(*) n FROM reading_list_items WHERE list_id = ?').get(l.id).n,
     owned: owned(db, l.id),
+    series_count: seriesCount(db, l.id),
+    covers: firstCovers(db, l.id),
   }));
 }
 
