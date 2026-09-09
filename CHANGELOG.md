@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-09-09
+
 ### Added
 
 - Reading lists now report how many volumes they span and the first few covers,
