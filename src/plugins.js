@@ -84,6 +84,8 @@ const libraryScanners = []; // { type, scan({libraryId}) } — plugin-owned libr
 const bookMetadataSources = []; // { id, priority, makeClient(config) } — ebook metadata sources, preferred before the hosted fallback
 const remoteMediaSources = []; // { id, mediaType, label, listPage, materialize?, openStream?, cover?, chapters? } — file-less remote media catalogs (ebooks, audiobooks, …) for on-demand libraries
 const collectionFilters = []; // { id, resolve(selection, ctx) -> number[] } — resolve a Library facet selection to matching series ids (narrows /api/collection)
+const mediaHandlers = []; // { type, exts, file({ path, files, libraryId, hint, source, log }) -> { issueId, seriesId } } — files a downloaded book/audiobook into a plugin library
+const mediaListeners = []; // (event) => void — told when a media download lands or fails ({ event:'imported'|'failed', type, ref, … })
 
 // Per-plugin catalog for the management page: everything discovered on disk,
 // loaded or not. name → { name, version, description, enabled, loaded, error, counts }.
@@ -302,6 +304,38 @@ export const pluginApi = {
     if (remoteMediaSources.some((s) => s.id === source.id && s.mediaType === source.mediaType)) return; // idempotent per (id, type)
     remoteMediaSources.push({ ...source, id: String(source.id), mediaType: String(source.mediaType), plugin: currentLoadingPlugin });
   },
+  // Where a DOWNLOADED book or audiobook goes. The download sources (usenet,
+  // torrent, any site source declaring `types: ['ebook']` …) find and fetch a
+  // release for a plugin library type; the plugin owning that type files the
+  // result. `file({ path, files, libraryId, hint, source, log })` receives the
+  // completed download (path = file or folder; files = the matching files in
+  // it, by `exts`), the target library and the asker's hint ({ title, author,
+  // year }) and returns { issueId, seriesId } once the item is catalogued.
+  registerMediaHandler(handler) {
+    if (!handler?.type || typeof handler.file !== 'function') return;
+    const type = String(handler.type).toLowerCase();
+    if (mediaHandlers.some((h) => h.type === type)) return; // idempotent
+    mediaHandlers.push({ ...handler, type, exts: (handler.exts || []).map((e) => String(e).toLowerCase()), plugin: currentLoadingPlugin });
+    bump('mediaHandlers');
+  },
+  // Hear about media downloads landing or failing: fn({ event: 'imported' |
+  // 'failed', type, libraryId, ref, title, source, issueId?, seriesId?, error? }).
+  // `ref` is whatever the asker passed to downloadMedia — how it recognises
+  // its own downloads among everyone else's.
+  onMediaDownload(fn) {
+    if (typeof fn === 'function') mediaListeners.push(fn);
+  },
+  // Ask the download sources for a book or audiobook and file it into a
+  // plugin library when it lands: { db, type, libraryId, title, author?, year?,
+  // ref? } → { status: 'grabbed' | 'downloading' | 'imported' | 'no-match' |
+  // 'no-sources', source?, release?, issueId? }. A deferred source (usenet,
+  // torrent) hands the release to its client and the download monitor files
+  // it later; an immediate one downloads in the background. Either way the
+  // asker hears the outcome through onMediaDownload.
+  async downloadMedia(opts) {
+    const { queueMediaDownload } = await import('./mediadownload.js');
+    return queueMediaDownload(opts);
+  },
   // Back-compat alias — the original book-only hook (mediaType 'ebook').
   registerRemoteBookSource(source) {
     if (!source?.id || typeof source.listPage !== 'function' || typeof source.materialize !== 'function') return;
@@ -335,6 +369,9 @@ export function registeredImportHandlers() { return importHandlers; }
 export function registeredLibraryScanners() { return libraryScanners; }
 export function registeredBookMetadataSources() { return [...bookMetadataSources].sort((a, b) => a.priority - b.priority); }
 export function registeredCollectionFilters() { return [...collectionFilters]; }
+export function registeredMediaHandlers() { return [...mediaHandlers]; }
+export function mediaHandlerFor(type) { return mediaHandlers.find((h) => h.type === String(type || '').toLowerCase()) || null; }
+export function registeredMediaListeners() { return [...mediaListeners]; }
 export function registeredRemoteMediaSources(mediaType) {
   return mediaType ? remoteMediaSources.filter((s) => s.mediaType === mediaType) : [...remoteMediaSources];
 }
@@ -385,7 +422,7 @@ export async function loadPluginsFromDir(dir, api = pluginApi, disabled = [], ki
         name, kind, ...readMeta(dir, name),
         enabled: false, loaded: false, superseded: true,
         error: null,
-        counts: { sources: 0, settings: 0, startups: 0, routes: 0, jobs: 0, assets: 0, permissions: 0, notifiers: 0, indexerProviders: 0, importHandlers: 0 },
+        counts: { sources: 0, settings: 0, startups: 0, routes: 0, jobs: 0, assets: 0, permissions: 0, notifiers: 0, indexerProviders: 0, importHandlers: 0, mediaHandlers: 0 },
       });
       console.log(`Plugin "${name}" is now a download site and is already installed as one — the plugin is not loaded and can be removed.`);
       continue;
@@ -398,7 +435,7 @@ export async function loadPluginsFromDir(dir, api = pluginApi, disabled = [], ki
       enabled: !disabled.includes(name),
       loaded: false,
       error: null,
-      counts: { sources: 0, settings: 0, startups: 0, routes: 0, jobs: 0, assets: 0, permissions: 0, notifiers: 0, indexerProviders: 0, importHandlers: 0 },
+      counts: { sources: 0, settings: 0, startups: 0, routes: 0, jobs: 0, assets: 0, permissions: 0, notifiers: 0, indexerProviders: 0, importHandlers: 0, mediaHandlers: 0 },
     };
     catalog.set(name, info);
     if (!info.enabled) {
@@ -471,7 +508,7 @@ export function pluginCatalog() {
     if (catalog.has(name) || pend.action === 'removed') continue;
     rows.push({
       name, version: pend.version, description: null, enabled: true, loaded: false, error: null,
-      counts: { sources: 0, settings: 0, startups: 0, routes: 0, jobs: 0, assets: 0, permissions: 0, notifiers: 0, indexerProviders: 0, importHandlers: 0 },
+      counts: { sources: 0, settings: 0, startups: 0, routes: 0, jobs: 0, assets: 0, permissions: 0, notifiers: 0, indexerProviders: 0, importHandlers: 0, mediaHandlers: 0 },
       pending: pend.action, pendingVersion: pend.version, restartRequired: true,
     });
   }

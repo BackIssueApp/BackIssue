@@ -6,7 +6,8 @@
 // `grabs` table + each client's own state, it survives restarts — on boot it
 // reconciles whatever finished while we were down.
 import config from './config.js';
-import { activeGrabs, setGrabStatus, setIssueStatus, getIssueById, blacklistRelease, isCorruptContentError } from './db.js';
+import { activeGrabs, setGrabStatus, setIssueStatus, getIssueById, blacklistRelease, isCorruptContentError, grabPayload } from './db.js';
+import { fileMedia, emitMedia } from './mediadownload.js';
 import { makeNzbClient } from './nzbclients.js';
 import { makeTorrentClient } from './torrentclients.js';
 import { importCompleted } from './sources/usenet.js';
@@ -80,6 +81,51 @@ async function handlePackGrab({ db, grab, item, client, policy, source, cvClient
 
 // Per-source client + policy. Torrents are LEFT in the client after import so they
 // keep seeding (manage ratio/removal in qBittorrent); usenet downloads are removed.
+// A media grab (a book or audiobook for a plugin library, queued by
+// mediadownload.js) has no issue: on completion the file goes to the plugin
+// that owns the library type, and the asker hears about it through the media
+// listeners. Failures blacklist the release on usenet just like an issue's.
+async function handleMediaGrab({ db, grab, item, client, policy, source, onProgress, now }) {
+  const p = grabPayload(grab);
+  const base = { type: p.type, libraryId: p.libraryId, ref: grab.ref, title: p.title || grab.title, source };
+  const fail = async (error, { blacklist = false, cleanup: doCleanup = false } = {}) => {
+    setGrabStatus(db, grab.id, 'failed', { error });
+    if (blacklist && source === 'usenet') {
+      try { blacklistRelease(db, { source, guid: grab.release_guid, title: grab.title, reason: error.slice(0, 200) }); }
+      catch (e) { console.warn('download monitor: blacklisting failed:', e?.message || e); }
+    }
+    if (doCleanup && policy.removeOnFailed) await cleanup(client, grab.download_id, 'failed', grab.id);
+    onProgress({ event: 'media-failed', ...base, error });
+    emitMedia({ event: 'failed', ...base, error });
+  };
+  try {
+    if (!item) {
+      if (now() - grabbedAtMs(grab.grabbed_at) > policy.timeoutMs) await fail('not found on client before timeout');
+      return;
+    }
+    if (item.state === 'downloading') return;
+    if (item.state === 'failed') { await fail(item.error || 'client reported failure', { blacklist: true, cleanup: true }); return; }
+    if (item.state !== 'done') return;
+    const r = await fileMedia(db, { type: p.type, libraryId: p.libraryId, path: item.path, hint: p.hint || {}, source, ref: grab.ref, title: base.title });
+    if (!r.ok) {
+      // fileMedia told the listeners already; a download with nothing usable
+      // in it is the release's fault, so usenet won't grab it again.
+      setGrabStatus(db, grab.id, 'failed', { error: r.error });
+      if (source === 'usenet' && /nothing usable/i.test(r.error)) {
+        try { blacklistRelease(db, { source, guid: grab.release_guid, title: grab.title, reason: r.error.slice(0, 200) }); } catch { /* best-effort */ }
+      }
+      onProgress({ event: 'media-failed', ...base, error: r.error });
+      return;
+    }
+    setGrabStatus(db, grab.id, 'imported', { importedAt: new Date(now()).toISOString() });
+    onProgress({ event: 'media-done', ...base, issueId: r.issueId, seriesId: r.seriesId });
+    if (policy.removeOnDone) await cleanup(client, grab.download_id, 'done', grab.id);
+  } catch (e) {
+    console.warn('download monitor: media grab failed', grab.id, e?.stack || e?.message || e);
+    await fail(String(e?.message || e));
+  }
+}
+
 function sourcePolicy(source) {
   if (source === 'usenet') {
     return {
@@ -150,6 +196,7 @@ export function createDownloadMonitor({ db, onProgress = () => {}, now = () => D
           if (now() - outages.get(source) > policy.timeoutMs) {
             for (const grab of sourceGrabs) {
               setGrabStatus(db, grab.id, 'failed', { error: `client unreachable: ${e?.message || e}` });
+              if (grab.kind === 'media') { emitMedia({ event: 'failed', ...grabPayload(grab), ref: grab.ref, source, error: 'download client unreachable' }); onProgress({ event: 'media-failed', source, title: grab.title, error: 'download client unreachable' }); continue; }
               if (grab.kind !== 'pack' && grab.issue_id) setIssueStatus(db, grab.issue_id, 'failed', { error: `${source}: download client unreachable` });
               onProgress({ event: grab.kind === 'pack' ? 'pack-failed' : 'failed', source, title: grab.title, issue: grab.kind !== 'pack' ? getIssueById(db, grab.issue_id) : undefined, error: 'download client unreachable' });
             }
@@ -164,6 +211,7 @@ export function createDownloadMonitor({ db, onProgress = () => {}, now = () => D
           // Pack grabs (per-series or 0-day) have no single issue — on completion
           // they post-process the whole download and import every wanted issue.
           if (grab.kind === 'pack') { await handlePackGrab({ db, grab, item, client, policy, source, cvClient, onProgress, now, record: (id, d) => { nextPacks[id] = d; } }); continue; }
+          if (grab.kind === 'media') { await handleMediaGrab({ db, grab, item, client, policy, source, onProgress, now }); continue; }
           const issue = getIssueById(db, grab.issue_id);
           if (!issue) { setGrabStatus(db, grab.id, 'orphan', { error: 'issue no longer exists' }); continue; }
           try {

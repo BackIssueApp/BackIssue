@@ -19,6 +19,7 @@ import { load } from 'cheerio';
 import { normalizeNumber } from '../matcher.js';
 import { scoreRelease, normalizeSeries, suspiciouslySmall, autoTarget, manualTarget } from '../sources/usenet.js';
 import { isCollectedSeries, collectedQueries } from '../editions.js';
+import { isBookContext, bookQueries, bookTarget, scoreBookRelease, bookTooSmall } from '../sources/books.js';
 import { logInfo, logWarn } from '../logstore.js';
 import { fetchHtml, fetchJson, downloadToBuffer } from './http.js';
 import { normalizeArchive } from './bytes.js';
@@ -202,6 +203,18 @@ export function defineSource(rawDef) {
   }
 
   async function defaultFind(ctx, kit) {
+    // A book or audiobook: the site is searched by author + title and the
+    // results judged by the book matcher (no issue number to parse).
+    if (isBookContext(ctx)) {
+      const target = bookTarget(ctx);
+      const results = await runSearch(bookQueries(ctx), ctx, kit);
+      const scored = results
+        .filter((r) => !bookTooSmall(target.type, r.size))
+        .map((r) => ({ r, score: scoreBookRelease(r.title, target) }))
+        .filter((x) => x.score != null)
+        .sort((a, b) => b.score - a.score);
+      return scored[0]?.r || null;
+    }
     // Match against every name the volume has; search under only a few.
     const target = autoTarget(ctx, unique(ctx.seriesNames?.length ? ctx.seriesNames : [ctx.seriesTitle]));
     const names = kit.searchNames(ctx);
@@ -253,6 +266,7 @@ export function defineSource(rawDef) {
       if (!r) throw Object.assign(new Error(`${label}: nothing to download for ${candidate.title || candidate.url}`), { noRetry: true });
       const referer = r.referer ?? candidate.url ?? kit.siteUrl;
       if (kind === 'pages') {
+        if (isBookContext(ctx)) throw Object.assign(new Error(`${label} serves page images, not book files`), { noRetry: true });
         onProgress({ phase: 'connecting', detail: label });
         const pages = await fetchPages({
           pages: r.pages, referer, headers: r.headers, session, rateMs: def.pageRateMs ?? 0,
@@ -273,6 +287,9 @@ export function defineSource(rawDef) {
             onStage: (name) => onProgress({ phase: name === 'solving' ? 'solving' : 'connecting', detail }),
             onProgress: ({ done, total, bps }) => onProgress({ phase: 'download', unit: 'bytes', done, total, bps, detail }),
           });
+          // A book is handed over as downloaded — the media handler that files
+          // it knows its formats; the comic normaliser would mangle an EPUB.
+          if (isBookContext(ctx)) return { buffer, url: link.url, name: candidate.title || '', media: true };
           return await normalizeArchive(buffer, { label: detail, id, url: link.url });
         } catch (e) {
           lastErr = e;

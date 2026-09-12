@@ -8,6 +8,7 @@ import { makeNzbClient } from '../nzbclients.js';
 import { loadReleaseBlacklist, normReleaseTitle } from '../db.js';
 import { normalizeNumber } from '../matcher.js';
 import { cbrBufferToCbz, sniffFormat } from '../archive.js';
+import { isBookContext, findBookRelease } from './books.js';
 
 export const COMIC_EXT = new Set(['.cbz', '.cbr', '.pdf', '.zip', '.rar']);
 const IMG_EXT = /\.(jpe?g|png|gif|webp|bmp)$/i;
@@ -264,6 +265,18 @@ async function importCompleted(srcPath, name) {
 // "Deferred" means grab() hands the NZB to the download client and returns
 // immediately; the background monitor (src/downloadmonitor.js) polls the client
 // by category, and calls importCompleted() to finish the job when it's done.
+// Releases that previously failed to download — a broken post is very likely
+// to fail again on retry, so the search skips it and lets the next-best win.
+// Best-effort: if the blacklist can't load, search unfiltered rather than fail.
+function blockedFor(ctx) {
+  let blocked = { guids: new Set(), titles: new Set() };
+  if (ctx.db) {
+    try { blocked = loadReleaseBlacklist(ctx.db, 'usenet'); }
+    catch (e) { console.warn('usenet: blacklist load failed —', e?.stack || e?.message || e); }
+  }
+  return (r) => (r.guid && blocked.guids.has(r.guid)) || blocked.titles.has(normReleaseTitle(r.title));
+}
+
 export const usenet = {
   id: 'usenet',
   label: 'usenet',
@@ -277,6 +290,12 @@ export const usenet = {
   async find(ctx) {
     const indexers = await resolveIndexers(ctx.config, 'newznab');
     if (!indexers.length) return null;
+    const isBlocked = blockedFor(ctx);
+    // A book or audiobook: its own queries, categories and matcher (books.js).
+    if (isBookContext(ctx)) {
+      const best = await findBookRelease(ctx, (q, cat) => searchNewznab(indexers, q, { cat }), { urlOf: (r) => r.nzbUrl, isBlocked });
+      return best ? { source: 'usenet', ...best } : null;
+    }
     // Search under every known name for this volume (title + CV/user aliases), so
     // an indexer that lists it as "2000AD" is found even though CV says "2000 AD".
     const names = (ctx.seriesNames && ctx.seriesNames.length) ? ctx.seriesNames : [ctx.seriesTitle];
@@ -292,15 +311,6 @@ export const usenet = {
       }
     }
     const target = autoTarget(ctx, names);
-    // Drop releases that previously failed to download — a broken post is very
-    // likely to fail again on retry, so skip it and let the next-best win.
-    // Best-effort: if the blacklist can't load, search unfiltered rather than fail.
-    let blocked = { guids: new Set(), titles: new Set() };
-    if (ctx.db) {
-      try { blocked = loadReleaseBlacklist(ctx.db, 'usenet'); }
-      catch (e) { console.warn('usenet: blacklist load failed —', e?.stack || e?.message || e); }
-    }
-    const isBlocked = (r) => (r.guid && blocked.guids.has(r.guid)) || blocked.titles.has(normReleaseTitle(r.title));
     // Keep only true matches (series matches any alias + number) that aren't
     // suspiciously small (fake-release guard), then prefer the best year. Larger
     // files sort first within a score (searchNewznab order).

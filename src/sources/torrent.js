@@ -7,6 +7,7 @@ import { parseIndexers, searchTorznab } from '../torznab.js';
 import { resolveIndexers, indexersManaged } from '../indexerproviders.js';
 import { makeTorrentClient, torrentClientHost } from '../torrentclients.js';
 import { scoreRelease, issueToken, suspiciouslySmall, manualQueries, manualTarget, autoQueries, autoTarget } from './usenet.js';
+import { isBookContext, findBookRelease } from './books.js';
 
 export const torrent = {
   id: 'torrent',
@@ -22,6 +23,11 @@ export const torrent = {
   async find(ctx) {
     const indexers = await resolveIndexers(ctx.config, 'torznab');
     if (!indexers.length) return null;
+    // A book or audiobook: its own queries, categories and matcher (books.js).
+    if (isBookContext(ctx)) {
+      const best = await findBookRelease(ctx, (q, cat) => searchTorznab(indexers, q, { cat }), { urlOf: (r) => r.downloadUrl });
+      return best ? { source: 'torrent', ...best } : null;
+    }
     // Search under every known name for this volume (title + CV/user aliases).
     const names = (ctx.seriesNames && ctx.seriesNames.length) ? ctx.seriesNames : [ctx.seriesTitle];
     const byUrl = new Map();

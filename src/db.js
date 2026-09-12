@@ -272,6 +272,11 @@ function migrate(db) {
   // Indexer guid of the grabbed release, so a failure can blacklist that exact
   // release (not just its title) and future searches skip it.
   if (grabCols.length && !grabCols.includes('release_guid')) db.exec('ALTER TABLE grabs ADD COLUMN release_guid TEXT');
+  // Media grabs (a book or audiobook for a plugin library, kind='media') carry
+  // what to do with the file once it lands (JSON payload) and who asked for it
+  // (ref, e.g. 'requests:12') so the asker can find its grab again.
+  if (grabCols.length && !grabCols.includes('payload')) db.exec('ALTER TABLE grabs ADD COLUMN payload TEXT');
+  if (grabCols.length && !grabCols.includes('ref')) db.exec('ALTER TABLE grabs ADD COLUMN ref TEXT');
   // Library type inferred by the import scan (ComicInfo's Manga tag).
   const icCols = db.prepare('PRAGMA table_info(import_candidates)').all().map((c) => c.name);
   if (icCols.length && !icCols.includes('series_type')) db.exec('ALTER TABLE import_candidates ADD COLUMN series_type TEXT');
@@ -549,11 +554,23 @@ export function getIssueById(db, id) {
 // strings, but a malformed indexer response can leak other shapes.
 const guidStr = (g) => (typeof g === 'string' && g) || (typeof g === 'number' ? String(g) : null);
 
-export function recordGrab(db, { issueId = 0, source, client = null, downloadId = null, category = null, title = null, seriesId = null, kind = 'issue', releaseGuid = null }) {
-  // issue_id is NOT NULL in the schema; pack grabs have no single issue → 0 sentinel.
+export function recordGrab(db, { issueId = 0, source, client = null, downloadId = null, category = null, title = null, seriesId = null, kind = 'issue', releaseGuid = null, payload = null, ref = null }) {
+  // issue_id is NOT NULL in the schema; pack and media grabs have no single issue → 0 sentinel.
   return db.prepare(
-    `INSERT INTO grabs (issue_id, source, client, download_id, category, title, series_id, kind, release_guid) VALUES (?,?,?,?,?,?,?,?,?)`
-  ).run(issueId ?? 0, source, client, downloadId != null ? String(downloadId) : null, category, title, seriesId, kind, guidStr(releaseGuid)).lastInsertRowid;
+    `INSERT INTO grabs (issue_id, source, client, download_id, category, title, series_id, kind, release_guid, payload, ref) VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+  ).run(issueId ?? 0, source, client, downloadId != null ? String(downloadId) : null, category, title, seriesId, kind, guidStr(releaseGuid),
+    payload == null ? null : JSON.stringify(payload), ref == null ? null : String(ref)).lastInsertRowid;
+}
+
+/** A grab's JSON payload, parsed ({} when absent or unreadable). */
+export function grabPayload(grab) {
+  try { return grab?.payload ? JSON.parse(grab.payload) : {}; } catch { return {}; }
+}
+
+/** The grabs filed under a ref ('requests:12'), newest first — so the asker
+ *  can show "downloading from usenet" or "failed: …" against its own row. */
+export function grabsByRef(db, ref, { limit = 5 } = {}) {
+  return db.prepare('SELECT * FROM grabs WHERE ref=? ORDER BY id DESC LIMIT ?').all(String(ref), limit);
 }
 
 // Normalize a release title to a stable comparison key: lowercase, drop a comic

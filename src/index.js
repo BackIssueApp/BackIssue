@@ -1507,6 +1507,8 @@ const downloadMonitor = createDownloadMonitor({
     if (p.event === 'tag-result') recordProgressTagLog(p);
     if (p.event === 'done') { logInfo(`Imported from ${p.source || 'download'}: ${p.issue?.title || 'issue ' + p.issue?.id}`, p.source || 'usenet'); notifyRaw(db, { type: 'import.done', category: 'import', level: 'success', title: 'Downloaded', body: `${p.issue?.title || 'issue'}${p.source ? ' · ' + p.source : ''}`, seriesId: p.issue?.series_id ?? null }); settlePicks(p.issue?.series_id ?? null); }
     if (p.event === 'failed') { logError(`${p.source || 'download'} import failed: ${p.issue?.title || 'issue ' + p.issue?.id} — ${p.error}`, p.source || 'usenet'); notifyRaw(db, { type: 'import.failed', category: 'failure', level: 'error', title: 'Download failed', body: `${p.issue?.title || 'issue'} — ${p.error}`, seriesId: p.issue?.series_id ?? null }); }
+    if (p.event === 'media-done') notifyRaw(db, { type: 'import.done', category: 'import', level: 'success', title: 'Downloaded', body: `${p.title || p.type}${p.source ? ' · ' + p.source : ''}`, seriesId: p.seriesId ?? null });
+    if (p.event === 'media-failed') { logError(`${p.source || 'download'}: ${p.title || p.type || 'media'} — ${p.error}`, p.source || 'download'); notifyRaw(db, { type: 'import.failed', category: 'failure', level: 'error', title: 'Download failed', body: `${p.title || p.type || 'media'} — ${p.error}` }); }
     if (p.event === 'pack-start') logInfo(`Post-processing pack — ${p.title}…`, p.source || 'torrent');
     if (p.event === 'pack-import') {
       if (p.outcome === 'imported') logInfo(`[${p.done}/${p.total}] imported ${p.reason}`, p.source || 'torrent');

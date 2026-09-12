@@ -8,6 +8,19 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+
+- **Books and audiobooks from your download sources.** A plugin can now ask
+  the app to download a book or audiobook (`api.downloadMedia`) and the same
+  sources that serve comics go looking: usenet and torrent search the book
+  and audiobook categories with a matcher built for how book releases are
+  named (author and title, no issue number; the right kind of file), and a
+  site source takes part when its definition declares `types: ['ebook']` or
+  `['audiobook']`. The plugin that owns the library type files the result
+  (`api.registerMediaHandler`) and whoever asked is told when it lands
+  (`api.onMediaDownload`). The Requests plugin uses this to fill approved
+  book requests.
+
 ## [0.8.3] - 2026-09-09
 
 ### Added

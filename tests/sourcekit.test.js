@@ -196,6 +196,36 @@ test('defineSource (archive kind): find, fetch, manualSearch, test, card and set
   } finally { await site.close(); }
 });
 
+test('defineSource: a site declaring ebooks is searched by author + title and hands the file over as-is', async () => {
+  const site = await fakeSite();
+  try {
+    resetPacing();
+    const searched = [];
+    const src = defineSource({
+      id: 'bookshop', label: 'Book Shop', baseUrl: site.base, types: ['ebook'],
+      search: async (q) => {
+        searched.push(q);
+        return /kings/i.test(q) ? [
+          { title: 'Brandon Sanderson - Words of Radiance (2014) EPUB', url: site.base + '/post/wor', size: 3e6 },
+          { title: 'Brandon Sanderson - The Way of Kings (2010) EPUB', url: site.base + '/post/wok', size: 2e6 },
+        ] : [];
+      },
+      resolve: async () => ({ url: site.base + '/file/saga-12.cbz' }), // any bytes will do: books are not normalised
+    });
+    assert.deepEqual(src.types, ['ebook']);
+    const ctx = { config: { bookshopEnabled: true }, series: { type: 'ebook', title: 'The Way of Kings' }, seriesTitle: 'The Way of Kings', seriesNames: ['The Way of Kings'], issue: { issue_number: '', title: 'The Way of Kings' }, book: { type: 'ebook', title: 'The Way of Kings', author: 'Brandon Sanderson', year: '2010' } };
+    const found = await src.find(ctx);
+    assert.equal(found.title, 'Brandon Sanderson - The Way of Kings (2010) EPUB');
+    assert.deepEqual(searched, ['Brandon Sanderson The Way of Kings', 'The Way of Kings']);
+    const fetched = await src.fetch(found, ctx, () => {});
+    assert.equal(fetched.media, true);
+    assert.equal(fetched.name, found.title);
+    assert.ok(Buffer.isBuffer(fetched.buffer));
+    // A comic context never reaches a books-only site.
+    assert.equal(await src.find({ ...ctx, book: undefined, series: { type: 'comic' }, issue: { issue_number: '1' } }), null);
+  } finally { await site.close(); }
+});
+
 test('defineSource (pages kind) with a custom find builds a CBZ from page images', async () => {
   const site = await fakeSite();
   try {
