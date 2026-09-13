@@ -567,6 +567,11 @@ export function grabPayload(grab) {
   try { return grab?.payload ? JSON.parse(grab.payload) : {}; } catch { return {}; }
 }
 
+/** Media grabs (a book or audiobook for a plugin library) still on a client. */
+export function activeMediaGrabs(db) {
+  return db.prepare("SELECT * FROM grabs WHERE kind='media' AND status='active' ORDER BY id").all();
+}
+
 /** The grabs filed under a ref ('requests:12'), newest first — so the asker
  *  can show "downloading from usenet" or "failed: …" against its own row. */
 export function grabsByRef(db, ref, { limit = 5 } = {}) {

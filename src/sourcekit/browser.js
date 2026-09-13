@@ -37,13 +37,24 @@ let contextPromise = null;
  *  checking `browserAvailable()` — on the lean image the import throws. */
 export async function sharedContext() {
   if (!browserAvailable()) throw new Error('this source needs the browser image (the lean image ships no browser)');
-  if (!contextPromise) {
-    contextPromise = (async () => {
-      const { launchContext } = await import('../browser.js');
-      return launchContext();
-    })().catch((e) => { contextPromise = null; throw e; });
+  if (contextPromise) {
+    // The context may have been closed by another holder (a plugin's crawler
+    // restarting its browser) since it was cached — then it is no use to
+    // anyone, and the next page must come from a fresh launch.
+    const ctx = await contextPromise.catch(() => null);
+    if (ctx && !ctx.__closed && isOpen(ctx)) return ctx;
+    contextPromise = null;
   }
+  contextPromise = (async () => {
+    const { launchContext } = await import('../browser.js');
+    return launchContext();
+  })().catch((e) => { contextPromise = null; throw e; });
   return contextPromise;
+}
+
+function isOpen(ctx) {
+  try { ctx.pages(); return ctx.browser() ? ctx.browser().isConnected() : true; }
+  catch { return false; }
 }
 
 /** Close the shared context (app shutdown). */
@@ -55,8 +66,22 @@ export async function closeSharedBrowser() {
 }
 
 async function withPage(fn) {
-  const ctx = await sharedContext();
-  const page = await ctx.newPage();
+  let ctx = await sharedContext();
+  let page;
+  try { page = await ctx.newPage(); }
+  catch (e) {
+    // The context can be dead without ever having said so — its window was
+    // closed by hand, or the browser went away — and the only symptom is
+    // that it will not open a page. Treat that as closed: drop it, launch
+    // afresh, and try once more.
+    if (!/closed|disconnected|Target/i.test(String(e?.message || e))) throw e;
+    console.warn('browser: the shared context refused a new page — relaunching:', e?.stack || e?.message || e);
+    ctx.__closed = true;
+    contextPromise = null;
+    try { await ctx.close(); } catch { /* already gone */ }
+    ctx = await sharedContext();
+    page = await ctx.newPage();
+  }
   try { return await fn(page); }
   finally { try { await page.close(); } catch { /* ignore */ } }
 }
@@ -72,6 +97,20 @@ export async function browserHtml(url, { referer = '', waitMs = 0, waitFor = nul
     if (waitMs) await sleep(waitMs);
     return page.content();
   });
+}
+
+/** The cookies the browser holds for a host, plus its user agent — what a
+ *  plain request needs to be honoured by a site the browser just cleared. */
+export async function browserClearance(host) {
+  const ctx = await sharedContext();
+  const h = String(host || '').toLowerCase();
+  const cookies = (await ctx.cookies()).filter((c) => {
+    const d = String(c.domain || '').toLowerCase().replace(/^\./, '');
+    return h === d || h.endsWith('.' + d);
+  });
+  if (!cookies.length) return null;
+  const ua = await withPage((page) => page.evaluate(() => navigator.userAgent)).catch(() => '');
+  return { cookieHeader: cookies.map((c) => `${c.name}=${c.value}`).join('; '), ua };
 }
 
 /** One image's bytes, read through the browser — for hosts that serve images

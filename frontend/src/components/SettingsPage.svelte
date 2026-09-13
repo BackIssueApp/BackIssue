@@ -907,7 +907,7 @@
                     {:else if f.type === 'int'}
                       <label class="field"><span>{f.label}</span><input id="set-{f.key}" type="number" placeholder={f.placeholder || (f.default ?? '')} /></label>
                     {:else}
-                      <label class="field"><span>{f.label}</span><input id="set-{f.key}" type="text" spellcheck="false" placeholder={f.placeholder || (f.default ?? '')} /></label>
+                      <label class="field"><span>{f.label}</span><input id="set-{f.key}" type={f.secret ? 'password' : 'text'} spellcheck="false" autocomplete={f.secret ? 'off' : null} placeholder={f.placeholder || (f.default ?? '')} /></label>
                     {/if}
                     {#if f.note}<p class="modal__note">{f.note}</p>{/if}
                   {/each}

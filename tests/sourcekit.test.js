@@ -4,8 +4,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import JSZip from 'jszip';
-import { assertPublicUrl, pace, resetPacing, fetchHtml, fetchJson, downloadToBuffer } from '../src/sourcekit/http.js';
-import { sniffBuffer, normalizeArchive, describeBody } from '../src/sourcekit/bytes.js';
+import { assertPublicUrl, pace, resetPacing, fetchHtml, fetchJson, downloadToBuffer, looksChallenged, ddosGuardPage, hasClearance, rememberClearance } from '../src/sourcekit/http.js';
+import { sniffBuffer, normalizeArchive, describeBody, epubInfo } from '../src/sourcekit/bytes.js';
 import { fetchPages, pagesToArchive } from '../src/sourcekit/pages.js';
 import { defineSource, scoreCandidate, pickBest, siteQueries } from '../src/sourcekit/define.js';
 import { testKit } from '../src/sourcekit/testing.js';
@@ -17,6 +17,9 @@ process.env.BACKISSUE_ALLOW_INTERNAL_FETCH = '1';
 // A 1x1 JPEG and PNG, enough for the sniffer.
 const JPG = Buffer.from('ffd8ffe000104a46494600010100000100010000ffd9', 'hex');
 const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
+
+// DDoS-Guard's JS-check interstitial, as served to a plain request (403).
+const DDG_HTML = '<!doctype html><html><head><title>DDoS-Guard</title><script defer src="/.well-known/ddos-guard/js-challenge/index.js"></script><script src="https://check.ddos-guard.net/check.js"></script></head><body data-ddg-origin="true"><h1>Checking your browser before accessing</h1></body></html>';
 
 async function fakeSite() {
   const zip = new JSZip(); zip.file('001.jpg', JPG);
@@ -41,6 +44,7 @@ async function fakeSite() {
     if (u.pathname === '/img/2.png') return res.end(PNG);
     if (u.pathname === '/img/blocked.jpg') { res.setHeader('content-type', 'text/html'); return res.end('<html><title>Hotlink blocked</title></html>'); }
     if (u.pathname === '/cf') { res.statusCode = 503; return res.end('<html><title>Just a moment...</title></html>'); }
+    if (u.pathname === '/ddg') { res.statusCode = 403; return res.end(DDG_HTML); }
     res.statusCode = 404; res.end('nope');
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -74,6 +78,18 @@ test('pace spaces requests to one host and leaves other hosts alone', async () =
   resetPacing();
 });
 
+test('epubInfo reads the package document; anything else is null', async () => {
+  const zip = new JSZip();
+  zip.file('mimetype', 'application/epub+zip');
+  zip.file('META-INF/container.xml', '<container><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
+  zip.file('OEBPS/content.opf', '<package><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Le Calamity Club</dc:title><dc:language>fr</dc:language><dc:creator opf:role="trl">Laura Satz</dc:creator><dc:creator>Kathryn Stockett</dc:creator><dc:identifier id="isbn">9780385703246</dc:identifier></metadata></package>');
+  const info = await epubInfo(await zip.generateAsync({ type: 'nodebuffer' }));
+  assert.deepEqual(info, { title: 'Le Calamity Club', language: 'fr', creators: ['Laura Satz', 'Kathryn Stockett'], identifiers: ['9780385703246'] });
+  assert.equal(await epubInfo(Buffer.from('%PDF-1.4')), null);
+  const plain = new JSZip(); plain.file('a.txt', 'x');
+  assert.equal(await epubInfo(await plain.generateAsync({ type: 'nodebuffer' })), null, 'a zip that is not an EPUB');
+});
+
 test('sniffBuffer, describeBody and normalizeArchive', async () => {
   assert.equal(sniffBuffer(JPG), 'jpg');
   assert.equal(sniffBuffer(PNG), 'png');
@@ -104,6 +120,19 @@ test('fetchHtml/fetchJson/downloadToBuffer against a local site; a challenge is 
     assert.equal(d.filename, 'Saga 012.cbz');
     assert.equal(sniffBuffer(d.buffer), 'cbz');
     await assert.rejects(fetchHtml(`${site.base}/cf`, { rateMs: 0, settingsHint: 'Settings → Sources → X' }), (e) => e.challenged === true && /FlareSolverr URL in Settings → Sources → X/.test(e.message));
+    // DDoS-Guard is a challenge too — by its well-known paths, whatever the status.
+    await assert.rejects(fetchHtml(`${site.base}/ddg`, { rateMs: 0 }), (e) => e.challenged === true);
+    assert.equal(ddosGuardPage(DDG_HTML), true);
+    assert.equal(looksChallenged(DDG_HTML, 200), true, 'a 200 that is still the interstitial (what a failed solve returns)');
+    assert.equal(ddosGuardPage('<html><title>Search</title><a href="/md5/x">x</a></html>'), false);
+    // A clearance remembered from the browser is honoured by plain requests.
+    const host = new URL(site.base).host;
+    assert.equal(hasClearance(host), false);
+    rememberClearance(host, '__ddg1_=abc; aa=1', 'Mozilla/5.0 Test');
+    assert.equal(hasClearance(host), true);
+    const before = site.hits.length;
+    await fetchHtml(`${site.base}/search?q=saga`, { rateMs: 0 });
+    assert.equal(site.hits.length, before + 1);
   } finally { await site.close(); }
 });
 
@@ -205,6 +234,9 @@ test('defineSource: a site declaring ebooks is searched by author + title and ha
       id: 'bookshop', label: 'Book Shop', baseUrl: site.base, types: ['ebook'],
       search: async (q) => {
         searched.push(q);
+        // The ISBN query answers with the exact edition (a plainer name than
+        // the title search's best); the title search answers with the rest.
+        if (q === '9780765326355') return [{ title: 'Sanderson - The Way of Kings EPUB', url: site.base + '/post/wok-isbn', size: 2e6 }];
         return /kings/i.test(q) ? [
           { title: 'Brandon Sanderson - Words of Radiance (2014) EPUB', url: site.base + '/post/wor', size: 3e6 },
           { title: 'Brandon Sanderson - The Way of Kings (2010) EPUB', url: site.base + '/post/wok', size: 2e6 },
@@ -217,10 +249,29 @@ test('defineSource: a site declaring ebooks is searched by author + title and ha
     const found = await src.find(ctx);
     assert.equal(found.title, 'Brandon Sanderson - The Way of Kings (2010) EPUB');
     assert.deepEqual(searched, ['Brandon Sanderson The Way of Kings', 'The Way of Kings']);
+    // With an ISBN the site is asked for it first, and what it answers wins.
+    searched.length = 0;
+    const byIsbn = await src.find({ ...ctx, book: { ...ctx.book, isbn: '978-0-7653-2635-5' } });
+    assert.equal(byIsbn.url, site.base + '/post/wok-isbn');
+    assert.equal(searched[0], '9780765326355');
     const fetched = await src.fetch(found, ctx, () => {});
     assert.equal(fetched.media, true);
     assert.equal(fetched.name, found.title);
     assert.ok(Buffer.isBuffer(fetched.buffer));
+    // A definition may refuse what it downloaded; the refusal names the
+    // candidate and is final for it, and find() skips excluded candidates.
+    const picky = defineSource({ id: 'pickyshop', label: 'Picky', baseUrl: site.base, types: ['ebook'],
+      search: async () => [{ title: 'Brandon Sanderson - The Way of Kings (2010) EPUB', url: site.base + '/post/a', size: 2e6 }, { title: 'Brandon Sanderson - The Way of Kings EPUB', url: site.base + '/post/b', size: 2e6 }],
+      resolve: async () => ({ url: site.base + '/file/saga-12.cbz' }),
+      verify: async (f, c) => { if (c.url.endsWith('/a')) throw new Error('the file says it is in "fr"'); },
+    });
+    const pctx = { ...ctx, config: { pickyshopEnabled: true } };
+    const first = await picky.find(pctx);
+    assert.equal(first.url, site.base + '/post/a');
+    await assert.rejects(picky.fetch(first, pctx, () => {}), (e) => e.rejected === true && e.noRetry === true && /"fr"/.test(e.message));
+    const second = await picky.find({ ...pctx, exclude: new Set([first.url]) });
+    assert.equal(second.url, site.base + '/post/b');
+    assert.ok(await picky.fetch(second, pctx, () => {}));
     // A comic context never reaches a books-only site.
     assert.equal(await src.find({ ...ctx, book: undefined, series: { type: 'comic' }, issue: { issue_number: '1' } }), null);
   } finally { await site.close(); }

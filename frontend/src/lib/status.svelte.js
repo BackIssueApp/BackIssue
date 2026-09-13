@@ -6,7 +6,7 @@ import { subscribe } from './events.svelte.js';
 import { BackIssue } from './plugins.svelte.js';
 import { detail, loadCollection, reloadDetail, refreshIssueStatuses } from './store.svelte.js';
 
-export const status = $state({ counts: {}, packsActive: 0, version: '', downloading: false, libraryTypes: [], libraries: [] });
+export const status = $state({ counts: {}, packsActive: 0, mediaActive: 0, version: '', downloading: false, libraryTypes: [], libraries: [] });
 
 let wasDownloading = false;
 export async function pollStatus() {
@@ -14,6 +14,7 @@ export async function pollStatus() {
   try { s = await apiGet('/api/status'); } catch { return; }
   status.counts = s.counts || {};
   status.packsActive = s.packsActive || 0;
+  status.mediaActive = s.mediaActive || 0;
   status.libraryTypes = s.libraryTypes || [];
   status.libraries = s.libraries || [];
   status.downloading = !!s.queue?.running;

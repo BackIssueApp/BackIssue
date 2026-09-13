@@ -32,7 +32,7 @@
   // Per-row live progress. Works for both immediate downloads (page/byte
   // stream, from state.queue.live) and deferred grabs (percent + seeders,
   // from the download monitor). Returns { pct, label, meta } for the bar.
-  const PHASE = { searching: 'Searching', starting: 'Starting', connecting: 'Connecting', solving: 'Solving challenge', grabbed: 'Sent', queued: 'Queued', downloading: 'Downloading', done: 'Importing', tagging: 'Tagging', saving: 'Saving' };
+  const PHASE = { searching: 'Searching', starting: 'Starting', connecting: 'Connecting', solving: 'Solving challenge', grabbed: 'Sent', queued: 'Queued', downloading: 'Downloading', done: 'Filing', tagging: 'Tagging', saving: 'Saving' };
   // Phases with no measurable progress yet — show a label + a pulsing bar,
   // never a misleading "0%".
   const INDETERMINATE = new Set(['searching', 'starting', 'connecting', 'solving', 'grabbed', 'queued']);
@@ -66,8 +66,9 @@
   const ACTIVE_SET = new Set(['downloading', 'grabbed', 'tagging', 'done', 'sent', 'importing']);
   const items = $derived(q?.items || []);
   const packs = $derived(q?.packs || []);
+  const media = $derived(q?.media || []);
   const counts = $derived.by(() => {
-    const c = { all: items.length + packs.length, active: packs.length, queued: 0, failed: 0 };
+    const c = { all: items.length + packs.length + media.length, active: packs.length + media.length, queued: 0, failed: 0 };
     for (const it of items) {
       if (it.status === 'failed') c.failed++;
       else if (it.status === 'queued') c.queued++;
@@ -79,6 +80,7 @@
     let bps = 0;
     for (const it of items) bps += it.live?.bps || 0;
     for (const pk of packs) bps += pk.live?.bps || 0;
+    for (const md of media) bps += md.live?.bps || 0;
     return bps;
   });
   const FILTERS = [
@@ -93,6 +95,7 @@
     || (filter === 'active' && ACTIVE_SET.has(it.status));
   const visibleItems = $derived(items.filter(inFilter));
   const visiblePacks = $derived(filter === 'all' || filter === 'active' ? packs : []);
+  const visibleMedia = $derived(filter === 'all' || filter === 'active' ? media : []);
   const EMPTY = {
     all: { title: 'Queue is empty', body: 'New downloads appear here as you add series or issues. Active downloads keep running even while paused items wait.' },
     active: { title: 'Nothing downloading', body: 'No active downloads right now. Queued items start automatically as slots free up.' },
@@ -220,7 +223,7 @@
     <!-- Scrolling list -->
     <div class="qx__scroll">
       <div class="qx__list">
-        {#if q && !visibleItems.length && !visiblePacks.length}
+        {#if q && !visibleItems.length && !visiblePacks.length && !visibleMedia.length}
           <div class="qx__empty">
             <span class="qx__emptychip"><Icon name="download" size={20} /></span>
             <b>{EMPTY[filter].title}</b>
@@ -245,6 +248,26 @@
               <Badge status={pk.live ? 'downloading' : 'sent'} />
               {#if can('downloads.grab')}
                 <button class="qx__act" title="Cancel — removes the download from the client" onclick={() => cancelGrab(pk.id)}><Icon name="close" size={15} /></button>
+              {/if}
+            </div>
+          </div>
+        {/each}
+        <!-- Books and audiobooks: a source searching, downloading or a client fetching. -->
+        {#each visibleMedia as md (md.id)}
+          <div class="qx__row">
+            <div class="qx__cover qx__cover--pack"><Icon name="book" size={17} /></div>
+            <div class="qx__main">
+              <div class="qx__toprow">
+                <span class="qx__packbadge">{md.type === 'audiobook' ? 'Audiobook' : 'Book'}</span>
+                <span class="qx__series" style="cursor:default">{md.title || 'Untitled'}{md.author ? ` · ${md.author}` : ''}</span>
+              </div>
+              <div class="qx__release">{md.release || ''}</div>
+              {@render liveBar(md.live ? { ...md.live, source: md.source } : null, 'downloading')}
+            </div>
+            <div class="qx__end">
+              <Badge status={md.live?.phase === 'grabbed' ? 'sent' : 'downloading'} />
+              {#if md.grabId && can('downloads.grab')}
+                <button class="qx__act" title="Cancel — removes the download from the client" onclick={() => cancelGrab(md.grabId)}><Icon name="close" size={15} /></button>
               {/if}
             </div>
           </div>

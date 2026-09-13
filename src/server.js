@@ -41,7 +41,7 @@ if (process.env.BUILD_CHANNEL && process.env.BUILD_CHANNEL !== 'release') {
   APP_VERSION += `-${process.env.BUILD_CHANNEL}${sha ? '.' + sha : ''}`;
 }
 
-export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, listSourceCards, testSource, sourceCatalog, installSource: installSourceFn, uninstallSource: uninstallSourceFn, queueProgress, packProgress, cancelGrab, testCvKeys, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, supportPackage, supportSend, supportSendMobile, state }) {
+export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, listSourceCards, testSource, sourceCatalog, installSource: installSourceFn, uninstallSource: uninstallSourceFn, queueProgress, packProgress, activeMedia, cancelGrab, testCvKeys, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, supportPackage, supportSend, supportSendMobile, state }) {
   const startDownloads = (arg) => {
     if (!state.queue.running) {
       state.queue.running = true;
@@ -982,7 +982,8 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     // queue list uses, so the badge matches what this user actually sees there.
     const rset = canRestricted(req) ? null : restrictedSeriesIds(db);
     const packsActive = activePackGrabs(db).filter((p) => !rset || p.series_id == null || !rset.has(p.series_id)).length;
-    res.json({ counts: pieces.counts, packsActive, followedCount: pieces.followedCount, libraryTypes: pieces.libraryTypes, libraries: libs, version: APP_VERSION, crawl: state.crawl, queue: state.queue, follow: state.follow || { running: false } });
+    const mediaActive = activeMedia ? activeMedia().length : 0;
+    res.json({ counts: pieces.counts, packsActive, mediaActive, followedCount: pieces.followedCount, libraryTypes: pieces.libraryTypes, libraries: libs, version: APP_VERSION, crawl: state.crawl, queue: state.queue, follow: state.follow || { running: false } });
     warmChipCounts(req, pieces.libraries); // fire-and-forget: pre-warm this user's chip counts on the worker
   });
 
@@ -998,6 +999,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       // an immediate-source download never ticks the drawer.
       q: listQueue(db), p: activePackGrabs(db), s: state.queue,
       live: queueProgress ? queueProgress() : null, pk: packProgress ? packProgress() : null,
+      m: activeMedia ? activeMedia() : null,
     }),
     jobs: () => (listJobs ? listJobs() : null),
     schedules: () => (listSchedules ? listSchedules() : null),
@@ -1320,11 +1322,15 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     // be invisible here while downloading.
     const packLive = (packProgress ? packProgress() : {}) || {};
     const packs = activePackGrabs(db).map((g) => ({ ...g, live: packLive[g.id] || null }));
+    // Books and audiobooks in flight — no issue rows either, so they'd be
+    // invisible here while a source searches, downloads or a client fetches.
+    const media = activeMedia ? activeMedia() : [];
     // Restricted series stay invisible to roles without the permission.
     const rset = canRestricted(req) ? null : restrictedSeriesIds(db);
     res.json({
       items: rset ? items.filter((i) => !rset.has(i.series_id)) : items,
       packs: rset ? packs.filter((p) => p.series_id == null || !rset.has(p.series_id)) : packs,
+      media,
       paused: !!state.queue.paused,
       running: !!state.queue.running,
       current: state.queue.current || null,

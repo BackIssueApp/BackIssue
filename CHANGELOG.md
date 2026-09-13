@@ -19,7 +19,33 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   `['audiobook']`. The plugin that owns the library type files the result
   (`api.registerMediaHandler`) and whoever asked is told when it lands
   (`api.onMediaDownload`). The Requests plugin uses this to fill approved
-  book requests.
+  book requests. A book with an ISBN is asked for by ISBN first on catalog
+  sites, so the exact edition wins over a look-alike. A site source may
+  `verify` what it downloaded and refuse it (an EPUB whose own metadata
+  says it is a translation, say); the next-best candidate is tried.
+- **Sites behind DDoS-Guard.** Its interstitial is recognised as a challenge,
+  a FlareSolverr "solve" that hands back the interstitial (the manual captcha
+  it escalates headless browsers to) is reported as one rather than parsed
+  as a page, and once the app's own browser clears a site, its cookies are
+  reused for plain requests to it. A site source can mark a setting
+  `secret: true` to have it masked on its card.
+
+- **Books and audiobooks show in the queue.** A book being searched for,
+  downloaded by a site source, or fetched by a download client is a row on
+  the Queue page with its source and progress, counts toward the sidebar
+  badge, and can be cancelled while a client has it. The log says which
+  source was searched, what release was picked, and what was filed.
+- **Add finds books and audiobooks.** With a Books or Audiobooks library
+  (and its plugin), the Add button gains a tab for it: search the catalog,
+  see what is already on the shelf, add one and the download sources are
+  asked for it.
+
+### Fixed
+
+- One browser per process: a site source that needs the browser now shares
+  the one a plugin already launched instead of starting a second Chromium
+  on the same profile, which Chromium refuses ("Opening in existing browser
+  session").
 
 ## [0.8.3] - 2026-09-09
 

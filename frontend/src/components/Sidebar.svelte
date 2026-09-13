@@ -14,7 +14,7 @@
   // (downloading / handed to the client / tagging) + active pack grabs. Summing
   // only queued+downloading hid grabbed/tagging items, so the badge undercounted.
   const c = $derived(status.counts);
-  const queueActive = $derived((c.queued || 0) + (c.downloading || 0) + (c.grabbed || 0) + (c.tagging || 0) + (status.packsActive || 0));
+  const queueActive = $derived((c.queued || 0) + (c.downloading || 0) + (c.grabbed || 0) + (c.tagging || 0) + (status.packsActive || 0) + (status.mediaActive || 0));
   const failed = $derived(c.failed || 0);
 
   // Library owns '/' and every /volume/* page.

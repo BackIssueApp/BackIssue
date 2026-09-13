@@ -2,7 +2,33 @@ import { chromium } from 'patchright';
 import { setTimeout as sleep } from 'node:timers/promises';
 import config from './config.js';
 
+// One browser per process. Every consumer — a plugin's crawler, the site
+// sources' shared context — shares the same profile, and Chromium refuses a
+// second instance on a profile that is already open ("Opening in existing
+// browser session"), so the first launch is the only launch until it closes.
+let liveContext = null; // promise of the launched context
 export async function launchContext() {
+  if (liveContext) {
+    try {
+      const ctx = await liveContext;
+      // Still usable? A context whose browser has gone (its window closed by
+      // hand, a crash) may never have fired 'close'; check the connection.
+      let alive = !ctx.__closed;
+      if (alive) { try { const b = ctx.browser(); alive = b ? b.isConnected() : true; ctx.pages(); } catch { alive = false; } }
+      if (alive) return ctx;
+      ctx.__closed = true;
+    } catch { /* the last launch failed — try again below */ }
+  }
+  const p = launchFresh().then((ctx) => {
+    ctx.on('close', () => { ctx.__closed = true; if (liveContext === p) liveContext = null; });
+    return ctx;
+  });
+  liveContext = p;
+  try { return await p; }
+  catch (e) { if (liveContext === p) liveContext = null; throw e; }
+}
+
+async function launchFresh() {
   // Patchright (a stealth-patched Playwright fork) drives the bundled Chromium
   // and closes the automation leaks anti-bot systems detect. Do NOT add manual
   // fingerprint patches here (webdriver overrides, automation flags): patchright
@@ -57,9 +83,11 @@ export async function isChallenged(page) {
   try {
     if (/(?:__cf_chl|cf_chl_)/i.test(page.url())) return true;
     const title = await page.title().catch(() => '');
-    if (/just a moment|attention required|checking your browser|checking if the site/i.test(title)) return true;
+    if (/just a moment|attention required|checking your browser|checking if the site|ddos-guard/i.test(title)) return true;
+    // DDoS-Guard's interstitial names itself in its script paths and body
+    // attribute; its JS check reloads the page on its own once it passes.
     return await page.evaluate(() =>
-      !!document.querySelector('#challenge-running, #cf-challenge-running, script[src*="challenge-platform"], #cf-please-wait')
+      !!document.querySelector('#challenge-running, #cf-challenge-running, script[src*="challenge-platform"], #cf-please-wait, script[src*="/.well-known/ddos-guard/"], body[data-ddg-origin]')
     ).catch(() => false);
   } catch { return false; }
 }
@@ -69,11 +97,16 @@ export async function isChallenged(page) {
 // (headless). Returns true once clear, false if still challenged at timeout.
 export async function waitForChallengeClear(page, { timeoutMs = 25000 } = {}) {
   const deadline = Date.now() + timeoutMs;
+  let cleared = false;
   while (Date.now() < deadline) {
-    if (!(await isChallenged(page))) return true;
+    if (!(await isChallenged(page))) { cleared = true; break; }
     await sleep(1500);
   }
-  return !(await isChallenged(page));
+  if (!cleared) cleared = !(await isChallenged(page));
+  // The clear is a navigation to the real page: let it land before the caller
+  // reads the document, or it reads a half-loaded one.
+  if (cleared) { try { await page.waitForLoadState('domcontentloaded', { timeout: 15000 }); } catch { /* read what is there */ } }
+  return cleared;
 }
 
 export async function gotoPolite(page, url) {

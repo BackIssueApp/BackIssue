@@ -428,6 +428,8 @@
                     {#if sRow.description}<p class="plx__desc">{sRow.description}</p>{/if}
                     {#if sRow.requires === 'flaresolverr'}
                       <p class="plx__site-note"><Icon name="alert-triangle" size={13} /> Behind Cloudflare — set the FlareSolverr URL in Settings → Downloading.</p>
+                    {:else if sRow.requires === 'browser'}
+                      <p class="plx__site-note"><Icon name="alert-triangle" size={13} /> Needs the browser build of the app (the image tagged -browser) — the site checks for a real browser.</p>
                     {/if}
                     {#if sRow.error}<div class="plx__err">Load error: {sRow.error}</div>{/if}
                   </div>

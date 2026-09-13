@@ -1676,6 +1676,7 @@ textarea.dialog-input { resize: vertical; font-family: var(--font-mono); }
    to the base .srcbadge style. Plugins may ship their own .srcbadge--<id> rule. */
 .list-note--warn { color: var(--amber, #fbbf24); }
 .srcbadge--pack { background: rgba(244,114,182,.16); color: #f9a8d4; }
+.srcbadge--annas { background: rgba(251,191,36,.16); color: #fcd34d; }
 
 /* Per-type library lanes under the main Library entry (Comics / Manga / …). */
 .sidenav__item--sub { padding-left: 26px; font-size: 13px; }

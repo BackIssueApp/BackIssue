@@ -38,8 +38,15 @@ export function assertPublicUrl(raw) {
   return u;
 }
 
+/** A DDoS-Guard interstitial (the JS check, or the manual captcha it
+ *  escalates to). Keyed on its own well-known paths, not on wording. */
+export function ddosGuardPage(html) {
+  return /ddos-guard\/(?:js-challenge|ddg-captcha-page)|data-ddg-origin|check\.ddos-guard\.net\/check\.js/i.test(html || '');
+}
+
 export function looksChallenged(html, status) {
   if (/just a moment|challenge-platform|cf-browser-verification|_cf_chl/i.test(html || '')) return true;
+  if (ddosGuardPage(html)) return true;
   if (status !== 403 && status !== 503) return false;
   // A 403 is not automatically Cloudflare: a site's own API answers 403 with
   // JSON when a request is missing something. Calling that "a challenge" sends
@@ -93,6 +100,11 @@ function clearanceGet(host) {
 function clearanceSet(host, cookieHeader, ua) {
   if (cookieHeader) clearanceJar.set(host, { cookieHeader, ua, ts: Date.now() });
 }
+/** Is a fresh clearance (solved cookies + the solving UA) known for this host? */
+export function hasClearance(host) { return !!clearanceGet(host); }
+/** Remember a clearance obtained elsewhere (the app's own browser, after it
+ *  cleared a challenge) so plain requests to the host can reuse it. */
+export function rememberClearance(host, cookieHeader, ua) { clearanceSet(host, cookieHeader, ua || DEFAULT_UA); }
 
 /** Solve/fetch a Cloudflare-gated page via FlareSolverr → { html, cookieHeader, ua, status }. */
 export async function viaFlareSolverr(flareUrl, url) {
@@ -166,6 +178,12 @@ export async function fetchHtml(url, { flareUrl = '', session = {}, headers = {}
 
   if (flareUrl) {
     const r = await viaFlareSolverr(flareUrl, url);
+    // A "solve" that hands back the interstitial itself is no solve: DDoS-Guard
+    // escalates a headless browser to a manual captcha, which nothing here can
+    // pass. Say so (and let a source with the app's own browser fall back to it).
+    if (ddosGuardPage(r.html) || /<title>[^<]*just a moment/i.test(r.html)) {
+      throw Object.assign(new Error(`FlareSolverr could not clear the challenge on ${host} — the site wants a real browser (a captcha, most likely)`), { challenged: true, status: r.status, unsolvable: true });
+    }
     session.cookieHeader = r.cookieHeader;
     session.ua = r.ua;
     clearanceSet(host, r.cookieHeader, r.ua);

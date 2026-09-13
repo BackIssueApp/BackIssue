@@ -29,6 +29,7 @@ import { fetchWeeklyReleases, matchReleases, shiftWeek, currentWeek } from './re
 import { startJob, listJobs, clearFinishedJobs, attachJobsDb } from './jobs.js';
 import { createScheduler } from './scheduler.js';
 import { createDownloadMonitor } from './downloadmonitor.js';
+import { activeMedia as activeMediaList, emitMedia } from './mediadownload.js';
 import { tagAllUntagged, convertAllCbr, removeAllDuplicates, verifyLibrary, relinkAllCv, scanEntireLibrary, backupDatabase, renameAllFiles, removeGhostSeries } from './tools.js';
 import { collectionStats } from './stats.js';
 import { installConsoleCapture, attachLogDb, listLogs, clearLogs, logInfo, logWarn, logError, logCounts, logCategories } from './logstore.js';
@@ -975,7 +976,9 @@ async function cancelActiveGrab(grabId) {
   } catch { /* client unreachable — still cancel our side */ }
   setGrabStatus(db, grab.id, 'failed', { error: 'cancelled by user' });
   if (grab.kind !== 'pack' && grab.issue_id) setIssueStatus(db, grab.issue_id, 'pending');
-  logInfo(`Cancelled ${grab.kind === 'pack' ? 'pack ' : ''}grab: ${grab.title || grab.id}`, grab.source || 'download');
+  // A media grab has an asker (a request, a wanted book) waiting to hear.
+  if (grab.kind === 'media') { try { const { grabPayload } = await import('./db.js'); emitMedia({ event: 'failed', ...grabPayload(grab), ref: grab.ref, source: grab.source, error: 'cancelled by user' }); } catch { /* best-effort */ } }
+  logInfo(`Cancelled ${grab.kind === 'pack' ? 'pack ' : grab.kind === 'media' ? 'book ' : ''}grab: ${grab.title || grab.id}`, grab.source || 'download');
   return { cancelled: true };
 }
 
@@ -1390,6 +1393,8 @@ const app = createApp({
   },
   queueProgress: () => downloadMonitor.getProgress(),
   packProgress: () => ({ ...downloadMonitor.getPackProgress(), ...Object.fromEntries(inAppPackProgress) }),
+  // Books and audiobooks in flight (immediate downloads + deferred grabs).
+  activeMedia: () => activeMediaList(db, downloadMonitor.getMediaProgress()),
   cancelGrab: cancelActiveGrab,
   testCvKeys,
   usenetSearch,

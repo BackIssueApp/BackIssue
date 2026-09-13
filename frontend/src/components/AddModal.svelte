@@ -22,11 +22,21 @@
   import { status } from '../lib/status.svelte.js';
   import Cover from './Cover.svelte';
 
-  // Manga lane: searches the metadata server's manga catalog instead of
-  // ComicVine, and adds series into the Manga library (created on first add).
-  let mangaMode = $state(false);
-  const mangaLib = $derived((status.libraries || []).find((l) => l.type === 'manga'));
-  const sourceLabel = $derived(mangaMode ? 'the manga catalog' : 'ComicVine');
+  // Which catalog the search talks to: ComicVine for comics; the metadata
+  // server's manga catalog (series join the Manga library, created on first
+  // add); and — where a Books or Audiobooks library and its plugin exist —
+  // the book and audiobook catalogs, whose adds go to the download sources
+  // rather than tracking a series.
+  let mode = $state('comic');
+  const mangaMode = $derived(mode === 'manga');
+  const bookMode = $derived(mode === 'ebook' || mode === 'audiobook');
+  const libOf = (type) => (status.libraries || []).find((l) => l.type === type);
+  const mangaLib = $derived(libOf('manga'));
+  const bookLib = $derived(libOf('ebook'));
+  const audioLib = $derived(libOf('audiobook'));
+  const sourceLabel = $derived(mode === 'manga' ? 'the manga catalog' : mode === 'ebook' ? 'the books catalog' : mode === 'audiobook' ? 'the audiobooks catalog' : 'ComicVine');
+  const thing = $derived(mode === 'ebook' ? 'book' : mode === 'audiobook' ? 'audiobook' : 'series');
+  const plugin = $derived(mode === 'ebook' ? 'ebooks' : 'audiobooks');
 
   const open = $derived(modals.stack.includes('add'));
 
@@ -36,7 +46,7 @@
 
   let timer;
   function onInput() { clearTimeout(timer); timer = setTimeout(() => search(m.query), 200); }
-  function setManga(on) { if (mangaMode === on) return; mangaMode = on; search(m.query); }
+  function setMode(next) { if (mode === next) return; mode = next; search(m.query); }
 
   let searching = $state(false);
   let needsKey = $state(false); // missing-ComicVine-key dead end → guided fix
@@ -48,6 +58,24 @@
     const seq = ++searchSeq;
     if (q.trim().length < 2) { m.results = null; m.error = ''; searching = false; return; }
     searching = true; m.error = ''; needsKey = false;
+
+    // Books and audiobooks: the plugin's catalog, each result already marked
+    // with what the shelf holds and what is wanted. Rows take the series row's
+    // shape so one list renders them all.
+    if (bookMode) {
+      let r;
+      try { r = await apiGet(`/api/${plugin}/catalog/search?q=` + encodeURIComponent(q)); }
+      catch { if (seq === searchSeq) { m.error = 'Search failed — is the app reachable?'; searching = false; } return; }
+      if (seq !== searchSeq) return;
+      searching = false;
+      if (r.error) { m.error = r.error; m.results = null; return; }
+      m.results = (r.results || []).map((b) => ({
+        id: b.id, name: b.title, start_year: b.year, image_url: b.cover, inLibrary: b.inLibrary, seriesId: b.seriesId,
+        _meta: [b.author, b.publisher, b.pages ? fmt(b.pages) + ' pages' : null, b.minutes ? Math.round(b.minutes / 60) + 'h' : null, b.narrators?.length ? 'read by ' + b.narrators.join(', ') : null].filter(Boolean).join(' · '),
+        _label: b.wanted ? 'Wanted' : 'Add', _busy: false, _done: !!b.wanted,
+      }));
+      return;
+    }
 
     // A pasted CV URL, "cv:12345", or bare volume id resolves that exact volume
     // and pins it first — common names ("Batman") have so many volumes that a
@@ -90,6 +118,21 @@
 
   async function add(v) {
     v._busy = true; v._label = 'Adding…';
+    // A book or audiobook: it goes on the wanted list and the download
+    // sources are asked for it now; the button says what happened.
+    if (bookMode) {
+      try {
+        const r = await apiPost(`/api/${plugin}/catalog/add`, { id: v.id });
+        if (r.error) { notify('Add failed: ' + r.error, 'error'); v._busy = false; v._label = 'Add'; return; }
+        const s = r.status;
+        const inLib = s === 'imported' || s === 'on-shelf';
+        v._label = inLib ? 'In library' : ['grabbed', 'downloading', 'active'].includes(s) ? 'Downloading' : 'Wanted';
+        v._done = true;
+        if (r.note) notify(r.note, s === 'error' ? 'error' : inLib || s === 'grabbed' || s === 'downloading' ? 'success' : 'info');
+        if (inLib) loadCollection();
+      } catch { notify('Add failed', 'error'); v._busy = false; v._label = 'Add'; }
+      return;
+    }
     try {
       const r = await apiPost('/api/collection/add-cv', { comicvineId: v.id, manga: mangaMode });
       if (r.error) { notify('Add failed: ' + r.error, 'error'); v._busy = false; v._label = 'Add'; return; }
@@ -113,20 +156,26 @@
 
 {#if open}
   <div id="add-modal" class="modal addx-overlay" onclick={(e) => { if (e.target === e.currentTarget) closeModal('add'); }}>
-    <div class="addx" use:trapFocus role="dialog" aria-label="Add series">
+    <div class="addx" use:trapFocus role="dialog" aria-label="Add {thing}">
       <div class="addx__head">
         <div class="addx__icon"><Icon name="plus" size={18} /></div>
         <div class="addx__titles">
-          <div class="addx__title">Add a series</div>
-          <div class="addx__sub">Search {sourceLabel} and start tracking it</div>
+          <div class="addx__title">Add {thing === 'audiobook' ? 'an' : 'a'} {thing}</div>
+          <div class="addx__sub">Search {sourceLabel} and {bookMode ? 'get it from your download sources' : 'start tracking it'}</div>
         </div>
         <button id="add-modal-x" class="addx__x" aria-label="Close" onclick={() => closeModal('add')}><Icon name="close" size={16} /></button>
       </div>
 
       <div class="addx__switch-row">
         <div class="addx__switch" role="tablist">
-          <button class="addx__seg" class:is-on={!mangaMode} role="tab" aria-selected={!mangaMode} onclick={() => setManga(false)}><Icon name="book" size={14} /> Comics</button>
-          <button class="addx__seg" class:is-on={mangaMode} role="tab" aria-selected={mangaMode} title={mangaLib ? `Added series join the ${mangaLib.name} library` : 'Your Manga library is created on the first add'} onclick={() => setManga(true)}><Icon name="book" size={14} /> Manga</button>
+          <button class="addx__seg" class:is-on={mode === 'comic'} role="tab" aria-selected={mode === 'comic'} onclick={() => setMode('comic')}><Icon name="book" size={14} /> Comics</button>
+          <button class="addx__seg" class:is-on={mode === 'manga'} role="tab" aria-selected={mode === 'manga'} title={mangaLib ? `Added series join the ${mangaLib.name} library` : 'Your Manga library is created on the first add'} onclick={() => setMode('manga')}><Icon name="book" size={14} /> Manga</button>
+          {#if bookLib}
+            <button class="addx__seg" class:is-on={mode === 'ebook'} role="tab" aria-selected={mode === 'ebook'} title={`Added books are fetched by your download sources into ${bookLib.name}`} onclick={() => setMode('ebook')}><Icon name="book" size={14} /> Books</button>
+          {/if}
+          {#if audioLib}
+            <button class="addx__seg" class:is-on={mode === 'audiobook'} role="tab" aria-selected={mode === 'audiobook'} title={`Added audiobooks are fetched by your download sources into ${audioLib.name}`} onclick={() => setMode('audiobook')}><Icon name="book" size={14} /> Audiobooks</button>
+          {/if}
         </div>
       </div>
 
@@ -150,10 +199,11 @@
           <div class="addx__prompt">
             <div class="addx__prompt-art"><Icon name="search" size={20} /></div>
             <div>Type at least 2 characters to search {sourceLabel}.</div>
-            {#if !mangaMode}<div class="addx__tip">Can’t find a series? Paste its ComicVine URL or id (e.g. <code>cv:166619</code>) to jump straight to it.</div>{/if}
+            {#if mode === 'comic'}<div class="addx__tip">Can’t find a series? Paste its ComicVine URL or id (e.g. <code>cv:166619</code>) to jump straight to it.</div>{/if}
+            {#if bookMode}<div class="addx__tip">Search by title, author or ISBN. An added {thing} is fetched by your download sources and filed into the library.</div>{/if}
           </div>
         {:else if noResults}
-          <div class="addx__empty">No series found for “{ql}”.</div>
+          <div class="addx__empty">No {thing === 'series' ? 'series' : thing + 's'} found for “{ql}”.</div>
         {:else if m.results}
           {#each m.results as v (v.id)}
             <div class="addx__row" class:is-dim={v.inLibrary}>
@@ -163,7 +213,7 @@
                   {#if v.site_detail_url}<a class="addx__link" href={v.site_detail_url} target="_blank" rel="noreferrer" title="View details">{v.name || '?'}</a>{:else}{v.name || '?'}{/if}
                   {#if v.start_year}<span class="addx__year">({v.start_year})</span>{/if}
                 </div>
-                <div class="addx__meta">{v.publisher || ''}{v.publisher ? ' · ' : ''}{fmt(v.count_of_issues || 0)} issues</div>
+                <div class="addx__meta">{#if v._meta !== undefined}{v._meta}{:else}{v.publisher || ''}{v.publisher ? ' · ' : ''}{fmt(v.count_of_issues || 0)} issues{/if}</div>
               </div>
               {#if v.inLibrary}
                 <button class="addx__btn addx__btn--ghost" title="Already in your library — open it" onclick={() => { closeModal('add'); navigate('/series/' + v.seriesId); }}>In library</button>

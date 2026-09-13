@@ -37,6 +37,29 @@ export function sniffBuffer(buf) {
 export function isImageBuffer(buf) { return ['jpg', 'png', 'webp', 'gif'].includes(sniffBuffer(buf)); }
 
 /**
+ * What an EPUB says about itself — { title, language, creators, identifiers }
+ * from its package document — or null when the bytes are not an EPUB. A site
+ * can label a French translation "English"; the file cannot.
+ */
+export async function epubInfo(buffer) {
+  if (!buffer || sniffBuffer(buffer) !== 'cbz') return null; // an EPUB is a zip
+  let zip;
+  try { const { default: JSZip } = await import('jszip'); zip = await JSZip.loadAsync(buffer); }
+  catch { return null; }
+  const container = await zip.file('META-INF/container.xml')?.async('string').catch(() => null);
+  const opfPath = container && (/full-path="([^"]+)"/.exec(container) || [])[1];
+  const opf = opfPath && await zip.file(opfPath)?.async('string').catch(() => null);
+  if (!opf) return null;
+  const texts = (tag) => [...opf.matchAll(new RegExp(`<dc:${tag}\\b[^>]*>([^<]*)<`, 'gi'))].map((m) => m[1].trim()).filter(Boolean);
+  return {
+    title: texts('title')[0] || null,
+    language: (texts('language')[0] || '').toLowerCase() || null,
+    creators: texts('creator'),
+    identifiers: texts('identifier'),
+  };
+}
+
+/**
  * Explain a body that is not the file we asked for: { html, title, cloudHost }.
  * `title` is the page's own <title> (Cloudflare's "Just a moment…", a host's
  * "Rate limited"), `cloudHost` names a cloud locker the link redirected to,

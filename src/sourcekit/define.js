@@ -21,11 +21,11 @@ import { scoreRelease, normalizeSeries, suspiciouslySmall, autoTarget, manualTar
 import { isCollectedSeries, collectedQueries } from '../editions.js';
 import { isBookContext, bookQueries, bookTarget, scoreBookRelease, bookTooSmall } from '../sources/books.js';
 import { logInfo, logWarn } from '../logstore.js';
-import { fetchHtml, fetchJson, downloadToBuffer } from './http.js';
-import { normalizeArchive } from './bytes.js';
+import { fetchHtml, fetchJson, downloadToBuffer, hasClearance, rememberClearance } from './http.js';
+import { normalizeArchive, epubInfo } from './bytes.js';
 import { fetchPages, pagesToArchive } from './pages.js';
 import { buildSearch, buildResolve } from './declarative.js';
-import { browserAvailable, browserHtml, browserImage } from './browser.js';
+import { browserAvailable, browserHtml, browserImage, browserClearance } from './browser.js';
 
 const DEFAULT_TYPES = ['comic', 'manga'];
 
@@ -127,10 +127,29 @@ export function makeKit(def, ctx = {}, { session = {}, http = null } = {}) {
   //                site challenges anyway and one happens to be installed.
   const needsBrowser = def.browser === 'required';
   const mayUseBrowser = needsBrowser || def.browser === 'fallback';
-  const htmlViaBrowser = (url, opts = {}) => browserHtml(url, { referer: opts.referer || '', waitFor: opts.waitFor || def.waitFor || null, waitMs: opts.waitMs || 0 });
+  // After the browser clears a site, its cookies and UA are remembered for the
+  // host so the next pages go as plain requests — a browser page is the slow,
+  // heavy way to read HTML, and a cleared site accepts the cookies for a while.
+  const htmlViaBrowser = async (url, opts = {}) => {
+    const html = await browserHtml(url, { referer: opts.referer || '', waitFor: opts.waitFor || def.waitFor || null, waitMs: opts.waitMs || 0 });
+    try {
+      const host = new URL(url).host;
+      const c = await browserClearance(host);
+      if (c?.cookieHeader) { rememberClearance(host, c.cookieHeader, c.ua); session.cookieHeader = c.cookieHeader; if (c.ua) session.ua = c.ua; }
+    } catch { /* the page is what matters */ }
+    return html;
+  };
   const realHttp = {
     html: async (url, opts = {}) => {
-      if (needsBrowser) return htmlViaBrowser(url, opts);
+      if (needsBrowser) {
+        // A site that needs the browser still gets plain requests while the
+        // browser's last clearance holds; the browser only when that fails.
+        if (hasClearance(new URL(url).host)) {
+          try { return await fetchHtml(url, { flareUrl: '', session, rateMs, settingsHint, ...opts }); }
+          catch (e) { if (!e?.challenged) throw e; }
+        }
+        return htmlViaBrowser(url, opts);
+      }
       try {
         return await fetchHtml(url, { flareUrl, session, rateMs, settingsHint, ...opts });
       } catch (e) {
@@ -196,7 +215,7 @@ export function defineSource(rawDef) {
       catch (e) { throw new Error(`${label} search failed: ${e?.message || e}`); }
       for (const r of (rows || [])) {
         const key = r?.url || r?.title;
-        if (r && key && !seen.has(key)) seen.set(key, r);
+        if (r && key && !seen.has(key)) seen.set(key, { ...r, _q: q });
       }
     }
     return [...seen.values()];
@@ -207,11 +226,18 @@ export function defineSource(rawDef) {
     // results judged by the book matcher (no issue number to parse).
     if (isBookContext(ctx)) {
       const target = bookTarget(ctx);
-      const results = await runSearch(bookQueries(ctx), ctx, kit);
+      // The ISBN first when the book has one: a catalog site answers it with
+      // exactly that book, and those results outrank the title search's.
+      const results = await runSearch(bookQueries(ctx, { isbn: true }), ctx, kit);
+      // A candidate the caller already tried and rejected (the file was not
+      // what the site said) is not offered again.
+      const excluded = ctx.exclude instanceof Set ? ctx.exclude : new Set(ctx.exclude || []);
       const scored = results
         .filter((r) => !bookTooSmall(target.type, r.size))
+        .filter((r) => !excluded.has(r.url || r.title))
         .map((r) => ({ r, score: scoreBookRelease(r.title, target) }))
         .filter((x) => x.score != null)
+        .map((x) => ({ ...x, score: x.score + (target.isbn && x.r._q === target.isbn ? 30 : 0) }))
         .sort((a, b) => b.score - a.score);
       return scored[0]?.r || null;
     }
@@ -289,9 +315,22 @@ export function defineSource(rawDef) {
           });
           // A book is handed over as downloaded — the media handler that files
           // it knows its formats; the comic normaliser would mangle an EPUB.
-          if (isBookContext(ctx)) return { buffer, url: link.url, name: candidate.title || '', media: true };
+          // The definition may look at the bytes first (verify) and refuse
+          // them: a refusal is final for this candidate, and the caller may
+          // ask find() for the next one.
+          if (isBookContext(ctx)) {
+            const fetched = { buffer, url: link.url, name: candidate.title || '', media: true };
+            if (typeof def.verify === 'function') {
+              try { await def.verify(fetched, candidate, ctx, { ...kit, epubInfo }); }
+              catch (e) { throw Object.assign(new Error(`${label}: ${e?.message || e}`), { noRetry: true, rejected: true, candidate }); }
+            }
+            return fetched;
+          }
           return await normalizeArchive(buffer, { label: detail, id, url: link.url });
         } catch (e) {
+          // A refused file is final for this candidate: every link of it
+          // serves the same bytes, so the refusal goes straight up.
+          if (e?.rejected) throw e;
           lastErr = e;
           if (e?.status === 403) {
             // A host can explain its own refusal ("this is usually the free
@@ -341,7 +380,7 @@ export function defineSource(rawDef) {
         { key: `${id}Url`, type: 'string', label: 'Site URL', placeholder: def.baseUrl || '', note: def.urlNote || '' },
 
         ...(def.proxy ? [{ key: `${id}DownloadProxy`, type: 'string', label: 'Download proxy', placeholder: 'http://gluetun:8888', note: 'Optional HTTP proxy for the file download only, for hosts that block datacenter IPs.' }] : []),
-        ...Object.entries(def.settings || {}).map(([key, f]) => ({ key, type: fieldSpec(f).type, label: f.label || key, placeholder: f.placeholder || '', note: f.note || '', default: f.default ?? null })),
+        ...Object.entries(def.settings || {}).map(([key, f]) => ({ key, type: fieldSpec(f).type, label: f.label || key, placeholder: f.placeholder || '', note: f.note || '', default: f.default ?? null, secret: !!f.secret })),
       ],
     },
     settingsFields: {

@@ -6,9 +6,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { scoreBookRelease, bookQueries, bookTarget, isBookContext, findBookRelease, bookTooSmall, bookCategory } from '../src/sources/books.js';
-import { bookContext, sniffMediaExt, mediaFilesIn, fileMedia, emitMedia } from '../src/mediadownload.js';
-import { openDb, recordGrab, activeGrabs, grabPayload, grabsByRef } from '../src/db.js';
+import { scoreBookRelease, bookQueries, bookTarget, isBookContext, findBookRelease, bookTooSmall, bookCategory, isbnOf } from '../src/sources/books.js';
+import { bookContext, sniffMediaExt, mediaFilesIn, fileMedia, emitMedia, activeMedia } from '../src/mediadownload.js';
+import { openDb, recordGrab, activeGrabs, grabPayload, grabsByRef, activeMediaGrabs } from '../src/db.js';
 import { pluginApi } from '../src/plugins.js';
 import { usenet } from '../src/sources/usenet.js';
 
@@ -52,13 +52,32 @@ test('scoreBookRelease: ranks epub over other ebook formats, m4b over mp3, unabr
   assert.ok(m4b > mp3 && mp3 > abridged);
 });
 
+test('scoreBookRelease: the plain title beats an altered edition or a padded title', () => {
+  const martian = { type: 'ebook', title: 'The Martian', author: 'Andy Weir', year: '2014' };
+  const plain = scoreBookRelease('Andy Weir - The Martian (2014) [en] EPUB', martian);
+  const novel = scoreBookRelease('Andy Weir - The Martian: A Novel (2014) [en] EPUB', martian);
+  const classroom = scoreBookRelease('Andy Weir - The Martian: Classroom Edition : A Novel (2016) [en] EPUB', martian);
+  const guide = scoreBookRelease('Study Guide: The Martian by Andy Weir EPUB', martian);
+  assert.ok(plain >= novel, 'a padded title never ranks higher');
+  assert.ok(novel - classroom >= 30, 'an altered edition ranks far lower');
+  assert.ok(classroom != null && guide != null, 'still matches — it may be the only copy');
+  assert.ok(novel > guide);
+});
+
 test('bookQueries, bookTarget, bookCategory and isBookContext', () => {
   const ctx = bookContext(null, KINGS);
   assert.ok(isBookContext(ctx));
   assert.ok(!isBookContext({ series: { type: 'comic' }, seriesTitle: 'Saga' }));
   assert.deepEqual(bookQueries(ctx), ['Brandon Sanderson The Way of Kings', 'The Way of Kings']);
   assert.deepEqual(bookQueries(bookContext(null, { type: 'ebook', title: 'Dune' })), ['Dune']);
-  assert.deepEqual(bookTarget(ctx), { type: 'ebook', title: 'The Way of Kings', author: 'Brandon Sanderson', year: '2010' });
+  // An ISBN is a query only where asked for (catalog sites), never for indexers.
+  const withIsbn = bookContext(null, { ...KINGS, isbn: '978-0-7653-2635-5' });
+  assert.equal(bookTarget(withIsbn).isbn, '9780765326355');
+  assert.deepEqual(bookQueries(withIsbn), ['Brandon Sanderson The Way of Kings', 'The Way of Kings']);
+  assert.deepEqual(bookQueries(withIsbn, { isbn: true }), ['9780765326355', 'Brandon Sanderson The Way of Kings', 'The Way of Kings']);
+  assert.equal(isbnOf('0-7653-2635-4'), '0765326354');
+  assert.equal(isbnOf('not one'), null);
+  assert.deepEqual(bookTarget(ctx), { type: 'ebook', title: 'The Way of Kings', author: 'Brandon Sanderson', year: '2010', isbn: null });
   assert.equal(bookCategory('ebook'), '7020');
   assert.equal(bookCategory('audiobook'), '3030');
   // The comic fields a source reads are there too, so an unpatched source
@@ -113,6 +132,13 @@ test('recordGrab: a media grab keeps its payload and ref; grabsByRef finds it', 
   assert.deepEqual(grabPayload({ payload: 'not json' }), {});
   assert.equal(grabsByRef(db, 'requests:12')[0].id, id);
   assert.deepEqual(grabsByRef(db, 'requests:13'), []);
+  // The queue sees a media grab as a row of its own, with the monitor's progress.
+  assert.deepEqual(activeMediaGrabs(db).map((g) => g.id), [id]);
+  const rows = activeMedia(db, { [id]: { state: 'downloading', progress: 42, seeders: 3 } });
+  const row = rows.find((r) => r.grabId === id);
+  assert.deepEqual([row.id, row.type, row.title, row.source, row.release, row.ref], [`g${id}`, 'ebook', 'The Way of Kings', 'usenet', 'Way of Kings EPUB', 'requests:12']);
+  assert.deepEqual(row.live, { phase: 'downloading', progress: 42, seeders: 3, source: 'usenet' });
+  assert.equal(activeMedia(db)[0].live.phase, 'grabbed', 'no progress yet → sent to the client');
 });
 
 test('sniffMediaExt: epub, pdf, m4b/m4a, mp3, else the url extension', () => {

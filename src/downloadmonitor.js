@@ -85,7 +85,7 @@ async function handlePackGrab({ db, grab, item, client, policy, source, cvClient
 // mediadownload.js) has no issue: on completion the file goes to the plugin
 // that owns the library type, and the asker hears about it through the media
 // listeners. Failures blacklist the release on usenet just like an issue's.
-async function handleMediaGrab({ db, grab, item, client, policy, source, onProgress, now }) {
+async function handleMediaGrab({ db, grab, item, client, policy, source, onProgress, now, record = () => {} }) {
   const p = grabPayload(grab);
   const base = { type: p.type, libraryId: p.libraryId, ref: grab.ref, title: p.title || grab.title, source };
   const fail = async (error, { blacklist = false, cleanup: doCleanup = false } = {}) => {
@@ -103,7 +103,7 @@ async function handleMediaGrab({ db, grab, item, client, policy, source, onProgr
       if (now() - grabbedAtMs(grab.grabbed_at) > policy.timeoutMs) await fail('not found on client before timeout');
       return;
     }
-    if (item.state === 'downloading') return;
+    if (item.state === 'downloading') { record(grab.id, { state: 'downloading', progress: item.progress || 0, seeders: item.seeders }); return; }
     if (item.state === 'failed') { await fail(item.error || 'client reported failure', { blacklist: true, cleanup: true }); return; }
     if (item.state !== 'done') return;
     const r = await fileMedia(db, { type: p.type, libraryId: p.libraryId, path: item.path, hint: p.hint || {}, source, ref: grab.ref, title: base.title });
@@ -152,8 +152,10 @@ export function createDownloadMonitor({ db, onProgress = () => {}, now = () => D
   // progress, seeders }), surfaced in the download queue. Rebuilt each tick.
   let snapshot = {};
   let packSnapshot = {}; // grab_id → { state, progress, seeders } for active packs
+  let mediaSnapshot = {}; // grab_id → { state, progress, seeders } for active media (book/audiobook) grabs
   const getProgress = () => snapshot;
   const getPackProgress = () => packSnapshot;
+  const getMediaProgress = () => mediaSnapshot;
   // Per-source outage tracking: when a client can't be polled (down, config
   // removed), warn ONCE instead of every tick, and once the outage outlives the
   // source's timeout, fail its active grabs rather than spinning forever.
@@ -162,10 +164,11 @@ export function createDownloadMonitor({ db, onProgress = () => {}, now = () => D
   async function tick() {
     if (running) return;               // never let ticks overlap
     const grabs = activeGrabs(db);
-    if (!grabs.length) { snapshot = {}; packSnapshot = {}; return; }
+    if (!grabs.length) { snapshot = {}; packSnapshot = {}; mediaSnapshot = {}; return; }
     running = true;
     const next = {};
     const nextPacks = {};
+    const nextMedia = {};
     let cvc = null;
     const cvClient = () => (cvc ||= makeCvClient(config));
     try {
@@ -211,7 +214,7 @@ export function createDownloadMonitor({ db, onProgress = () => {}, now = () => D
           // Pack grabs (per-series or 0-day) have no single issue — on completion
           // they post-process the whole download and import every wanted issue.
           if (grab.kind === 'pack') { await handlePackGrab({ db, grab, item, client, policy, source, cvClient, onProgress, now, record: (id, d) => { nextPacks[id] = d; } }); continue; }
-          if (grab.kind === 'media') { await handleMediaGrab({ db, grab, item, client, policy, source, onProgress, now }); continue; }
+          if (grab.kind === 'media') { await handleMediaGrab({ db, grab, item, client, policy, source, onProgress, now, record: (id, d) => { nextMedia[id] = d; } }); continue; }
           const issue = getIssueById(db, grab.issue_id);
           if (!issue) { setGrabStatus(db, grab.id, 'orphan', { error: 'issue no longer exists' }); continue; }
           try {
@@ -283,6 +286,7 @@ export function createDownloadMonitor({ db, onProgress = () => {}, now = () => D
       }
       snapshot = next;
       packSnapshot = nextPacks;
+      mediaSnapshot = nextMedia;
     } finally { running = false; }
   }
 
@@ -299,5 +303,5 @@ export function createDownloadMonitor({ db, onProgress = () => {}, now = () => D
     return t;
   }
 
-  return { tick, start, getProgress, getPackProgress };
+  return { tick, start, getProgress, getPackProgress, getMediaProgress };
 }

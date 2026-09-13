@@ -18,7 +18,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import config from './config.js';
-import { recordGrab } from './db.js';
+import { recordGrab, activeMediaGrabs, grabPayload } from './db.js';
 import { safeName } from './downloader.js';
 import { walkFiles } from './sources/usenet.js';
 import { mediaHandlerFor, registeredMediaListeners, loadPlugins } from './plugins.js';
@@ -26,6 +26,39 @@ import { sourcesForType } from './sources/index.js';
 import { logInfo, logWarn } from './logstore.js';
 
 const TYPES = ['ebook', 'audiobook'];
+
+// What is in flight right now, for the queue page: an immediate download's
+// search/fetch/filing phases live here (keyed by a running number); a
+// deferred grab is on its client and in the grabs table, so the queue reads
+// those from the database and the download monitor's progress.
+let nextLiveId = 1;
+const live = new Map(); // id → { id, type, title, author, source, phase, page, pages, unit, bps, detail, release, startedAt, ref }
+function track(entry) { const id = nextLiveId++; live.set(id, { id, startedAt: Date.now(), ...entry }); return id; }
+function update(id, patch) { const e = live.get(id); if (e) Object.assign(e, patch); }
+function untrack(id) { live.delete(id); }
+
+/** Every media download in flight: { id, grabId?, type, title, author, source,
+ *  release, ref, live: { phase, page, pages, unit, bps, detail, progress,
+ *  seeders } }. `db` adds the deferred grabs; `progress` is the download
+ *  monitor's per-grab state for them. */
+export function activeMedia(db, progress = {}) {
+  const out = [...live.values()].map((e) => ({
+    id: `m${e.id}`, grabId: null, type: e.type, title: e.title, author: e.author || null, source: e.source || null, release: e.release || null, ref: e.ref || null,
+    live: { phase: e.phase, page: e.page ?? null, pages: e.pages ?? null, unit: e.unit || null, bps: e.bps ?? null, detail: e.detail || null, source: e.source || null },
+  }));
+  if (db) {
+    for (const g of activeMediaGrabs(db)) {
+      const p = grabPayload(g);
+      const pr = progress?.[g.id] || null;
+      out.push({
+        id: `g${g.id}`, grabId: g.id, type: p.type || null, title: p.title || p.hint?.title || g.title, author: p.hint?.author || null, source: g.source, release: g.title, ref: g.ref || null,
+        live: pr ? { phase: pr.state === 'downloading' ? 'downloading' : 'grabbed', progress: pr.progress ?? null, seeders: pr.seeders ?? null, source: g.source }
+          : { phase: 'grabbed', source: g.source },
+      });
+    }
+  }
+  return out;
+}
 
 /** Tell the listeners (best-effort; a listener that throws is logged, not fatal). */
 export function emitMedia(event) {
@@ -37,14 +70,14 @@ export function emitMedia(event) {
 
 /** The ctx a source's find() receives for a book: the comic fields it reads
  *  (seriesTitle, seriesNames, issue, series.type) plus the `book` block. */
-export function bookContext(db, { type, title, author = null, year = null }) {
+export function bookContext(db, { type, title, author = null, year = null, isbn = null }) {
   const names = [...new Set([title, author ? `${author} ${title}` : null].filter(Boolean))];
   return {
     db, config,
     issue: { id: 0, issue_number: '', title },
     series: { type, title },
     seriesTitle: title, seriesNames: names, seriesYear: year || null, cv: null,
-    book: { type, title, author, year },
+    book: { type, title, author, year, isbn: isbn || null },
   };
 }
 
@@ -138,7 +171,7 @@ async function stash(fetched, { title, type }) {
  *   { status: 'no-sources' }                           — nothing enabled serves this type
  * and throws when no plugin can file `type` at all.
  */
-export async function queueMediaDownload({ db, type, libraryId, title, author = null, year = null, ref = null, onProgress = () => {} }) {
+export async function queueMediaDownload({ db, type, libraryId, title, author = null, year = null, isbn = null, ref = null, onProgress = () => {} }) {
   type = String(type || '').toLowerCase();
   if (!TYPES.includes(type)) throw new Error(`unknown media type ${type}`);
   if (!db) throw new Error('downloadMedia needs a db');
@@ -147,15 +180,20 @@ export async function queueMediaDownload({ db, type, libraryId, title, author = 
   if (!mediaHandlerFor(type)) throw new Error(`no plugin files ${type} downloads`);
   const sources = sourcesForType(config, type);
   if (!sources.length) return { status: 'no-sources' };
-  const ctx = bookContext(db, { type, title, author, year });
-  const hint = { title, author, year };
+  const ctx = bookContext(db, { type, title, author, year, isbn });
+  const hint = { title, author, year, isbn: isbn || null };
   const label = `${type} "${title}"${author ? ` by ${author}` : ''}`;
+  const liveId = track({ type, title, author, ref, phase: 'searching', source: null });
+  let lastErr = null; // a source that broke, as opposed to one that had nothing
+  try {
   for (const src of sources) {
     let candidate;
     onProgress({ event: 'searching', source: src.id });
+    update(liveId, { phase: 'searching', source: src.id });
+    logInfo(`Searching ${src.id} for ${label}`, src.id);
     try { candidate = await src.find(ctx); }
-    catch (e) { logWarn(`${src.id}: search for ${label} failed: ${e?.message || e}`, src.id); continue; }
-    if (!candidate) continue;
+    catch (e) { lastErr = `${src.id}: ${e?.message || e}`; logWarn(`${src.id}: search for ${label} failed: ${e?.message || e}`, src.id); continue; }
+    if (!candidate) { logInfo(`${src.id}: nothing matched ${label}`, src.id); continue; }
     const release = candidate.title || candidate.url || '';
     if (src.kind === 'deferred') {
       try {
@@ -165,25 +203,62 @@ export async function queueMediaDownload({ db, type, libraryId, title, author = 
           title: g.title || release, releaseGuid: g.releaseGuid, ref, payload: { type, libraryId, hint, title },
         });
         logInfo(`Grabbed ${label} from ${src.id}: ${g.title || release}`, src.id);
+        untrack(liveId); // the grabs table carries it from here
         return { status: 'grabbed', source: src.id, release: g.title || release, grabId };
-      } catch (e) { logWarn(`${src.id}: could not grab ${label}: ${e?.message || e}`, src.id); continue; }
+      } catch (e) { lastErr = `${src.id}: ${e?.message || e}`; logWarn(`${src.id}: could not grab ${label}: ${e?.message || e}`, src.id); continue; }
     }
     // Immediate: download and file in the background; the outcome reaches the
-    // asker through the listeners like a deferred grab's would.
+    // asker through the listeners like a deferred grab's would. A file the
+    // source itself rejects on inspection (a translation labelled as the
+    // wanted language, say) is not the end: the next-best candidate is asked
+    // for, a few times over.
+    update(liveId, { phase: 'connecting', release, page: 0, pages: 0, unit: null, bps: null, detail: null });
+    logInfo(`${src.id}: downloading ${release} for ${label}`, src.id);
     (async () => {
       let file;
+      let pick = candidate;
+      const exclude = new Set();
       try {
-        const fetched = await src.fetch(candidate, ctx, () => {});
-        if (!fetched?.buffer) throw new Error(`${src.id} returned no file`);
-        file = await stash(fetched, { title, type });
-      } catch (e) {
-        logWarn(`${src.id}: download of ${label} failed: ${e?.message || e}`, src.id);
-        emitMedia({ event: 'failed', type, libraryId, ref, title, source: src.id, error: String(e?.message || e) });
-        return;
-      }
-      await fileMedia(db, { type, libraryId, path: file, hint, source: src.id, ref, title });
+        for (let attempt = 1; ; attempt++) {
+          try {
+            const fetched = await src.fetch(pick, ctx, (p) => update(liveId, {
+              phase: p.phase === 'download' ? 'downloading' : (p.phase || 'connecting'),
+              page: p.done ?? null, pages: p.total ?? null, unit: p.unit || (p.phase === 'download' ? 'bytes' : null), bps: p.bps ?? null, detail: p.detail || null,
+            }));
+            if (!fetched?.buffer) throw new Error(`${src.id} returned no file`);
+            update(liveId, { phase: 'saving', bps: null });
+            file = await stash(fetched, { title, type });
+            break;
+          } catch (e) {
+            const why = String(e?.message || e);
+            if (e?.rejected && attempt < 4) {
+              exclude.add(pick.url || pick.title);
+              logWarn(`${src.id}: ${why} — trying the next candidate for ${label}`, src.id);
+              update(liveId, { phase: 'searching', page: null, pages: null, bps: null });
+              let next = null;
+              try { next = await src.find({ ...ctx, exclude }); } catch { /* nothing more */ }
+              if (next && !exclude.has(next.url || next.title)) {
+                pick = next;
+                update(liveId, { phase: 'connecting', release: next.title || next.url || '' });
+                logInfo(`${src.id}: downloading ${next.title || next.url || ''} for ${label} instead`, src.id);
+                continue;
+              }
+            }
+            logWarn(`${src.id}: download of ${label} failed: ${why}`, src.id);
+            emitMedia({ event: 'failed', type, libraryId, ref, title, source: src.id, error: why });
+            return;
+          }
+        }
+        update(liveId, { phase: 'done', page: null, pages: null });
+        await fileMedia(db, { type, libraryId, path: file, hint, source: src.id, ref, title });
+      } finally { untrack(liveId); }
     })();
     return { status: 'downloading', source: src.id, release };
   }
+  // Nothing matched. When a source broke along the way, say so rather than
+  // "no source has it" — the book may well be there once the source works.
+  if (lastErr) return { status: 'error', error: lastErr, searched: sources.map((s) => s.id) };
+  logInfo(`No enabled source had ${label} (asked ${sources.map((s) => s.id).join(', ')})`, 'download');
   return { status: 'no-match', searched: sources.map((s) => s.id) };
+  } finally { if (live.has(liveId) && live.get(liveId).phase === 'searching') untrack(liveId); }
 }
