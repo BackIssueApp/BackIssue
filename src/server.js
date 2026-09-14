@@ -21,7 +21,7 @@ import { testTorznabIndexer } from './torznab.js';
 import { testTorrentClient } from './torrentclients.js';
 import { pluginsDir, pluginCatalog, setPluginEnabled, markPluginPending, pendingPluginChanges, installedOnDisk, registeredRoutes, registeredPermissions, registeredAuthProviders, registeredCredentialProviders, pluginLibraryTypes, registeredLibraryScanners, registeredCollectionFilters } from './plugins.js';
 import { fetchCatalog, installPlugin, uninstallPlugin } from './plugincatalog.js';
-import { logWarn } from './logstore.js';
+import { logInfo, logWarn } from './logstore.js';
 import * as users from './users.js';
 import * as lists from './lists.js';
 import * as cbl from './cbl.js';
