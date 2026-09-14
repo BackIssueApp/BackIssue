@@ -37,11 +37,28 @@ export function issueLabel(title, number) {
 
 // Parse the issue number out of a comic filename. Handles "Series V1999 #001",
 // trailing numbers, and the unicode fractions our naming uses for half issues.
+// A volume marker with its number — "Vol. 3", "Volume 01", "v2", "V1999" —
+// names the volume, never the issue. Only with digits right after the marker,
+// so a series name like "V for Vendetta" is never touched.
+const VOLUME_MARK_RE = /(?<![A-Za-z0-9])v(?:ol(?:ume)?)?\.?\s*\d+(?![A-Za-z0-9])/gi;
+// An explicit issue marker — "Issue 002", "No. 12", "Iss 7", "Issue #3" — IS
+// the issue number, the way "#3" is, whatever other numbers the name carries.
+const ISSUE_MARK_RE = /(?<![A-Za-z0-9])(?:issue|iss|no)\.?\s*#?\s*(\d+(?:\.\d+)?)(?![A-Za-z0-9])/i;
+const stripTags = (s) => s.replace(/\([^)]*\)|\[[^\]]*\]/g, ' ');
+
 export function parseIssueFromFilename(name) {
-  const base = String(name).replace(/\.(cbz|cbr|pdf|zip|rar)$/i, '');
-  if (/#\s*1\/2(?!\d)/.test(base)) return '½';
-  const uni = base.match(/#\s*(½|¼|¾)/);
+  const raw = String(name).replace(/\.(cbz|cbr|pdf|zip|rar)$/i, '');
+  if (/#\s*1\/2(?!\d)/.test(raw)) return '½';
+  const uni = raw.match(/#\s*(½|¼|¾)/);
   if (uni) return uni[1];
+  // "Series (2024) Volume 01 Issue 002": the issue is named outright, and the
+  // volume marker must not be mistaken for it. The marker is dropped before
+  // any number is read — unless it is the only number there is (a trade named
+  // "Series Vol. 3" is still volume 3).
+  const explicit = stripTags(raw).match(ISSUE_MARK_RE);
+  if (explicit) return explicit[1];
+  const unmarked = raw.replace(VOLUME_MARK_RE, ' ');
+  const base = /\d/.test(stripTags(unmarked).replace(/(?:19|20)\d{2}/g, '')) || !/\d/.test(stripTags(raw)) ? unmarked : raw;
   // Scene-style filename: "Series NNN (year) (tags)". Cut at the (year), drop
   // parenthetical/bracket tags, keep a dot BETWEEN digits (so "000.5" survives as
   // the ½ promo, "1.1" as a point-one), then take the last non-year number.

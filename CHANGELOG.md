@@ -8,6 +8,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Files named "Series (Year) Volume 01 Issue 002" read the volume number as
+  the issue number, so every file in the folder landed as issue 1 and the
+  rest showed as missing. An explicit issue marker ("Issue 002", "No. 12",
+  "Issue #3") now names the issue outright, and a volume marker ("Volume
+  01", "Vol. 3", "v2") is never mistaken for one — unless it is the only
+  number in the name, as on a trade.
+
 ## [0.8.4] - 2026-09-14
 
 ### Added

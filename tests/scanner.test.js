@@ -102,6 +102,22 @@ test('parseIssueFromFilename reads the number from common library names', () => 
   assert.equal(parseIssueFromFilename('Spider-Man 000.5 (1998) (Marvel-Wizard) (c2c) (Raven-DCP).cbz'), '000.5');
   assert.equal(parseIssueFromFilename('Amazing Spider-Man 001.1 (2014).cbz'), '001.1');
   assert.equal(parseIssueFromFilename('Earth X Issue #1/2.cbz'), '½');
+  // "Series (Year) Volume NN Issue NNN" — an explicit issue marker wins, and
+  // the volume number is never mistaken for the issue (it used to be).
+  assert.equal(parseIssueFromFilename('Absolute Batman (2024) Volume 01 Issue 002.cbz'), '002');
+  assert.equal(parseIssueFromFilename('Absolute Batman (2024) Volume 01 Issue 011 (Digital).cbz'), '011');
+  assert.equal(parseIssueFromFilename('Absolute Batman Volume 01 Issue 002 (2024).cbz'), '002');
+  assert.equal(parseIssueFromFilename('Absolute Batman (2024) Issue #3.cbz'), '3');
+  assert.equal(parseIssueFromFilename('Absolute Batman (2024) No. 12.cbz'), '12');
+  assert.equal(parseIssueFromFilename('Absolute Batman (2024) Vol. 1 007.cbz'), '007');
+  assert.equal(parseIssueFromFilename('Absolute Batman (2024) v1 007.cbz'), '007');
+  assert.equal(parseIssueFromFilename('Batman Vol. 3 012 (2016).cbz'), '012');
+  // A volume marker that is the only number stays what it is (a trade).
+  assert.equal(parseIssueFromFilename('Batman Vol. 3.cbz'), '3');
+  // "V for Vendetta" is a name, not a volume marker.
+  assert.equal(parseIssueFromFilename('V for Vendetta 004 (1988).cbz'), '004');
+  // "Nova 5" is not "No. 5".
+  assert.equal(parseIssueFromFilename('Nova 005 (2016).cbz'), '005');
 });
 
 test('groupSeries groups by folder, deriving series + publisher + present numbers', () => {
