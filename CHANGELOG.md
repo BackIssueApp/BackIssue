@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-09-14
+
 ### Added
 
 - **Books and audiobooks from your download sources.** A plugin can now ask
