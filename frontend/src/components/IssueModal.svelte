@@ -39,6 +39,23 @@
     ? [info.store_date && ('In stores ' + info.store_date), info.cover_date && ('Cover date ' + info.cover_date)].filter(Boolean)
     : []);
 
+  // Move a file that landed under the wrong issue (its number read wrongly)
+  // to the right one — or undo a hand assignment. Same route the series
+  // page's unmatched-file picker uses; the choice sticks through rescans.
+  let movePick = $state({});
+  const otherIssues = $derived((detail.det?.issues || []).filter((i) => i.cv_issue_id !== m.cvIssueId));
+  const issueChoice = (i) => `#${i.number}${i.title && i.title !== '#' + i.number ? ' · ' + i.title : ''}${i.owned ? ' (owned)' : ''}`;
+  async function setAssignment(f, cvIssueId) {
+    const sid = f.series_id ?? detail.series?.id;
+    if (!sid) return;
+    const r = await apiPost(`/api/collection/${sid}/assign-file`, { path: f.path, cvIssueId }).catch((e) => ({ error: String(e) }));
+    if (r?.error) return notify(r.error, 'error');
+    notify(cvIssueId ? 'File moved to that issue — the assignment is remembered through rescans.' : 'Assignment cleared — the file links by its number again.', 'ok');
+    delete movePick[f.path];
+    await openIssueInfo(m.cvIssueId, m.number);
+    reloadDetail();
+  }
+
   async function download() {
     closeModal('issue');
     if (info.owned || info.corrupt) await redownloadCvIssues([m.cvIssueId]);
@@ -231,6 +248,17 @@
                   {#if !f.valid}<span class="ii-flag ii-flag--bad">corrupt</span>
                   {:else if !f.has_metadata}<span class="ii-flag">untagged</span>{/if}
                   {#if !f.valid && f.error}<div class="ii-error">Reason: {f.error}</div>{/if}
+                  {#if f.assigned}<span class="ii-flag">assigned by hand</span>{/if}
+                  {#if (isTrusted() || can('library.manage')) && otherIssues.length}
+                    <div class="ii-move">
+                      <select class="ii-move__pick" aria-label="Move {f.name} to another issue" bind:value={movePick[f.path]}>
+                        <option value="">Move to another issue…</option>
+                        {#each otherIssues as i (i.cv_issue_id)}<option value={i.cv_issue_id}>{issueChoice(i)}</option>{/each}
+                      </select>
+                      <button class="ii-move__btn" disabled={!movePick[f.path]} onclick={() => setAssignment(f, Number(movePick[f.path]))}>Move</button>
+                      {#if f.assigned}<button class="ii-move__btn ii-move__btn--ghost" onclick={() => setAssignment(f, null)}>Undo</button>{/if}
+                    </div>
+                  {/if}
                 </div>
               {/each}
             </div>

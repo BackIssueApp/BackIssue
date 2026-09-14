@@ -271,7 +271,10 @@ async function cvIssueInfo(cvIssueId) {
     try { issue = await ensureCvIssueDetail(db, cvClient(), cvIssueId); }
     catch (e) { console.warn('cv issue detail fetch failed', cvIssueId, e?.message || e); }
   }
-  const files = db.prepare('SELECT path, name, valid, has_metadata, error FROM library_files WHERE cv_issue_id=?').all(cvIssueId);
+  // `assigned`: the file sits under this issue because someone said so, not
+  // because its number read that way — the modal offers to undo that.
+  const files = db.prepare('SELECT f.path, f.name, f.valid, f.has_metadata, f.error, f.series_id, EXISTS (SELECT 1 FROM file_issue_overrides o WHERE o.path = f.path) AS assigned FROM library_files f WHERE f.cv_issue_id=?').all(cvIssueId)
+    .map((f) => ({ ...f, assigned: !!f.assigned }));
   let credits = [];
   try { credits = issue.credits ? JSON.parse(issue.credits) : []; } catch { /* ignore */ }
   const owned = files.some((f) => f.valid);

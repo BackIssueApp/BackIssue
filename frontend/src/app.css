@@ -893,6 +893,11 @@ body.queuepage .home, body.releasespage .home { display: none; }
 .ii-missing { color: var(--muted); font-family: inherit; }
 .ii-flag { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--amber); border: 1px solid rgba(255,194,75,.35); border-radius: 4px; padding: 0 5px; }
 .ii-flag--bad { color: var(--red); border-color: rgba(255,90,82,.4); }
+.ii-move { display: flex; align-items: center; gap: 6px; margin: 4px 0 6px 20px; font-family: var(--font-body); }
+.ii-move__pick { max-width: 240px; height: 24px; padding: 0 6px; background: var(--ink); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font: 11.5px var(--font-body); }
+.ii-move__btn { height: 24px; padding: 0 9px; border: none; background: var(--accent); color: #fff; border-radius: 6px; font: 600 11px var(--font-body); cursor: pointer; }
+.ii-move__btn:disabled { opacity: .45; cursor: default; }
+.ii-move__btn--ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); }
 .ii-cvlink { align-self: flex-start; margin-top: 6px; color: var(--accent); font-size: 13px; text-decoration: none; }
 .ii-cvlink:hover { text-decoration: underline; }
 

@@ -15,7 +15,10 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   the issue and the file links to it at once. The choice is remembered per
   file, so rescans, re-matches and metadata refreshes keep it (a re-match to
   a different volume drops it). For files whose number the app cannot read,
-  or reads wrongly, without renaming or retagging anything.
+  or reads wrongly, without renaming or retagging anything. A file that
+  linked to the wrong issue can be moved from that issue's own file list
+  (open the issue, *Move to another issue…*), and a hand assignment undone
+  there too.
 
 ### Fixed
 
