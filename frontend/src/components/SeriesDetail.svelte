@@ -24,6 +24,19 @@
   const det = $derived(detail.det);
   const isCv = $derived(!!det && det.source === 'cv' && Array.isArray(det.issues));
   let showAllUnlinked = $state(false);
+  // "Assign to issue" on an unmatched file: the issue picked per file path,
+  // sent with the file so the choice sticks through rescans.
+  let assignPick = $state({});
+  async function assignFile(f) {
+    const cvIssueId = Number(assignPick[f.path]);
+    if (!cvIssueId) return;
+    const r = await apiPost(`/api/collection/${s.id}/assign-file`, { path: f.path, cvIssueId }).catch((e) => ({ error: String(e) }));
+    if (r?.error) return notify(r.error, 'error');
+    notify('File assigned to the issue — it stays there through rescans.', 'ok');
+    delete assignPick[f.path];
+    reloadDetail();
+  }
+  const issueChoice = (i) => `#${i.number}${i.title && i.title !== '#' + i.number ? ' · ' + i.title : ''}${i.owned ? ' (owned)' : ''}`;
   // Unlinked files whose number is beyond anything this volume has: the
   // strongest sign the series is matched to the WRONG ComicVine volume.
   const unlinkedBeyond = $derived.by(() => {
@@ -963,7 +976,7 @@
                this, such a file is invisible and its issue simply reads "missing". -->
           <div class="unlinked">
             <div class="unlinked__head"><Icon name="alert-triangle" size={14} /> {fmt(n)} file{n === 1 ? '' : 's'} in this folder {n === 1 ? "isn't" : "aren't"} matched to an issue</div>
-            <div class="unlinked__note">They count as missing until they match. The issue number is read from the file's ComicInfo tag first, then its filename, and looked up in this ComicVine volume — if the volume is the wrong one, use <b>Fix match</b>; if the number is, retag or rename the file, then <b>Scan folder</b>.</div>
+            <div class="unlinked__note">They count as missing until they match. The issue number is read from the file's ComicInfo tag first, then its filename, and looked up in this ComicVine volume — if the volume is the wrong one, use <b>Fix match</b>; if the number is, retag or rename the file, then <b>Scan folder</b>{#if isTrusted() || can('library.manage')} — or just <b>assign</b> the file to its issue here; the assignment is remembered through rescans{/if}.</div>
             {#if unlinkedBeyond}
               <div class="unlinked__hint">{fmt(unlinkedBeyond)} of them {unlinkedBeyond === 1 ? 'has a number' : 'have numbers'} this volume never reaches (it has {fmt(det.issues.length)} issue{det.issues.length === 1 ? '' : 's'}) — this is almost certainly the wrong ComicVine volume. <b>Fix match</b> to the right one and the files link on their own.</div>
             {/if}
@@ -974,6 +987,13 @@
               <div class="unlinked__file" class:is-bad={!f.valid} title={f.path}>
                 <span class="unlinked__name">{f.name}</span>
                 <span class="unlinked__num">{f.number ? `read as #${f.number}${f.fromTag ? ' (from tag)' : ''}` : 'no issue number found'}</span>
+                {#if isTrusted() || can('library.manage')}
+                  <select class="unlinked__pick" aria-label="Assign {f.name} to an issue" bind:value={assignPick[f.path]}>
+                    <option value="">Assign to issue…</option>
+                    {#each det.issues as i (i.cv_issue_id)}<option value={i.cv_issue_id}>{issueChoice(i)}</option>{/each}
+                  </select>
+                  <button class="unlinked__assign" disabled={!assignPick[f.path]} onclick={() => assignFile(f)}>Assign</button>
+                {/if}
               </div>
             {/each}
             {#if !showAllUnlinked && n > 40}

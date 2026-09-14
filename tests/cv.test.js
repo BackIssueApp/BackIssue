@@ -14,6 +14,7 @@ import {
   upsertCvSeries, getCvSeries, upsertCvIssue, listCvIssues, setSeriesCv,
   seriesNeedingCvMatch, setFollowed, getSeriesById, createCvSeries,
   collectionSeries, seriesCollectionDetail, getSeriesByCvId, untrackSeries, getLibraryFile, ensureCvIssueRow,
+  setFileIssueOverride, clearFileIssueOverride, getFileIssueOverride, fileIssueOverridesForSeries,
 } from '../src/db.js';
 
 // A fake CV client whose volume() returns a fixed volume with an issue list.
@@ -224,6 +225,40 @@ test('linkFilesToCv maps owned files to CV issues by number', () => {
   assert.equal(linked, 2);
   assert.equal(db.prepare('SELECT cv_issue_id FROM library_files WHERE path=?').get('/i1.cbz').cv_issue_id, 201);
   assert.equal(db.prepare('SELECT cv_issue_id FROM library_files WHERE path=?').get('/i2.cbz').cv_issue_id, 202);
+});
+
+test('linkFilesToCv: a file assigned by hand goes to that issue, through relinks, until cleared', () => {
+  const db = openDb(':memory:');
+  const sid = upsertSeries(db, { title: 'Absolute Batman', url: '/c/ab' });
+  upsertCvSeries(db, { id: 30, name: 'Absolute Batman', count_of_issues: 3 });
+  for (const n of ['1', '2', '3']) upsertCvIssue(db, { id: 300 + Number(n), cv_series_id: 30, number: n, name: 'Issue ' + n });
+  upsertCvIssue(db, { id: 999, cv_series_id: 31, number: '1', name: 'Another volume' });
+  // The parser reads no number from this name; a second file reads the wrong one.
+  upsertLibraryFile(db, { path: '/ab/x.cbz', dir: '/ab', name: 'Absolute Batman - The Zoo.cbz', size: 1, mtime: 1, valid: 1 });
+  linkLibraryFile(db, '/ab/x.cbz', sid, null);
+  upsertLibraryFile(db, { path: '/ab/y.cbz', dir: '/ab', name: 'Absolute Batman 001.cbz', size: 1, mtime: 1, valid: 1 });
+  linkLibraryFile(db, '/ab/y.cbz', sid, null);
+  assert.equal(linkFilesToCv(db, sid, 30), 1, 'only the numbered file links on its own');
+  assert.equal(getLibraryFile(db, '/ab/x.cbz').cv_issue_id, null);
+
+  setFileIssueOverride(db, '/ab/x.cbz', 302);
+  setFileIssueOverride(db, '/ab/y.cbz', 303); // the number said #1; the person says #3
+  assert.equal(getFileIssueOverride(db, '/ab/x.cbz'), 302);
+  assert.deepEqual([...fileIssueOverridesForSeries(db, sid)], [['/ab/x.cbz', 302], ['/ab/y.cbz', 303]]);
+  assert.equal(linkFilesToCv(db, sid, 30), 2);
+  assert.equal(getLibraryFile(db, '/ab/x.cbz').cv_issue_id, 302, 'assigned where the person said');
+  assert.equal(getLibraryFile(db, '/ab/y.cbz').cv_issue_id, 303, 'the hand assignment beats the parsed number');
+  // Relinking (a rescan, a metadata refresh) keeps it.
+  linkFilesToCv(db, sid, 30);
+  assert.equal(getLibraryFile(db, '/ab/x.cbz').cv_issue_id, 302);
+  // An assignment to an issue outside the volume is ignored, not applied.
+  setFileIssueOverride(db, '/ab/x.cbz', 999);
+  linkFilesToCv(db, sid, 30);
+  assert.equal(getLibraryFile(db, '/ab/x.cbz').cv_issue_id, null);
+  // Cleared → back to what the number says.
+  assert.equal(clearFileIssueOverride(db, '/ab/y.cbz'), 1);
+  linkFilesToCv(db, sid, 30);
+  assert.equal(getLibraryFile(db, '/ab/y.cbz').cv_issue_id, 301);
 });
 
 test('linkFilesToCv also links invalid/corrupt files so they surface per-issue', () => {

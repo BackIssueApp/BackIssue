@@ -13,6 +13,8 @@ import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
 import { normalizeNumber } from './matcher.js';
 import { parseIssueFromFilename } from './scanner.js';
+import { linkFilesToCv } from './cvmatch.js';
+import { getLibraryFile, linkFileCvIssue, setFileIssueOverride, clearFileIssueOverride } from './db.js';
 import { testIndexer } from './newznab.js';
 import { testClient } from './nzbclients.js';
 import { testTorznabIndexer } from './torznab.js';
@@ -279,7 +281,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     // pinned explicitly so they can never drift off the manage permission if the
     // fall-through default ever changes. $-anchored, so GET browse of the
     // collection stays library.view and downloads still route via DOWNLOAD_RULES.
-    [/^\/api\/collection\/\d+\/(delete|scan|refile|refresh|tag|cleanup|metadata|monitor|path|restricted|aliases|cv|type|library)$/, 'library.manage'],
+    [/^\/api\/collection\/\d+\/(delete|scan|refile|refresh|tag|cleanup|metadata|monitor|path|restricted|aliases|cv|type|library|assign-file)$/, 'library.manage'],
     [/^\/api\/collection\/(bulk|add-cv)$/, 'library.manage'],
     [/^\/api\/cv\/match$/, 'library.manage'],
     [/^\/api\/issue\/\d+\/metadata$/, 'library.manage'],
@@ -1763,6 +1765,34 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   });
   app.get('/api/scan-folder', (req, res) => res.json(state.scanFolder || { running: false }));
   // Set (or clear, with empty) a comic's folder on disk.
+  // Assign one of the series' files to an issue by hand — for a file the app
+  // read no number from, or the wrong one. { path, cvIssueId } links it and
+  // remembers the choice per file path, so rescans, re-matches and metadata
+  // refreshes keep it; { path, cvIssueId: null } forgets it and re-reads the
+  // number as usual.
+  app.post('/api/collection/:id/assign-file', (req, res) => {
+    const id = Number(req.params.id);
+    const row = getSeriesById(db, id);
+    if (!row) return res.status(404).json({ error: 'no such series' });
+    const p = String(req.body?.path || '');
+    const f = p ? getLibraryFile(db, p) : null;
+    if (!f || f.series_id !== id) return res.status(400).json({ error: 'that file is not in this series' });
+    const raw = req.body?.cvIssueId;
+    const cvIssueId = raw == null || raw === '' ? null : Number(raw);
+    if (cvIssueId != null) {
+      const ci = Number.isFinite(cvIssueId) ? getCvIssue(db, cvIssueId) : null;
+      if (!ci || !row.cv_id || ci.cv_series_id !== row.cv_id) return res.status(400).json({ error: 'that issue is not in this volume' });
+      setFileIssueOverride(db, p, cvIssueId);
+    } else {
+      clearFileIssueOverride(db, p);
+    }
+    if (row.cv_id) linkFilesToCv(db, id, row.cv_id);
+    else linkFileCvIssue(db, p, cvIssueId);
+    const after = getLibraryFile(db, p);
+    logInfo(cvIssueId != null ? `Assigned "${f.name}" to ComicVine issue ${cvIssueId} by hand` : `Cleared the hand assignment of "${f.name}"`, 'library');
+    res.json({ ok: true, cvIssueId: after?.cv_issue_id ?? null });
+  });
+
   app.post('/api/collection/:id/path', (req, res) => {
     setSeriesPath(db, Number(req.params.id), req.body?.path || null);
     const row = getSeriesById(db, Number(req.params.id));

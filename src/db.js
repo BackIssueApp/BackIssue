@@ -39,6 +39,13 @@ export function initSchema(db) {
       series_id INTEGER NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    -- A file assigned to a ComicVine issue by hand (its number could not be
+    -- read, or was read wrongly). Keyed by path; every relink honours it.
+    CREATE TABLE IF NOT EXISTS file_issue_overrides (
+      path TEXT PRIMARY KEY,
+      cv_issue_id INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
     CREATE TABLE IF NOT EXISTS library_files (
       path TEXT PRIMARY KEY, dir TEXT, name TEXT, size INTEGER, mtime INTEGER,
       page_count INTEGER, has_metadata INTEGER DEFAULT 0,
@@ -864,6 +871,27 @@ export function clearScanOverride(db, dir) {
   return db.prepare('DELETE FROM scan_overrides WHERE dir = ?').run(dir).changes;
 }
 
+// A file → ComicVine issue assignment made by hand. The scanner reads a
+// number from the tag, then the filename; when neither is right (or there),
+// the person who knows the book says which issue it is, and that sticks
+// through rescans, re-matches and metadata refreshes until cleared.
+export function setFileIssueOverride(db, path, cvIssueId) {
+  db.prepare("INSERT INTO file_issue_overrides (path, cv_issue_id, created_at) VALUES (?, ?, datetime('now')) ON CONFLICT(path) DO UPDATE SET cv_issue_id=excluded.cv_issue_id, created_at=excluded.created_at")
+    .run(path, Number(cvIssueId));
+}
+export function getFileIssueOverride(db, path) {
+  const r = db.prepare('SELECT cv_issue_id FROM file_issue_overrides WHERE path = ?').get(path);
+  return r ? r.cv_issue_id : undefined;
+}
+/** path → cv_issue_id for every assigned file of one series. */
+export function fileIssueOverridesForSeries(db, seriesId) {
+  const rows = db.prepare('SELECT o.path, o.cv_issue_id FROM file_issue_overrides o JOIN library_files f ON f.path = o.path WHERE f.series_id = ?').all(seriesId);
+  return new Map(rows.map((r) => [r.path, r.cv_issue_id]));
+}
+export function clearFileIssueOverride(db, path) {
+  return db.prepare('DELETE FROM file_issue_overrides WHERE path = ?').run(path).changes;
+}
+
 // --- Library health index ---
 export function upsertLibraryFile(db, r) {
   // series_id/issue_id are NOT touched on conflict — the link is preserved across
@@ -1387,7 +1415,8 @@ export function seriesCollectionDetail(db, id, userId = null) {
   const asFile = (f) => ({ path: f.path, name: f.name, valid: f.valid, has_metadata: f.has_metadata, error: f.error, size: f.size, page_count: f.page_count });
   // Per-issue copies omit the full path — the UI only shows name/size/health,
   // and on a 2,000-issue series the (JSON-escaped) paths dominated the payload.
-  const asIssueFile = (f) => ({ name: f.name, valid: f.valid, has_metadata: f.has_metadata, error: f.error, size: f.size, page_count: f.page_count });
+  const assigned = new Set(db.prepare('SELECT o.path FROM file_issue_overrides o JOIN library_files f ON f.path = o.path WHERE f.series_id = ?').all(series.id).map((r) => r.path));
+  const asIssueFile = (f) => ({ name: f.name, valid: f.valid, has_metadata: f.has_metadata, error: f.error, size: f.size, page_count: f.page_count, assigned: assigned.has(f.path) });
   // Invalid files already superseded by a valid copy of the same CV issue —
   // safe-to-remove duplicates (see removeSupersededFiles).
   const validCvIds = new Set(files.filter((f) => f.valid && f.cv_issue_id != null).map((f) => f.cv_issue_id));

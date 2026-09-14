@@ -1,6 +1,6 @@
 import { normalizeTitle, extractYear, normalizeNumber } from './matcher.js';
 import config from './config.js';
-import { upsertCvSeries, upsertCvIssue, setSeriesCv, seriesNeedingCvMatch, listCvIssues, linkFileCvIssue, getSeriesByCvId, createCvSeries, setFollowed, setMonitor, MONITOR_STATES, defaultLibrary, assignSeriesLibrary, getSeriesById, getCvSeries, setSeriesPath, mergeSeriesRows } from './db.js';
+import { upsertCvSeries, upsertCvIssue, setSeriesCv, seriesNeedingCvMatch, listCvIssues, linkFileCvIssue, getSeriesByCvId, createCvSeries, setFollowed, setMonitor, MONITOR_STATES, defaultLibrary, assignSeriesLibrary, getSeriesById, getCvSeries, setSeriesPath, mergeSeriesRows, fileIssueOverridesForSeries } from './db.js';
 import { parseIssueFromFilename } from './scanner.js';
 import { normVolume } from './cv.js';
 import { poolWithResource } from './pool.js';
@@ -24,17 +24,23 @@ function fileIssueKeys(f) {
 // each. This is what makes the collection roll up against CV's issue list.
 export function linkFilesToCv(db, seriesId, cvSeriesId) {
   const byNum = new Map();
+  const ids = new Set();
   for (const ci of listCvIssues(db, cvSeriesId)) {
+    ids.add(ci.comicvine_id);
     const k = normalizeNumber(ci.issue_number);
     if (k && !byNum.has(k)) byNum.set(k, ci.comicvine_id);
   }
+  // A file someone assigned by hand goes where they said — as long as that
+  // issue is still in this volume (a re-match to another volume voids it).
+  const overrides = fileIssueOverridesForSeries(db, seriesId);
   // Link ALL files (incl. invalid/corrupt ones) by number, so a corrupt copy maps
   // to its CV issue and surfaces as "corrupt" in the detail — not silently missing.
   const files = db.prepare('SELECT path, ci_number, name FROM library_files WHERE series_id=?').all(seriesId);
   let linked = 0;
   for (const f of files) {
-    let cvId = null;
-    for (const k of fileIssueKeys(f)) { cvId = byNum.get(k) ?? null; if (cvId) break; }
+    let cvId = overrides.get(f.path) ?? null;
+    if (cvId && !ids.has(cvId)) cvId = null;
+    if (!cvId) for (const k of fileIssueKeys(f)) { cvId = byNum.get(k) ?? null; if (cvId) break; }
     linkFileCvIssue(db, f.path, cvId);
     if (cvId) linked++;
   }

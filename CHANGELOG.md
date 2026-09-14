@@ -8,6 +8,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+
+- **Assign a file to an issue by hand.** On a series page, each file the app
+  could not match to an issue now has an *Assign to issue* picker: choose
+  the issue and the file links to it at once. The choice is remembered per
+  file, so rescans, re-matches and metadata refreshes keep it (a re-match to
+  a different volume drops it). For files whose number the app cannot read,
+  or reads wrongly, without renaming or retagging anything.
+
 ### Fixed
 
 - Files named "Series (Year) Volume 01 Issue 002" read the volume number as
