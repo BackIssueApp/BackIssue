@@ -34,7 +34,14 @@
 
   /** Svelte action: right-click (and touch long-press) opens `items()`.
    *  Used as `use:contextMenu={() => buildItems(row)}` so the list is built
-   *  fresh at open time and reflects current state (read/unread, owned, …). */
+   *  fresh at open time and reflects current state (read/unread, owned, …).
+   *
+   *  Touch needs three things a mouse does not. The press must not also count
+   *  as a tap, or lifting your finger opens the row behind the menu. iOS must
+   *  be told not to run its own long-press (the copy/share callout, and text
+   *  selection) on top of ours, which is the `.has-longpress` class below. And
+   *  a short buzz, where the device supports one, is what tells someone the
+   *  press registered — without it a long press feels like nothing happened. */
   export function contextMenu(node, getItems) {
     let build = getItems;
     let timer = null;
@@ -43,12 +50,27 @@
 
     const onContext = (e) => openContextMenu(e, build?.());
     const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+
+    // Swallow the compatibility click the browser sends after touchend, so the
+    // long press does not also activate the row. One shot, and self-cancelling
+    // so a later genuine tap is never eaten.
+    const swallowNextClick = () => {
+      const kill = (e) => { e.preventDefault(); e.stopPropagation(); };
+      window.addEventListener('click', kill, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener('click', kill, { capture: true }), 700);
+    };
+
     const onTouchStart = (e) => {
       const t = e.touches?.[0];
       if (!t) return;
       startX = t.clientX; startY = t.clientY;
       clear();
-      timer = setTimeout(() => { timer = null; openContextMenu(e, build?.()); }, 500);
+      timer = setTimeout(() => {
+        timer = null;
+        if (!openContextMenu(e, build?.())) return;
+        swallowNextClick();
+        try { navigator.vibrate?.(8); } catch { /* not supported, no matter */ }
+      }, 500);
     };
     // Scrolling a list must not fire the menu, so any real movement cancels.
     const onTouchMove = (e) => {
@@ -57,6 +79,7 @@
       if (Math.abs(t.clientX - startX) > 10 || Math.abs(t.clientY - startY) > 10) clear();
     };
 
+    node.classList.add('has-longpress');
     node.addEventListener('contextmenu', onContext);
     node.addEventListener('touchstart', onTouchStart, { passive: true });
     node.addEventListener('touchmove', onTouchMove, { passive: true });
@@ -67,6 +90,7 @@
       update(next) { build = next; },
       destroy() {
         clear();
+        node.classList.remove('has-longpress');
         node.removeEventListener('contextmenu', onContext);
         node.removeEventListener('touchstart', onTouchStart);
         node.removeEventListener('touchmove', onTouchMove);

@@ -1307,6 +1307,12 @@ body.import .import-page { display: flex; flex-direction: column; height: 100%; 
 /* Right-click menu on series cards and issue rows. Shares .menu__item with the
    series overflow menu above, so both look the same; only the positioning
    differs (fixed at the pointer rather than anchored to a button). */
+/* Long-pressable targets. iOS runs its own long press (the copy/share callout,
+   and starting a text selection) which would fight ours, so opt those out. Set
+   by the contextMenu action rather than by hand, so it can never drift from the
+   elements that actually have a menu. */
+.has-longpress { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+
 .ctxmenu__scrim { position: fixed; inset: 0; z-index: 80; }
 .ctxmenu {
   position: fixed; z-index: 81;

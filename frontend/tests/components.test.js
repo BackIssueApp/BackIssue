@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import Badge from '../src/components/Badge.svelte';
@@ -6,7 +6,7 @@ import Toasts from '../src/components/Toasts.svelte';
 import DialogModal from '../src/components/DialogModal.svelte';
 import { confirmDialog, inputDialog } from '../src/components/DialogModal.svelte';
 import { notify, toasts } from '../src/lib/toasts.svelte.js';
-import ContextMenu, { openContextMenu, closeContextMenu } from '../src/components/ContextMenu.svelte';
+import ContextMenu, { openContextMenu, closeContextMenu, contextMenu } from '../src/components/ContextMenu.svelte';
 
 describe('Badge', () => {
   test('maps statuses to labels', () => {
@@ -117,5 +117,74 @@ describe('ContextMenu', () => {
     expect(screen.getByText('Keep me')).toBeTruthy();
     expect(document.querySelectorAll('.ctxmenu .menu__item').length).toBe(1);
     closeContextMenu();
+  });
+});
+
+describe('ContextMenu long-press (touch)', () => {
+  const touch = (type, x = 30, y = 30) => new (class extends Event {
+    constructor() { super(type, { bubbles: true, cancelable: true }); }
+    touches = type === 'touchend' ? [] : [{ clientX: x, clientY: y }];
+    changedTouches = [{ clientX: x, clientY: y }];
+    clientX = undefined;
+    clientY = undefined;
+  })();
+
+  function mount() {
+    const node = document.createElement('div');
+    document.body.appendChild(node);
+    const handle = contextMenu(node, () => [{ id: 'a', label: 'Mark as read', run() {} }]);
+    return { node, handle };
+  }
+
+  test('a press held past the threshold opens the menu', async () => {
+    vi.useFakeTimers();
+    render(ContextMenu);
+    const { node, handle } = mount();
+    node.dispatchEvent(touch('touchstart'));
+    vi.advanceTimersByTime(600);
+    vi.useRealTimers();
+    await tick();
+    expect(screen.getByText('Mark as read')).toBeTruthy();
+    closeContextMenu();
+    handle.destroy();
+    node.remove();
+  });
+
+  test('a quick tap does not open it', async () => {
+    vi.useFakeTimers();
+    render(ContextMenu);
+    const { node, handle } = mount();
+    node.dispatchEvent(touch('touchstart'));
+    vi.advanceTimersByTime(120);
+    node.dispatchEvent(touch('touchend'));
+    vi.advanceTimersByTime(600);
+    vi.useRealTimers();
+    await tick();
+    expect(document.querySelector('.ctxmenu')).toBeNull();
+    handle.destroy();
+    node.remove();
+  });
+
+  test('sliding a finger (a scroll) cancels the press', async () => {
+    vi.useFakeTimers();
+    render(ContextMenu);
+    const { node, handle } = mount();
+    node.dispatchEvent(touch('touchstart', 30, 30));
+    vi.advanceTimersByTime(200);
+    node.dispatchEvent(touch('touchmove', 30, 200));   // well past the 10px slop
+    vi.advanceTimersByTime(600);
+    vi.useRealTimers();
+    await tick();
+    expect(document.querySelector('.ctxmenu')).toBeNull();
+    handle.destroy();
+    node.remove();
+  });
+
+  test('the action marks its node so iOS does not run its own long press', () => {
+    const { node, handle } = mount();
+    expect(node.classList.contains('has-longpress')).toBe(true);
+    handle.destroy();
+    expect(node.classList.contains('has-longpress')).toBe(false);
+    node.remove();
   });
 });

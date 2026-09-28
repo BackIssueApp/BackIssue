@@ -19,6 +19,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   want or skip. The menu is built when it opens, so it always reflects that row
   as it stands, it only lists what your role can do, and right-clicking never
   disturbs a selection you are part-way through building.
+
+  On a touch screen the same menu opens on a **long press**, with a short
+  buzz where the device supports one. Lifting your finger afterwards does not
+  also open the row, a quick tap still opens it as before, and starting to
+  scroll cancels the press rather than opening a menu you did not ask for.
 - **Date formats for file naming.** The `{date}` token in a file pattern still
   writes "November 2011", but it now takes a modifier for the parts on their
   own: `{date:m}` the two-digit month, `{date:y}` the year, `{date:mon}` the
