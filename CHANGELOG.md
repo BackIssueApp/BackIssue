@@ -10,6 +10,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Quick actions on Library cards** (#5). Every series card and row has an
+  actions menu, reached from the **⋯ button** that appears on hover, a
+  right-click, or a long press. It carries the library-management actions that
+  previously meant opening the series first: **Scan folder**, **Edit
+  metadata**, **Rename files** and **Fix match** (or **Match to ComicVine** for
+  a series that has none yet).
 - **Right-click menus on series and issues.** A series card in the Library, and
   an issue in either the grid or the list on a series page, now open a menu on
   right-click (press and hold on a touch screen). A series offers open, follow,

@@ -4,7 +4,7 @@
   import { navigate, route, setQuery } from '../lib/router.svelte.js';
   import { rail, railSelect, ops, loadCollection, loadMoreCollection } from '../lib/store.svelte.js';
   import { status } from '../lib/status.svelte.js';
-  import { apiPost } from '../lib/api.js';
+  import { apiGet, apiPost } from '../lib/api.js';
   import { notify } from '../lib/toasts.svelte.js';
   import { fmt, humanBytes, windowRange } from '../lib/util.js';
   import Cover from './Cover.svelte';
@@ -15,7 +15,12 @@
   import { libraryFilterFor } from '../lib/plugins.svelte.js';
   import FiltersModal from './FiltersModal.svelte';
   import Icon from '../lib/Icon.svelte';
-  import { contextMenu } from './ContextMenu.svelte';
+  import { contextMenu, openContextMenu } from './ContextMenu.svelte';
+  import { openCvPicker } from './CvPickerModal.svelte';
+  import { openEditMetadata } from './EditMetadataModal.svelte';
+
+  // Which card is under the pointer, so its actions button can fade in.
+  let hovered = $state(null);
 
   const FILTERS = [
     { key: 'all', label: 'All' },
@@ -115,6 +120,48 @@
     loadCollection();
   }
 
+  // Scan one series' folder. Goes through the shared ops.scan state so the
+  // progress and the completion toast are the same ones the series page shows.
+  async function scanSeries(s) {
+    if (ops.scan.running) return notify('A folder scan is already running.', 'info');
+    ops.scan = { running: true, seriesId: s.id, done: 0, total: 0 };
+    try { await apiPost('/api/collection/' + s.id + '/scan'); }
+    catch { notify('Scan failed', 'error'); ops.scan = { running: false }; }
+  }
+
+  // The metadata editor wants the ComicVine record and the resolved folder,
+  // which a library row does not carry — fetch the detail first. One request,
+  // and only when the action is actually chosen.
+  async function editMetadata(s) {
+    let d;
+    try { d = await apiGet('/api/collection/' + s.id); }
+    catch (e) { return notify('Could not load that series: ' + (e?.message || e), 'error'); }
+    if (d?.error) return notify(d.error, 'error');
+    openEditMetadata(s.id, d.cv, d.series, d.location);
+  }
+
+  // Same dry-run-then-confirm flow as the series page: never move files
+  // without saying how many, and never silently skip a collision.
+  async function renameFiles(s) {
+    let plan;
+    try { plan = (await apiPost(`/api/collection/${s.id}/refile`, { dryRun: true })).plan || []; }
+    catch (e) { return notify('Could not plan the rename: ' + (e?.message || e), 'error'); }
+    const moves = plan.filter((x) => x.status === 'move').length;
+    const collisions = plan.filter((x) => x.status === 'skip:collision').length;
+    if (!moves) return notify(collisions ? `Nothing to do — ${collisions} file(s) would collide.` : 'Files already match the pattern.', 'info');
+    if (!(await confirmDialog({
+      title: `Rename ${moves} file${moves === 1 ? '' : 's'}?`,
+      message: `Files for “${s.title}” are moved/renamed to match your folder and file patterns${collisions ? ` (${collisions} would collide and are skipped)` : ''}.`,
+      confirmLabel: 'Rename files',
+    }))) return;
+    let r;
+    try { r = await apiPost(`/api/collection/${s.id}/refile`, {}); }
+    catch (e) { r = { error: String(e?.message || e) }; }
+    if (r.error) return notify(r.error, 'error');
+    notify(`Renamed ${r.moved} file${r.moved === 1 ? '' : 's'}${r.skipped ? `, ${r.skipped} skipped` : ''}.`, 'ok');
+    loadCollection();
+  }
+
   // Right-click menu for a series card. Built on open so Follow/Unfollow and
   // the ticked monitoring policy reflect the row as it stands.
   function seriesMenuItems(s) {
@@ -126,6 +173,18 @@
     if (can('downloads.grab')) {
       items.push('sep');
       items.push({ id: 'dl', label: 'Download missing issues', icon: 'download', run: () => oneBulk(s, 'download-missing') });
+    }
+    if (isTrusted()) {
+      items.push('sep');
+      // The library-management actions that used to need a trip into the
+      // series page. Matching and metadata only mean anything once the series
+      // is matched, so they are offered accordingly.
+      items.push({ id: 'scan', label: 'Scan folder', icon: 'search', disabled: ops.scan.running, run: () => scanSeries(s) });
+      if (s.matched) {
+        items.push({ id: 'edit', label: 'Edit metadata…', icon: 'edit', run: () => editMetadata(s) });
+        items.push({ id: 'refile', label: 'Rename files', icon: 'edit', run: () => renameFiles(s) });
+      }
+      items.push({ id: 'match', label: s.matched ? 'Fix match…' : 'Match to ComicVine…', icon: 'diamond', run: () => openCvPicker(s.id, s.matched ? s.title : (s.folder || s.title), null, {}) });
     }
     if (can('library.manage')) {
       items.push('sep');
@@ -446,11 +505,18 @@
         {#each rail.rows.slice(range.start, range.end) as s (s.id)}
           <div class="libx-card" class:is-selected={rail.selecting && railSelect.has(s.id)}
             use:contextMenu={() => seriesMenuItems(s)}
+            onpointerenter={() => { hovered = s.id; }} onpointerleave={() => { if (hovered === s.id) hovered = null; }}
             onclick={() => open(s)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter') open(s); }}>
             <div class="libx-card__art" class:is-unmatched={!s.matched}>
               <Cover coverUrl={s.matched ? s.cover_url : null} title={s.matched ? s.title : (s.folder || '?')} />
               {#if rail.selecting}<span class="libx-card__check" class:is-on={railSelect.has(s.id)}>{#if railSelect.has(s.id)}<Icon name="check" size={14} />{/if}</span>{/if}
               {#if s.followed}<span class="libx-card__star" title="Followed"><Icon name="star" fill size={15} /></span>{/if}
+              {#if !rail.selecting}
+                <button class="libx-card__more" class:is-shown={hovered === s.id}
+                  title="Actions" aria-label="Actions for {s.title}"
+                  onclick={(e) => { e.stopPropagation(); openContextMenu(e, seriesMenuItems(s)); }}
+                ><Icon name="more-horizontal" size={16} /></button>
+              {/if}
               {#if s.matched && s.monitor && s.monitor !== 'all'}<span class="libx-card__mon" title={s.monitor === 'new' ? `Monitoring new issues from #${s.monitor_from ?? '?'}` : 'Not monitored — nothing is fetched automatically'}><Icon name={s.monitor === 'new' ? 'zap' : 'pause'} size={12} /></span>{/if}
               {#if !s.matched}<span class="libx-card__matchchip">match…</span>{/if}
               {#if s.matched}<div class="libx-card__bar"><div class="libx-card__fill" class:is-done={isDone(s)} style="width:{pct(s)}%"></div></div>{/if}
@@ -480,6 +546,7 @@
         {#each rail.rows.slice(range.start, range.end) as s (s.id)}
           <div class="libx-row" class:is-selected={rail.selecting && railSelect.has(s.id)}
             use:contextMenu={() => seriesMenuItems(s)}
+            onpointerenter={() => { hovered = s.id; }} onpointerleave={() => { if (hovered === s.id) hovered = null; }}
             onclick={() => open(s)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter') open(s); }}>
             <Cover coverUrl={s.matched ? s.cover_url : null} title={s.matched ? s.title : (s.folder || 'Unidentified series')} />
             <div class="libx-row__main">
@@ -512,6 +579,12 @@
             {#if isTrusted()}
               <button class="libx-row__star" class:is-on={s.followed} title={s.followed ? 'Followed — click to unfollow' : 'Not followed — click to follow'} aria-label={s.followed ? 'Unfollow' : 'Follow'} onclick={(e) => { e.stopPropagation(); toggleMon(s); }}><Icon name="star" fill={!!s.followed} size={15} /></button>
             {:else}<span></span>{/if}
+            {#if !rail.selecting}
+              <button class="libx-row__more" class:is-shown={hovered === s.id}
+                title="Actions" aria-label="Actions for {s.title}"
+                onclick={(e) => { e.stopPropagation(); openContextMenu(e, seriesMenuItems(s)); }}
+              ><Icon name="more-horizontal" size={16} /></button>
+            {/if}
           </div>
         {/each}
         {#if range.padBottom > 0}<div style="height:{range.padBottom}px"></div>{/if}

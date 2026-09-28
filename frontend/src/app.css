@@ -1313,6 +1313,27 @@ body.import .import-page { display: flex; flex-direction: column; height: 100%; 
    elements that actually have a menu. */
 .has-longpress { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 
+/* The actions button on a library card/row. Right-click and long press already
+   open this menu; the button is what tells you it is there. It stays in the
+   DOM (so it has a stable place) and fades in on hover, and is always visible
+   to keyboard focus and on touch, where there is no hover to reveal it. */
+.libx-card__more, .libx-row__more {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0;
+  background: rgba(18,16,24,.82); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--text); cursor: pointer;
+  opacity: 0; transition: opacity .12s ease;
+}
+.libx-card__more { position: absolute; top: 6px; left: 6px; z-index: 3; }
+.libx-card__more.is-shown, .libx-row__more.is-shown,
+.libx-card__more:focus-visible, .libx-row__more:focus-visible { opacity: 1; }
+.libx-card__more:hover, .libx-row__more:hover { background: var(--panel-2, #2a2a33); }
+.libx-row__more { opacity: 0; }
+@media (hover: none) {
+  /* No hover to reveal it, so it simply stays visible. */
+  .libx-card__more, .libx-row__more { opacity: 1; }
+}
+
 .ctxmenu__scrim { position: fixed; inset: 0; z-index: 80; }
 .ctxmenu {
   position: fixed; z-index: 81;
