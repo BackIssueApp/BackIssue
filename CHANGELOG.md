@@ -51,6 +51,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **Adding a series now takes you to it** (#4). After a successful add the
+  button showed the outcome ("Added — 12 queued") but was dead, leaving no way
+  to reach the new series without closing the dialog and hunting for it. It now
+  opens the series, keeping the outcome as its label. The neighbouring **"In
+  library" button was broken too**, in a worse way: it pointed at a path that
+  has never been a route, so the one button meant to work landed on Page not
+  found. Both now go to the same place.
 - The Library's **sort is remembered** (#6). It was carried in the URL, so it
   survived Back, a reload and the series page's Library button, but any trip
   through the sidebar built a fresh URL and dropped it, putting you back at

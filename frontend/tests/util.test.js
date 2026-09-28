@@ -166,3 +166,38 @@ describe('library sort preference', () => {
     Object.defineProperty(window, 'localStorage', real);
   });
 });
+
+// A route typo fails silently: navigate() accepts any string, and the app just
+// shows "Page not found". That is how AddModal's "In library" button spent a
+// while sending people to /series/:id, which has never been a route. Check
+// every literal destination in the source against the routes that exist.
+describe('every navigate() target is a real route', () => {
+  test('no component links to a path the router does not serve', async () => {
+    const { readdirSync, readFileSync, statSync } = await import('node:fs');
+    const { join } = await import('node:path');
+
+    const walk = (dir) => readdirSync(dir).flatMap((f) => {
+      const full = join(dir, f);
+      return statSync(full).isDirectory() ? walk(full) : /\.(svelte|js)$/.test(f) ? [full] : [];
+    });
+
+    const router = readFileSync('src/lib/router.svelte.js', 'utf8');
+    const overlays = JSON.parse(
+      (/export const OVERLAY_PATHS = (\[[^\]]*\])/.exec(router)[1]).replace(/'/g, '"'),
+    );
+    // KNOWN_PATHS in App.svelte, plus the one parameterised route it matches.
+    const known = new Set(['/', '/system', '/profile', '/jobs', '/tools', '/logs', '/volume', ...overlays]);
+
+    const bad = [];
+    for (const file of walk('src')) {
+      const src = readFileSync(file, 'utf8');
+      // navigate('/x…') and navigate(`/x…`) — the literal head is enough, since
+      // the first segment is what the router dispatches on.
+      for (const m of src.matchAll(/navigate\(\s*['"`](\/[a-z0-9-]*)/gi)) {
+        const first = m[1] === '/' ? '/' : '/' + m[1].slice(1).split('/')[0];
+        if (!known.has(first)) bad.push(file + ' -> ' + m[1]);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+});

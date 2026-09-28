@@ -116,6 +116,14 @@
     m.results = pinned ? [pinned, ...rows] : rows;
   }
 
+  // Leaving the modal for a series. The route is /volume/:id — "In library"
+  // pointed at /series/:id, which is not a route at all, so the one button
+  // that was meant to work landed on Page not found.
+  function openSeries(seriesId) {
+    closeModal('add');
+    navigate('/volume/' + seriesId);
+  }
+
   async function add(v) {
     v._busy = true; v._label = 'Adding…';
     // A book or audiobook: it goes on the wanted list and the download
@@ -128,6 +136,9 @@
         const inLib = s === 'imported' || s === 'on-shelf';
         v._label = inLib ? 'In library' : ['grabbed', 'downloading', 'active'].includes(s) ? 'Downloading' : 'Wanted';
         v._done = true;
+        // Only a book already on the shelf has a series to open; one that was
+        // merely wanted has nothing to point at yet.
+        if (r.seriesId) v.seriesId = r.seriesId;
         if (r.note) notify(r.note, s === 'error' ? 'error' : inLib || s === 'grabbed' || s === 'downloading' ? 'success' : 'info');
         if (inLib) loadCollection();
       } catch { notify('Add failed', 'error'); v._busy = false; v._label = 'Add'; }
@@ -141,6 +152,7 @@
         r.noSources ? 'Added (no sources enabled)' :
         r.outcome === 'created' ? 'Added' : 'Already in library';
       v._done = true;
+      if (r.seriesId) v.seriesId = r.seriesId;   // so the row can open it
       if (r.noSources) notify('Added. Nothing was queued — no download sources are enabled (Settings → Download sources).', 'info');
       // The first manga add materializes the Manga library — without a folder
       // its downloads file into the comics root, so point at the fix.
@@ -216,9 +228,15 @@
                 <div class="addx__meta">{#if v._meta !== undefined}{v._meta}{:else}{v.publisher || ''}{v.publisher ? ' · ' : ''}{fmt(v.count_of_issues || 0)} issues{/if}</div>
               </div>
               {#if v.inLibrary}
-                <button class="addx__btn addx__btn--ghost" title="Already in your library — open it" onclick={() => { closeModal('add'); navigate('/series/' + v.seriesId); }}>In library</button>
+                <button class="addx__btn addx__btn--ghost" title="Already in your library — open it" onclick={() => openSeries(v.seriesId)}>In library</button>
               {:else if v._done}
-                <button class="addx__btn addx__btn--done" disabled>{v._label}</button>
+                <!-- Just added. Keep the outcome as the label (how many issues
+                     queued is the useful part) and make it open the series,
+                     the same as the In library row. A book that is only wanted
+                     has no series yet, so that one stays a plain label. -->
+                <button class="addx__btn addx__btn--done" class:is-open={!!v.seriesId}
+                  disabled={!v.seriesId} title={v.seriesId ? 'Open the series' : undefined}
+                  onclick={() => v.seriesId && openSeries(v.seriesId)}>{v._label}</button>
               {:else}
                 <button class="addx__btn {v._label === 'Add' ? 'addx__btn--add' : 'addx__btn--ghost'}" disabled={v._busy || v._label !== 'Add'} onclick={() => add(v)}>{v._label}</button>
               {/if}
@@ -276,6 +294,8 @@
   .addx__btn--ghost { border: 1px solid var(--line); background: transparent; color: var(--muted); }
   .addx__btn--ghost:disabled { cursor: default; }
   .addx__btn--done { border: 1px solid rgba(95,211,138,.4); background: rgba(95,211,138,.1); color: var(--green); cursor: default; }
+  .addx__btn--done.is-open { cursor: pointer; }
+  .addx__btn--done.is-open:hover { background: rgba(95,211,138,.2); }
 
   .addx__prompt { padding: 44px 20px; text-align: center; color: var(--faint); font-size: 13px; }
   .addx__prompt-art { width: 46px; height: 46px; margin: 0 auto 12px; border-radius: 12px; background: var(--panel-2); display: grid; place-items: center; color: #6f6885; }
