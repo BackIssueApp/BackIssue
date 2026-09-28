@@ -10,6 +10,14 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Date formats for file naming.** The `{date}` token in a file pattern still
+  writes "November 2011", but it now takes a modifier for the parts on their
+  own: `{date:m}` the two-digit month, `{date:y}` the year, `{date:mon}` the
+  short month name. So `{series} V{year} #{issue} ({date:m}-{date:y})` files as
+  `Batman V2011 #001 (11-2011).cbz`. The month keeps its leading zero, so March
+  is `03` and sorts with the rest of the year. Existing patterns are unchanged,
+  an unrecognised modifier falls back to the full form, and an issue with no
+  cover date drops the whole bracket rather than leaving `(-)` behind.
 - **Assign a file to an issue by hand.** On a series page, each file the app
   could not match to an issue now has an *Assign to issue* picker: choose
   the issue and the file links to it at once. The choice is remembered per

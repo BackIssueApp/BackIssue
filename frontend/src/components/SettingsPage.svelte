@@ -668,7 +668,9 @@
                 <span class="switch"><input id="set-renameDownloads" type="checkbox" /><span class="switch__track"></span></span>
                 <span>Rename downloaded files to the file pattern (off = keep the source's original filename)</span>
               </label>
-              <p class="modal__note">Tokens: <code>{'{publisher}'}</code> <code>{'{series}'}</code> <code>{'{year}'}</code> <code>{'{issue}'}</code> (<code>{'{issue:2}'}</code> sets the pad width) <code>{'{issueTitle}'}</code> <code>{'{date}'}</code> <code>{'{edition}'}</code>. Changing these affects <b>new</b> downloads — for existing files use <b>Reorganize library</b> on the Tools page.</p>
+              <p class="modal__note">Tokens: <code>{'{publisher}'}</code> <code>{'{series}'}</code> <code>{'{year}'}</code> <code>{'{issue}'}</code> (<code>{'{issue:2}'}</code> sets the pad width) <code>{'{issueTitle}'}</code> <code>{'{date}'}</code> <code>{'{edition}'}</code>.</p>
+              <p class="modal__note"><code>{'{date}'}</code> is the cover date — <i>November 2011</i>. For the parts on their own: <code>{'{date:m}'}</code> <i>11</i>, <code>{'{date:y}'}</code> <i>2011</i>, <code>{'{date:mon}'}</code> <i>Nov</i>. So <code>{'({date:m}-{date:y})'}</code> gives <i>(11-2011)</i>.</p>
+              <p class="modal__note">Changing these affects <b>new</b> downloads — for existing files use <b>Reorganize library</b> on the Tools page.</p>
             </div>
           </div>
 

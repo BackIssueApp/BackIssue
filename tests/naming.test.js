@@ -31,6 +31,38 @@ test('a {date} token, when added, renders the cover date as "Month YYYY"', () =>
   assert.equal(fileStemFromPattern(batman, { issue_number: '1' }, '{series} #{issue} ({date})'), 'Batman #001');
 });
 
+test('{date} format modifiers render the parts of the cover date', () => {
+  const nov = { issue_number: '1', cover_date: '2011-11-01' };
+  assert.equal(fileStemFromPattern(batman, nov, '{series} #{issue} ({date:m}-{date:y})'), 'Batman #001 (11-2011)');
+  assert.equal(fileStemFromPattern(batman, nov, '{series} #{issue} ({date:y}-{date:m})'), 'Batman #001 (2011-11)');
+  assert.equal(fileStemFromPattern(batman, nov, '{series} #{issue} ({date:mon} {date:y})'), 'Batman #001 (Nov 2011)');
+  // bare {date} is unchanged, and an unknown modifier falls back to it
+  assert.equal(fileStemFromPattern(batman, nov, '{series} ({date})'), 'Batman (November 2011)');
+  assert.equal(fileStemFromPattern(batman, nov, '{series} ({date:nope})'), 'Batman (November 2011)');
+});
+
+test('the single-digit month keeps its leading zero', () => {
+  // the reported case: a March issue must file as "03-2026", not "3-2026"
+  assert.equal(fileStemFromPattern(batman, { issue_number: '7', cover_date: '2026-03-01' }, '{series} #{issue} ({date:m}-{date:y})'),
+    'Batman #007 (03-2026)');
+});
+
+test('a missing cover date drops the whole bracket, separator included', () => {
+  const noDate = { issue_number: '1' };
+  assert.equal(fileStemFromPattern(batman, noDate, '{series} #{issue} ({date:m}-{date:y})'), 'Batman #001');
+  assert.equal(fileStemFromPattern(batman, noDate, '{series} #{issue} [{date:y}]'), 'Batman #001');
+  assert.equal(fileStemFromPattern(batman, noDate, '{series} #{issue} ({date})'), 'Batman #001');
+});
+
+test('a bogus month is dropped rather than rendered as undefined', () => {
+  assert.equal(fileStemFromPattern(batman, { issue_number: '1', cover_date: '2011-13-01' }, '{series} ({date})'), 'Batman');
+  assert.equal(fileStemFromPattern(batman, { issue_number: '1', cover_date: '2011-00-01' }, '{series} ({date:m})'), 'Batman');
+});
+
+test('a year-only cover date is not treated as a date', () => {
+  assert.equal(fileStemFromPattern(batman, { issue_number: '1', cover_date: '2011' }, '{series} ({date:y})'), 'Batman');
+});
+
 test('file pattern: an Annual edition fills {edition} and uses its own number', () => {
   const stem = fileStemFromPattern(batman, { issue_number: '1', title: 'Annual #2' }, DEFAULT_FILE_PATTERN);
   assert.equal(stem, 'Batman V2011 Annual #002');
