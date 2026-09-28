@@ -2,7 +2,7 @@
   import { goBack, navigate } from '../lib/router.svelte.js';
   import { detail, detailSelected, flags, ops, loadCollection, reloadDetail, clearDetail, issueState, downloadCvIssues, redownloadCvIssues, redownloadIssues, watchDetailSweep, refreshIssueStatuses } from '../lib/store.svelte.js';
   import { plugins, issueActions, seriesActions, issueActionsTick, issueCoverUrl, seriesViews, renderSeriesView } from '../lib/plugins.svelte.js';
-  import { contextMenu } from './ContextMenu.svelte';
+  import { contextMenu, openContextMenu } from './ContextMenu.svelte';
   import { isTrusted, can } from '../lib/auth.svelte.js';
   import { apiGet, apiPost } from '../lib/api.js';
   import { notify } from '../lib/toasts.svelte.js';
@@ -926,6 +926,8 @@
                     <input class="icard__check" type="checkbox" checked={detailSelected.has(i.cv_issue_id)}
                       onclick={(e) => { e.stopPropagation(); toggleIssue(i, range.start + vi, e.shiftKey); }} />
                     <span class="icard__state icard__state--{state}" title={state}></span>
+                    <button class="icard__more" title="Actions" aria-label="Actions for issue {i.number ?? ''}"
+                      onclick={(e) => { e.stopPropagation(); openContextMenu(e, issueMenuItems(i)); }}><Icon name="more-horizontal" size={15} /></button>
                     <div class="icard__actions" onclick={(e) => e.stopPropagation()}>
                       {#each issueActions as a (a.id + ':' + issueActionsTick.n)}
                         {#if !a.when || a.when(i)}
@@ -986,6 +988,8 @@
                     <button class="issue__dl" title={typeof a.title === 'function' ? a.title(i) : a.title} onclick={(e) => { e.stopPropagation(); a.run(i, detail.series); }}>{@html typeof a.icon === 'function' ? a.icon(i) : a.icon}</button>
                   {/if}
                 {/each}
+                <button class="issue__dl issue__more" title="Actions" aria-label="Actions for issue {i.number ?? ''}"
+                  onclick={(e) => { e.stopPropagation(); openContextMenu(e, issueMenuItems(i)); }}><Icon name="more-horizontal" /></button>
                 {#if !i.owned && !i.corrupt && can('downloads.grab')}
                   <button class="issue__dl issue__want" class:is-on={i.wanted} title={wantTitle(i)} onclick={(e) => { e.stopPropagation(); setWants([i.cv_issue_id], !i.wanted); }}><Icon name="target" /></button>
                 {/if}

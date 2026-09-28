@@ -519,7 +519,9 @@ button .bi-icon, a .bi-icon { pointer-events: none; }
 .icard__state--pending { background: rgba(255,255,255,.25); }
 .icard__actions {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
-  display: flex; justify-content: center; gap: 6px; padding: 22px 6px 7px;
+  /* Wrap: a card with several plugin actions plus want/download used to push
+     its last buttons outside the card, where nothing could click them. */
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 22px 6px 7px;
   background: linear-gradient(180deg, transparent, rgba(0,0,0,.78));
   opacity: 0; transition: opacity .12s;
 }
@@ -1333,6 +1335,27 @@ body.import .import-page { display: flex; flex-direction: column; height: 100%; 
   /* No hover to reveal it, so it simply stays visible. */
   .libx-card__more, .libx-row__more { opacity: 1; }
 }
+
+/* The same affordance on an issue row. The poster card already reveals an
+   action bar on hover, so the menu button just joins it; the list row's
+   buttons are always visible, so this one is too. */
+.issue__more { color: var(--faint); }
+.issue__more:hover { color: var(--text); }
+
+/* Issue poster card: its own corner, rather than a sixth button in the bottom
+   bar, which is already the widest thing on a narrow card. */
+.icard__more {
+  position: absolute; top: 6px; right: 6px; z-index: 4;
+  width: 26px; height: 26px; display: grid; place-items: center; padding: 0;
+  background: rgba(20,18,28,.85); border: 1px solid var(--line); border-radius: 7px;
+  color: var(--text); cursor: pointer;
+  opacity: 0; transition: opacity .12s;
+}
+.icard__art:hover .icard__more, .icard__more:focus-visible { opacity: 1; }
+.icard__more:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* The state dot would sit under it, so shift the dot along when both show. */
+.icard__art:hover .icard__state { right: 38px; }
+@media (hover: none) { .icard__more { opacity: 1; } .icard__state { right: 38px; } }
 
 .ctxmenu__scrim { position: fixed; inset: 0; z-index: 80; }
 .ctxmenu {

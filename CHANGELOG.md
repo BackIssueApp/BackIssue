@@ -12,7 +12,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 - **Quick actions on Library cards** (#5). Every series card and row has an
   actions menu, reached from the **⋯ button** that appears on hover, a
-  right-click, or a long press. It carries the library-management actions that
+  right-click, or a long press. Issues carry the same button, on the poster
+  card and at the end of a list row. It carries the library-management actions that
   previously meant opening the series first: **Scan folder**, **Edit
   metadata**, **Rename files** and **Fix match** (or **Match to ComicVine** for
   a series that has none yet).
@@ -50,6 +51,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- An issue poster card with several plugin actions pushed the last of its hover
+  buttons outside the card, where they could not be clicked. The row of buttons
+  now wraps.
 - Files named "Series (Year) Volume 01 Issue 002" read the volume number as
   the issue number, so every file in the folder landed as issue 1 and the
   rest showed as missing. An explicit issue marker ("Issue 002", "No. 12",
