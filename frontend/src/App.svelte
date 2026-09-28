@@ -1,7 +1,7 @@
 <script>
   import { untrack } from 'svelte';
   import { route, navigate, goBack, OVERLAY_PATHS, activeDrawer } from './lib/router.svelte.js';
-  import { rail, railSelect, detail, loadCollection, openVolume, clearDetail, loadFlags, startOpsTracking } from './lib/store.svelte.js';
+  import { rail, railSelect, detail, loadCollection, openVolume, clearDetail, loadFlags, startOpsTracking, librarySort } from './lib/store.svelte.js';
   import Icon from './lib/Icon.svelte';
   import { startStatusPolling } from './lib/status.svelte.js';
   import { startEvents } from './lib/events.svelte.js';
@@ -124,7 +124,7 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
     const p = new URLSearchParams(route.search);
     const filter = p.get('filter') || 'all';
     const q = p.get('q') || '';
-    const sort = p.get('sort') || 'title';
+    const sort = p.get('sort') || librarySort();
     const library = p.get('library') || '';
     const facet = p.get('facet') || '';
     const collections = p.get('collections') === '1';

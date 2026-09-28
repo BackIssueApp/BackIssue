@@ -10,6 +10,23 @@ import { notify } from './toasts.svelte.js';
 // grows as the user scrolls). total is the full count for the active filter — the
 // grid shows it and keeps loading pages until rows.length reaches it. counts are
 // the filter-independent chip badges (fetched once, with page 1).
+// The Library's sort is a preference, not part of a given view: picking one
+// should still be true tomorrow. It lives in the URL while you are browsing
+// (so Back, reload and a shared link all behave), and here for when you arrive
+// without one — coming in from the sidebar, or opening the app fresh.
+const SORTS = ['title', 'added', 'missing'];
+export function librarySort() {
+  try {
+    const v = localStorage.getItem('librarySort');
+    return SORTS.includes(v) ? v : 'title';
+  } catch { return 'title'; }   // private mode / storage disabled
+}
+export function setLibrarySort(v) {
+  try {
+    if (SORTS.includes(v)) localStorage.setItem('librarySort', v);
+  } catch { /* the URL still carries it for this visit */ }
+}
+
 export const rail = $state({ rows: [], counts: {}, total: 0, filter: 'all', sort: 'title', search: '', library: null, facet: '', collections: false, selecting: false, loaded: false, loadingMore: false });
 // Rows per network page — a few hundred keeps each response a few hundred KB.
 const COLLECTION_PAGE = 200;

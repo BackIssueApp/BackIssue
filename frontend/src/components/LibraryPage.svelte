@@ -2,7 +2,7 @@
   // The Library: a poster wall of every volume (grid), or a dense table
   // (list) for power flows. Replaces the old side rail as the main '/' view.
   import { navigate, route, setQuery } from '../lib/router.svelte.js';
-  import { rail, railSelect, ops, loadCollection, loadMoreCollection } from '../lib/store.svelte.js';
+  import { rail, railSelect, ops, loadCollection, loadMoreCollection, setLibrarySort } from '../lib/store.svelte.js';
   import { status } from '../lib/status.svelte.js';
   import { apiGet, apiPost } from '../lib/api.js';
   import { notify } from '../lib/toasts.svelte.js';
@@ -415,7 +415,7 @@
     </div>
     <div class="libx__actions">
     <select id="coll-sort" class="libx__sort" title="Sort the collection" value={rail.sort}
-      onchange={(e) => setQuery({ sort: e.currentTarget.value === 'title' ? null : e.currentTarget.value })}>
+      onchange={(e) => { const v = e.currentTarget.value; setLibrarySort(v); setQuery({ sort: v === 'title' ? null : v }); }}>
       <option value="title">A–Z</option>
       <option value="added">Recently added</option>
       <option value="missing">Most missing</option>

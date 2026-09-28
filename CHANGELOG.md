@@ -51,6 +51,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- The Library's **sort is remembered** (#6). It was carried in the URL, so it
+  survived Back, a reload and the series page's Library button, but any trip
+  through the sidebar built a fresh URL and dropped it, putting you back at
+  A–Z. The choice is now kept as a preference and reapplied whenever you arrive
+  without one, including from a sidebar library and in a new session. A sort
+  named in the URL still wins, so a shared or bookmarked link is unchanged.
 - An issue poster card with several plugin actions pushed the last of its hover
   buttons outside the card, where they could not be clicked. The row of buttons
   now wraps.

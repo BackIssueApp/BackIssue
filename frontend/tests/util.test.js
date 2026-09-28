@@ -1,4 +1,5 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, beforeEach } from 'vitest';
+import { librarySort, setLibrarySort } from '../src/lib/store.svelte.js';
 import {
   fmt, pad3, initials, humanBytes, spct, fmtIn, fmtAgo,
   parseCvVolumeRef, parseIndexerString, serializeIndexers,
@@ -128,5 +129,40 @@ describe('sanitizeHtml', () => {
   });
   test('stripTags flattens to text', () => {
     expect(stripTags('<p>A  <i>b</i>\nc</p>')).toBe('A b c');
+  });
+});
+
+describe('library sort preference', () => {
+  beforeEach(() => localStorage.removeItem('librarySort'));
+
+  test('defaults to A–Z when nothing is stored', () => {
+    expect(librarySort()).toBe('title');
+  });
+
+  test('round-trips a chosen sort', () => {
+    setLibrarySort('added');
+    expect(librarySort()).toBe('added');
+    expect(localStorage.getItem('librarySort')).toBe('added');
+  });
+
+  test('a value that is not a real sort is ignored, both ways', () => {
+    // writing junk never lands...
+    setLibrarySort('; DROP TABLE series');
+    expect(localStorage.getItem('librarySort')).toBe(null);
+    // ...and junk already in storage (an old build, a hand-edit) reads as the default,
+    // so it can never reach the API as a sort key
+    localStorage.setItem('librarySort', 'whatever');
+    expect(librarySort()).toBe('title');
+  });
+
+  test('survives storage being unavailable', () => {
+    const real = Object.getOwnPropertyDescriptor(window, 'localStorage');
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() { throw new Error('denied'); },   // private mode / site data blocked
+    });
+    expect(() => setLibrarySort('added')).not.toThrow();
+    expect(librarySort()).toBe('title');
+    Object.defineProperty(window, 'localStorage', real);
   });
 });
