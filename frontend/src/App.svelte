@@ -38,6 +38,7 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
   import DialogModal from './components/DialogModal.svelte';
   import Onboarding from './components/Onboarding.svelte';
   import Toasts from './components/Toasts.svelte';
+  import ContextMenu from './components/ContextMenu.svelte';
 
   // Section pages are always mounted (plugin slots inject into them) —
   // a body class picks which one is visible (app.css hides .home under it).
@@ -248,3 +249,4 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
 <Onboarding />
 
 <Toasts />
+<ContextMenu />

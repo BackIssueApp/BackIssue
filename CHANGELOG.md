@@ -10,6 +10,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Right-click menus on series and issues.** A series card in the Library, and
+  an issue in either the grid or the list on a series page, now open a menu on
+  right-click (press and hold on a touch screen). A series offers open, follow,
+  download missing, its monitoring policy, and remove; an issue offers whatever
+  the installed plugins contribute first (with the reader, that is Read, Mark as
+  read/unread and Read later), then issue details, download or re-download, and
+  want or skip. The menu is built when it opens, so it always reflects that row
+  as it stands, it only lists what your role can do, and right-clicking never
+  disturbs a selection you are part-way through building.
 - **Date formats for file naming.** The `{date}` token in a file pattern still
   writes "November 2011", but it now takes a modifier for the parts on their
   own: `{date:m}` the two-digit month, `{date:y}` the year, `{date:mon}` the

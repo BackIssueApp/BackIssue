@@ -11,10 +11,11 @@
   import { openAddModal } from './AddModal.svelte';
   import { hscroll } from '../lib/hscroll.js';
   import { confirmDialog } from './DialogModal.svelte';
-  import { isTrusted } from '../lib/auth.svelte.js';
+  import { isTrusted, can } from '../lib/auth.svelte.js';
   import { libraryFilterFor } from '../lib/plugins.svelte.js';
   import FiltersModal from './FiltersModal.svelte';
   import Icon from '../lib/Icon.svelte';
+  import { contextMenu } from './ContextMenu.svelte';
 
   const FILTERS = [
     { key: 'all', label: 'All' },
@@ -102,6 +103,49 @@
     s.followed = follow ? 1 : 0; // optimistic — personal follow, not the monitor flag
     const r = await apiPost('/api/collection/' + s.id + '/follow', { follow });
     if (r?.error) { s.followed = follow ? 0 : 1; notify(r.error, 'error'); }
+  }
+
+  // One series' worth of the bulk actions, run against just that series. The
+  // bulk endpoint already takes a list of ids, so a right-click acts on the
+  // card under the pointer without first entering selection mode.
+  async function oneBulk(s, action, extra = {}) {
+    const r = await apiPost('/api/collection/bulk', { ids: [s.id], action, ...extra });
+    if (r?.error) return notify(r.error, 'error');
+    if (action === 'download-missing') notify(`Queued ${fmt(r.queued)} issue(s).`, 'ok');
+    loadCollection();
+  }
+
+  // Right-click menu for a series card. Built on open so Follow/Unfollow and
+  // the ticked monitoring policy reflect the row as it stands.
+  function seriesMenuItems(s) {
+    const monitor = s.monitor || (s.monitored ? 'all' : 'none');
+    const items = [
+      { id: 'open', label: 'Open', icon: 'library', run: () => navigate('/volume/' + s.id + libParams()) },
+      { id: 'follow', label: s.followed ? 'Unfollow' : 'Follow', icon: s.followed ? 'star' : 'star', run: () => toggleMon(s) },
+    ];
+    if (can('downloads.grab')) {
+      items.push('sep');
+      items.push({ id: 'dl', label: 'Download missing issues', icon: 'download', run: () => oneBulk(s, 'download-missing') });
+    }
+    if (can('library.manage')) {
+      items.push('sep');
+      items.push({ id: 'mon-all', label: 'Monitor: all issues', icon: monitor === 'all' ? 'check' : 'target', disabled: monitor === 'all', run: () => oneBulk(s, 'monitor', { monitor: 'all' }) });
+      items.push({ id: 'mon-new', label: 'Monitor: new issues only', icon: monitor === 'new' ? 'check' : 'zap', disabled: monitor === 'new', run: () => oneBulk(s, 'monitor', { monitor: 'new' }) });
+      items.push({ id: 'mon-none', label: 'Monitor: off', icon: monitor === 'none' ? 'check' : 'pause', disabled: monitor === 'none', run: () => oneBulk(s, 'monitor', { monitor: 'none' }) });
+      items.push('sep');
+      items.push({
+        id: 'remove', label: 'Remove from library…', icon: 'trash', danger: true,
+        run: async () => {
+          if (!(await confirmDialog({
+            title: `Remove ${s.title}?`,
+            message: 'It is removed from the collection \u2014 its files stay on disk.',
+            confirmLabel: 'Remove', danger: true,
+          }))) return;
+          await oneBulk(s, 'remove');
+        },
+      });
+    }
+    return items;
   }
 
   function toggleSelecting() {
@@ -401,6 +445,7 @@
         {#if range.padTop > 0}<div class="libx-grid__pad" style="height:{range.padTop}px"></div>{/if}
         {#each rail.rows.slice(range.start, range.end) as s (s.id)}
           <div class="libx-card" class:is-selected={rail.selecting && railSelect.has(s.id)}
+            use:contextMenu={() => seriesMenuItems(s)}
             onclick={() => open(s)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter') open(s); }}>
             <div class="libx-card__art" class:is-unmatched={!s.matched}>
               <Cover coverUrl={s.matched ? s.cover_url : null} title={s.matched ? s.title : (s.folder || '?')} />
@@ -434,6 +479,7 @@
         {#if range.padTop > 0}<div style="height:{range.padTop}px"></div>{/if}
         {#each rail.rows.slice(range.start, range.end) as s (s.id)}
           <div class="libx-row" class:is-selected={rail.selecting && railSelect.has(s.id)}
+            use:contextMenu={() => seriesMenuItems(s)}
             onclick={() => open(s)} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter') open(s); }}>
             <Cover coverUrl={s.matched ? s.cover_url : null} title={s.matched ? s.title : (s.folder || 'Unidentified series')} />
             <div class="libx-row__main">

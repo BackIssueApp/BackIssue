@@ -1304,6 +1304,33 @@ body.import .import-page { display: flex; flex-direction: column; height: 100%; 
 .series-more__menu .menu__item--danger { color: var(--red, #ff6b6b); }
 .series-more__sep { height: 1px; background: var(--line); margin: 4px 6px; }
 
+/* Right-click menu on series cards and issue rows. Shares .menu__item with the
+   series overflow menu above, so both look the same; only the positioning
+   differs (fixed at the pointer rather than anchored to a button). */
+.ctxmenu__scrim { position: fixed; inset: 0; z-index: 80; }
+.ctxmenu {
+  position: fixed; z-index: 81;
+  min-width: 210px; max-width: min(320px, calc(100vw - 16px)); padding: 6px;
+  background: var(--panel, #1b1722); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 10px 34px rgba(0,0,0,.5);
+  display: flex; flex-direction: column; gap: 2px;
+  outline: none;
+}
+.ctxmenu .menu__item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 12px; background: none; border: none; border-radius: 7px;
+  color: var(--text); font: 500 13px var(--font-body); text-align: left; cursor: pointer;
+}
+.ctxmenu .menu__item:hover:not(:disabled) { background: rgba(255,255,255,.07); }
+.ctxmenu .menu__item:focus-visible { background: rgba(255,255,255,.07); }
+.ctxmenu .menu__item:disabled { opacity: .5; cursor: default; }
+.ctxmenu .menu__item--danger { color: var(--red, #ff6b6b); }
+.ctxmenu__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Plugin actions hand us their own markup; box it so every row lines up. */
+.ctxmenu__icon { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; flex: none; }
+.ctxmenu__icon :global(svg) { width: 15px; height: 15px; }
+.ctxmenu__sep { height: 1px; background: var(--line); margin: 4px 6px; }
+
 /* Live-connection-lost pill in the header. */
 .topbar__offline {
   font-size: 11px; color: #fbbf24; border: 1px solid rgba(251,191,36,.4);

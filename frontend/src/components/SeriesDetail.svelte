@@ -2,6 +2,7 @@
   import { goBack, navigate } from '../lib/router.svelte.js';
   import { detail, detailSelected, flags, ops, loadCollection, reloadDetail, clearDetail, issueState, downloadCvIssues, redownloadCvIssues, redownloadIssues, watchDetailSweep, refreshIssueStatuses } from '../lib/store.svelte.js';
   import { plugins, issueActions, seriesActions, issueActionsTick, issueCoverUrl, seriesViews, renderSeriesView } from '../lib/plugins.svelte.js';
+  import { contextMenu } from './ContextMenu.svelte';
   import { isTrusted, can } from '../lib/auth.svelte.js';
   import { apiGet, apiPost } from '../lib/api.js';
   import { notify } from '../lib/toasts.svelte.js';
@@ -402,6 +403,39 @@
   // Per-issue wants: pick an issue the policy doesn't want, or skip one it
   // does. The server stores only the exception and answers with each issue's
   // resulting state, which is patched straight into the open rows.
+  // Right-click menu for one issue. Built fresh on open so it reflects the
+  // row's current state, and it deliberately mirrors the buttons already on the
+  // row — the menu is a faster way to reach them, not a second set of actions.
+  // Plugin actions come first because that is where Mark as read/unread lives.
+  function issueMenuItems(i) {
+    void issueActionsTick.n;   // rebuild when a plugin flips an issue's state
+    const val = (v) => (typeof v === 'function' ? v(i) : v);
+    const items = [];
+    for (const a of issueActions) {
+      if (a.when && !a.when(i)) continue;
+      const label = val(a.title);
+      if (!label) continue;
+      items.push({ id: 'plugin:' + a.id, label, iconHtml: val(a.icon), run: () => a.run(i, detail.series) });
+    }
+    if (items.length) items.push('sep');
+    items.push({ id: 'info', label: 'Issue details…', icon: 'info', run: () => openIssueInfo(i.cv_issue_id, i.number) });
+    if (can('downloads.grab')) {
+      if (i.corrupt) {
+        items.push({ id: 'redl', label: 'Re-download (file is corrupt)', icon: 'refresh', run: () => redownloadCvIssues([i.cv_issue_id]) });
+      } else if (!i.owned) {
+        items.push({ id: 'dl', label: 'Download this issue', icon: 'download', run: () => downloadCvIssues([i.cv_issue_id]) });
+      } else {
+        items.push({ id: 'redl', label: 'Download again', icon: 'refresh', run: () => redownloadCvIssues([i.cv_issue_id]) });
+      }
+      if (!i.owned && !i.corrupt) {
+        items.push(i.wanted
+          ? { id: 'want', label: "Don't want this issue", icon: 'target', run: () => setWants([i.cv_issue_id], false) }
+          : { id: 'want', label: 'Want this issue', icon: 'target', run: () => setWants([i.cv_issue_id], true) });
+      }
+    }
+    return items;
+  }
+
   async function setWants(cvIssueIds, want) {
     if (!s || !cvIssueIds.length) return;
     let r;
@@ -882,6 +916,7 @@
                 {@const cover = issueCoverUrl(i)}
                 <div class="icard"
                   class:is-corrupt={i.corrupt} class:is-checked={detailSelected.has(i.cv_issue_id)} class:is-wanted={i.wanted && !i.owned}
+                  use:contextMenu={() => issueMenuItems(i)}
                   title={i.corrupt && corruptReason(i) ? 'Corrupt: ' + corruptReason(i) : (i.title || '')}>
                   <div class="icard__art" onclick={() => openIssueInfo(i.cv_issue_id, i.number)} role="button" tabindex="0"
                     onkeydown={(e) => { if (e.key === 'Enter') openIssueInfo(i.cv_issue_id, i.number); }}>
@@ -930,6 +965,7 @@
               {@const bf = bestFile(i)}
               <div class="issue"
                 class:is-owned={i.owned} class:is-corrupt={i.corrupt}
+                use:contextMenu={() => issueMenuItems(i)}
                 title={i.corrupt && corruptReason(i) ? 'Corrupt: ' + corruptReason(i) : undefined}
                 onclick={(e) => toggleIssue(i, range.start + vi, e.shiftKey)} role="button" tabindex="0"
                 onkeydown={(e) => { if (e.key === 'Enter') toggleIssue(i, range.start + vi, e.shiftKey); }}>
