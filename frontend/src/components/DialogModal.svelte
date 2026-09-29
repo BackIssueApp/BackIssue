@@ -75,6 +75,13 @@
     if (b.value === 'submit' && m.input != null) settleDialog(m.input);
     else settleDialog(b.value);
   }
+  // A handful of choices fit as a row of footer buttons. More than that and
+  // they have to stack and scroll: the footer never wrapped, so a dozen reading
+  // lists were laid out in one row inside a 440px panel and most of them ended
+  // up off the side of the screen with no way to reach them.
+  const choices = $derived(m.buttons.filter((b) => !b.ghost));
+  const asList = $derived(choices.length > 3);
+
   function onKeydown(e) {
     if (e.key === 'Enter' && !m.textarea && m.input != null) { e.preventDefault(); settleDialog(m.input); }
   }
@@ -89,6 +96,14 @@
       </div>
       <div class="modal__body">
         {#if m.message}<p class="dialog-message">{m.message}</p>{/if}
+        {#if asList}
+          <div class="dialog-choices">
+            {#each choices as b, i (i)}
+              <button class="btn {b.danger ? 'btn--ghost btn--danger' : 'btn--ghost'} dialog-choice"
+                onclick={() => pick(b)}>{b.label}</button>
+            {/each}
+          </div>
+        {/if}
         {#if m.input != null}
           {#if m.textarea}
             <textarea class="dialog-input" rows="4" spellcheck="false" placeholder={m.placeholder} bind:this={inputEl} bind:value={m.input}></textarea>
@@ -102,7 +117,7 @@
           {#if b.ghost}
             <button class="btn btn--ghost" onclick={() => pick(b)}>{b.label}</button>
             <span class="modal__foot-spacer"></span>
-          {:else}
+          {:else if !asList}
             <button class="btn {b.danger ? 'btn--ghost btn--danger' : 'btn--primary'}" onclick={() => pick(b)}>{b.label}</button>
           {/if}
         {/each}

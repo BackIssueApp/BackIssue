@@ -939,13 +939,22 @@ body.queuepage .home, body.releasespage .home { display: none; }
   width: min(440px, 92vw);
   background: var(--panel); border: 1px solid var(--line);
   border-radius: var(--radius); box-shadow: var(--shadow);
+  /* Never taller than the screen, and it is the BODY that scrolls, so the
+     title and the buttons stay put while the content moves. */
+  max-height: 88vh; display: flex; flex-direction: column;
 }
+.modal__panel > .modal__head, .modal__panel > .modal__foot { flex: none; }
 .modal__head { display: flex; align-items: center; justify-content: space-between;
   padding: 16px 20px; border-bottom: 1px solid var(--line); }
 .modal__head h3 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 20px; letter-spacing: .03em; }
 .modal__x { background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; line-height: 1; }
 .modal__x:hover { color: var(--text); }
-.modal__body { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+.modal__body { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; }
+
+/* A long set of choices (reading lists, say) stacks and scrolls instead of
+   being laid out as one unwrapping row of footer buttons. */
+.dialog-choices { display: flex; flex-direction: column; gap: 6px; max-height: 46vh; overflow-y: auto; margin: -4px -4px; padding: 4px; }
+.dialog-choice { width: 100%; justify-content: flex-start; text-align: left; }
 .field { display: grid; grid-template-columns: 1fr 150px; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); }
 .field input, .field select {
   height: 34px; padding: 0 10px; background: var(--ink);
@@ -972,7 +981,8 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline
 input[type="checkbox"]:disabled { opacity: .45; cursor: default; }
 .field input:focus, .field select:focus { border-color: var(--accent); }
 .modal__note { grid-column: 1 / -1; font-size: 12px; color: var(--faint); margin: 2px 0 0; line-height: 1.5; }
-.modal__foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--line); }
+/* wrap: a dialog with several buttons used to push them off the side */
+.modal__foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--line); }
 .modal__sep { border: none; border-top: 1px solid var(--line); margin: 6px 0 2px; }
 .modal__subhead { font-family: var(--font-display); font-weight: 400; font-size: 15px; letter-spacing: .03em; color: var(--text); margin: 0; }
 

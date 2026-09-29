@@ -1,10 +1,10 @@
-import { describe, test, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import Badge from '../src/components/Badge.svelte';
 import Toasts from '../src/components/Toasts.svelte';
 import DialogModal from '../src/components/DialogModal.svelte';
-import { confirmDialog, inputDialog } from '../src/components/DialogModal.svelte';
+import { confirmDialog, inputDialog, choiceDialog } from '../src/components/DialogModal.svelte';
 import { notify, toasts } from '../src/lib/toasts.svelte.js';
 import ContextMenu, { openContextMenu, closeContextMenu, contextMenu } from '../src/components/ContextMenu.svelte';
 
@@ -186,5 +186,32 @@ describe('ContextMenu long-press (touch)', () => {
     handle.destroy();
     expect(node.classList.contains('has-longpress')).toBe(false);
     node.remove();
+  });
+});
+
+describe('choiceDialog with many options', () => {
+  // Earlier tests in this file leave their DialogModal mounted; a second live
+  // instance makes the queries below ambiguous.
+  beforeEach(() => cleanup());
+
+  test('a long choice set becomes a scrollable list, not a row of footer buttons', async () => {
+    render(DialogModal);
+    choiceDialog({ title: 'Add to reading list', buttons: Array.from({ length: 12 }, (_, i) => ({ label: `List ${i + 1}`, value: i + 1 })) });
+    await tick();
+    // Every option is in the scrollable body. They used to be laid out as one
+    // unwrapping row in the footer, which put most of them off-screen.
+    const box = document.querySelector('.dialog-choices');
+    expect(box).toBeTruthy();
+    expect(box.querySelectorAll('button').length).toBe(12);
+    // and the footer is left holding only Cancel
+    expect([...document.querySelectorAll('.modal__foot button')].map((b) => b.textContent.trim())).toEqual(['Cancel']);
+  });
+
+  test('a short choice set stays as footer buttons', async () => {
+    render(DialogModal);
+    choiceDialog({ title: 'Pick', buttons: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b' }] });
+    await tick();
+    expect(document.querySelector('.dialog-choices')).toBeNull();
+    expect([...document.querySelectorAll('.modal__foot button')].map((b) => b.textContent.trim())).toEqual(['Cancel', 'A', 'B']);
   });
 });

@@ -69,6 +69,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   A–Z. The choice is now kept as a preference and reapplied whenever you arrive
   without one, including from a sidebar library and in a new session. A sort
   named in the URL still wins, so a shared or bookmarked link is unchanged.
+- **Add to reading list was unusable with more than a few lists.** The choices
+  were laid out as one unwrapping row of footer buttons inside a 440px dialog,
+  so with a dozen lists most of them sat off the side of the screen, with
+  nothing to scroll and no way to reach them. A long set of choices now stacks
+  into a scrollable list. Dialogs are also capped at the height of the screen
+  and scroll their body, so no dialog can run off the edge again.
 - A matched series' row carried no file count internally, unlike every other
   kind of row. Nothing user-visible depended on it until now, but any check for
   "does this series have files" read it as none.
