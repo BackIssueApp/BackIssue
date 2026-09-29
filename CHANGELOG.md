@@ -10,6 +10,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Find and clear failed adds** (#8). A **Nothing downloaded** filter lists
+  every series with no file to its name, which is what a mass-add leaves behind
+  when the downloads fail. The bulk bar also gains **Select all**, so clearing
+  them is filter, select, Remove. On a list longer than one page the button
+  says how many are loaded rather than pretending to select the rest.
 - **Quick actions on Library cards** (#5). Every series card and row has an
   actions menu, reached from the **⋯ button** that appears on hover, a
   right-click, or a long press. Issues carry the same button, on the poster
@@ -64,6 +69,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   A–Z. The choice is now kept as a preference and reapplied whenever you arrive
   without one, including from a sidebar library and in a new session. A sort
   named in the URL still wins, so a shared or bookmarked link is unchanged.
+- A matched series' row carried no file count internally, unlike every other
+  kind of row. Nothing user-visible depended on it until now, but any check for
+  "does this series have files" read it as none.
 - An issue poster card with several plugin actions pushed the last of its hover
   buttons outside the card, where they could not be clicked. The row of buttons
   now wraps.

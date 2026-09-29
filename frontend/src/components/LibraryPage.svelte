@@ -31,6 +31,7 @@
     { key: 'ongoing', label: 'Ongoing' },
     { key: 'ended', label: 'Ended' },
     { key: 'problems', label: 'Problems' },
+    { key: 'empty', label: 'Nothing downloaded' },
     { key: 'unmatched', label: 'Unmatched' },
   ];
 
@@ -205,6 +206,18 @@
       });
     }
     return items;
+  }
+
+  // Select/clear every series in the current view. Rows load a page at a
+  // time, so this can only honestly offer what is loaded — the label says so
+  // when there is more, rather than quietly selecting a subset.
+  const allLoadedSelected = $derived(rail.rows.length > 0 && rail.rows.every((r) => railSelect.has(r.id)));
+  function toggleSelectAll() {
+    if (allLoadedSelected) { railSelect.clear(); return; }
+    for (const r of rail.rows) railSelect.add(r.id);
+    if (rail.total > rail.rows.length) {
+      notify(`Selected the ${fmt(rail.rows.length)} loaded — scroll to load the rest of ${fmt(rail.total)}.`, 'info');
+    }
   }
 
   function toggleSelecting() {
@@ -440,6 +453,10 @@
   {#if rail.selecting}
     <div id="coll-bulkbar" class="libx__bulk">
       <span id="coll-bulk-count" class="libx__bulk-count">{railSelect.size} selected</span>
+      <button id="coll-select-all" class="libx__link" onclick={toggleSelectAll}>
+        <Icon name="check-square" size={14} />
+        {allLoadedSelected ? 'Clear' : (rail.total > rail.rows.length ? `Select ${fmt(rail.rows.length)} loaded` : 'Select all')}
+      </button>
       <button class="libx__link" onclick={() => bulk('follow')}><Icon name="star" fill size={14} /> Follow</button>
       <button class="libx__link" onclick={() => bulk('unfollow')}><Icon name="star" size={14} /> Unfollow</button>
       <button class="libx__link" onclick={() => bulk('download-missing')}><Icon name="download" size={14} /> Download missing</button>

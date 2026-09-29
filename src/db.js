@@ -1051,7 +1051,8 @@ function collLeanCols(guard) {
           AND NOT EXISTS (SELECT 1 FROM library_files g WHERE g.series_id=s.id AND g.valid=1
             AND g.cv_issue_id IS NOT NULL AND g.cv_issue_id=bad.cv_issue_id)) END corrupt,
       CASE WHEN s.cv_id IS NULL THEN 0 ELSE (SELECT COUNT(*) FROM cv_issues ci WHERE ci.cv_series_id=s.cv_id) END cv_total,
-      COALESCE(lf.cv_owned, 0) cv_owned`;
+      COALESCE(lf.cv_owned, 0) cv_owned,
+      COALESCE(lf.file_count, 0) file_count`;
 }
 
 // A collection MEMBER = followed OR owns a valid file OR the caller personally
@@ -1102,6 +1103,10 @@ function chipPredicateSql(filter, { guardOuter, seriesTypeList, params }) {
   if (filter === 'ongoing') return "pub_status = 'Ongoing'";                        // publication status (enriched metadata)
   if (filter === 'ended') return "pub_status IN ('Completed','Cancelled')";
   if (filter === 'problems') return 'untagged > 0 OR corrupt > 0';
+  // Nothing on disk at all. A mass-add whose downloads failed leaves exactly
+  // this: followed series with no file to their name. (Membership keeps them
+  // in the collection precisely because they are followed.)
+  if (filter === 'empty') return 'COALESCE(file_count, 0) = 0';
   if (filter === 'unmatched') return `cv_id IS NULL AND COALESCE(${guardOuter},0) = 0`; // !matched
   if (filter === 'comics') return `${effType} NOT IN (${seriesTypeList}) OR ${effType} = 'comic'`;
   if (SERIES_TYPES.includes(filter)) { params['lane_' + filter] = filter; return `${effType} = @lane_${filter}`; }
@@ -1200,6 +1205,9 @@ function mapCollectionRow(r) {
     id: r.id, followed: r.my_follow ? 1 : 0, monitored: r.followed, monitor: r.monitor || (r.followed ? 'all' : 'none'), monitor_from: r.monitor_from ?? null, pub_status: r.pub_status || null, cv_id: r.cv_id, cv_locked: r.cv_locked, sourced, matched: true, source: 'cv',
     title: r.cv_name || r.title, publisher: r.cv_publisher || null, year: r.cv_year || null, cover_url: r.cv_image || null,
     cv_name: r.cv_name, cv_year: r.cv_year, restricted: !!r.restricted, type: r.type || 'comic',
+    // The other two branches carry this; without it a matched series looked
+    // like it had no files at all to anything reading the mapped row.
+    folder: dirBaseName(r.file_dir), files: r.file_count,
     total, owned, missing: Math.max(0, total - owned), available: 0, on_demand: false, untagged: r.untagged, corrupt: r.corrupt,
     latest: r.cv_latest, active: r.active, size: r.size_bytes,
   };
@@ -1391,6 +1399,7 @@ export function seriesMatchesFilter(r, filter) {
     : filter === 'ongoing' ? r.pub_status === 'Ongoing'
     : filter === 'ended' ? ['Completed', 'Cancelled'].includes(r.pub_status)
     : filter === 'problems' ? (r.untagged > 0 || r.corrupt > 0)
+    : filter === 'empty' ? !((r.files ?? r.file_count ?? 0) > 0)
     // Self-described rows are matched by construction — never "unmatched".
     : filter === 'unmatched' ? !r.matched
     // Library-type lanes. The comics lane means "not any other known type",

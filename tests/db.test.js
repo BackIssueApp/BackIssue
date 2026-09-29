@@ -92,6 +92,52 @@ test('collectionSeries corrupt count: an invalid file superseded by a valid copy
   assert.equal(row.corrupt, 1); // only issue 2 — issue 1 has a good copy
 });
 
+test('the "empty" filter finds series with nothing on disk, and only those', async () => {
+  const { seriesMatchesFilter } = await import('../src/db.js');
+  const db = openDb(':memory:');
+  // A failed mass-add: followed, matched, not one file downloaded.
+  const failed = upsertSeries(db, { title: 'Nothing Here', url: 'cv:40', publisher: 'Image' });
+  setSeriesCv(db, failed, 40, { locked: 1 });
+  upsertCvSeries(db, { id: 40, name: 'Nothing Here', count_of_issues: 3 });
+  db.prepare('UPDATE series SET followed=1 WHERE id=?').run(failed);
+
+  // One that did download.
+  const ok = upsertSeries(db, { title: 'Has Files', url: 'cv:41', publisher: 'Image' });
+  setSeriesCv(db, ok, 41, { locked: 1 });
+  upsertCvSeries(db, { id: 41, name: 'Has Files', count_of_issues: 3 });
+  upsertCvIssue(db, { id: 410, cv_series_id: 41, number: '1', name: 'One' });
+  db.prepare('UPDATE series SET followed=1 WHERE id=?').run(ok);
+  upsertLibraryFile(db, { path: '/ok1.cbz', dir: '/d', name: 'ok1.cbz', size: 1, mtime: 1, valid: 1, series_id: ok });
+  linkFileCvIssue(db, '/ok1.cbz', 410);
+
+  // A series whose only file is corrupt still owns nothing readable, but it is
+  // not "nothing downloaded" — it is a Problems case, and must stay out.
+  const bad = upsertSeries(db, { title: 'Broken File', url: 'cv:42', publisher: 'Image' });
+  setSeriesCv(db, bad, 42, { locked: 1 });
+  upsertCvSeries(db, { id: 42, name: 'Broken File', count_of_issues: 1 });
+  upsertCvIssue(db, { id: 420, cv_series_id: 42, number: '1', name: 'One' });
+  db.prepare('UPDATE series SET followed=1 WHERE id=?').run(bad);
+  upsertLibraryFile(db, { path: '/bad.cbr', dir: '/d', name: 'bad.cbr', size: 1, mtime: 1, valid: 0, series_id: bad });
+  linkFileCvIssue(db, '/bad.cbr', 420);
+
+  const titles = (filter) => collectionSeries(db, { filter }).map((r) => r.title).sort();
+  assert.deepEqual(titles('empty'), ['Broken File', 'Nothing Here'],
+    'no VALID file counts as nothing downloaded — a corrupt-only series owns nothing either');
+  assert.ok(titles('all').includes('Has Files'), 'the one with files is still in the collection');
+  assert.ok(!titles('empty').includes('Has Files'), 'but not in the empty list');
+
+  // The SQL predicate and the JS mirror must agree — they are used on
+  // different paths and drifting apart is how a chip count stops matching
+  // the list it opens.
+  for (const r of collectionSeries(db, {})) {
+    assert.equal(
+      seriesMatchesFilter(r, 'empty'),
+      titles('empty').includes(r.title),
+      `seriesMatchesFilter disagrees with the query for ${r.title}`,
+    );
+  }
+});
+
 test('collectionSeries + seriesCollectionDetail: unmatched comics surface no catalog data', () => {
   const db = openDb(':memory:');
   const s = upsertSeries(db, { title: 'Earth X (1999)', url: '/c/ex', publisher: 'M', coverUrl: '' });
