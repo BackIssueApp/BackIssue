@@ -20,6 +20,7 @@
   import { openIssueInfo } from './IssueModal.svelte';
   import { openPackSearch } from './PackSearchModal.svelte';
   import { confirmDialog, choiceDialog, inputDialog } from './DialogModal.svelte';
+  import { pickList } from '../lib/lists.js';
 
   const s = $derived(detail.series);
   const det = $derived(detail.det);
@@ -529,21 +530,9 @@
     let ids = [...detailSelected];
     if (!ids.length) ids = issues.map((i) => i.cv_issue_id).filter(Boolean);
     if (!ids.length) return;
-    const r = await apiGet('/api/lists');
-    if (r.error) return notify(r.error, 'error');
-    const buttons = (r.lists || []).map((l) => ({ label: `${l.name} (${l.items})`, value: l.id }));
-    buttons.push({ label: '+ New list…', value: 'new' });
     const scope = detailSelected.size ? `${ids.length} selected issue(s)` : `all ${ids.length} issues`;
-    const choice = await choiceDialog({ title: 'Add to reading list', message: `Adding ${scope} of “${s?.title}”.`, buttons });
-    if (!choice) return;
-    let listId = choice;
-    if (choice === 'new') {
-      const name = await inputDialog({ title: 'New reading list', value: s?.title || '', confirmLabel: 'Create' });
-      if (!name) return;
-      const c = await apiPost('/api/lists', { name });
-      if (c.error) return notify(c.error, 'error');
-      listId = c.id;
-    }
+    const listId = await pickList({ message: `Adding ${scope} of “${s?.title}”.`, newName: s?.title || '' });
+    if (!listId) return;
     const res = await apiPost(`/api/lists/${listId}/items`, { cvIssueIds: ids });
     if (res.error) return notify(res.error, 'error');
     notify(res.added ? `Added ${fmt(res.added)} issue(s) to the list.` : 'Already on that list.', 'ok');

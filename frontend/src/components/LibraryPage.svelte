@@ -18,6 +18,7 @@
   import { contextMenu, openContextMenu } from './ContextMenu.svelte';
   import { openCvPicker } from './CvPickerModal.svelte';
   import { openEditMetadata } from './EditMetadataModal.svelte';
+  import { pickList } from '../lib/lists.js';
 
   // Which card is under the pointer, so its actions button can fade in.
   let hovered = $state(null);
@@ -244,6 +245,32 @@
     loadCollection();
   }
 
+  // Whole volumes onto a reading list. A run often spans several ComicVine
+  // volumes of one title, and building it a series page at a time is the long
+  // way round — so the selection goes on in the order it is shown, each
+  // series' issues in issue order, and the list's own reorder does the rest.
+  async function addSelectedToList() {
+    if (!railSelect.size) return notify('Select some series first.', 'info');
+    // On-screen order, so the run reads the way the Library is sorted. Anything
+    // selected before a filter change is no longer on screen; it still goes on,
+    // after the rows that are.
+    const shown = rail.rows.filter((r) => railSelect.has(r.id));
+    const ids = [...shown.map((r) => r.id), ...[...railSelect].filter((id) => !shown.some((r) => r.id === id))];
+    const issues = shown.reduce((n, r) => n + (r.total || 0), 0);
+    const about = issues ? `about ${fmt(issues)} issue${issues === 1 ? '' : 's'}` : 'their issues';
+    const listId = await pickList({
+      message: `Adding every issue of ${fmt(ids.length)} series (${about}), in the order they are shown.`,
+      newName: shown[0]?.title || '',
+    });
+    if (!listId) return;
+    const res = await apiPost(`/api/lists/${listId}/series`, { seriesIds: ids });
+    if (res.error) return notify(res.error, 'error');
+    const skipped = res.skipped ? ` ${fmt(res.skipped)} series had no ComicVine issues to add.` : '';
+    notify(res.added ? `Added ${fmt(res.added)} issue(s) to the list.${skipped}`
+      : `Nothing to add — already on that list.${skipped}`, res.added || !res.skipped ? 'ok' : 'info');
+    railSelect.clear();
+  }
+
   // Bulk monitoring policy for the selection: all / new (from each series'
   // newest known issue) / none.
   async function monitorSelected(monitor) {
@@ -460,6 +487,8 @@
       <button class="libx__link" onclick={() => bulk('follow')}><Icon name="star" fill size={14} /> Follow</button>
       <button class="libx__link" onclick={() => bulk('unfollow')}><Icon name="star" size={14} /> Unfollow</button>
       <button class="libx__link" onclick={() => bulk('download-missing')}><Icon name="download" size={14} /> Download missing</button>
+      <button class="libx__link" title="Add every issue of the selected series to a reading list"
+        onclick={addSelectedToList}><Icon name="menu" size={14} /> Add to list</button>
       <select class="libx__movesel" title="Monitoring policy for the selected series"
         onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) monitorSelected(v); }}>
         <option value="">Monitoring…</option>

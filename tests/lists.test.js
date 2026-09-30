@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../src/db.js';
-import { initListTables, listLists, getList, createList, renameList, deleteList, addItems, removeItem, reorderList, importArcAsList, setListPublic } from '../src/lists.js';
+import { initListTables, listLists, getList, createList, renameList, deleteList, addItems, addSeries, removeItem, reorderList, importArcAsList, setListPublic } from '../src/lists.js';
 
 function makeDb() {
   const db = openDb(':memory:');
@@ -171,4 +171,46 @@ test('a shared list never leaks restricted issues to roles without the permissio
   assert.equal(full.items.length, 2, 'a permitted viewer sees everything');
   const filtered = getList(db, 2, id, { includeRestricted: false });
   assert.deepEqual(filtered.items.map((i) => i.cv_issue_id), [302], 'restricted item is dropped');
+});
+
+test('lists: whole series go on in the order asked, issues in issue order', () => {
+  const db = makeDb();
+  // Two ComicVine volumes of one title, plus a series with no CV match.
+  db.exec(`
+    INSERT INTO series (id, title, url, type, cv_id) VALUES
+      (1, 'GL Corps v1', 'u:1', 'comic', 700),
+      (2, 'GL Corps v2', 'u:2', 'comic', 701),
+      (3, 'Shelf scan',  'u:3', 'comic', NULL);
+    INSERT INTO cv_issues (comicvine_id, cv_series_id, issue_number) VALUES
+      (7003, 700, '10'), (7001, 700, '2'), (7002, 700, '9'),
+      (7011, 701, '1'), (7012, 701, '2');
+  `);
+
+  const id = createList(db, 1, 'Corps run');
+  // Deliberately second volume first: the caller's order is the reading order.
+  const r = addSeries(db, 1, id, [2, 1]);
+  assert.deepEqual(r, { added: 5, series: 2, skipped: 0 });
+  assert.deepEqual(getList(db, 1, id).items.map((i) => i.cv_issue_id),
+    [7011, 7012, 7001, 7002, 7003], 'volume order kept; #2 < #9 < #10 within each');
+
+  // Adding again is a no-op, and appending a series appends rather than sorts.
+  assert.equal(addSeries(db, 1, id, [1, 2]).added, 0);
+  assert.deepEqual(getList(db, 1, id).items.map((i) => i.cv_issue_id), [7011, 7012, 7001, 7002, 7003]);
+});
+
+test('lists: a series with nothing to add is reported, not silently dropped', () => {
+  const db = makeDb();
+  db.exec(`
+    INSERT INTO series (id, title, url, type, cv_id) VALUES
+      (1, 'Matched',   'u:1', 'comic', 800),
+      (2, 'Unmatched', 'u:2', 'comic', NULL),
+      (3, 'No issues', 'u:3', 'comic', 801);
+    INSERT INTO cv_issues (comicvine_id, cv_series_id, issue_number) VALUES (8001, 800, '1');
+  `);
+  const id = createList(db, 1, 'Mixed');
+  assert.deepEqual(addSeries(db, 1, id, [1, 2, 3]), { added: 1, series: 1, skipped: 2 });
+
+  assert.deepEqual(addSeries(db, 1, id, []), { added: 0, series: 0, skipped: 0 });
+  // Someone else's list stays someone else's.
+  assert.throws(() => addSeries(db, 2, id, [1]), /no such list/);
 });

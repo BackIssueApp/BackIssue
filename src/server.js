@@ -746,6 +746,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     try { res.json({ added: lists.addItems(db, req.user.id, Number(req.params.id), (req.body || {}).cvIssueIds) }); }
     catch (e) { listErr(res, e); }
   });
+  // Whole series at a time, for a run assembled out of volumes.
+  app.post('/api/lists/:id/series', (req, res) => {
+    try { res.json(lists.addSeries(db, req.user.id, Number(req.params.id), (req.body || {}).seriesIds)); }
+    catch (e) { listErr(res, e); }
+  });
   app.delete('/api/lists/:id/items/:cvIssueId', (req, res) => {
     try { lists.removeItem(db, req.user.id, Number(req.params.id), req.params.cvIssueId); res.json({ ok: true }); }
     catch (e) { listErr(res, e); }

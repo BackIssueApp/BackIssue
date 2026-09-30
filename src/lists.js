@@ -172,6 +172,31 @@ export function addItems(db, userId, id, cvIssueIds) {
   return added;
 }
 
+/** Append whole series to a list: every ComicVine issue of each, in the order
+ *  the caller listed the series and by issue number within each. That is how a
+ *  run gets built out of volumes — a title that ComicVine splits across four
+ *  volumes is four picks here rather than four trips through a series page.
+ *  A series with no ComicVine match has no issues to name, so it is counted as
+ *  skipped rather than silently contributing nothing. */
+export function addSeries(db, userId, id, seriesIds) {
+  if (!listRow(db, userId, id)) throw new Error('no such list');
+  const ids = (seriesIds || []).map(Number).filter((n) => Number.isFinite(n) && n > 0);
+  if (!ids.length) return { added: 0, series: 0, skipped: 0 };
+  const cvOf = db.prepare('SELECT cv_id FROM series WHERE id = ?');
+  const issuesOf = db.prepare(
+    'SELECT comicvine_id FROM cv_issues WHERE cv_series_id = ? ORDER BY CAST(issue_number AS REAL), issue_number',
+  );
+  const cvIssueIds = [];
+  let skipped = 0;
+  for (const sid of ids) {
+    const cv = cvOf.get(sid)?.cv_id;
+    const rows = cv ? issuesOf.all(cv) : [];
+    if (!rows.length) { skipped++; continue; }
+    for (const r of rows) cvIssueIds.push(r.comicvine_id);
+  }
+  return { added: addItems(db, userId, id, cvIssueIds), series: ids.length - skipped, skipped };
+}
+
 export function removeItem(db, userId, id, cvIssueId) {
   if (!listRow(db, userId, id)) throw new Error('no such list');
   db.prepare('DELETE FROM reading_list_items WHERE list_id = ? AND cv_issue_id = ?').run(id, Number(cvIssueId));

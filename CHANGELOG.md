@@ -10,6 +10,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Add whole series to a reading list from the Library** (#9). Select mode's
+  bulk bar gains **Add to list**, which puts every issue of every selected
+  series on a list in one step, in the order the Library is showing them and by
+  issue number within each series. A run that ComicVine splits across several
+  volumes is now a few picks rather than a trip through each series page, and
+  the list's own reordering handles the rest. The dialog says how many issues
+  that will be before you commit, and a selected series with no ComicVine
+  issues to contribute is reported rather than silently skipped.
+
 - **Reading lists are runs now.** A list's page is built around where you are
   in it rather than what share of it you own. Its issues sit on one spine with
   a node each: the rail is filled to the point you have reached and grey after
