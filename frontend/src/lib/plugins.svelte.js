@@ -206,6 +206,14 @@ const bi = {
     // Open a series/volume page (same route a library card uses), so a plugin's
     // home rail or action can navigate to a series it owns.
     openSeries(id) { navigate('/volume/' + Number(id)); },
+    // Any in-app route, so a plugin can send someone back where they came from
+    // (the reader's "Back to arc" returns to the reading list it was opened
+    // from). Internal paths only — an absolute URL would leave the app.
+    navigate(path) {
+      const p = String(path || '');
+      if (!p.startsWith('/') || p.startsWith('//')) return;
+      navigate(p);
+    },
     // The core's already-fetched library list — spares plugin clients their own
     // /api/status round-trip (the status query is heavy at large catalog sizes,
     // and duplicating it at boot serialized behind the SPA's own fetch). May be

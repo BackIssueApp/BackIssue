@@ -10,6 +10,21 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Reading lists are runs now.** A list's page is built around where you are
+  in it rather than what share of it you own. Its issues sit on one spine with
+  a node each: the rail is filled to the point you have reached and grey after
+  it, read issues are ticked and dimmed, and exactly one issue is promoted as
+  **Read next** with its own cover and button. **Continue** at the top opens
+  that issue. An issue you do not own is drawn as a gap, labelled with its
+  position in the run, and the spine stops at it instead of filling through it,
+  though Continue still skips ahead to the next issue you can actually read.
+  The header counts reads, in-progress issues and missing ones, keeping
+  ownership as a separate, separately labelled number. The index gives every
+  list a tick per issue and a status (New, a read count, or Done), and pins a
+  **Continue** card for the run you read most recently that still has somewhere
+  to go. Without the reader installed a list shows ownership and order exactly
+  as before, and makes no claim about what has been read.
+
 - **Find and clear failed adds** (#8). A **Nothing downloaded** filter lists
   every series with no file to its name, which is what a mass-add leaves behind
   when the downloads fail. The bulk bar also gains **Select all**, so clearing

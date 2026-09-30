@@ -6,6 +6,7 @@ import {
   rankCvResults, issueMatchesFilter, sanitizeHtml, stripTags,
   weekOfYear, shiftWeek,
 } from '../src/lib/util.js';
+import { arcModel, arcTicks, arcStatus, pickResume } from '../src/lib/arcs.js';
 
 describe('formatting', () => {
   test('fmt localizes and tolerates nullish', () => {
@@ -199,5 +200,97 @@ describe('every navigate() target is a real route', () => {
       }
     }
     expect(bad).toEqual([]);
+  });
+});
+
+describe('arc model', () => {
+  // A six-issue run with a gap at index 3 (not owned).
+  const rows = [
+    { cv_issue_id: 1, owned: true },
+    { cv_issue_id: 2, owned: true },
+    { cv_issue_id: 3, owned: true },
+    { cv_issue_id: 4, owned: false },
+    { cv_issue_id: 5, owned: true },
+    { cv_issue_id: 6, owned: true },
+  ];
+  const read = (...ids) => Object.fromEntries(ids.map((id) => [id, { page: 0, pages: 10, completed: 1 }]));
+
+  test('without the reader it claims no progress at all', () => {
+    const a = arcModel(rows, null);
+    expect(a.hasReader).toBe(false);
+    expect(a.readCount).toBe(0);
+    expect(a.positionIndex).toBe(-1);
+    expect(a.nextReadable).toBe(null);
+    expect(a.done).toBe(false);
+    // Only ownership is knowable, so no row is called read or current.
+    expect(rows.map((r, i) => a.nodeKind(r, i)))
+      .toEqual(['upcoming', 'upcoming', 'upcoming', 'missing', 'upcoming', 'upcoming']);
+  });
+
+  test('position is the first unread issue, and the spine fills up to it', () => {
+    const a = arcModel(rows, read(1, 2));
+    expect(a.readCount).toBe(2);
+    expect(a.positionIndex).toBe(2);
+    expect(a.nodeKind(rows[2], 2)).toBe('current');
+    expect(rows.map((_, i) => a.spineDone(i))).toEqual([true, true, false, false, false, false]);
+  });
+
+  test('the position stops AT a gap rather than reading through it', () => {
+    const a = arcModel(rows, read(1, 2, 3));
+    expect(a.positionIndex).toBe(3);          // the unowned issue
+    expect(a.nodeKind(rows[3], 3)).toBe('missing');  // shown as a gap, not as current
+    expect(a.nextReadable.cv_issue_id).toBe(5);      // but Continue skips past it
+    expect(a.spineDone(4)).toBe(false);              // nothing is filled past the gap
+  });
+
+  test('in-progress counts pages started but not finished', () => {
+    const a = arcModel(rows, { 1: { page: 4, pages: 20, completed: 0 }, 2: { page: 0, pages: 20, completed: 0 } });
+    expect(a.inProgressCount).toBe(1);
+    expect(a.readCount).toBe(0);
+  });
+
+  test('done only when every issue is read', () => {
+    expect(arcModel(rows, read(1, 2, 3, 4, 5)).done).toBe(false);
+    const all = arcModel(rows, read(1, 2, 3, 4, 5, 6));
+    expect(all.done).toBe(true);
+    expect(all.nextReadable).toBe(null);
+    expect(all.positionIndex).toBe(-1);
+    expect(all.spineDone(5)).toBe(true);      // filled to the end
+  });
+
+  test('an empty run is not "done"', () => {
+    expect(arcModel([], {}).done).toBe(false);
+  });
+
+  test('ticks scale onto a capped row', () => {
+    expect(arcTicks(3, 6)).toEqual([true, true, true, false, false, false]);
+    expect(arcTicks(0, 4)).toEqual([false, false, false, false]);
+    const big = arcTicks(150, 300);
+    expect(big.length).toBe(40);                       // capped
+    expect(big.filter(Boolean).length).toBe(20);       // half lit
+    expect(arcTicks(5, 0)).toEqual([]);
+  });
+
+  test('status reports done/reading/new, and nothing without the reader', () => {
+    expect(arcStatus(null)).toBe(null);
+    expect(arcStatus({ total: 5, read: 5, in_progress: 0 })).toBe('done');
+    expect(arcStatus({ total: 5, read: 2, in_progress: 0 })).toBe('reading');
+    expect(arcStatus({ total: 5, read: 0, in_progress: 1 })).toBe('reading');
+    expect(arcStatus({ total: 5, read: 0, in_progress: 0 })).toBe('new');
+  });
+
+  test('resume picks the most recently read started arc that has a next', () => {
+    const lists = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }];
+    const progress = {
+      1: { total: 5, read: 1, in_progress: 0, last_read_at: '2026-01-01T00:00:00Z', next: { cv_issue_id: 11 } },
+      2: { total: 5, read: 3, in_progress: 0, last_read_at: '2026-02-01T00:00:00Z', next: { cv_issue_id: 22 } },
+      3: { total: 5, read: 5, in_progress: 0, last_read_at: '2026-03-01T00:00:00Z', next: null },  // finished
+      4: { total: 5, read: 0, in_progress: 0, last_read_at: null, next: { cv_issue_id: 44 } },     // not started
+    };
+    expect(pickResume(lists, progress).list.id).toBe(2);
+    // Marked read by hand: no timestamp, but still resumable — it sorts last.
+    expect(pickResume([{ id: 4 }], { 4: { read: 2, in_progress: 0, last_read_at: null, next: { cv_issue_id: 44 } } }).list.id).toBe(4);
+    expect(pickResume(lists, null)).toBe(null);
+    expect(pickResume([{ id: 3 }], progress)).toBe(null);   // nowhere left to go
   });
 });

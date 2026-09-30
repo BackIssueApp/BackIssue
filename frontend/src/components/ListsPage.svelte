@@ -9,11 +9,19 @@
   import { issueActions, issueActionsTick, issueCoverProviders } from '../lib/plugins.svelte.js';
   import { can, isTrusted } from '../lib/auth.svelte.js';
   import { fmt } from '../lib/util.js';
+  import { arcModel, arcTicks, arcStatus, pickResume } from '../lib/arcs.js';
   import Cover from './Cover.svelte';
   import Icon from '../lib/Icon.svelte';
 
   let { active = false } = $props();
   let lists = $state([]);
+  // Read state, from the reader plugin. `null` means we have not been told —
+  // which is different from "nothing read", and the difference matters: with
+  // no reader installed the screens fall back to owned/total rather than
+  // inventing progress they cannot know.
+  let arcProgress = $state(null);   // { [listId]: { total, read, in_progress, last_read_at, next } }
+  let readStates = $state(null);    // { [cvIssueId]: { page, pages, completed } }
+  const hasReader = $derived(arcProgress !== null);
   let det = $state(null);
   let loaded = $state(false);
   // arc import
@@ -121,6 +129,19 @@
   });
   const cblState = (b) => (b.owned ? 'owned' : b.hasId ? 'missing' : 'byname');
 
+  // The reader plugin owns read state; core never touches its tables. Both
+  // calls are best-effort — a 404 just means the plugin is not installed.
+  async function refreshProgress() {
+    try {
+      const [prog, st] = await Promise.all([
+        apiGet('/api/reader/lists-progress').catch(() => null),
+        apiGet('/api/reader/state').catch(() => null),
+      ]);
+      arcProgress = prog && !prog.error ? (prog.lists || {}) : null;
+      readStates = st && !st.error ? (st.states || {}) : null;
+    } catch { arcProgress = null; readStates = null; }
+  }
+
   async function refresh() {
     try {
       const r = await apiGet('/api/lists');
@@ -130,6 +151,7 @@
         det = d.error ? null : d;
       } else det = null;
     } catch { /* keep last */ }
+    refreshProgress();
   }
   $effect(() => { if (active) { void listId; refresh(); } });
 
@@ -142,12 +164,44 @@
     corrupt: !!it.corrupt,
   })));
   const ownedCount = $derived(rows.filter((r) => r.owned).length);
-  const detPct = $derived(rows.length ? Math.round((ownedCount / rows.length) * 100) : 0);
   const missing = $derived(rows.filter((r) => !r.owned && r.series_id));
+
+  // ---- the arc model -----------------------------------------------------
+  // A list is a run you read through, so what matters is where you are in it.
+  // The rules live in lib/arcs.js; this page just renders them.
+  const arc = $derived(arcModel(rows, hasReader ? (readStates || {}) : null));
+  // Progress is READ progress when we know it, and ownership only as a stated
+  // fallback — never one labelled as the other.
+  const detPct = $derived(rows.length
+    ? Math.round(((hasReader ? arc.readCount : ownedCount) / rows.length) * 100)
+    : 0);
+  const seriesCount = $derived(new Set(rows.map((r) => r.series_id || 's:' + r.series_title).filter(Boolean)).size);
+
+  // Per-arc progress for the index. Keyed by list id; absent when the reader
+  // plugin is not installed, in which case the cards show owned/total only.
+  const progOf = (l) => (arcProgress ? arcProgress[String(l.id)] || null : null);
+  const ticks = (l) => arcTicks(progOf(l)?.read ?? 0, progOf(l)?.total ?? l.items ?? 0);
+  // Resume across arcs, pinned above the index.
+  const resumeArc = $derived(pickResume(lists, arcProgress));
   const coverOf = (i) => {
     for (const fn of issueCoverProviders) { const u = fn(i); if (u) return u; }
     return i.image_url || null;
   };
+
+  // Open an issue through the reader plugin's own action, so the reader owns
+  // reading and this page stays out of it. The arc id rides along so the
+  // reader can offer the next issue in the run when this one finishes.
+  function readerAction() {
+    return issueActions.find((a) => a.id === 'reader') || null;
+  }
+  function openInReader(r) {
+    const a = readerAction();
+    if (!a) return notify('The reader plugin is not installed.', 'info');
+    a.run({ ...r, arc_id: listId }, null);
+  }
+  function continueArc() {
+    if (arc.nextReadable) openInReader(arc.nextReadable);
+  }
 
   async function createList() {
     const name = await inputDialog({ title: 'New reading list', placeholder: 'e.g. Sunday backlog', confirmLabel: 'Create' });
@@ -377,8 +431,20 @@
           <div>No reading lists yet. Create one, add issues from any series page, or import a ComicVine story arc.</div>
         </div>
       {/if}
+      {#if resumeArc && !listId}
+        <button class="listx__resume" onclick={() => setQuery({ list: resumeArc.list.id })}>
+          <span class="listx__resume-lbl">Continue</span>
+          <span class="listx__resume-body">
+            <span class="listx__resume-name">{resumeArc.list.name}</span>
+            <span class="listx__resume-next">#{resumeArc.pr.next.issue_number ?? '?'} · {resumeArc.pr.next.series || ''}</span>
+          </span>
+          <span class="listx__resume-go"><Icon name="play" size={15} /></span>
+        </button>
+      {/if}
       {#each lists as l (l.id)}
         {@const pct = l.items ? Math.round((l.owned / l.items) * 100) : 0}
+        {@const status = arcStatus(progOf(l))}
+        {@const pr = progOf(l)}
         <button class="listx__card" class:is-active={listId === l.id} onclick={() => { arcResults = null; cblOpen = false; setQuery({ list: l.id }); }}>
           <div class="listx__card-top">
             <span class="listx__card-name">{l.name}</span>
@@ -386,10 +452,25 @@
             {#if l.source}<span class="listx__card-arc" title="Imported from a CBL reading list"><Icon name="import" size={13} /></span>{/if}
             {#if l.public}<span class="listx__card-arc" title={l.mine ? 'Shared with every user' : `Shared by ${l.owner || 'another user'}`}><Icon name="users" size={13} /></span>{/if}
           </div>
-          <div class="listx__card-prog">
-            <span class="listx__card-track"><span class="listx__card-fill" class:is-done={pct >= 100} style="width:{pct}%"></span></span>
-            <span class="listx__card-num">{fmt(l.owned)}/{fmt(l.items)}</span>
-          </div>
+          {#if status}
+            <!-- One tick per issue: a 12-issue run is legible at a glance in a
+                 way a percentage never is. -->
+            <div class="listx__ticks" aria-hidden="true">
+              {#each ticks(l) as lit}<span class="listx__tick" class:is-lit={lit}></span>{/each}
+            </div>
+            <div class="listx__card-prog">
+              <span class="listx__card-sub">{fmt(l.owned)}/{fmt(l.items)} owned</span>
+              <span class="listx__status listx__status--{status}">
+                {status === 'done' ? 'Done' : status === 'new' ? 'New' : `${fmt(pr.read)} of ${fmt(pr.total)}`}
+              </span>
+            </div>
+          {:else}
+            <!-- No reader plugin: ownership is all we can honestly report. -->
+            <div class="listx__card-prog">
+              <span class="listx__card-track"><span class="listx__card-fill" class:is-done={pct >= 100} style="width:{pct}%"></span></span>
+              <span class="listx__card-num">{fmt(l.owned)}/{fmt(l.items)}</span>
+            </div>
+          {/if}
         </button>
       {/each}
     </div>
@@ -621,9 +702,17 @@
             <span class="listx__dtitle">{det.name}</span>
             {#if isTrusted() && det.mine !== false}<button class="listx__edit" title="Rename list" onclick={() => renameList(det)}><Icon name="edit" size={15} /></button>{/if}
           </div>
-          <div class="listx__dsummary">{ownedCount}/{rows.length} owned{det.arc_cv_id ? ' · from a ComicVine arc' : det.source ? ' · from a CBL reading list' : ''}{det.mine === false ? ` · shared by ${det.owner || 'another user'}` : ''}{det.public && det.mine !== false ? ' · shared with everyone' : ''}</div>
+          <div class="listx__dsummary">{fmt(rows.length)} issue{rows.length === 1 ? '' : 's'} · {fmt(seriesCount)} series{det.arc_cv_id ? ' · from a ComicVine arc' : det.source ? ' · from a CBL reading list' : ''}{det.mine === false ? ` · shared by ${det.owner || 'another user'}` : ''}{det.public && det.mine !== false ? ' · shared with everyone' : ''}</div>
         </div>
         <div class="listx__dactions">
+          {#if hasReader && rows.length}
+            <button class="listx__continue" disabled={!arc.nextReadable}
+              title={arc.done ? 'Every issue in this run is read' : arc.nextReadable ? 'Open the next issue you have not read' : 'The next issue in the run is not on your shelf yet'}
+              onclick={continueArc}>
+              <Icon name={arc.done ? 'check' : 'play'} size={15} />
+              {arc.done ? 'Arc complete' : arc.nextReadable ? `Continue · #${arc.nextReadable.issue_number ?? '?'}` : 'Blocked by a gap'}
+            </button>
+          {/if}
           {#if wantable.length && can('library.manage')}
             <button class="listx__want" disabled={wanting} title="Make every issue on this list wanted — series not in the library yet are added for just these issues" onclick={wantList}><Icon name="target" size={15} /> {wanting ? 'Wanting…' : `Want all (${fmt(wantable.length)})`}</button>
           {/if}
@@ -639,7 +728,17 @@
           {#if det.mine !== false}<button class="listx__del" onclick={() => deleteList(det)}>Delete</button>{/if}
         </div>
       </div>
-      <div class="listx__dbar"><span class="listx__dbar-track"><span class="listx__dbar-fill" class:is-done={detPct >= 100} style="width:{detPct}%"></span></span><span class="listx__dbar-num">{detPct}% read</span></div>
+      <div class="listx__dbar">
+        <span class="listx__dbar-track"><span class="listx__dbar-fill" class:is-done={detPct >= 100} style="width:{detPct}%"></span></span>
+        {#if hasReader}
+          <span class="listx__dbar-num">{fmt(arc.readCount)} of {fmt(rows.length)} read{arc.inProgressCount ? ` · ${fmt(arc.inProgressCount)} in progress` : ''}</span>
+        {:else}
+          <!-- No reader plugin: we genuinely do not know what has been read,
+               so show what we DO know rather than dressing ownership up. -->
+          <span class="listx__dbar-num">{fmt(ownedCount)} of {fmt(rows.length)} owned</span>
+        {/if}
+        {#if missing.length}<span class="listx__dbar-gaps">{fmt(missing.length)} missing</span>{/if}
+      </div>
       <div class="listx__scroll">
         <div class="listx__items">
           {#if !rows.length}
@@ -650,17 +749,41 @@
           {/if}
           {#each rows as it, idx (it.cv_issue_id)}
             {@const st = it.owned ? 'owned' : it.series_id ? 'missing' : 'notlib'}
-            <div class="listx__item">
-              <span class="listx__pos">{idx + 1}</span>
-              <div class="listx__cover"><Cover coverUrl={coverOf(it)} title={it.series_title || '?'} /></div>
+            {@const kind = arc.nodeKind(it, idx)}
+            <div class="listx__item listx__item--{kind}"
+              class:is-current={kind === 'current'}
+              class:is-first={idx === 0} class:is-last={idx === rows.length - 1}>
+              <!-- The rail: filled up to where the run has got to, grey after.
+                   It stops AT a gap on purpose — see positionIndex. -->
+              <span class="listx__spine" class:is-done={arc.spineDone(idx)}></span>
+              <span class="listx__node listx__node--{kind}" title={kind === 'current' ? 'Where you are in this run' : kind === 'read' ? 'Read' : kind === 'missing' ? 'Not on your shelf' : 'Not read yet'}>
+                {#if kind === 'read'}<Icon name="check" size={12} />{/if}
+              </span>
+              <div class="listx__cover" class:is-read={kind === 'read'} class:is-gap={kind === 'missing'}>
+                {#if kind === 'missing'}
+                  <div class="listx__gapcover" aria-label="Not owned">#{it.issue_number ?? '?'}</div>
+                {:else}
+                  <Cover coverUrl={coverOf(it)} title={it.series_title || '?'} />
+                {/if}
+              </div>
               <div class="listx__imain">
                 {#if it.series_id}
                   <a class="listx__iseries" href={'/volume/' + it.series_id} onclick={(e) => { e.preventDefault(); navigate('/volume/' + it.series_id); }}>{it.series_title || 'Unknown series'} <span class="listx__inum">#{it.issue_number ?? '?'}</span></a>
                 {:else}<span class="listx__iseries">{it.series_title || 'Unknown series'} <span class="listx__inum">#{it.issue_number ?? '?'}</span></span>{/if}
-                <div class="listx__isub">{[it.title, it.cover_date].filter(Boolean).join(' · ')}</div>
+                {#if kind === 'missing'}
+                  <div class="listx__isub listx__isub--gap">Not owned · position {idx + 1} in this run</div>
+                {:else}
+                  <div class="listx__isub">{[it.title, it.cover_date].filter(Boolean).join(' · ')}</div>
+                {/if}
+                {#if kind === 'current'}<div class="listx__nexttag">Read next</div>{/if}
               </div>
-              <span class="listx__badge listx__badge--{st}">{st === 'owned' ? 'Owned' : st === 'missing' ? 'Missing' : 'Not in library'}</span>
+              {#if !hasReader || kind === 'missing'}
+                <span class="listx__badge listx__badge--{st}">{st === 'owned' ? 'Owned' : st === 'missing' ? 'Missing' : 'Not in library'}</span>
+              {/if}
               <div class="listx__iact">
+                {#if kind === 'current'}
+                  <button class="listx__readnow" onclick={() => openInReader(it)}><Icon name="play" size={13} /> Read</button>
+                {/if}
                 {#each issueActions as a (a.id + ':' + issueActionsTick.n)}
                   {#if !a.when || a.when(it)}
                     <button class="listx__ibtn" title={typeof a.title === 'function' ? a.title(it) : a.title} onclick={() => a.run(it, null)}>{@html typeof a.icon === 'function' ? a.icon(it) : a.icon}</button>
@@ -746,9 +869,97 @@
   .listx__dbar-num { font: 12px var(--font-mono); color: var(--muted); }
 
   .listx__items { max-width: 820px; margin: 0 auto; padding: 10px 16px 60px; }
-  .listx__item { display: flex; align-items: center; gap: 13px; padding: 9px 12px; border-radius: 10px; }
+  /* ---- the spine -------------------------------------------------------
+     A list is a run you read through, so the rows sit on one continuous rail
+     with a node each. The rail is filled up to where you have got to and grey
+     after, and it stops AT a gap rather than through it. */
+  .listx__item { position: relative; display: flex; align-items: center; gap: 13px; padding: 9px 12px 9px 0; border-radius: 10px; }
   .listx__item:hover { background: rgba(255,255,255,.025); }
   .listx__item:hover .listx__iact { opacity: 1; }
+
+  .listx__spine { position: absolute; left: 21px; top: 0; bottom: 0; width: 2px; background: var(--line); }
+  .listx__spine.is-done { background: var(--green); }
+  /* the run has a beginning and an end — do not draw past them */
+  .listx__item.is-first .listx__spine { top: 50%; }
+  .listx__item.is-last .listx__spine { bottom: 50%; }
+  .listx__item.is-first.is-last .listx__spine { display: none; }
+
+  .listx__node {
+    position: relative; z-index: 1; flex: none; margin-left: 10px;
+    width: 22px; height: 22px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--panel); border: 2px solid var(--line); color: #0b0a0f;
+  }
+  .listx__node--read { background: var(--green); border-color: var(--green); color: #0b0a0f; }
+  .listx__node--current { background: var(--amber, #f2b705); border-color: var(--amber, #f2b705); box-shadow: 0 0 0 5px rgba(242,183,5,.18); }
+  .listx__node--missing { background: transparent; border-color: var(--red); border-style: dashed; }
+
+  /* The current issue is physically a different object, so you never have to
+     scan for where you are. */
+  .listx__item--current {
+    background: rgba(242,183,5,.06);
+    border: 1px solid rgba(242,183,5,.35);
+    padding-top: 13px; padding-bottom: 13px;
+  }
+  .listx__item--current .listx__cover :global(.cover) { width: 46px; height: 64px; }
+  .listx__nexttag {
+    margin-top: 3px; font: 700 10px var(--font-display); letter-spacing: .1em;
+    text-transform: uppercase; color: var(--amber, #f2b705);
+  }
+  .listx__readnow {
+    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px;
+    border: 1px solid rgba(242,183,5,.5); background: rgba(242,183,5,.12);
+    color: var(--amber, #f2b705); border-radius: 7px; font: 600 12px var(--font-body); cursor: pointer;
+  }
+  .listx__readnow:hover { background: rgba(242,183,5,.2); }
+
+  /* A read issue is done with: dim it so the unread ones carry the eye. */
+  .listx__cover.is-read :global(.cover) { opacity: .55; }
+  /* A gap is drawn as an absence, not as a broken cover. */
+  .listx__gapcover {
+    width: 32px; height: 44px; border-radius: 5px;
+    border: 1.5px dashed rgba(255,90,82,.55); color: rgba(255,90,82,.8);
+    display: grid; place-items: center; font: 600 10px var(--font-mono);
+  }
+  .listx__isub--gap { color: rgba(255,90,82,.8); }
+  .listx__dbar-gaps { font: 12px var(--font-mono); color: var(--red); }
+
+  .listx__continue {
+    display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 14px;
+    border: 1px solid rgba(242,183,5,.45); background: rgba(242,183,5,.12);
+    color: var(--amber, #f2b705); border-radius: 8px; font: 600 12.5px var(--font-body); cursor: pointer;
+  }
+  .listx__continue:hover:not(:disabled) { background: rgba(242,183,5,.2); }
+  .listx__continue:disabled { opacity: .5; cursor: default; }
+
+  /* ---- the arc index ---------------------------------------------------- */
+  .listx__ticks { display: flex; gap: 2px; margin: 8px 0 6px; }
+  .listx__tick { flex: 1; height: 4px; border-radius: 2px; background: var(--panel-2); min-width: 2px; }
+  .listx__tick.is-lit { background: var(--green); }
+  .listx__card-sub { font: 11.5px var(--font-mono); color: var(--muted); }
+  .listx__status {
+    margin-left: auto; padding: 1px 8px; border-radius: 999px;
+    font: 700 10px var(--font-display); letter-spacing: .08em; text-transform: uppercase;
+  }
+  .listx__status--done { background: rgba(95,211,138,.14); color: var(--green); }
+  .listx__status--reading { background: rgba(242,183,5,.14); color: var(--amber, #f2b705); }
+  .listx__status--new { background: var(--panel-2); color: var(--muted); }
+
+  .listx__resume {
+    display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+    margin-bottom: 10px; padding: 11px 13px; cursor: pointer;
+    background: rgba(242,183,5,.08); border: 1px solid rgba(242,183,5,.32); border-radius: 12px;
+  }
+  .listx__resume:hover { background: rgba(242,183,5,.14); }
+  .listx__resume-lbl {
+    font: 700 9.5px var(--font-display); letter-spacing: .12em; text-transform: uppercase;
+    color: var(--amber, #f2b705); writing-mode: vertical-rl; transform: rotate(180deg);
+  }
+  .listx__resume-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+  .listx__resume-name { font: 600 13px var(--font-body); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .listx__resume-next { font: 11.5px var(--font-mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .listx__resume-go { flex: none; color: var(--amber, #f2b705); }
+
   .listx__pos { width: 22px; text-align: center; font: 12px var(--font-mono); color: #6f6885; flex: none; }
   .listx__cover :global(.cover) { width: 32px; height: 44px; border-radius: 5px; }
   .listx__imain { flex: 1; min-width: 0; }
