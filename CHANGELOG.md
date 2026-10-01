@@ -19,6 +19,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   that will be before you commit, and a selected series with no ComicVine
   issues to contribute is reported rather than silently skipped.
 
+### Fixed
+
+- **A very long reading list no longer bogs the page down.** Lists can now be
+  built in a couple of clicks, and a single series can carry thousands of
+  issues, so the list page renders only the rows near the viewport past 200
+  items, the way a long series page already did. A 4,239-issue list went from
+  134,000 elements on the page to 3,000, first paint from 2.5s to 1s, and
+  scrolling about five times quicker.
+
 - **Reading lists are runs now.** A list's page is built around where you are
   in it rather than what share of it you own. Its issues sit on one spine with
   a node each: the rail is filled to the point you have reached and grey after

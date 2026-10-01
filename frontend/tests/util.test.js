@@ -4,7 +4,7 @@ import {
   fmt, pad3, initials, humanBytes, spct, fmtIn, fmtAgo,
   parseCvVolumeRef, parseIndexerString, serializeIndexers,
   rankCvResults, issueMatchesFilter, sanitizeHtml, stripTags,
-  weekOfYear, shiftWeek,
+  weekOfYear, shiftWeek, windowRange,
 } from '../src/lib/util.js';
 import { arcModel, arcTicks, arcStatus, pickResume } from '../src/lib/arcs.js';
 
@@ -292,5 +292,54 @@ describe('arc model', () => {
     expect(pickResume([{ id: 4 }], { 4: { read: 2, in_progress: 0, last_read_at: null, next: { cv_issue_id: 44 } } }).list.id).toBe(4);
     expect(pickResume(lists, null)).toBe(null);
     expect(pickResume([{ id: 3 }], progress)).toBe(null);   // nowhere left to go
+  });
+});
+
+describe('windowRange', () => {
+  // Governs both the series page and a reading list, where a four-figure run
+  // is ordinary; the spacers must always add up to the rows left out.
+  const base = { stride: 50, viewH: 500, listTop: 0 };
+
+  test('at the top it mounts the viewport plus overscan, padded below', () => {
+    const r = windowRange({ ...base, n: 1000, scrollTop: 0, overscan: 6 });
+    expect(r.start).toBe(0);
+    expect(r.end).toBe(16);          // 10 rows in view + 6 overscan
+    expect(r.padTop).toBe(0);
+    expect(r.padBottom).toBe((1000 - 16) * 50);
+  });
+
+  test('scrolled deep, the pads account for every row not mounted', () => {
+    const n = 1000;
+    const r = windowRange({ ...base, n, scrollTop: 25000, overscan: 6 });   // row 500
+    expect(r.start).toBe(494);
+    expect(r.end).toBe(516);
+    // The whole column still measures the same, so the scrollbar doesn't lie.
+    expect(r.padTop + (r.end - r.start) * 50 + r.padBottom).toBe(n * 50);
+  });
+
+  test('at the bottom nothing is padded past the end', () => {
+    const r = windowRange({ ...base, n: 100, scrollTop: 100 * 50, overscan: 6 });
+    expect(r.end).toBe(100);
+    expect(r.padBottom).toBe(0);
+  });
+
+  test('a stale deep scroll after the set shrinks still mounts rows', () => {
+    // Filtering 2,000 issues down to 3 while scrolled to the bottom used to
+    // leave the window past the end, rendering nothing at all.
+    const r = windowRange({ ...base, n: 3, scrollTop: 90000, overscan: 6 });
+    expect(r.start).toBe(0);
+    expect(r.end).toBe(3);
+  });
+
+  test('a grid windows whole rows of `cols` items', () => {
+    const r = windowRange({ ...base, n: 100, cols: 5, scrollTop: 0, overscan: 1 });
+    expect(r.start).toBe(0);
+    expect(r.end).toBe(55);          // (10 + 1) rows x 5 columns
+    expect(r.padBottom).toBe((20 - 11) * 50);
+  });
+
+  test('without a measured stride it renders everything rather than nothing', () => {
+    expect(windowRange({ n: 40, stride: 0, viewH: 500, scrollTop: 0 })).toEqual({ start: 0, end: 40, padTop: 0, padBottom: 0 });
+    expect(windowRange({ n: 0, stride: 50, viewH: 500, scrollTop: 0 }).end).toBe(0);
   });
 });

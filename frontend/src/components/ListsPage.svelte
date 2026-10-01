@@ -8,7 +8,7 @@
   import { confirmDialog, inputDialog } from './DialogModal.svelte';
   import { issueActions, issueActionsTick, issueCoverProviders } from '../lib/plugins.svelte.js';
   import { can, isTrusted } from '../lib/auth.svelte.js';
-  import { fmt } from '../lib/util.js';
+  import { fmt, windowRange } from '../lib/util.js';
   import { arcModel, arcTicks, arcStatus, pickResume } from '../lib/arcs.js';
   import Cover from './Cover.svelte';
   import Icon from '../lib/Icon.svelte';
@@ -183,6 +183,50 @@
   const ticks = (l) => arcTicks(progOf(l)?.read ?? 0, progOf(l)?.total ?? l.items ?? 0);
   // Resume across arcs, pinned above the index.
   const resumeArc = $derived(pickResume(lists, arcProgress));
+  /* ---- windowing -------------------------------------------------------
+     A list is as long as someone cares to make it, and adding whole series
+     from the Library makes four-figure lists a couple of clicks (2000 AD is
+     2,492 issues by itself). Rendering every row cost 134k DOM elements and
+     two and a half seconds to first paint, so past a threshold only the rows
+     near the viewport are mounted and the rest are spacers — the same
+     treatment a long series page gets. */
+  const VIRTUAL_MIN = 200;
+  const OVERSCAN = 6;
+  let scroller = $state(null);    // .listx__scroll — the scrolling container
+  let itemsEl = $state(null);     // .listx__items
+  let scrollTop = $state(0);
+  let viewH = $state(800);
+  let stride = $state(64);        // row height incl. gap, measured
+  const virtual = $derived(rows.length > VIRTUAL_MIN);
+  const range = $derived.by(() => {
+    const n = rows.length;
+    if (!virtual) return { start: 0, end: n, padTop: 0, padBottom: 0 };
+    const listTop = (itemsEl && scroller)
+      ? itemsEl.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scrollTop
+      : 0;
+    return windowRange({ n, cols: 1, stride, viewH, scrollTop, listTop, overscan: OVERSCAN });
+  });
+  let raf = 0;
+  function onListScroll() {
+    if (raf) return;
+    raf = requestAnimationFrame(() => { raf = 0; if (scroller) scrollTop = scroller.scrollTop; });
+  }
+  function measureRows() {
+    if (scroller) viewH = scroller.clientHeight || viewH;
+    const items = itemsEl?.querySelectorAll('.listx__item');
+    if (items && items.length >= 2) {
+      const d = items[1].offsetTop - items[0].offsetTop;
+      if (d > 10) stride = d;
+    }
+  }
+  $effect(() => { void rows; void itemsEl; measureRows(); });
+  $effect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => measureRows();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  });
+
   const coverOf = (i) => {
     for (const fn of issueCoverProviders) { const u = fn(i); if (u) return u; }
     return i.image_url || null;
@@ -739,15 +783,17 @@
         {/if}
         {#if missing.length}<span class="listx__dbar-gaps">{fmt(missing.length)} missing</span>{/if}
       </div>
-      <div class="listx__scroll">
-        <div class="listx__items">
+      <div class="listx__scroll" bind:this={scroller} onscroll={onListScroll}>
+        <div class="listx__items" bind:this={itemsEl}>
           {#if !rows.length}
             <div class="listx__d-empty">
               <div class="listx__d-empty-art"><Icon name="list" size={22} /></div>
               <div>This list is empty — add issues from any series page (“Add to list”).</div>
             </div>
           {/if}
-          {#each rows as it, idx (it.cv_issue_id)}
+          {#if range.padTop > 0}<div style="height:{range.padTop}px"></div>{/if}
+          {#each rows.slice(range.start, range.end) as it, vi (it.cv_issue_id)}
+            {@const idx = range.start + vi}
             {@const st = it.owned ? 'owned' : it.series_id ? 'missing' : 'notlib'}
             {@const kind = arc.nodeKind(it, idx)}
             <div class="listx__item listx__item--{kind}"
@@ -800,6 +846,7 @@
               </div>
             </div>
           {/each}
+          {#if range.padBottom > 0}<div style="height:{range.padBottom}px"></div>{/if}
         </div>
       </div>
     {:else}
