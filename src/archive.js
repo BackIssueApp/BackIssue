@@ -64,6 +64,26 @@ function withRarSlot(fn) {
   });
 }
 const isCI = (name) => /(^|\/)ComicInfo\.xml$/i.test(String(name));
+const ARCHIVE_RE = /\.(cbr|cbz|rar|zip|7z)$/i;
+
+/** A comic archive with no page in it is not a comic, however well-formed the
+ *  container is. The case that brought this to light: releases packaged as a
+ *  .cbz holding one .cbr plus ComicInfo.xml — a perfectly valid zip, readable
+ *  metadata, and zero pages. They passed every check and sat in the library
+ *  looking healthy, because nothing ever asked whether there was anything to
+ *  read. Returns an error string, or null when the archive is fine.
+ *
+ *  Only comics are judged this way. An EPUB is a zip of XHTML that may hold no
+ *  image at all and still be perfectly good; books come in through their own
+ *  plugin and never reach here, but nothing should depend on that staying true. */
+function noPagesError(names, path) {
+  if (!/\.(cbz|cbr)$/i.test(String(path))) return null;
+  if (names.some(isImageName)) return null;
+  const nested = names.find((n) => ARCHIVE_RE.test(n));
+  return nested
+    ? `no pages — contains another archive (${String(nested).replace(/^.*[\/]/, '')}) instead of images`
+    : 'no pages — the archive contains no images';
+}
 
 // Parse the fields we care about out of a ComicInfo.xml string.
 export function parseComicInfo(xml) {
@@ -108,7 +128,12 @@ function readZipInfo(path) {
           zip.readEntry();
         }
       });
-      zip.on('end', () => done({ ok: true, format: 'cbz', pageCount: names.filter(isImageName).length, hasComicInfo, comicInfo }));
+      zip.on('end', () => {
+        const empty = noPagesError(names, path);
+        done(empty
+          ? { ok: false, format: 'cbz', error: empty, pageCount: 0, hasComicInfo, comicInfo }
+          : { ok: true, format: 'cbz', pageCount: names.filter(isImageName).length, hasComicInfo, comicInfo });
+      });
       zip.readEntry();
     });
   });
@@ -137,6 +162,8 @@ async function readRarInfo(path) {
           if (arr[0]?.extraction) comicInfo = parseComicInfo(Buffer.from(arr[0].extraction).toString('utf8'));
         } catch { /* metadata unknown */ }
       }
+      const empty = noPagesError(names, path);
+      if (empty) return { ok: false, format: 'cbr', error: empty, pageCount: 0, hasComicInfo: ciNames.length > 0, comicInfo };
       return { ok: true, format: 'cbr', pageCount, hasComicInfo: ciNames.length > 0, comicInfo };
     } catch (e) {
       return { ok: false, format: 'cbr', error: String(e?.message || e) };
@@ -253,6 +280,58 @@ export async function convertCbrToCbz(path) {
   await fs.rename(tmp, cbzPath);
   await fs.unlink(path);
   return { cbzPath };
+}
+
+/** Unwrap a comic archive whose only real content is ANOTHER archive — the
+ *  "cbz holding a cbr" packaging some releases ship — so the pages come out to
+ *  the top level where a reader can find them. Rewrites the file in place, at
+ *  the same path, atomically.
+ *
+ *  Deliberately conservative: it refuses unless there is exactly one nested
+ *  archive and no pages beside it, and it never replaces the original until the
+ *  unwrapped result has been read back and proven to contain images. A file it
+ *  will not touch is left exactly as it was, still flagged, for a human.
+ *
+ *  The outer ComicInfo.xml is carried across when the inner archive has none —
+ *  that metadata is usually the only thing the outer wrapper added. */
+export async function unwrapNestedArchive(path) {
+  const p = String(path);
+  const info = await readArchiveInfo(p);
+  if (info.pageCount) return { unwrapped: false, reason: 'already has pages' };
+
+  const zip = await JSZip.loadAsync(await fs.readFile(p)).catch(() => null);
+  if (!zip) return { unwrapped: false, reason: 'not a zip' };
+  const entries = Object.values(zip.files).filter((f) => !f.dir);
+  const nested = entries.filter((f) => ARCHIVE_RE.test(f.name));
+  if (nested.length !== 1) return { unwrapped: false, reason: nested.length ? 'more than one archive inside' : 'nothing to unwrap' };
+
+  const inner = await nested[0].async('nodebuffer');
+  // Trust the bytes, not the inner name: a ".cbr" inside is as likely to be a zip.
+  const isRar = inner.length >= 4 && inner.toString('latin1', 0, 4) === 'Rar!';
+  let out = isRar ? await cbrBufferToCbz(inner) : inner;
+
+  // Carry the wrapper's metadata in if the inner archive brought none.
+  const outZip = await JSZip.loadAsync(out).catch(() => null);
+  if (!outZip) return { unwrapped: false, reason: 'inner archive unreadable' };
+  const innerNames = Object.values(outZip.files).filter((f) => !f.dir).map((f) => f.name);
+  if (!innerNames.some(isImageName)) return { unwrapped: false, reason: 'inner archive has no pages either' };
+  if (!innerNames.some(isCI)) {
+    const ci = entries.find((f) => isCI(f.name));
+    if (ci) {
+      outZip.file('ComicInfo.xml', await ci.async('nodebuffer'));
+      out = await outZip.generateAsync({ type: 'nodebuffer', compression: 'STORE' });
+    }
+  }
+
+  const tmp = p + '.part';
+  await fs.writeFile(tmp, out);
+  const check = await readArchiveInfo(tmp);          // prove it before destroying anything
+  if (!check.ok || !check.pageCount) {
+    await fs.unlink(tmp).catch(() => {});
+    return { unwrapped: false, reason: 'unwrapped result had no pages' };
+  }
+  await fs.rename(tmp, p);
+  return { unwrapped: true, pages: check.pageCount, wasRar: isRar };
 }
 
 // Repack a mislabeled archive — RAR bytes carrying a .cbz/.zip name — into a

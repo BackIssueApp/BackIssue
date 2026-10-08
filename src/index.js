@@ -30,7 +30,7 @@ import { startJob, listJobs, clearFinishedJobs, attachJobsDb } from './jobs.js';
 import { createScheduler } from './scheduler.js';
 import { createDownloadMonitor } from './downloadmonitor.js';
 import { activeMedia as activeMediaList, emitMedia } from './mediadownload.js';
-import { tagAllUntagged, convertAllCbr, removeAllDuplicates, verifyLibrary, relinkAllCv, scanEntireLibrary, backupDatabase, renameAllFiles, removeGhostSeries } from './tools.js';
+import { tagAllUntagged, convertAllCbr, unwrapNestedArchives, removeAllDuplicates, verifyLibrary, relinkAllCv, scanEntireLibrary, backupDatabase, renameAllFiles, removeGhostSeries } from './tools.js';
 import { collectionStats } from './stats.js';
 import { installConsoleCapture, attachLogDb, listLogs, clearLogs, logInfo, logWarn, logError, logCounts, logCategories } from './logstore.js';
 import { startWatchdog } from './watchdog.js';
@@ -166,6 +166,7 @@ const TOOLS = {
   'reindex-series': { label: 'Re-index series folders', desc: "For every ComicVine-matched series, re-index its OWN folder and attribute the files there — authoritatively, without fuzzy matching. Fixes files that were attached to the wrong same-named series. (Finding brand-new comics is still 'Scan entire library'.)", run: (op) => reindexSeriesFolders(op) },
   'tag-untagged': { label: 'Tag all untagged files', desc: 'Write ComicVine metadata into every owned file that has none (converts .cbr as needed).', needsCv: true, run: (op) => tagAllUntagged(db, cvClient(), op) },
   'convert-cbr': { label: 'Convert all CBR → CBZ', desc: 'Repack every .cbr as a .cbz so it can be tagged and read consistently.', run: (op) => convertAllCbr(db, op) },
+  'unwrap-nested': { label: 'Unwrap nested archives', desc: 'Some releases ship a .cbz that holds a .cbr instead of pages — it opens, tags and looks healthy, and has nothing to read. This lifts the inner archive’s pages to the top level, in place, keeping the ComicInfo. Anything it cannot prove is left untouched.', run: (op) => unwrapNestedArchives(db, op) },
   'remove-duplicates': { label: 'Remove duplicate files', desc: 'Delete duplicate copies of the same issue across every comic. Corrupt copies a good one already replaced go outright. Where two GOOD copies exist, the best is kept — tagged first, then the most pages, then the largest — and the other removed; that part runs as a preview (see Logs → tools for the list) unless you tick the box.', run: (op, opts) => removeAllDuplicates(db, op, opts) },
   'verify': { label: 'Verify archives', desc: 'Deep-check every comic file for corruption and prune ones missing from disk.', run: (op, opts) => verifyLibrary(db, op, opts) },
   'relink-cv': { label: 'Re-link to ComicVine', desc: 'Re-map owned files to ComicVine issues for every matched comic (fixes owned/missing counts).', run: (op) => relinkAllCv(db, op) },

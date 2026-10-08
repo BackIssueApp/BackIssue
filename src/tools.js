@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import config from './config.js';
 import { poolWithResource } from './pool.js';
-import { convertCbrToCbz, verifyArchive, readArchiveInfo, sniffFormat, repackRarAsZip, sidecarPath } from './archive.js';
+import { convertCbrToCbz, verifyArchive, readArchiveInfo, sniffFormat, repackRarAsZip, sidecarPath, unwrapNestedArchive } from './archive.js';
 import { removeSupersededFiles, removeExtraCopies, indexLibrary } from './library.js';
 import { walkFiles } from './sources/usenet.js';
 import { pruneLibraryFiles, SELF_DESCRIBED_TYPES } from './db.js';
@@ -87,6 +87,40 @@ export async function convertAllCbr(db, onProgress = () => {}) {
     onProgress({ done: ++done, total: files.length, message: `${converted} converted` });
   });
   return { total: files.length, converted, deduped, failed };
+}
+
+/** Comics whose archive holds another archive instead of pages — the "cbz with
+ *  a cbr inside" some releases ship. They open fine, tag fine and look healthy,
+ *  and contain nothing to read; the fix is to lift the inner archive's pages to
+ *  the top level, in place.
+ *
+ *  Candidates are files with no pages. Most will not be unwrappable (an empty
+ *  stub archive has nothing inside either) and are simply left alone — the
+ *  unwrap refuses anything it cannot prove, so running this cannot make a
+ *  library worse. */
+export async function unwrapNestedArchives(db, onProgress = () => {}) {
+  const files = db.prepare(
+    `SELECT path FROM library_files
+      WHERE COALESCE(page_count, -1) = 0
+        AND (LOWER(name) LIKE '%.cbz' OR LOWER(name) LIKE '%.cbr')`,
+  ).all().map((r) => r.path);
+  let done = 0, unwrapped = 0, skipped = 0, failed = 0;
+  await eachFile(files, async (p) => {
+    try {
+      const r = await unwrapNestedArchive(p);
+      if (r.unwrapped) {
+        unwrapped++;
+        const info = await readArchiveInfo(p);
+        db.prepare('UPDATE library_files SET page_count=?, has_metadata=?, valid=?, error=NULL, verified=0 WHERE path=?')
+          .run(info.pageCount ?? null, info.hasComicInfo ? 1 : 0, info.ok ? 1 : 0, p);
+      } else skipped++;
+    } catch (e) {
+      failed++;
+      logWarn('tools', `unwrap failed: ${p} — ${e?.message || e}`);
+    }
+    onProgress({ done: ++done, total: files.length, message: `${unwrapped} unwrapped` });
+  });
+  return { total: files.length, unwrapped, skipped, failed };
 }
 
 // Duplicate copies across every comic. Invalid files a good copy already

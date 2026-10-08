@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import JSZip from 'jszip';
 import { existsSync } from 'node:fs';
-import { readArchiveInfo, parseComicInfo, isImageName, convertCbrToCbz, verifyArchive, sniffFormat, repackRarAsZip } from '../src/archive.js';
+import { readArchiveInfo, parseComicInfo, isImageName, convertCbrToCbz, verifyArchive, sniffFormat, repackRarAsZip, unwrapNestedArchive } from '../src/archive.js';
 
 test('readArchiveInfo reads the committed .cbr fixture', async () => {
   const r = await readArchiveInfo('tests/fixtures/sample.cbr');
@@ -201,4 +201,115 @@ test('readArchiveInfo: corrupt .cbz -> ok false', async () => {
   const r = await readArchiveInfo(p);
   assert.equal(r.ok, false);
   await fs.rm(d, { recursive: true, force: true });
+});
+
+// A .cbz whose whole payload is another archive: a well-formed zip, readable
+// metadata, and nothing to read. These passed every check and sat in libraries
+// looking healthy, which is how the reporter ended up with unreadable issues
+// the app insisted were fine.
+async function nestedCbz(dir, { withComicInfo = true } = {}) {
+  const inner = new JSZip();
+  inner.file('001.jpg', Buffer.from([0xff, 0xd8, 0xff]));
+  inner.file('002.jpg', Buffer.from([0xff, 0xd8, 0xff]));
+  const innerBuf = await inner.generateAsync({ type: 'nodebuffer' });
+
+  const outer = new JSZip();
+  outer.file('Some Comic 038 (Digital-Empire).cbr', innerBuf);   // named .cbr, zip bytes
+  if (withComicInfo) outer.file('ComicInfo.xml', '<ComicInfo><Series>Wrapped</Series><Number>38</Number></ComicInfo>');
+  const p = path.join(dir, 'Wrapped 038.cbz');
+  await fs.writeFile(p, await outer.generateAsync({ type: 'nodebuffer' }));
+  return p;
+}
+
+test('a .cbz containing only another archive is not valid, and says why', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'nested-'));
+  const p = await nestedCbz(dir);
+  const r = await readArchiveInfo(p);
+  assert.equal(r.ok, false, 'an archive with no pages is not a readable comic');
+  assert.equal(r.pageCount, 0);
+  assert.match(r.error, /contains another archive/);
+  assert.match(r.error, /\.cbr/, 'the error names the thing inside');
+  // The metadata is still read — it is what makes these look healthy.
+  assert.equal(r.hasComicInfo, true);
+});
+
+test('an archive with no images and no nested archive is reported plainly', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'empty-'));
+  const zip = new JSZip();
+  zip.file('readme.txt', 'nothing to see');
+  const p = path.join(dir, 'Empty 001.cbz');
+  await fs.writeFile(p, await zip.generateAsync({ type: 'nodebuffer' }));
+  const r = await readArchiveInfo(p);
+  assert.equal(r.ok, false);
+  assert.match(r.error, /no pages/);
+  assert.doesNotMatch(r.error, /contains another archive/);
+});
+
+test('a normal comic is unaffected', async () => {
+  const r = await readArchiveInfo('tests/fixtures/sample.cbr');
+  assert.equal(r.ok, true);
+  assert.equal(r.pageCount, 2);
+});
+
+test('only comics are judged on pages — an .epub of XHTML is left alone', async () => {
+  // EPUBs are zips that can legitimately hold no image at all. Books come in
+  // through their own plugin, but this reader must not condemn one if handed it.
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'epub-'));
+  const zip = new JSZip();
+  zip.file('mimetype', 'application/epub+zip');
+  zip.file('OEBPS/chapter1.xhtml', '<html><body>text only</body></html>');
+  const p = path.join(dir, 'Book.epub');
+  await fs.writeFile(p, await zip.generateAsync({ type: 'nodebuffer' }));
+  const r = await readArchiveInfo(p);
+  assert.equal(r.ok, true, 'an image-free epub is not a corrupt comic');
+});
+
+test('unwrapNestedArchive lifts the inner pages out, in place, keeping ComicInfo', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'unwrap-'));
+  const p = await nestedCbz(dir);
+  const before = await fs.stat(p);
+
+  const r = await unwrapNestedArchive(p);
+  assert.equal(r.unwrapped, true);
+  assert.equal(r.pages, 2);
+
+  const after = await readArchiveInfo(p);
+  assert.equal(after.ok, true, 'the file is readable now');
+  assert.equal(after.pageCount, 2);
+  assert.equal(after.hasComicInfo, true, 'the wrapper’s metadata was carried across');
+  assert.equal(after.comicInfo.series, 'Wrapped');
+  assert.ok(before.size > 0);
+  assert.ok(!existsSync(p + '.part'), 'no temp file left behind');
+});
+
+test('unwrapNestedArchive refuses what it cannot prove, and leaves the file alone', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'refuse-'));
+
+  // Nothing inside to lift out.
+  const empty = new JSZip();
+  empty.file('readme.txt', 'x');
+  const p1 = path.join(dir, 'Empty.cbz');
+  await fs.writeFile(p1, await empty.generateAsync({ type: 'nodebuffer' }));
+  const bytes1 = await fs.readFile(p1);
+  assert.equal((await unwrapNestedArchive(p1)).unwrapped, false);
+  assert.deepEqual(await fs.readFile(p1), bytes1, 'untouched');
+
+  // Two archives inside — which one is the comic? Leave it for a human.
+  const two = new JSZip();
+  const in1 = new JSZip(); in1.file('001.jpg', Buffer.from([0xff, 0xd8, 0xff]));
+  two.file('a.cbr', await in1.generateAsync({ type: 'nodebuffer' }));
+  two.file('b.cbr', await in1.generateAsync({ type: 'nodebuffer' }));
+  const p2 = path.join(dir, 'Two.cbz');
+  await fs.writeFile(p2, await two.generateAsync({ type: 'nodebuffer' }));
+  const bytes2 = await fs.readFile(p2);
+  const r2 = await unwrapNestedArchive(p2);
+  assert.equal(r2.unwrapped, false);
+  assert.match(r2.reason, /more than one/);
+  assert.deepEqual(await fs.readFile(p2), bytes2, 'untouched');
+
+  // A good comic is not "unwrapped" into something worse.
+  const good = path.join(dir, 'Good.cbz');
+  const g = new JSZip(); g.file('001.jpg', Buffer.from([0xff, 0xd8, 0xff]));
+  await fs.writeFile(good, await g.generateAsync({ type: 'nodebuffer' }));
+  assert.equal((await unwrapNestedArchive(good)).unwrapped, false);
 });

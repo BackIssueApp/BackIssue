@@ -8,7 +8,25 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A comic with nothing in it to read is a problem now.** Some releases ship a
+  `.cbz` that holds a `.cbr` instead of pages. It is a perfectly good zip, its
+  ComicInfo reads, and it counted as owned, tagged and healthy — because
+  nothing ever asked whether there was anything to read. Any comic archive with
+  no pages is now flagged, naming what is inside when the cause is a nested
+  archive, so it turns up under Problems instead of sitting in the library
+  looking fine. Empty and truncated archives are caught by the same check.
+  Books are unaffected: an EPUB with no image in it is still a good EPUB.
+
 ### Added
+
+- **Unwrap nested archives** (Tools). Repairs the files the check above finds:
+  the inner archive's pages are lifted to the top level, in place, with the
+  wrapper's ComicInfo carried across when the inner one has none. It refuses
+  anything it cannot prove — more than one archive inside, or an unwrapped
+  result with no pages — and never replaces a file until the replacement has
+  been read back and found to contain pages.
 
 - **Add whole series to a reading list from the Library** (#9). Select mode's
   bulk bar gains **Add to list**, which puts every issue of every selected
