@@ -8,6 +8,24 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The issue details modal is two columns.** It was one long scroll: cover,
+  dates, two rows of buttons, then five stacked sections of dot-joined text.
+  Now the cover carries a status chip and every action stacks beneath it, so
+  the actions never scroll away, and the content is four tabs with counts —
+  Overview, Credits, Appearing, Files — where the count tells you whether a
+  tab is worth opening. The primary action follows the state: Read for an
+  owned issue, **Replace corrupt file** in red for a damaged one, Download
+  when there is nothing on disk. Credits group by role rather than listing a
+  row per person, characters and teams and arcs are chips with a working
+  "+N more" instead of a dead-end count, and each file gets a card with its
+  folder, one state flag and the move-to-issue control inside it. Previous
+  and next issue buttons in the header step through the run without going
+  back to the series page, keeping the tab you were reading. Editing keeps
+  the same layout, and every edited field now shows the amber "edited" mark,
+  not just the three that used to.
+
 ### Added
 
 - **Characters, teams, locations and story arcs are written into your files.**

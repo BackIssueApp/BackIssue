@@ -864,44 +864,120 @@ body.queuepage .home, body.releasespage .home { display: none; }
 
 /* Issue info modal */
 .modal__panel--wide { max-width: 640px; width: min(640px, 92vw); }
-.issue-info { padding: 4px 20px 20px; display: flex; flex-direction: column; gap: 10px; max-height: 70vh; overflow-y: auto; }
-.issue-info .ii-h { font-family: var(--font-display); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
-.ii-top { display: flex; gap: 14px; align-items: flex-start; }
-.ii-cover { width: 96px; flex: none; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-2); }
-.ii-head { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.ii-statusrow { margin-top: 2px; }
-.ii-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-/* Plugin per-issue action buttons (Read, mark read/unread) render an inline SVG
-   icon followed by their label — align and size the icon to the text. */
-.ii-actions--read { margin-bottom: 8px; }
-.ii-actions--read .btn { display: inline-flex; align-items: center; gap: 6px; }
-.ii-actions--read .btn svg { width: 16px; height: 16px; }
-.ii-flag--ok { color: var(--green); border-color: rgba(95,211,138,.4); }
-.ii-error { font-family: var(--font-sans, inherit); color: var(--red); font-size: 11px; margin-top: 2px; white-space: normal; }
-.ii-name { font-size: 16px; font-weight: 500; }
-.ii-dates { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
-.ii-credits { display: flex; flex-wrap: wrap; gap: 6px 14px; }
-.ii-enrich { display: flex; flex-direction: column; gap: 4px; }
-.ii-cred { font-size: 12px; color: var(--text); }
-.ii-cred b { color: var(--muted); font-weight: 500; text-transform: capitalize; margin-right: 4px; }
-.ii-desc { font-size: 13px; line-height: 1.6; color: var(--text); }
-.ii-desc p { margin: 0 0 8px; }
-.ii-desc h2, .ii-desc h3, .ii-desc h4 { font-size: 13px; margin: 10px 0 4px; }
-.ii-desc a { color: var(--accent); }
-.ii-desc img, .ii-desc figure { max-width: 100%; height: auto; border-radius: 6px; }
-.ii-files { display: flex; flex-direction: column; gap: 4px; }
-.ii-file { font-size: 12px; font-family: var(--font-mono); color: var(--green); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ii-file.is-bad { color: var(--red); }
-.ii-missing { color: var(--muted); font-family: inherit; }
-.ii-flag { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--amber); border: 1px solid rgba(255,194,75,.35); border-radius: 4px; padding: 0 5px; }
-.ii-flag--bad { color: var(--red); border-color: rgba(255,90,82,.4); }
-.ii-move { display: flex; align-items: center; gap: 6px; margin: 4px 0 6px 20px; font-family: var(--font-body); }
-.ii-move__pick { max-width: 240px; height: 24px; padding: 0 6px; background: var(--ink); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font: 11.5px var(--font-body); }
-.ii-move__btn { height: 24px; padding: 0 9px; border: none; background: var(--accent); color: #fff; border-radius: 6px; font: 600 11px var(--font-body); cursor: pointer; }
-.ii-move__btn:disabled { opacity: .45; cursor: default; }
-.ii-move__btn--ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); }
-.ii-cvlink { align-self: flex-start; margin-top: 6px; color: var(--accent); font-size: 13px; text-decoration: none; }
-.ii-cvlink:hover { text-decoration: underline; }
+/* ---- Issue details modal (two columns: cover + actions | tabbed content) ----
+   The actions sit beside the content rather than above it, so they never
+   scroll away, and the five stacked sections became four tabs with counts —
+   the count is what tells you whether a tab is worth opening. */
+/* Compound selector on purpose: .modal__panel's own width is declared later
+   in this file, so a bare .ix would lose on source order alone. */
+.modal__panel.ix { max-width: 880px; width: min(880px, 94vw); }
+.ix__head { display: flex; align-items: center; gap: 10px; }
+.ix__title { margin: 0; flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 9px; }
+.ix__series { font-family: var(--font-display); font-size: 18px; letter-spacing: .03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ix__num { font: 700 15px var(--font-mono); color: var(--accent); flex: none; }
+.ix__pos { font: 11px var(--font-mono); color: var(--faint); flex: none; }
+.ix__nav { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: var(--radius-sm); cursor: pointer; flex: none; }
+.ix__nav:hover:not(:disabled) { background: var(--panel-2); }
+.ix__nav:disabled { color: var(--line); cursor: default; }
+.ix__body { padding: 0; max-height: 78vh; overflow-y: auto; }
+.ix__grid { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 26px; padding: 22px 24px 26px; }
+.ix__left { display: flex; flex-direction: column; gap: 9px; }
+.ix__right { min-width: 0; }
+
+.ix__cover { position: relative; aspect-ratio: 2/3; border-radius: var(--radius); background: var(--panel-2); border: 1px solid var(--line); display: grid; place-items: center; overflow: hidden; margin-bottom: 4px; }
+.ix__cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ix__covernum { font: 700 26px var(--font-mono); color: var(--faint); }
+.ix__status { position: absolute; left: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 5px; font: 600 11px var(--font-body); color: #0b0a0f; border-radius: 6px; padding: 4px 8px; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+.ix__status--ok { background: var(--green); }
+.ix__status--bad { background: var(--red); color: #fff; }
+.ix__status--none { background: var(--faint); color: #fff; }
+
+.ix__act { width: 100%; justify-content: center; gap: 7px; }
+.ix__act--lead { height: 42px; font-size: 13.5px; }
+.ix__act--danger { background: var(--red); border-color: var(--red); color: #fff; }
+.ix__act--danger:hover { filter: brightness(1.08); }
+.ix__act svg { width: 16px; height: 16px; }
+.ix__cvlink { margin-top: 2px; color: var(--faint); font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.ix__cvlink:hover { color: var(--accent); }
+
+.ix__name { font-family: var(--font-display); font-size: 24px; letter-spacing: .02em; line-height: 1.15; }
+.ix__dates { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 9px; font-size: 12.5px; color: var(--faint); }
+.ix__dates b { color: var(--text); font-weight: 600; }
+
+.ix__tabs { display: flex; gap: 2px; margin: 18px 0 16px; border-bottom: 1px solid var(--line); }
+.ix__tab { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 13px; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--muted); font: 600 13px var(--font-body); cursor: pointer; }
+.ix__tab.is-on { border-bottom-color: var(--accent); color: var(--text); }
+.ix__tabn { font: 600 10.5px var(--font-mono); color: var(--faint); }
+.ix__tab.is-on .ix__tabn { color: var(--accent); }
+
+.ix__desc { font-size: 13.5px; color: var(--text); line-height: 1.65; margin: 0 0 18px; }
+.ix__desc p { margin: 0 0 8px; }
+.ix__desc h2, .ix__desc h3, .ix__desc h4 { font-size: 13px; margin: 10px 0 4px; }
+.ix__desc a { color: var(--accent); }
+.ix__desc img, .ix__desc figure { max-width: 100%; height: auto; border-radius: 6px; }
+
+/* Hairline grid: 1px gaps over a panel-2 ground draw the dividers. */
+.ix__facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1px; background: var(--panel-2); border: 1px solid var(--panel-2); border-radius: 11px; overflow: hidden; }
+.ix__fact { background: var(--panel); padding: 10px 12px; }
+.ix__factk { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); }
+.ix__factv { font-size: 13px; margin-top: 4px; overflow-wrap: anywhere; }
+
+.ix__sub { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 16px 0 7px; }
+.ix__story { font-size: 13px; padding: 5px 0; border-bottom: 1px solid var(--panel-2); }
+.ix__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.ix__chip { font-size: 12.5px; border-radius: 20px; padding: 5px 12px; color: var(--muted); background: var(--panel-2); }
+.ix__chip--arc { color: #ff6b98; background: rgba(255,45,111,.1); border: 1px solid rgba(255,45,111,.3); }
+.ix__chip--char { color: var(--text); background: var(--panel-2); }
+.ix__chip--team { color: var(--cyan); background: rgba(43,212,217,.08); border: 1px solid rgba(43,212,217,.3); }
+.ix__more { font: 600 12px var(--font-body); color: var(--accent); background: none; border: none; cursor: pointer; padding: 4px 6px; }
+
+.ix__rows { display: flex; flex-direction: column; gap: 1px; background: var(--panel-2); border: 1px solid var(--panel-2); border-radius: 11px; overflow: hidden; }
+.ix__crow { display: grid; grid-template-columns: 120px 1fr; gap: 12px; background: var(--panel); padding: 10px 13px; }
+.ix__crole { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding-top: 2px; }
+.ix__cnames { font-size: 13px; }
+
+.ix__file { border: 1px solid var(--line); background: rgba(255,255,255,.012); border-radius: 11px; padding: 12px 13px; margin-bottom: 9px; }
+.ix__file.is-bad { border-color: rgba(255,90,82,.4); background: rgba(255,90,82,.04); }
+.ix__filetop { display: flex; align-items: center; gap: 11px; }
+.ix__fileicon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-sm); background: var(--panel-2); color: var(--green); flex: none; }
+.ix__fileicon.is-bad { color: var(--red); }
+.ix__filemain { flex: 1; min-width: 0; }
+.ix__filename { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ix__filedir { font: 11px var(--font-mono); color: var(--faint); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ix__flag { font: 600 10px var(--font-body); text-transform: uppercase; letter-spacing: .04em; color: var(--amber); border: 1px solid rgba(255,194,75,.35); background: rgba(255,194,75,.09); border-radius: 5px; padding: 2px 7px; flex: none; }
+.ix__flag--ok { color: var(--green); border-color: rgba(95,211,138,.35); background: rgba(95,211,138,.09); }
+.ix__flag--bad { color: var(--red); border-color: rgba(255,90,82,.35); background: rgba(255,90,82,.09); }
+.ix__fileerr { margin-top: 9px; font: 12px var(--font-mono); color: #ff8a83; }
+.ix__move { display: flex; gap: 7px; margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--panel-2); flex-wrap: wrap; }
+.ix__move select { flex: 1; min-width: 180px; height: 32px; padding: 0 9px; background: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--text); font: 12.5px var(--font-body); }
+.ix__empty { padding: 30px 16px; text-align: center; border: 1px dashed var(--line); border-radius: 11px; color: var(--muted); font-size: 13px; }
+
+.ix__edithead { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; flex-wrap: wrap; }
+.ix__editt { font-family: var(--font-display); font-size: 18px; letter-spacing: .03em; }
+.ix__editnote { font-size: 12px; color: var(--faint); }
+.ix__row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.ix__row--title { grid-template-columns: 2fr 1fr; }
+.ix__row--quad { grid-template-columns: repeat(4, 1fr); }
+.ix__field { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin-bottom: 12px; }
+.ix__field > span { display: flex; align-items: center; gap: 7px; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.ix__field input, .ix__field select, .ix__field textarea { padding: 9px 11px; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; color: var(--text); font: 13px var(--font-body); }
+.ix__field textarea { resize: vertical; line-height: 1.55; }
+/* An edited field is locked against refreshes — the amber border says so at a glance. */
+.ix__field input.is-edited, .ix__field select.is-edited, .ix__field textarea.is-edited { border-color: rgba(255,194,75,.5); }
+.ix__edited { font: 600 9.5px var(--font-body); letter-spacing: .04em; color: var(--amber); border: 1px solid rgba(255,194,75,.4); border-radius: 4px; padding: 1px 5px; text-transform: none; }
+.ix__editactions { display: flex; align-items: center; gap: 9px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.ix__reset { border: 1px solid rgba(255,90,82,.35); background: transparent; color: var(--red); }
+.ix__reset:hover:not(:disabled) { background: rgba(255,90,82,.08); }
+
+/* Under ~720px the cover sits beside the actions and the content follows. */
+@media (max-width: 720px) {
+  .ix__grid { display: flex; flex-direction: column; gap: 20px; padding: 18px; }
+  .ix__left { display: grid; grid-template-columns: 120px 1fr; gap: 10px; align-items: start; }
+  .ix__cover { grid-row: span 4; margin-bottom: 0; }
+  .ix__cvlink { grid-column: 1 / -1; }
+  .ix__row, .ix__row--title, .ix__row--quad { grid-template-columns: 1fr 1fr; }
+  .ix__name { font-size: 20px; }
+}
 
 .badge {
   font-family: var(--font-mono); font-size: 11px;
