@@ -4,8 +4,9 @@ import {
   fmt, pad3, initials, humanBytes, spct, fmtIn, fmtAgo,
   parseCvVolumeRef, parseIndexerString, serializeIndexers,
   rankCvResults, issueMatchesFilter, sanitizeHtml, stripTags,
-  weekOfYear, shiftWeek, windowRange,
+  weekOfYear, shiftWeek, windowRange, offsetWindow,
 } from '../src/lib/util.js';
+import { filterIssues, groupBySeries, roleTally, roleTokens, runsOf, yearSpan } from '../src/lib/featuring.js';
 import { arcModel, arcTicks, arcStatus, pickResume } from '../src/lib/arcs.js';
 
 describe('formatting', () => {
@@ -341,5 +342,102 @@ describe('windowRange', () => {
   test('without a measured stride it renders everything rather than nothing', () => {
     expect(windowRange({ n: 40, stride: 0, viewH: 500, scrollTop: 0 })).toEqual({ start: 0, end: 40, padTop: 0, padBottom: 0 });
     expect(windowRange({ n: 0, stride: 50, viewH: 500, scrollTop: 0 }).end).toBe(0);
+  });
+});
+
+describe('offsetWindow', () => {
+  // The featuring results interleave group headings, issue rows and whole
+  // blocks, so each unit carries its own height.
+  const hs = [40, 40, 40, 400, 40, 40, 40, 40, 40, 40];   // 760 total
+
+  test('at the top it mounts the viewport plus overscan', () => {
+    const r = offsetWindow(hs, { viewH: 200, scrollTop: 0, overscan: 1 });
+    expect(r.start).toBe(0);
+    expect(r.end).toBe(5);           // 40+40+40+400 covers 200px, +1 overscan
+    expect(r.padTop).toBe(0);
+    expect(r.padBottom).toBe(760 - 560);
+  });
+
+  test('the pads always add up to the units left out', () => {
+    const r = offsetWindow(hs, { viewH: 120, scrollTop: 500, overscan: 1 });
+    const mounted = hs.slice(r.start, r.end).reduce((a, b) => a + b, 0);
+    expect(r.padTop + mounted + r.padBottom).toBe(760);
+    expect(r.start).toBe(2);         // unit 3 spans 120-520; one overscan back
+  });
+
+  test('a stale deep scroll after the set shrinks still mounts units', () => {
+    const r = offsetWindow([40, 40], { viewH: 300, scrollTop: 9000, overscan: 1 });
+    expect(r.start).toBe(0);
+    expect(r.end).toBe(2);
+    expect(r.padBottom).toBe(0);
+  });
+
+  test('an empty column windows to nothing', () => {
+    expect(offsetWindow([], { viewH: 300, scrollTop: 0 })).toEqual({ start: 0, end: 0, padTop: 0, padBottom: 0 });
+  });
+});
+
+describe('featuring results', () => {
+  const issue = (n, over) => ({ cv_issue_id: n, issue_number: String(n), series: 'Thor', series_id: 7, cover_date: '1984-01-01', owned: false, ...over });
+
+  test('role tokens split a joined credit and tally busiest first', () => {
+    expect(roleTokens('Writer, Cover')).toEqual(['Writer', 'Cover']);
+    expect(roleTokens(null)).toEqual([]);
+    const tally = roleTally([
+      issue(1, { role: 'Writer' }),
+      issue(2, { role: 'Writer, Cover' }),
+      issue(3, { role: 'writer' }),
+    ]);
+    expect(tally[0]).toEqual({ role: 'Writer', count: 3 });   // case folded together
+    expect(tally[1]).toEqual({ role: 'Cover', count: 1 });
+  });
+
+  test('the toolbar filters are all client-side and combine', () => {
+    const rows = [
+      issue(1, { role: 'Writer', owned: true, title: 'The Ballad' }),
+      issue(2, { role: 'Cover', owned: false, series: 'Avengers' }),
+      issue(3, { role: 'Writer, Cover', owned: true }),
+    ];
+    expect(filterIssues(rows, { ownedOnly: true }).map((i) => i.cv_issue_id)).toEqual([1, 3]);
+    expect(filterIssues(rows, { role: 'cover' }).map((i) => i.cv_issue_id)).toEqual([2, 3]);
+    expect(filterIssues(rows, { q: 'aveng' }).map((i) => i.cv_issue_id)).toEqual([2]);
+    expect(filterIssues(rows, { q: 'ballad' }).map((i) => i.cv_issue_id)).toEqual([1]);
+    expect(filterIssues(rows, { q: 'thor', ownedOnly: true, role: 'writer' }).map((i) => i.cv_issue_id)).toEqual([1, 3]);
+  });
+
+  test('groups carry owned counts, a year span and numeric order', () => {
+    const rows = [
+      issue(10, { owned: true }),
+      issue(2, { cover_date: '1983-05-01' }),
+      { ...issue(0), issue_number: 'Annual 1' },
+      issue(5, { series: 'Avengers', series_id: 9, cover_date: '1990-01-01' }),
+    ];
+    const [thor, avengers] = groupBySeries(rows, { sort: 'series' });
+    expect(thor.series).toBe('Thor');
+    expect(thor.total).toBe(3);
+    expect(thor.owned).toBe(1);
+    expect(thor.years).toBe('1983–1984');
+    expect(thor.items.map((i) => i.issue_number)).toEqual(['2', '10', 'Annual 1']);
+    expect(avengers.years).toBe('1990');
+    // Most recent first is the other toolbar order.
+    expect(groupBySeries(rows, { sort: 'recent' })[0].series).toBe('Avengers');
+  });
+
+  test('a series with no library row still groups, by name', () => {
+    const g = groupBySeries([{ ...issue(1), series_id: null }, { ...issue(2), series_id: null }]);
+    expect(g).toHaveLength(1);
+    expect(g[0].seriesId).toBe(null);
+  });
+
+  test('runs collapse consecutive numbers and count the rest', () => {
+    expect(runsOf([1, 2, 3, 7, 8, 20])).toBe('#1–3, #7–8, #20');
+    expect(runsOf([5, 5, 6])).toBe('#5–6');                       // duplicates
+    expect(runsOf([1, 3, 5, 7, 9], { cap: 2 })).toBe('#1, #3 +3 more runs');
+    expect(runsOf([1, 2, 'Annual 1', '½'])).toBe('#1–2 · 2 other');
+    expect(runsOf([])).toBe('');
+  });
+
+  test('a year span needs at least one dated issue', () => {
+    expect(yearSpan([{ cover_date: null }])).toBe('');
   });
 });

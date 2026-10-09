@@ -23,6 +23,18 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   capped — the busiest creator here has 843 credits — and only the rows near
   the viewport are rendered, so a long one stays quick.
 
+  Those results group by series. Each heading sticks as you scroll and carries
+  the years it spans and how much of it you own — green when the run is
+  complete, amber when it is partial. A series with more than two dozen hits
+  stays collapsed behind a summary of its consecutive runs ("130 issues ·
+  #208-250, #400-443"), so coverage reads without opening it, and expands into
+  a grid of issue numbers — one cell each, filled where you own the issue —
+  with a switch to rows or covers that pages thirty at a time. Above the
+  groups: totals for issues, series, owned and years; a chip per credited role
+  for a creator; and a filter, an owned-only toggle, a sort (biggest series or
+  most recent) and a list/cover switch that all work on what is already
+  loaded.
+
 ### Changed
 
 - **The issue details modal is two columns.** It was one long scroll: cover,

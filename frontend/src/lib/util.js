@@ -42,6 +42,34 @@ export function windowRange({ n, cols = 1, stride, viewH, scrollTop, listTop = 0
   };
 }
 
+// Variable-height sibling of windowRange. The featuring results interleave
+// group headings, issue rows and whole blocks (a number grid, a grid of
+// covers), so there is no single stride to divide by — each unit carries its
+// own height instead. The heights are exact, not estimates (the blocks' column
+// counts are computed rather than left to auto-fill), so the pads always sum
+// to the real column height and the scrollbar never lies.
+export function offsetWindow(heights, { viewH, scrollTop, overscan = 4 }) {
+  const n = heights.length;
+  if (!n) return { start: 0, end: 0, padTop: 0, padBottom: 0 };
+  const off = new Array(n + 1);
+  off[0] = 0;
+  for (let i = 0; i < n; i++) off[i + 1] = off[i] + Math.max(0, heights[i]);
+  const total = off[n];
+  const top = Math.min(Math.max(0, scrollTop), Math.max(0, total - 1));
+  let lo = 0;
+  let hi = n - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (off[mid + 1] <= top) lo = mid + 1; else hi = mid;
+  }
+  const start = Math.max(0, lo - overscan);
+  const limit = top + viewH;
+  let end = start;
+  while (end < n && off[end] < limit) end++;
+  end = Math.min(n, end + overscan);
+  return { start, end, padTop: off[start], padBottom: total - off[end] };
+}
+
 // Percentage for stats. Never rounds up to a misleading 100% (or down to 0%) —
 // only shows 100 when actually complete, and ≥1 while any progress exists.
 export const spct = (a, b) => {
