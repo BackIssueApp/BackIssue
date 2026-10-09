@@ -17,6 +17,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   supplies them where it has them, which is about 6% of issues and almost
   nothing before 1980 because they are hand-tagged there; Metron fills the
   rest. Existing files need a re-tag to pick them up.
+- **Enrichment is on by default.** It was an opt-in toggle, so most libraries
+  were getting no Metron data at all — and since characters and story arcs
+  now go into `ComicInfo.xml`, that meant files written without fields every
+  other reader expects. Existing installs are switched on once; turn it off
+  again and it stays off. The hosted service caches the enrichment, so it
+  costs no extra upstream call, and the official ComicVine API ignores the
+  request.
 - **Everything Metron publishes is kept.** Alongside the prices, barcodes and
   ratings already stored, an issue now carries its characters, teams, arcs,
   universes, per-role credits, description, title, page count, imprint,
@@ -24,6 +31,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **A metadata server without enrichment is no longer asked on every access.**
+  Enrichment was re-requested whenever an issue had detail but no recorded
+  answer — and a server that does not support it (the official ComicVine API
+  ignores the parameter) never sends one, so the issue's detail was re-fetched
+  on every single access, forever, against the user's own rate limit. Asking
+  and getting nothing is now recorded as the miss it is.
 - **A comic with nothing in it to read is a problem now.** Some releases ship a
   `.cbz` that holds a `.cbr` instead of pages. It is a perfectly good zip, its
   ComicInfo reads, and it counted as owned, tagged and healthy — because
