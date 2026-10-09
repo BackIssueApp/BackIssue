@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import JSZip from 'jszip';
+import config from '../src/config.js';
 import { buildComicInfoXml, stripHtml, mapCredits, namesOf, tagCbzBuffer, writeComicInfo, ensureCvIssueDetail, tagFileFromCv, fetchAllIssueMetadata } from '../src/metatagger.js';
 import { openDb, upsertSeries, upsertCvSeries, upsertCvIssue, upsertLibraryFile, linkLibraryFile, linkFileCvIssue, getLibraryFile } from '../src/db.js';
 
@@ -275,4 +276,23 @@ test('namesOf copes with every shape these arrays arrive in', () => {
   assert.deepEqual(namesOf(null), []);
   assert.deepEqual(namesOf('not json'), []);
   assert.deepEqual(namesOf([{ nope: 1 }]), []);
+});
+
+test('a metadata server without enrichment is asked once, not on every access', async () => {
+  // The official ComicVine API ignores enrich=metron and answers with no
+  // `metron` key. Before this was recorded as a miss, every access re-fetched
+  // the issue's detail forever, spending the user's own rate limit.
+  const prior = config.cvEnrich;
+  config.cvEnrich = true;
+  try {
+    const db = openDb(':memory:');
+    upsertCvSeries(db, { id: 1, name: 'S' });
+    upsertCvIssue(db, { id: 11, cv_series_id: 1, number: '1' });
+    let calls = 0;
+    const client = { async issue(id) { calls++; return { id, issue_number: '1', description: 'd' }; } };
+    await ensureCvIssueDetail(db, client, 11);
+    await ensureCvIssueDetail(db, client, 11);
+    await ensureCvIssueDetail(db, client, 11);
+    assert.equal(calls, 1, 'asked once; the absent metron key is a recorded miss');
+  } finally { config.cvEnrich = prior; }
 });

@@ -123,7 +123,13 @@ export async function ensureCvIssueDetail(db, client, cvIssueId) {
     character_credits: d.character_credits, team_credits: d.team_credits,
     location_credits: d.location_credits, story_arc_credits: d.story_arc_credits,
     associated_images: d.associated_images,
-    ...(d.metron !== undefined ? { metron: d.metron } : {}),
+    // Record the ASK, not just an answer. A metadata server that doesn't do
+    // enrichment (the official ComicVine API ignores the parameter) returns no
+    // `metron` key at all — and without a stamp, `wantsEnrich` stayed true and
+    // re-fetched this issue's detail on every single access, forever, against
+    // the user's own rate limit. Treat "asked and got nothing" as the miss it
+    // is, so the speculative re-fetch happens exactly once.
+    ...(config.cvEnrich || d.metron !== undefined ? { metron: d.metron ?? null } : {}),
   });
   return getCvIssue(db, cvIssueId);
 }

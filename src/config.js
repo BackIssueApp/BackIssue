@@ -69,10 +69,16 @@ const config = {
   // Alternative ComicVine-compatible API base (a self-hosted CloneVine). Blank
   // = the official API (rate-limited, proxied, politeness-paced).
   cvBaseUrl: '',
-  // Ask the metadata endpoint for enriched data (enrich=metron) — content
-  // ratings, series status/end year. Supported by CloneVine; the real
-  // ComicVine API ignores the parameter, so it's safe either way.
-  cvEnrich: false,
+  // Ask the metadata endpoint for enriched data (enrich=metron) — characters,
+  // teams, story arcs, per-role credits, content ratings, series status.
+  // ON by default: ComicVine carries characters for ~6% of issues and almost
+  // none before 1980, so without this most libraries get none at all, and
+  // ComicInfo.xml goes out missing fields every other reader expects. The
+  // hosted service caches the enrichment, so it costs no extra upstream call,
+  // and the official ComicVine API ignores the parameter — safe either way.
+  cvEnrich: true,
+  // Marks the one-time flip of cvEnrich's default (see loadSettings).
+  cvEnrichDefaultApplied: false,
   // Manga search content ceiling: safe | suggestive | erotica (default) |
   // pornographic — passed to the metadata server's manga lane.
   mangaRating: 'erotica',

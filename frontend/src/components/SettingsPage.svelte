@@ -1023,9 +1023,9 @@
         <h4 class="setx-card__head">Enrichment</h4>
         <label class="field field--check">
           <span class="switch"><input id="set-cvEnrich" type="checkbox" /><span class="switch__track"></span></span>
-          <span>Enrich metadata (content ratings, series status, issue extras)</span>
+          <span>Enrich metadata (characters, story arcs, ratings, issue extras)</span>
         </label>
-        <p class="modal__note">When the metadata server supports it, adds Metron data — content ratings, series status and end year, and per-issue extras like price, UPC, and story titles. The official ComicVine API ignores the request, so it's safe either way.</p>
+        <p class="modal__note">When the metadata server supports it, adds Metron data on top of ComicVine: <strong>characters, teams and story arcs</strong> — which ComicVine has for only a small share of issues, and almost none published before 1980 — plus per-role credits, content ratings, series status and end year, price, UPC and story titles. Characters and arcs are written into <code>ComicInfo.xml</code>, so turning this off leaves those fields out of your files. The official ComicVine API ignores the request, so it's safe either way.</p>
       </div>
       <div class="setx-card">
         <h4 class="setx-card__head">Manga</h4>

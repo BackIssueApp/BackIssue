@@ -34,6 +34,7 @@ export const SETTING_FIELDS = {
   // use; not user-facing).
   metadataInstanceKey: { type: 'string', allowEmpty: true },
   cvEnrich:            { type: 'bool' },
+  cvEnrichDefaultApplied: { type: 'bool' },   // one-time: the default flipped on
   // One FlareSolverr for every source that needs to get past Cloudflare —
   // it is a service the user runs, not a property of any one site, so asking
   // for it per source made people configure the same URL repeatedly.
@@ -205,6 +206,17 @@ export function loadSettings() {
       config[enabledKey] = true;
     }
     config[hoursKey] = 0; // consumed — cron + enabled are the source of truth now
+  }
+  // Enrichment became the only source of characters, teams and story arcs, and
+  // those go into ComicInfo.xml — so an install left on the old default was
+  // writing files missing fields every other reader expects. Settings are
+  // persisted with every key, so flipping the default alone would have reached
+  // nobody who had ever saved settings. Turn it on once, remember that we did,
+  // and never touch it again: anyone who switches it back off stays off.
+  if (!config.cvEnrichDefaultApplied) {
+    config.cvEnrich = true;
+    config.cvEnrichDefaultApplied = true;
+    try { saveSettings({ cvEnrich: true, cvEnrichDefaultApplied: true }); } catch { /* read-only config dir */ }
   }
   // FlareSolverr moved from a per-source setting to one shared setting. Seed
   // it from whatever a source already had, so an existing install keeps
