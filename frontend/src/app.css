@@ -969,6 +969,36 @@ body.queuepage .home, body.releasespage .home { display: none; }
 .ix__reset { border: 1px solid rgba(255,90,82,.35); background: transparent; color: var(--red); }
 .ix__reset:hover:not(:disabled) { background: rgba(255,90,82,.08); }
 
+/* Chips and credited names link to everything else they turn up in. */
+.ix__chip--link { border: 0; font-family: inherit; cursor: pointer; }
+.ix__chip--link:hover { filter: brightness(1.25); }
+.ix__chip--link.ix__chip--arc:hover, .ix__chip--link.ix__chip--team:hover { filter: brightness(1.15); }
+.ix__person { background: none; border: 0; padding: 0; font: inherit; color: var(--text); cursor: pointer; text-align: left; }
+.ix__person:hover { color: var(--accent); text-decoration: underline; }
+.ix__sep { color: var(--muted); }
+
+/* ---- "Appears in" / "Credited on" results ---- */
+.modal__panel.fx { max-width: 680px; width: min(680px, 94vw); }
+.fx__head { display: flex; align-items: center; gap: 10px; }
+.fx__title { margin: 0; flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.fx__kind { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); flex: none; }
+.fx__name { font-family: var(--font-display); font-size: 18px; letter-spacing: .03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx__count { font: 11px var(--font-mono); color: var(--faint); flex: none; }
+.fx__body { padding: 14px 18px 18px; max-height: 70vh; overflow-y: auto; }
+.fx__list { display: flex; flex-direction: column; gap: 6px; }
+.fx__row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: none; cursor: pointer; color: var(--text); }
+.fx__row:hover { background: rgba(255,255,255,.03); border-color: var(--line); }
+.fx__cover { width: 34px; flex: none; }
+.fx__cover :global(.cover) { width: 34px; height: 48px; }
+.fx__main { flex: 1; min-width: 0; }
+.fx__series { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx__num { color: var(--accent); font: 600 12px var(--font-mono); }
+.fx__sub { font-size: 11.5px; color: var(--faint); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx__role { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); flex: none; }
+.fx__owned { font: 600 10px var(--font-body); text-transform: uppercase; letter-spacing: .04em; color: var(--green); border: 1px solid rgba(95,211,138,.35); background: rgba(95,211,138,.09); border-radius: 5px; padding: 2px 7px; flex: none; }
+.fx__empty { padding: 26px 10px; text-align: center; color: var(--text); font-size: 13px; }
+.fx__hint { margin-top: 8px; font-size: 12px; color: var(--faint); line-height: 1.6; }
+
 /* Under ~720px the cover sits beside the actions and the content follows. */
 @media (max-width: 720px) {
   .ix__grid { display: flex; flex-direction: column; gap: 20px; padding: 18px; }

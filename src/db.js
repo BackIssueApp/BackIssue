@@ -531,6 +531,46 @@ export function isCvIssueRestricted(db, cvIssueId) {
   return !!r;
 }
 
+/** Issues in the collection that credit a person, or that a character or team
+ *  appears in. Both ComicVine's arrays and Metron's are searched: ComicVine
+ *  carries characters for about 6% of issues, so on an older library Metron is
+ *  often the only one that has them.
+ *
+ *  `kind` is 'creator' | 'character' | 'team'. Matching is exact on the name —
+ *  these come from chips the user clicked, not free text, so a LIKE would only
+ *  add false positives. Restricted series are filtered the same way every other
+ *  surface filters them.
+ */
+export function issuesFeaturing(db, { kind, name, includeRestricted = false, limit = 200 } = {}) {
+  const COLS = {
+    creator: [['credits', '$.name'], ['metron_credits', '$.creator']],
+    character: [['character_credits', '$.name'], ['metron_characters', '$.name']],
+    team: [['team_credits', '$.name'], ['metron_teams', '$.name']],
+  }[kind];
+  if (!COLS || !name) return [];
+  // One scan per column, unioned: json_each cannot span two arrays in one pass,
+  // and over ~42k rows each side answers in tens of milliseconds.
+  const sql = COLS.map(([col, path]) => `
+      SELECT ci.comicvine_id AS cv_issue_id, ci.issue_number, ci.name AS title,
+             ci.cover_date, ci.image_url, ci.cv_series_id,
+             ${col === 'credits' ? "json_extract(j.value,'$.role')" : col === 'metron_credits' ? "(SELECT group_concat(json_extract(r.value,'$.name'), ', ') FROM json_each(json_extract(j.value,'$.role')) r)" : 'NULL'} AS role
+        FROM cv_issues ci, json_each(ci.${col}) j
+       WHERE ci.${col} IS NOT NULL AND json_extract(j.value, '${path}') = @name`).join(' UNION ');
+  const rows = db.prepare(`
+    WITH hit AS (${sql})
+    SELECT h.cv_issue_id, h.issue_number, h.title, h.cover_date, h.image_url, h.role,
+           s.id AS series_id, COALESCE(cs.name, s.title) AS series, s.year AS series_year,
+           EXISTS (SELECT 1 FROM library_files lf WHERE lf.cv_issue_id = h.cv_issue_id AND lf.valid = 1) AS owned
+      FROM hit h
+      LEFT JOIN series s ON s.cv_id = h.cv_series_id
+      LEFT JOIN cv_series cs ON cs.comicvine_id = h.cv_series_id
+     WHERE (@includeRestricted OR COALESCE(s.restricted, 0) = 0)
+     GROUP BY h.cv_issue_id
+     ORDER BY owned DESC, h.cover_date, h.cv_issue_id
+     LIMIT @limit`).all({ name: String(name), includeRestricted: includeRestricted ? 1 : 0, limit });
+  return rows.map((r) => ({ ...r, owned: !!r.owned }));
+}
+
 export function listIssues(db, { seriesId, status } = {}) {
   const clauses = [];
   const params = {};

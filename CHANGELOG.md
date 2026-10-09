@@ -8,6 +8,19 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+
+- **Characters and credited names are links.** Click a character, team or
+  creator in the issue modal for every other issue in your collection that
+  features or credits them, owned copies first, each row carrying the role it
+  was credited for. Both sources are searched — ComicVine's arrays and
+  Metron's — so an issue found only through enrichment still turns up.
+  Restricted series stay hidden unless you can see them. Credits are good
+  coverage for anything whose metadata has been downloaded; character listings
+  are thin, because the sources record them for a minority of issues and mostly
+  recent ones, so an empty result says which of the two you are looking at
+  rather than implying your collection has none.
+
 ### Changed
 
 - **The issue details modal is two columns.** It was one long scroll: cover,

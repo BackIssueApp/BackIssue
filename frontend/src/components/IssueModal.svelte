@@ -36,6 +36,7 @@
   import { trapFocus } from '../lib/dom.js';
   import { can, isTrusted } from '../lib/auth.svelte.js';
   import Icon from '../lib/Icon.svelte';
+  import { openFeaturing } from './FeaturingModal.svelte';
 
   const open = $derived(modals.stack.includes('issue'));
   const info = $derived(m.info && !m.info.error ? m.info : null);
@@ -82,7 +83,7 @@
       const r = c.role || 'credit';
       roles.set(r, [...(roles.get(r) || []), c.name].filter(Boolean));
     }
-    return [...roles].map(([role, names]) => ({ role, names: names.join(', ') }));
+    return [...roles].map(([role, names]) => ({ role, list: names }));
   });
 
   // Only facts that have a value — an empty grid cell says nothing.
@@ -106,9 +107,11 @@
   let showAllChars = $state(false);
   $effect(() => { void m.cvIssueId; showAllChars = false; });   // per issue
   const appearing = $derived([
-    { label: 'Story arcs', tint: 'arc', all: arcs, items: arcs },
-    { label: 'Characters', tint: 'char', all: chars, items: showAllChars ? chars : chars.slice(0, CHAR_CAP) },
-    { label: 'Teams', tint: 'team', all: teams, items: teams },
+    // `kind` is what the chip looks up; story arcs have no lookup of their own,
+    // so those chips stay plain text rather than pretending to be clickable.
+    { label: 'Story arcs', tint: 'arc', kind: null, all: arcs, items: arcs },
+    { label: 'Characters', tint: 'char', kind: 'character', all: chars, items: showAllChars ? chars : chars.slice(0, CHAR_CAP) },
+    { label: 'Teams', tint: 'team', kind: 'team', all: teams, items: teams },
   ].filter((g) => g.all.length));
 
   const reprints = $derived(info?.metron_reprints?.map((r) => r.issue || r.name || r) || []);
@@ -349,7 +352,13 @@
                   {#if creditGroups.length}
                     <div class="ix__rows">
                       {#each creditGroups as c (c.role)}
-                        <div class="ix__crow"><span class="ix__crole">{c.role}</span><span class="ix__cnames">{c.names}</span></div>
+                        <div class="ix__crow">
+                          <span class="ix__crole">{c.role}</span>
+                          <span class="ix__cnames">
+                            {#each c.list as person, i (person + i)}<button class="ix__person" title="Find other issues credited to {person}"
+                              onclick={() => openFeaturing('creator', person)}>{person}</button>{#if i < c.list.length - 1}<span class="ix__sep">, </span>{/if}{/each}
+                          </span>
+                        </div>
                       {/each}
                     </div>
                   {:else}<div class="list-note">No credits for this issue.</div>{/if}
@@ -359,7 +368,14 @@
                     {#each appearing as g (g.label)}
                       <div class="ix__sub">{g.label} · {g.all.length}</div>
                       <div class="ix__chips">
-                        {#each g.items as item, i (item + i)}<span class="ix__chip ix__chip--{g.tint}">{item}</span>{/each}
+                        {#each g.items as item, i (item + i)}
+                          {#if g.kind}
+                            <button class="ix__chip ix__chip--{g.tint} ix__chip--link" title="Find {item} elsewhere in your collection"
+                              onclick={() => openFeaturing(g.kind, item)}>{item}</button>
+                          {:else}
+                            <span class="ix__chip ix__chip--{g.tint}">{item}</span>
+                          {/if}
+                        {/each}
                         {#if g.all.length > g.items.length}
                           <button class="ix__more" onclick={() => { showAllChars = true; }}>+{g.all.length - g.items.length} more</button>
                         {/if}

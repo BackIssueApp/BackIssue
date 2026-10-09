@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { setSeriesAliases, seriesSearchNames, createCvSeries, mergeSeriesRows } from '../src/db.js';
+import { setSeriesAliases, seriesSearchNames, createCvSeries, mergeSeriesRows, issuesFeaturing } from '../src/db.js';
 import {
   openDb, upsertSeries, upsertIssue, listSeries, listIssues,
   setIssueStatus, queueIssues, getNextQueued, countByStatus, getSeriesTitleById,
@@ -905,4 +905,57 @@ test('mergeSeriesRows folds a second row for the same volume into the folder-bac
   assert.equal(k.followed, 1);
   assert.equal(k.year, '2016', 'the keeper inherited the year it lacked');
   assert.equal(k.path, '/comics/Batman (2016)', 'the keeper kept its folder');
+});
+
+test('issuesFeaturing: finds credits and appearances across BOTH sources, owned first', () => {
+  const db = openDb(':memory:');
+  const s = upsertSeries(db, { title: 'Detective Comics', url: 'cv:1', publisher: 'DC' });
+  setSeriesCv(db, s, 1);
+  upsertCvSeries(db, { id: 1, name: 'Detective Comics' });
+  for (const n of [1, 2, 3]) upsertCvIssue(db, { id: 100 + n, cv_series_id: 1, number: String(n) });
+
+  // #1 from ComicVine, #2 from Metron only — the case that matters, because
+  // ComicVine carries characters for a small share of issues.
+  setCvIssueDetail(db, 101, {
+    credits: [{ name: 'Chuck Dixon', role: 'writer' }, { name: 'Tom Lyle', role: 'penciler' }],
+    character_credits: [{ id: 1, name: 'Batman' }],
+    team_credits: [{ id: 9, name: 'Justice League' }],
+  });
+  setCvIssueDetail(db, 102, {
+    metron: {
+      id: 5,
+      credits: [{ creator: 'Chuck Dixon', role: [{ name: 'Writer' }, { name: 'Cover' }] }],
+      characters: [{ id: 1, name: 'Batman' }],
+      teams: [],
+    },
+  });
+  setCvIssueDetail(db, 103, { character_credits: [{ id: 2, name: 'Robin' }] });
+
+  const bats = issuesFeaturing(db, { kind: 'character', name: 'Batman' });
+  assert.deepEqual(bats.map((i) => i.cv_issue_id).sort(), [101, 102], 'both sources searched');
+  assert.equal(bats[0].series, 'Detective Comics');
+
+  const dixon = issuesFeaturing(db, { kind: 'creator', name: 'Chuck Dixon' });
+  assert.deepEqual(dixon.map((i) => i.cv_issue_id).sort(), [101, 102]);
+  // Role comes out of whichever shape it arrived in: CV's string, Metron's array.
+  assert.equal(dixon.find((i) => i.cv_issue_id === 101).role, 'writer');
+  assert.equal(dixon.find((i) => i.cv_issue_id === 102).role, 'Writer, Cover');
+
+  assert.equal(issuesFeaturing(db, { kind: 'team', name: 'Justice League' }).length, 1);
+  assert.equal(issuesFeaturing(db, { kind: 'character', name: 'Nobody' }).length, 0);
+  assert.equal(issuesFeaturing(db, { kind: 'nonsense', name: 'Batman' }).length, 0, 'unknown kind returns nothing');
+  assert.equal(issuesFeaturing(db, { kind: 'character', name: '' }).length, 0);
+});
+
+test('issuesFeaturing: a restricted series stays hidden unless the caller may see it', () => {
+  const db = openDb(':memory:');
+  const s = upsertSeries(db, { title: 'Adults Only', url: 'cv:2', publisher: 'X' });
+  setSeriesCv(db, s, 2);
+  db.prepare('UPDATE series SET restricted=1 WHERE id=?').run(s);
+  upsertCvSeries(db, { id: 2, name: 'Adults Only' });
+  upsertCvIssue(db, { id: 201, cv_series_id: 2, number: '1' });
+  setCvIssueDetail(db, 201, { character_credits: [{ id: 3, name: 'Someone' }] });
+
+  assert.equal(issuesFeaturing(db, { kind: 'character', name: 'Someone' }).length, 0, 'hidden by default');
+  assert.equal(issuesFeaturing(db, { kind: 'character', name: 'Someone', includeRestricted: true }).length, 1);
 });

@@ -14,7 +14,7 @@ import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
 import { normalizeNumber } from './matcher.js';
 import { parseIssueFromFilename } from './scanner.js';
 import { linkFilesToCv } from './cvmatch.js';
-import { getLibraryFile, linkFileCvIssue, setFileIssueOverride, clearFileIssueOverride } from './db.js';
+import { getLibraryFile, linkFileCvIssue, setFileIssueOverride, clearFileIssueOverride, issuesFeaturing } from './db.js';
 import { testIndexer } from './newznab.js';
 import { testClient } from './nzbclients.js';
 import { testTorznabIndexer } from './torznab.js';
@@ -1312,6 +1312,19 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     } catch (e) {
       res.status(500).json({ error: String(e?.message || e) });
     }
+  });
+
+  // Every issue in the collection crediting a person, or featuring a character
+  // or team — what the chips in the issue modal link to. `kind` and `name` come
+  // from a chip the user clicked, so the match is exact.
+  app.get('/api/issues/featuring', (req, res) => {
+    const kind = String(req.query.kind || '');
+    if (!['creator', 'character', 'team'].includes(kind)) return res.status(400).json({ error: 'kind must be creator, character or team' });
+    const name = String(req.query.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'name is required' });
+    try {
+      res.json({ kind, name, issues: issuesFeaturing(db, { kind, name, includeRestricted: canRestricted(req) }) });
+    } catch (e) { res.status(500).json({ error: String(e?.message || e) }); }
   });
 
   app.get('/api/queue', (req, res) => {

@@ -31,6 +31,7 @@
   import AddModal from './components/AddModal.svelte';
   import CvPickerModal from './components/CvPickerModal.svelte';
   import IssueModal from './components/IssueModal.svelte';
+  import FeaturingModal from './components/FeaturingModal.svelte';
 import EditMetadataModal from './components/EditMetadataModal.svelte';
   import SourceSearchModal from './components/SourceSearchModal.svelte';
   import PackSearchModal from './components/PackSearchModal.svelte';
@@ -241,6 +242,7 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
 <HelpModal />
 <CvPickerModal />
 <IssueModal />
+<FeaturingModal />
 <EditMetadataModal />
 <SourceSearchModal />
 <PackSearchModal />
