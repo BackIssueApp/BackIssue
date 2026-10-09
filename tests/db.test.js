@@ -947,6 +947,21 @@ test('issuesFeaturing: finds credits and appearances across BOTH sources, owned 
   assert.equal(issuesFeaturing(db, { kind: 'character', name: '' }).length, 0);
 });
 
+test('issuesFeaturing: a prolific creator is not silently truncated', () => {
+  // The busiest creator in a real 42k-issue library has 843 credits, and that
+  // grows as metadata is filled in. An arbitrary cap would quietly misreport
+  // the collection; the caller windows the list instead.
+  const db = openDb(':memory:');
+  const s = upsertSeries(db, { title: 'Big Run', url: 'cv:3', publisher: 'DC' });
+  setSeriesCv(db, s, 3);
+  upsertCvSeries(db, { id: 3, name: 'Big Run' });
+  for (let n = 1; n <= 450; n++) {
+    upsertCvIssue(db, { id: 3000 + n, cv_series_id: 3, number: String(n) });
+    setCvIssueDetail(db, 3000 + n, { credits: [{ name: 'Prolific Pat', role: 'writer' }] });
+  }
+  assert.equal(issuesFeaturing(db, { kind: 'creator', name: 'Prolific Pat' }).length, 450);
+});
+
 test('issuesFeaturing: a restricted series stays hidden unless the caller may see it', () => {
   const db = openDb(':memory:');
   const s = upsertSeries(db, { title: 'Adults Only', url: 'cv:2', publisher: 'X' });

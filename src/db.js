@@ -541,7 +541,7 @@ export function isCvIssueRestricted(db, cvIssueId) {
  *  add false positives. Restricted series are filtered the same way every other
  *  surface filters them.
  */
-export function issuesFeaturing(db, { kind, name, includeRestricted = false, limit = 200 } = {}) {
+export function issuesFeaturing(db, { kind, name, includeRestricted = false } = {}) {
   const COLS = {
     creator: [['credits', '$.name'], ['metron_credits', '$.creator']],
     character: [['character_credits', '$.name'], ['metron_characters', '$.name']],
@@ -566,8 +566,12 @@ export function issuesFeaturing(db, { kind, name, includeRestricted = false, lim
       LEFT JOIN cv_series cs ON cs.comicvine_id = h.cv_series_id
      WHERE (@includeRestricted OR COALESCE(s.restricted, 0) = 0)
      GROUP BY h.cv_issue_id
-     ORDER BY owned DESC, h.cover_date, h.cv_issue_id
-     LIMIT @limit`).all({ name: String(name), includeRestricted: includeRestricted ? 1 : 0, limit });
+     ORDER BY owned DESC, h.cover_date, h.cv_issue_id`)
+    // No cap: a prolific creator legitimately has hundreds of issues here
+    // (843 is the busiest in a 42k-row library, and that grows as metadata is
+    // filled in). Truncating silently would quietly lie about the collection;
+    // the caller windows the list instead so the DOM stays small.
+    .all({ name: String(name), includeRestricted: includeRestricted ? 1 : 0 });
   return rows.map((r) => ({ ...r, owned: !!r.owned }));
 }
 

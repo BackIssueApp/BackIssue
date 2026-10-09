@@ -19,7 +19,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   coverage for anything whose metadata has been downloaded; character listings
   are thin, because the sources record them for a minority of issues and mostly
   recent ones, so an empty result says which of the two you are looking at
-  rather than implying your collection has none.
+  rather than implying your collection has none. The list is complete, not
+  capped — the busiest creator here has 843 credits — and only the rows near
+  the viewport are rendered, so a long one stays quick.
 
 ### Changed
 
