@@ -8,6 +8,20 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+
+- **Characters, teams, locations and story arcs are written into your files.**
+  They are standard `ComicInfo.xml` elements that every other reader and
+  library server reads, and they were never written — even though the data
+  was already cached. They are there now, along with page count. ComicVine
+  supplies them where it has them, which is about 6% of issues and almost
+  nothing before 1980 because they are hand-tagged there; Metron fills the
+  rest. Existing files need a re-tag to pick them up.
+- **Everything Metron publishes is kept.** Alongside the prices, barcodes and
+  ratings already stored, an issue now carries its characters, teams, arcs,
+  universes, per-role credits, description, title, page count, imprint,
+  publisher and Metron and Grand Comics Database ids.
+
 ### Fixed
 
 - **A comic with nothing in it to read is a problem now.** Some releases ship a

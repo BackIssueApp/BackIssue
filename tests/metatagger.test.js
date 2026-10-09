@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import JSZip from 'jszip';
-import { buildComicInfoXml, stripHtml, mapCredits, tagCbzBuffer, writeComicInfo, ensureCvIssueDetail, tagFileFromCv, fetchAllIssueMetadata } from '../src/metatagger.js';
+import { buildComicInfoXml, stripHtml, mapCredits, namesOf, tagCbzBuffer, writeComicInfo, ensureCvIssueDetail, tagFileFromCv, fetchAllIssueMetadata } from '../src/metatagger.js';
 import { openDb, upsertSeries, upsertCvSeries, upsertCvIssue, upsertLibraryFile, linkLibraryFile, linkFileCvIssue, getLibraryFile } from '../src/db.js';
 
 const SERIES = { comicvine_id: 46568, name: 'Saga', publisher: 'Image', start_year: '2012', count_of_issues: 72, site_detail_url: 'https://cv/saga' };
@@ -223,4 +223,56 @@ test('tagFileFromCv converts a .cbr to .cbz, then tags it', async () => {
   const zip = await JSZip.loadAsync(await fs.readFile(cbz));
   assert.match(await zip.file('ComicInfo.xml').async('string'), /<Series>Saga<\/Series>/);
   await fs.rm(dir, { recursive: true, force: true });
+});
+
+test('ComicInfo carries characters, teams, locations and arcs — CV first, Metron behind it', () => {
+  // These are standard ComicInfo elements every other reader reads, and they
+  // were never written. ComicVine has characters for ~6% of issues and almost
+  // none before 1980, so for most of a library Metron is the only source.
+  const xml = buildComicInfoXml({
+    series: { name: 'Saga', publisher: 'Image' },
+    issue: {
+      issue_number: '1',
+      character_credits: JSON.stringify([{ id: 1, name: 'Alana' }, { id: 2, name: 'Marko' }]),
+      team_credits: JSON.stringify([{ id: 7, name: 'Blue Crew' }]),
+      location_credits: JSON.stringify([{ id: 8, name: 'Cleave' }]),
+      story_arc_credits: JSON.stringify([{ id: 3, name: 'Volume One' }]),
+      metron_page_count: '52',
+    },
+  });
+  assert.match(xml, /<Characters>Alana, Marko<\/Characters>/);
+  assert.match(xml, /<Teams>Blue Crew<\/Teams>/);
+  assert.match(xml, /<Locations>Cleave<\/Locations>/);
+  assert.match(xml, /<StoryArc>Volume One<\/StoryArc>/);
+  assert.match(xml, /<PageCount>52<\/PageCount>/);
+});
+
+test('with no ComicVine characters, Metron fills them', () => {
+  const xml = buildComicInfoXml({
+    series: { name: 'Action Comics', publisher: 'DC' },
+    issue: {
+      issue_number: '1',
+      character_credits: '[]',                       // CV checked, has none
+      metron_characters: JSON.stringify([{ id: 1, name: 'Superman' }]),
+      metron_arcs: JSON.stringify([{ id: 2, name: 'Savage Dawn' }]),
+    },
+  });
+  assert.match(xml, /<Characters>Superman<\/Characters>/);
+  assert.match(xml, /<StoryArc>Savage Dawn<\/StoryArc>/);
+});
+
+test('an issue with neither source omits the elements rather than emitting empties', () => {
+  const xml = buildComicInfoXml({ series: { name: 'S' }, issue: { issue_number: '1' } });
+  for (const el of ['Characters', 'Teams', 'Locations', 'StoryArc', 'PageCount']) {
+    assert.ok(!xml.includes(`<${el}>`), `${el} should be absent, not empty`);
+  }
+});
+
+test('namesOf copes with every shape these arrays arrive in', () => {
+  assert.deepEqual(namesOf('[{"name":"A"},{"name":"B"}]'), ['A', 'B']);      // JSON text from the column
+  assert.deepEqual(namesOf([{ creator: 'C' }]), ['C']);                      // Metron credits
+  assert.deepEqual(namesOf([{ name: 'A' }, { name: 'A' }]), ['A']);          // deduped
+  assert.deepEqual(namesOf(null), []);
+  assert.deepEqual(namesOf('not json'), []);
+  assert.deepEqual(namesOf([{ nope: 1 }]), []);
 });

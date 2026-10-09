@@ -261,8 +261,14 @@ function migrate(db) {
   // Per-issue: full CV credit arrays + every Metron extra. metron_checked
   // marks "enrichment answered" (hit or miss) so detail rows cached before
   // enrichment existed re-fetch exactly once, not forever.
+  // metron_characters/_teams/_arcs matter most: ComicVine carries characters
+  // for ~6% of issues and almost none before 1980 (they are hand-tagged
+  // there), so for most of a library Metron is the only source of them.
   for (const col of ['metron_price', 'metron_upc', 'metron_story_titles', 'metron_reprints', 'metron_checked',
                      'metron_isbn', 'metron_sku', 'metron_foc_date', 'metron_variants', 'metron_cover_hash', 'metron_rating',
+                     'metron_characters', 'metron_teams', 'metron_arcs', 'metron_universes', 'metron_credits',
+                     'metron_description', 'metron_title', 'metron_alt_number', 'metron_page_count',
+                     'metron_imprint', 'metron_publisher', 'metron_resource_url', 'metron_image', 'metron_gcd_id',
                      'character_credits', 'team_credits', 'location_credits', 'story_arc_credits', 'associated_images']) {
     if (cvi.length && !cvi.includes(col)) db.exec(`ALTER TABLE cv_issues ADD COLUMN ${col} TEXT`);
   }
@@ -1726,6 +1732,7 @@ export function setCvIssueDetail(db, comicvineId, {
   ).run(...baseCols.map((c) => base[c]), comicvineId).changes;
   // Enrichment answered (object = data, null = checked miss). Absent key =
   // enrichment off/unsupported — leave whatever a prior fetch stored.
+  const json = (a) => (Array.isArray(a) && a.length ? JSON.stringify(a) : null);
   if (metron !== undefined) {
     const mbase = {
       metron_price: metron?.price ?? null,
@@ -1738,6 +1745,20 @@ export function setCvIssueDetail(db, comicvineId, {
       metron_variants: metron?.variants?.length ? JSON.stringify(metron.variants) : null,
       metron_cover_hash: metron?.cover_hash ?? null,
       metron_rating: metron?.rating ?? null,
+      metron_characters: json(metron?.characters),
+      metron_teams: json(metron?.teams),
+      metron_arcs: json(metron?.arcs),
+      metron_universes: json(metron?.universes),
+      metron_credits: json(metron?.credits),
+      metron_description: metron?.description ?? null,
+      metron_title: metron?.title || null,
+      metron_alt_number: metron?.alt_number || null,
+      metron_page_count: metron?.page_count != null ? String(metron.page_count) : null,
+      metron_imprint: metron?.imprint || null,
+      metron_publisher: metron?.publisher ? JSON.stringify(metron.publisher) : null,
+      metron_resource_url: metron?.resource_url || null,
+      metron_image: metron?.image || null,
+      metron_gcd_id: metron?.gcd_id != null ? String(metron.gcd_id) : null,
     };
     const mcols = Object.keys(mbase).filter((c) => !locked.has(c));
     db.prepare(
