@@ -6,8 +6,14 @@ import { load } from 'cheerio';
 import { createExtractorFromData } from 'node-unrar-js';
 import JSZip from 'jszip';
 
-const IMG_RE = /\.(jpe?g|png|webp|gif|bmp)$/i;
-export function isImageName(name) { return IMG_RE.test(String(name)); }
+// Must stay in step with the reader plugin's own page test (its pages.js) — it
+// is the thing that decides whether a page is readable, and core calling a page
+// "not an image" that the reader happily renders would condemn a good comic.
+// The junk exclusion matters for counting: an archive whose only "images" are
+// macOS resource forks has no pages in it.
+const IMG_RE = /\.(jpe?g|png|webp|gif|bmp|avif)$/i;
+const JUNK_RE = /(^|\/)(__MACOSX\/|\._|\.DS_Store$)/i;
+export function isImageName(name) { const n = String(name); return IMG_RE.test(n) && !JUNK_RE.test(n); }
 
 // ArrayBuffer for node-unrar-js without copying when possible. A Buffer from
 // fs.readFile of a non-tiny file owns its whole ArrayBuffer, so we can hand it
@@ -299,11 +305,30 @@ export async function unwrapNestedArchive(path) {
   const info = await readArchiveInfo(p);
   if (info.pageCount) return { unwrapped: false, reason: 'already has pages' };
 
-  const zip = await JSZip.loadAsync(await fs.readFile(p)).catch(() => null);
-  if (!zip) return { unwrapped: false, reason: 'not a zip' };
+  const out = await unwrapNestedBuffer(await fs.readFile(p));
+  if (!out.buffer) return { unwrapped: false, reason: out.reason };
+
+  const tmp = p + '.part';
+  await fs.writeFile(tmp, out.buffer);
+  const check = await readArchiveInfo(tmp);          // prove it before destroying anything
+  if (!check.ok || !check.pageCount) {
+    await fs.unlink(tmp).catch(() => {});
+    return { unwrapped: false, reason: 'unwrapped result had no pages' };
+  }
+  await fs.rename(tmp, p);
+  return { unwrapped: true, pages: check.pageCount, wasRar: out.wasRar };
+}
+
+/** The unwrap itself, on bytes, so a download can be straightened out before it
+ *  is ever written and the Tools pass can repair what is already on disk — one
+ *  implementation, two callers. Returns { buffer, wasRar } or { reason }. */
+export async function unwrapNestedBuffer(bytes) {
+  const zip = await JSZip.loadAsync(bytes).catch(() => null);
+  if (!zip) return { reason: 'not a zip' };
   const entries = Object.values(zip.files).filter((f) => !f.dir);
+  if (entries.some((f) => isImageName(f.name))) return { reason: 'already has pages' };
   const nested = entries.filter((f) => ARCHIVE_RE.test(f.name));
-  if (nested.length !== 1) return { unwrapped: false, reason: nested.length ? 'more than one archive inside' : 'nothing to unwrap' };
+  if (nested.length !== 1) return { reason: nested.length ? 'more than one archive inside' : 'nothing to unwrap' };
 
   const inner = await nested[0].async('nodebuffer');
   // Trust the bytes, not the inner name: a ".cbr" inside is as likely to be a zip.
@@ -312,9 +337,9 @@ export async function unwrapNestedArchive(path) {
 
   // Carry the wrapper's metadata in if the inner archive brought none.
   const outZip = await JSZip.loadAsync(out).catch(() => null);
-  if (!outZip) return { unwrapped: false, reason: 'inner archive unreadable' };
+  if (!outZip) return { reason: 'inner archive unreadable' };
   const innerNames = Object.values(outZip.files).filter((f) => !f.dir).map((f) => f.name);
-  if (!innerNames.some(isImageName)) return { unwrapped: false, reason: 'inner archive has no pages either' };
+  if (!innerNames.some(isImageName)) return { reason: 'inner archive has no pages either' };
   if (!innerNames.some(isCI)) {
     const ci = entries.find((f) => isCI(f.name));
     if (ci) {
@@ -323,15 +348,7 @@ export async function unwrapNestedArchive(path) {
     }
   }
 
-  const tmp = p + '.part';
-  await fs.writeFile(tmp, out);
-  const check = await readArchiveInfo(tmp);          // prove it before destroying anything
-  if (!check.ok || !check.pageCount) {
-    await fs.unlink(tmp).catch(() => {});
-    return { unwrapped: false, reason: 'unwrapped result had no pages' };
-  }
-  await fs.rename(tmp, p);
-  return { unwrapped: true, pages: check.pageCount, wasRar: isRar };
+  return { buffer: out, wasRar: isRar };
 }
 
 // Repack a mislabeled archive — RAR bytes carrying a .cbz/.zip name — into a

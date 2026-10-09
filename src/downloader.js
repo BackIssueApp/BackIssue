@@ -11,7 +11,7 @@ import { fileStemFromPattern } from './naming.js';
 import { resolveSeriesDir } from './paths.js';
 import { indexDownloadedFile } from './library.js';
 import { tagCbzBuffer, taggingEnabled, xmlForIssue, writeSidecar, tagPlacementFor } from './metatagger.js';
-import { cbrBufferToCbz } from './archive.js';
+import { cbrBufferToCbz, unwrapNestedBuffer, isImageName } from './archive.js';
 import { makeCvClient } from './cv.js';
 // NOTE: sources/index.js is imported lazily inside runQueue to avoid a module
 // cycle (a source that builds files imports from here).
@@ -129,7 +129,18 @@ export async function finalizeComic({ buffer, srcPath, format = 'cbz', issue, se
   // to a real zip before we can tag it (tagCbzBuffer is JSZip) or file it as
   // .cbz; otherwise JSZip throws "Can't find end of central directory". This is
   // the download-import conversion path cbrBufferToCbz is meant to own.
-  if (buf[0] === 0x50 && buf[1] === 0x4b) format = 'cbz';                     // "PK" → ZIP
+  if (buf[0] === 0x50 && buf[1] === 0x4b) {                                   // "PK" → ZIP
+    format = 'cbz';
+    // A zip is not automatically a comic. Some releases are a .cbz wrapped
+    // around a .cbr: the magic bytes say zip, it tags cleanly, and there is
+    // nothing inside to read. Straighten it out HERE, before it is written,
+    // rather than filing a file the library will have to flag later.
+    const un = await unwrapNestedBuffer(buf);
+    if (un.buffer) { buf = un.buffer; }
+    else if (un.reason !== 'already has pages') {
+      throw new Error(`downloaded file has no pages (${un.reason}) — the source copy is not a readable comic`);
+    }
+  }
   else if (buf.toString('latin1', 0, 4) === 'Rar!') {                         // "Rar!" → repack
     // Repack RAR → CBZ so it can be tagged and read as a zip. A RAR too large
     // to extract in memory (the WASM-heap ceiling) is filed AS-IS: the app

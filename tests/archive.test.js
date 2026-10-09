@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import JSZip from 'jszip';
 import { existsSync } from 'node:fs';
-import { readArchiveInfo, parseComicInfo, isImageName, convertCbrToCbz, verifyArchive, sniffFormat, repackRarAsZip, unwrapNestedArchive } from '../src/archive.js';
+import { readArchiveInfo, parseComicInfo, isImageName, convertCbrToCbz, verifyArchive, sniffFormat, repackRarAsZip, unwrapNestedArchive, unwrapNestedBuffer } from '../src/archive.js';
 
 test('readArchiveInfo reads the committed .cbr fixture', async () => {
   const r = await readArchiveInfo('tests/fixtures/sample.cbr');
@@ -312,4 +312,50 @@ test('unwrapNestedArchive refuses what it cannot prove, and leaves the file alon
   const g = new JSZip(); g.file('001.jpg', Buffer.from([0xff, 0xd8, 0xff]));
   await fs.writeFile(good, await g.generateAsync({ type: 'nodebuffer' }));
   assert.equal((await unwrapNestedArchive(good)).unwrapped, false);
+});
+
+test('unwrapNestedBuffer leaves a real comic alone and straightens a wrapper', async () => {
+  // The download path uses this before anything touches disk.
+  const good = new JSZip();
+  good.file('001.jpg', Buffer.from([0xff, 0xd8, 0xff]));
+  const goodBuf = await good.generateAsync({ type: 'nodebuffer' });
+  const left = await unwrapNestedBuffer(goodBuf);
+  assert.equal(left.buffer, undefined);
+  assert.equal(left.reason, 'already has pages');
+
+  const inner = new JSZip();
+  inner.file('001.jpg', Buffer.from([0xff, 0xd8, 0xff]));
+  const outer = new JSZip();
+  outer.file('Release.cbr', await inner.generateAsync({ type: 'nodebuffer' }));
+  outer.file('ComicInfo.xml', '<ComicInfo><Series>S</Series></ComicInfo>');
+  const fixed = await unwrapNestedBuffer(await outer.generateAsync({ type: 'nodebuffer' }));
+  assert.ok(fixed.buffer, 'the wrapper was unwrapped in memory');
+  const names = Object.keys((await JSZip.loadAsync(fixed.buffer)).files);
+  assert.ok(names.some(isImageName), 'pages are at the top level now');
+  assert.ok(names.some((n) => /ComicInfo\.xml$/i.test(n)), 'the wrapper metadata came with it');
+});
+
+test('AVIF pages count, and macOS junk does not', async () => {
+  // The reader renders .avif, so core must not call such a comic pageless.
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'avif-'));
+  const zip = new JSZip();
+  zip.file('001.avif', Buffer.from([0, 0, 0, 0]));
+  zip.file('__MACOSX/._001.avif', Buffer.from([0]));
+  const p = path.join(dir, 'Modern 001.cbz');
+  await fs.writeFile(p, await zip.generateAsync({ type: 'nodebuffer' }));
+  const r = await readArchiveInfo(p);
+  assert.equal(r.ok, true, 'an AVIF comic is a comic');
+  assert.equal(r.pageCount, 1, 'the resource fork is not a page');
+});
+
+test('an archive of nothing but macOS junk has no pages', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'junk-'));
+  const zip = new JSZip();
+  zip.file('__MACOSX/._001.jpg', Buffer.from([0]));
+  zip.file('.DS_Store', Buffer.from([0]));
+  const p = path.join(dir, 'Junk 001.cbz');
+  await fs.writeFile(p, await zip.generateAsync({ type: 'nodebuffer' }));
+  const r = await readArchiveInfo(p);
+  assert.equal(r.ok, false);
+  assert.match(r.error, /no pages/);
 });

@@ -19,6 +19,18 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   looking fine. Empty and truncated archives are caught by the same check.
   Books are unaffected: an EPUB with no image in it is still a good EPUB.
 
+- **A download that is a wrapper is straightened out on the way in.** The import
+  step sniffed the magic bytes, saw a zip and filed it — so a release packaged
+  as a `.cbz` around a `.cbr` was written to the library exactly as the source
+  shipped it. It is now unwrapped before anything reaches disk, and a zip with
+  no pages that cannot be unwrapped is refused outright, the way an
+  unrecognisable container already was.
+- **AVIF pages count as pages.** The reader renders them; core's page test did
+  not list them, so an AVIF comic would have been called pageless by the check
+  above. The two tests now agree. macOS resource forks (`__MACOSX`, `._*`) no
+  longer count as pages either, so an archive of nothing but junk reads as
+  empty rather than full.
+
 ### Added
 
 - **Unwrap nested archives** (Tools). Repairs the files the check above finds:
