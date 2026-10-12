@@ -401,8 +401,12 @@
   const azCurrent = $derived.by(() => {
     void rail.rows;
     const c = view === 'grid' ? Math.max(1, cols) : 1;
-    const topRow = Math.max(0, Math.floor((scrollTop - listTop) / Math.max(1, stride)));
-    const r = rail.rows[topRow * c];
+    // Sample ~a third of a viewport down, not the very top-left cell: in a grid
+    // the first title of a letter often sits at the end of a row that starts in
+    // the previous letter, and this reflects what the eye is actually on.
+    const y = scrollTop - listTop + viewH * 0.3;
+    const row = Math.max(0, Math.floor(y / Math.max(1, stride)));
+    const r = rail.rows[row * c];
     const ch = (r?.title || r?.folder || '').trimStart().charAt(0).toUpperCase();
     return /[A-Z]/.test(ch) ? ch : '#';
   });
@@ -415,7 +419,22 @@
       await tick();
       measure();
       const c = view === 'grid' ? Math.max(1, cols) : 1;
-      scroller.scrollTop = listTop + Math.floor(offset / c) * stride;
+      const target = Math.max(0, listTop + Math.floor(offset / c) * stride);
+      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      const far = Math.abs(target - scroller.scrollTop) > viewH * 1.5;
+      if (reduce || viewH <= 0) {
+        scroller.scrollTop = target;                 // no motion
+      } else {
+        // Glide a fixed short distance into the target regardless of how far it
+        // is: jump instantly to ~one viewport away (the virtualized rows render
+        // there), then smooth-scroll the last stretch so arrival reads as motion
+        // rather than a teleport.
+        if (far) {
+          scroller.scrollTop = Math.max(0, target - viewH);
+          await tick();
+        }
+        scroller.scrollTo({ top: target, behavior: 'smooth' });
+      }
       scrollTop = scroller.scrollTop;
     } finally { azJumping = false; }
   }
@@ -691,20 +710,24 @@
 
   /* A-Z quick-jump rail: floats down the right edge of the scroll area, over
      the content margin. Shown only under the title sort. */
-  .libx__az { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); z-index: 6;
-    display: flex; flex-direction: column; align-items: stretch; gap: 0;
-    padding: 4px 2px; max-height: calc(100% - 90px); border-radius: 9px;
-    background: color-mix(in srgb, var(--panel) 72%, transparent); backdrop-filter: blur(3px);
-    box-shadow: 0 2px 12px rgba(0,0,0,.28); opacity: .55; transition: opacity .15s; }
+  .libx__az { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); z-index: 6;
+    display: flex; flex-direction: column; align-items: stretch; gap: 1px;
+    padding: 7px 4px; max-height: calc(100% - 70px); border-radius: 12px;
+    background: color-mix(in srgb, var(--panel) 80%, transparent); backdrop-filter: blur(4px);
+    border: 1px solid var(--line); box-shadow: 0 4px 16px rgba(0,0,0,.32);
+    opacity: .7; transition: opacity .15s; }
   .libx:hover .libx__az, .libx__az:hover, .libx__az:focus-within { opacity: 1; }
-  .libx__az.is-busy { pointer-events: none; opacity: .9; }
+  .libx__az.is-busy { pointer-events: none; }
   .libx__azl { appearance: none; border: none; background: none; cursor: pointer;
-    color: var(--muted); font: 600 10.5px var(--font-mono); line-height: 1;
-    padding: 2px 5px; border-radius: 5px; letter-spacing: .02em; }
+    color: var(--muted); font: 700 13px var(--font-mono); line-height: 1;
+    min-width: 24px; min-height: 20px; display: flex; align-items: center; justify-content: center;
+    padding: 2px 6px; border-radius: 6px; letter-spacing: .02em; transition: color .1s, background .1s; }
   .libx__azl:hover { color: var(--text); background: var(--panel-2); }
-  .libx__azl.is-current { color: var(--accent); }
-  @media (max-width: 720px) { .libx__az { gap: 0; padding: 3px 1px; }
-    .libx__azl { font-size: 10px; padding: 1px 6px; } }
+  .libx__azl.is-current { color: var(--accent); background: rgba(255,45,111,.12); }
+  /* Coarse pointers (touch) get a bigger hit target. */
+  @media (pointer: coarse) { .libx__azl { font-size: 14px; min-height: 24px; padding: 3px 8px; } }
+  /* Short viewports: shrink a touch so all 27 still fit without clipping. */
+  @media (max-height: 760px) { .libx__azl { font-size: 11.5px; min-height: 17px; padding: 1px 6px; } }
   /* The bar itself never scrolls: the chip row is the scroll container (with
      edge fades), and the actions cluster — Add above all — stays on screen at
      every width. Narrow screens put the actions on their own row. */

@@ -142,22 +142,36 @@ export async function collectionJumpOffset(letter) {
 
 // Load pages until the loaded prefix reaches row `n` — the A-Z jump needs a
 // contiguous prefix up to the target, since the grid virtualizes a prefix from
-// row 0. Uses the largest page the server allows (500) to keep the request
-// count down, and aborts if the scope changes mid-run.
+// row 0. Fetches the missing pages (500 rows each) in parallel, in bounded
+// waves, so a far jump is one round-trip's wait instead of several in series.
+// Aborts cleanly if the scope changes mid-run.
 export async function loadUpTo(n) {
   if (!rail.loaded) return;
-  let guardRuns = 0;
-  while (rail.rows.length <= n && rail.rows.length < rail.total && guardRuns++ < 4000) {
-    const offset = rail.rows.length;
-    const scope = collectionScope();
-    rail.loadingMore = true;
-    try {
-      const r = await apiGet('/api/collection?counts=0&offset=' + offset + '&limit=500&' + scope);
-      if (rail.rows.length !== offset || scope !== collectionScope()) break; // scope changed under us
-      if (!r.rows?.length) break;
-      rail.rows = [...rail.rows, ...r.rows];
-    } catch { break; } finally { rail.loadingMore = false; }
-  }
+  const PAGE = 500;
+  const WAVE = 8; // concurrent requests per wave — fast without flooding the server
+  const scope = collectionScope();
+  const target = Math.min(n + 1, rail.total);
+  const start = rail.rows.length;
+  if (start >= target) return;
+  const offsets = [];
+  for (let o = start; o < target; o += PAGE) offsets.push(o);
+  rail.loadingMore = true;
+  try {
+    for (let i = 0; i < offsets.length; i += WAVE) {
+      const batch = offsets.slice(i, i + WAVE);
+      const pages = await Promise.all(batch.map((o) =>
+        apiGet('/api/collection?counts=0&offset=' + o + '&limit=' + PAGE + '&' + scope)
+          .then((r) => r?.rows || null).catch(() => null)));
+      // A scope change (filter/sort/search) or a failed page → stop; keep the
+      // contiguous prefix we have rather than splicing a gap into it.
+      if (scope !== collectionScope() || pages.some((p) => p === null)) return;
+      const merged = pages.flat();
+      if (!merged.length) return;
+      // Only append if our tail still lines up with this wave's first offset.
+      if (rail.rows.length !== batch[0]) return;
+      rail.rows = [...rail.rows, ...merged];
+    }
+  } finally { rail.loadingMore = false; }
 }
 
 // Open a series by id: fetch the ComicVine-authoritative detail and derive the
