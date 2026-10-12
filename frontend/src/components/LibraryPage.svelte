@@ -2,7 +2,8 @@
   // The Library: a poster wall of every volume (grid), or a dense table
   // (list) for power flows. Replaces the old side rail as the main '/' view.
   import { navigate, route, setQuery } from '../lib/router.svelte.js';
-  import { rail, railSelect, ops, loadCollection, loadMoreCollection, setLibrarySort } from '../lib/store.svelte.js';
+  import { rail, railSelect, ops, loadCollection, loadMoreCollection, setLibrarySort, collectionJumpOffset, loadUpTo } from '../lib/store.svelte.js';
+  import { tick } from 'svelte';
   import { status } from '../lib/status.svelte.js';
   import { apiGet, apiPost } from '../lib/api.js';
   import { notify } from '../lib/toasts.svelte.js';
@@ -385,6 +386,39 @@
     listTop = listEl ? listEl.offsetTop : 0;
   }
   $effect(() => { void rail.rows; void view; measure(); });
+
+  /* ---- A-Z quick jump (issue #10) ----
+     A Plex-style letter rail down the right edge, shown only under the A-Z
+     (title) sort. Clicking a letter asks the server for that letter's row
+     offset in the current scope, loads the grid's prefix up to it (the window
+     virtualizes a prefix from row 0), then scrolls there. */
+  const AZ_LETTERS = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
+  const AZ_MIN = 40; // not worth the rail for a handful of series
+  const showAz = $derived(!homeMode && rail.loaded && rail.sort === 'title' && rail.total > AZ_MIN && !!rail.rows.length);
+  let azJumping = $state(false);
+  // The bucket of the top visible row, to highlight where you are. Derived
+  // from scrollTop (not range.start, which is pulled back by the overscan).
+  const azCurrent = $derived.by(() => {
+    void rail.rows;
+    const c = view === 'grid' ? Math.max(1, cols) : 1;
+    const topRow = Math.max(0, Math.floor((scrollTop - listTop) / Math.max(1, stride)));
+    const r = rail.rows[topRow * c];
+    const ch = (r?.title || r?.folder || '').trimStart().charAt(0).toUpperCase();
+    return /[A-Z]/.test(ch) ? ch : '#';
+  });
+  async function jumpToLetter(letter) {
+    if (!scroller || azJumping) return;
+    azJumping = true;
+    try {
+      const offset = letter === '#' ? 0 : await collectionJumpOffset(letter);
+      if (offset > 0) await loadUpTo(offset);
+      await tick();
+      measure();
+      const c = view === 'grid' ? Math.max(1, cols) : 1;
+      scroller.scrollTop = listTop + Math.floor(offset / c) * stride;
+      scrollTop = scroller.scrollTop;
+    } finally { azJumping = false; }
+  }
   // The home rail is filled by a plugin (plain DOM), so Svelte can't see it
   // change height or gain shelves — watch it, re-measure listTop when shelves
   // appear/hide, and track whether any shelf rendered (drives the home hint).
@@ -637,13 +671,40 @@
       </div>
     {/if}
   </div>
+
+  {#if showAz}
+    <nav class="libx__az" class:is-busy={azJumping} aria-label="Jump to letter">
+      {#each AZ_LETTERS as L (L)}
+        <button class="libx__azl" class:is-current={azCurrent === L}
+          title={L === '#' ? 'Numbers & symbols' : L} aria-label="Jump to {L}"
+          onclick={() => jumpToLetter(L)}>{L}</button>
+      {/each}
+    </nav>
+  {/if}
 </section>
 
 <FiltersModal open={filtersOpen} type={currentType} libraryId={currentLibrary?.id ?? null}
   selection={facetSelection} onapply={applyFacets} onclose={() => (filtersOpen = false)} />
 
 <style>
-  .libx { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  .libx { display: flex; flex-direction: column; height: 100%; min-height: 0; position: relative; }
+
+  /* A-Z quick-jump rail: floats down the right edge of the scroll area, over
+     the content margin. Shown only under the title sort. */
+  .libx__az { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); z-index: 6;
+    display: flex; flex-direction: column; align-items: stretch; gap: 0;
+    padding: 4px 2px; max-height: calc(100% - 90px); border-radius: 9px;
+    background: color-mix(in srgb, var(--panel) 72%, transparent); backdrop-filter: blur(3px);
+    box-shadow: 0 2px 12px rgba(0,0,0,.28); opacity: .55; transition: opacity .15s; }
+  .libx:hover .libx__az, .libx__az:hover, .libx__az:focus-within { opacity: 1; }
+  .libx__az.is-busy { pointer-events: none; opacity: .9; }
+  .libx__azl { appearance: none; border: none; background: none; cursor: pointer;
+    color: var(--muted); font: 600 10.5px var(--font-mono); line-height: 1;
+    padding: 2px 5px; border-radius: 5px; letter-spacing: .02em; }
+  .libx__azl:hover { color: var(--text); background: var(--panel-2); }
+  .libx__azl.is-current { color: var(--accent); }
+  @media (max-width: 720px) { .libx__az { gap: 0; padding: 3px 1px; }
+    .libx__azl { font-size: 10px; padding: 1px 6px; } }
   /* The bar itself never scrolls: the chip row is the scroll container (with
      edge fades), and the actions cluster — Add above all — stays on screen at
      every width. Narrow screens put the actions on their own row. */

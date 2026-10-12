@@ -1168,7 +1168,7 @@ function chipPredicateSql(filter, { guardOuter, seriesTypeList, params }) {
 // thread: better-sqlite3 is synchronous, and this is the app's heaviest read —
 // at 320k series it blocks the event loop for ~0.5-1s, stalling every other
 // request (pages, covers) behind it.
-export function buildCollCountSql({ keys = [], filter = 'all', search = '', includeRestricted = true, userId = null, library = null, restrictIds = null, collectionsOnly = false } = {}) {
+export function buildCollCountSql({ keys = [], filter = 'all', search = '', includeRestricted = true, userId = null, library = null, restrictIds = null, collectionsOnly = false, jumpLetter = null } = {}) {
   const { selfTypes, params: selfParams, guard } = selfTypeGuard('s.');
   const { guard: guardOuter } = selfTypeGuard('');
   const seriesTypes = [...SERIES_TYPES];
@@ -1177,12 +1177,18 @@ export function buildCollCountSql({ keys = [], filter = 'all', search = '', incl
   const mem = membershipWhere({ guard, selfTypesLen: selfTypes.length, includeRestricted, library, search, restrictIds, collectionsOnly });
   const params = { uid: userId ?? -1, ...selfParams, ...stParams, ...mem.params };
   const predCtx = { guardOuter, seriesTypeList, params };
+  // A-Z jump: `__total` becomes the count of matching members that sort before
+  // this letter — i.e. the row offset of the first title in its bucket, under
+  // the title sort's binary `ORDER BY title` (so `title < @jumpLetter` is exact).
+  // The caller only reads `__total`, so the chip selects are skipped.
+  const jump = jumpLetter ? ' AND title < @jumpLetter' : '';
+  if (jumpLetter) params.jumpLetter = jumpLetter;
   const selects = keys.map((k) => k === 'all'
     ? `COUNT(*) "all"`
     : `SUM(CASE WHEN (${chipPredicateSql(k, predCtx)}) THEN 1 ELSE 0 END) "${k}"`);
   const totalSel = filter && filter !== 'all'
-    ? `SUM(CASE WHEN (${chipPredicateSql(filter, predCtx)}) THEN 1 ELSE 0 END) "__total"`
-    : `COUNT(*) "__total"`;
+    ? `SUM(CASE WHEN (${chipPredicateSql(filter, predCtx)})${jump} THEN 1 ELSE 0 END) "__total"`
+    : (jumpLetter ? `SUM(CASE WHEN 1${jump} THEN 1 ELSE 0 END) "__total"` : `COUNT(*) "__total"`);
   selects.push(totalSel);
   const sql = `WITH ${collCtes(libraryScopeSql(library))},
     coll AS (${collLeanCols(guard)} ${COLL_JOINS} ${mem.sql})
@@ -1203,6 +1209,17 @@ export function collCountRowToResult(keys, row) {
 function collCountPass(db, opts = {}) {
   const { sql, params } = buildCollCountSql(opts);
   return collCountRowToResult(opts.keys || [], db.prepare(sql).get(params) || {});
+}
+
+// Row offset of the first series in a letter's bucket, within the current
+// filter/search/library scope — so the A-Z rail can scroll straight to it. The
+// letter is an uppercase A-Z; the '#' bucket (digits/symbols) is offset 0, which
+// the caller handles without asking. Matches the title sort's binary ordering.
+export function collectionJumpOffset(db, { letter, ...opts } = {}) {
+  if (!letter) return 0;
+  const { sql, params } = buildCollCountSql({ ...opts, keys: [], jumpLetter: String(letter).toUpperCase().slice(0, 1) });
+  const row = db.prepare(sql).get(params) || {};
+  return Number(row.__total) || 0;
 }
 
 // Hydrate the full row shape for a bounded, ordered list of series ids — the

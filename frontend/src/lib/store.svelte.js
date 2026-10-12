@@ -130,6 +130,36 @@ export async function loadMoreCollection() {
   } catch { /* keep what we have */ } finally { rail.loadingMore = false; }
 }
 
+// Offset (row index) of the first series whose title starts with `letter`, in
+// the current filter/search/library scope — the server counts it in SQL so the
+// A-Z rail can scroll straight there. '#' is handled by the caller as 0.
+export async function collectionJumpOffset(letter) {
+  try {
+    const r = await apiGet('/api/collection/jump?letter=' + encodeURIComponent(letter) + '&' + collectionScope());
+    return Math.max(0, Number(r?.offset) || 0);
+  } catch { return 0; }
+}
+
+// Load pages until the loaded prefix reaches row `n` — the A-Z jump needs a
+// contiguous prefix up to the target, since the grid virtualizes a prefix from
+// row 0. Uses the largest page the server allows (500) to keep the request
+// count down, and aborts if the scope changes mid-run.
+export async function loadUpTo(n) {
+  if (!rail.loaded) return;
+  let guardRuns = 0;
+  while (rail.rows.length <= n && rail.rows.length < rail.total && guardRuns++ < 4000) {
+    const offset = rail.rows.length;
+    const scope = collectionScope();
+    rail.loadingMore = true;
+    try {
+      const r = await apiGet('/api/collection?counts=0&offset=' + offset + '&limit=500&' + scope);
+      if (rail.rows.length !== offset || scope !== collectionScope()) break; // scope changed under us
+      if (!r.rows?.length) break;
+      rail.rows = [...rail.rows, ...r.rows];
+    } catch { break; } finally { rail.loadingMore = false; }
+  }
+}
+
 // Open a series by id: fetch the ComicVine-authoritative detail and derive the
 // header info from it (works for matched, unmatched, and error states).
 export async function openVolume(id) {

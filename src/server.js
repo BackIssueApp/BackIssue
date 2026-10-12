@@ -7,7 +7,7 @@ import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
 import { initCountWorker, workerGetRow } from './countWorker.js';
-import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, collectionPage, buildCollCountSql, collCountRowToResult, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser, setMonitor, setIssueWants, clearIssuePicks, wantStates, MONITOR_STATES } from './db.js';
+import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, collectionPage, collectionJumpOffset, buildCollCountSql, collCountRowToResult, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser, setMonitor, setIssueWants, clearIssuePicks, wantStates, MONITOR_STATES } from './db.js';
 import { resolveSeriesDir, defaultRootedDir } from './paths.js';
 import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
@@ -1595,6 +1595,34 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       res.json((await countsFor(opts)).counts); // worker + cache; same shape as before
     } catch {
       res.json(collectionCounts(db, opts)); // sync fallback
+    }
+  });
+
+  // Row offset of the first series in a letter's bucket, for the A-Z quick-jump
+  // rail. Same filter/search/library/facet scope as /api/collection, so the
+  // offset lands in the exact list the grid is showing. Only meaningful under
+  // the default title (A-Z) sort — the rail is hidden for other sorts.
+  app.get('/api/collection/jump', (req, res) => {
+    const opts = {
+      letter: req.query.letter, filter: req.query.filter, search: req.query.search,
+      includeRestricted: canRestricted(req), userId: req.user.id,
+      library: req.query.library ? Number(req.query.library) : null,
+      collectionsOnly: req.query.collections === '1' || req.query.collections === 'true',
+    };
+    if (req.query.facet) {
+      try {
+        const selection = JSON.parse(req.query.facet);
+        const ctx = { db, userId: req.user.id, includeRestricted: opts.includeRestricted, library: opts.library };
+        const ids = registeredCollectionFilters()
+          .map((f) => { try { return f.resolve(selection, ctx); } catch { return null; } })
+          .find((r) => Array.isArray(r));
+        if (ids) opts.restrictIds = ids;
+      } catch { /* malformed facet param → ignore */ }
+    }
+    try {
+      res.json({ offset: collectionJumpOffset(db, opts) });
+    } catch {
+      res.json({ offset: 0 });
     }
   });
 

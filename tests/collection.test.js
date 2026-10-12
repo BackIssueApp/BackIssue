@@ -119,3 +119,23 @@ test('deleting a library moves its members to a surviving library', async () => 
   assert.equal(s.library_id, comics); // re-homed, not left in limbo
   assert.equal(s.type, 'comic');      // takes the new library's type
 });
+
+test('collectionJumpOffset: A-Z rail offsets match the binary title order', async () => {
+  const { openDb, upsertSeries, collectionJumpOffset } = await import('../src/db.js');
+  const db = openDb(':memory:');
+  // Seed members across buckets (followed = collection member). Binary
+  // `ORDER BY title` puts digits/symbols before A-Z.
+  for (const [i, title] of ['100 Bullets', 'Aquaman', 'Batman', 'Daredevil', 'Saga', 'Zatanna'].entries()) {
+    const id = upsertSeries(db, { title, url: 'cv:' + i, publisher: 'X' });
+    db.prepare('UPDATE series SET followed=1 WHERE id=?').run(id);
+  }
+  const off = (letter) => collectionJumpOffset(db, { letter, filter: 'all' });
+  assert.equal(off('A'), 1, 'A lands after the one # title');
+  assert.equal(off('B'), 2);
+  assert.equal(off('D'), 3);
+  assert.equal(off('S'), 4);
+  assert.equal(off('Z'), 5, 'last bucket: the 6 members, 5 sort before Zatanna');
+  assert.equal(off('C'), 3, 'an empty letter lands where it would sit (next title)');
+  assert.equal(collectionJumpOffset(db, { letter: 'a', filter: 'all' }), 1, 'lowercase is folded to the bucket');
+  assert.equal(collectionJumpOffset(db, {}), 0, 'no letter -> 0');
+});

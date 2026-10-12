@@ -8,6 +8,16 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+
+- **Jump to a letter in the Library** (#10). When the Library is sorted A-Z, a
+  letter rail runs down the right edge: click a letter and the grid scrolls
+  straight to the series starting with it, loading whatever it needs to get
+  there on the way. The current letter is highlighted as you scroll. The rail
+  appears only under the A-Z sort and only once a library has more than a
+  handful of series, and it works the same in the poster grid and the list, and
+  across comic, book and audiobook libraries.
+
 ## [0.9.0] — 2026-10-09
 
 ### Added
