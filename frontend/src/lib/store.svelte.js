@@ -27,7 +27,7 @@ export function setLibrarySort(v) {
   } catch { /* the URL still carries it for this visit */ }
 }
 
-export const rail = $state({ rows: [], counts: {}, total: 0, filter: 'all', sort: 'title', search: '', library: null, facet: '', collections: false, selecting: false, loaded: false, loadingMore: false });
+export const rail = $state({ rows: [], counts: {}, buckets: {}, total: 0, filter: 'all', sort: 'title', search: '', library: null, facet: '', collections: false, selecting: false, loaded: false, loadingMore: false });
 // Rows per network page — a few hundred keeps each response a few hundred KB.
 const COLLECTION_PAGE = 200;
 // Shell chrome state (mobile sidebar overlay).
@@ -98,6 +98,9 @@ export async function loadCollection() {
   // grid. Until it lands, total falls back to the page size — loadMore resumes
   // once the real total arrives.
   const countsReq = apiGet('/api/collection/counts?' + scope).catch(() => null);
+  // A-Z rail offsets, preloaded in parallel so a letter click needs no round
+  // trip. Scope-dependent (filter/search/library), so refetched with each load.
+  const bucketsReq = apiGet('/api/collection/jump?' + scope).then((b) => b || {}).catch(() => ({}));
   try {
     const r = await apiGet('/api/collection?counts=0&offset=0&limit=' + COLLECTION_PAGE + '&' + scope);
     if (seq !== loadSeq) return;
@@ -112,6 +115,8 @@ export async function loadCollection() {
     // filtered total (counts.all when no chip is active).
     if (typeof c[rail.filter] === 'number') rail.total = c[rail.filter];
   }
+  const b = await bucketsReq;
+  if (seq === loadSeq) rail.buckets = b;
 }
 
 // Fetch the next page and APPEND it — the infinite-scroll grid calls this as the

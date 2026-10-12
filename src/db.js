@@ -1168,7 +1168,7 @@ function chipPredicateSql(filter, { guardOuter, seriesTypeList, params }) {
 // thread: better-sqlite3 is synchronous, and this is the app's heaviest read —
 // at 320k series it blocks the event loop for ~0.5-1s, stalling every other
 // request (pages, covers) behind it.
-export function buildCollCountSql({ keys = [], filter = 'all', search = '', includeRestricted = true, userId = null, library = null, restrictIds = null, collectionsOnly = false, jumpLetter = null } = {}) {
+export function buildCollCountSql({ keys = [], filter = 'all', search = '', includeRestricted = true, userId = null, library = null, restrictIds = null, collectionsOnly = false, jumpLetter = null, buckets = false } = {}) {
   const { selfTypes, params: selfParams, guard } = selfTypeGuard('s.');
   const { guard: guardOuter } = selfTypeGuard('');
   const seriesTypes = [...SERIES_TYPES];
@@ -1183,6 +1183,18 @@ export function buildCollCountSql({ keys = [], filter = 'all', search = '', incl
   // The caller only reads `__total`, so the chip selects are skipped.
   const jump = jumpLetter ? ' AND title < @jumpLetter' : '';
   if (jumpLetter) params.jumpLetter = jumpLetter;
+  // Buckets mode: one row of 26 offsets, A..Z, each the count of matching
+  // members sorting before that letter (same binary ORDER BY title as the jump).
+  // The A-Z rail fetches these once per scope so a click needs no round trip.
+  if (buckets) {
+    const gate = filter && filter !== 'all' ? `(${chipPredicateSql(filter, predCtx)}) AND ` : '';
+    const sels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+      .map((L) => `SUM(CASE WHEN ${gate}title < '${L}' THEN 1 ELSE 0 END) "${L}"`);
+    const sql = `WITH ${collCtes(libraryScopeSql(library))},
+      coll AS (${collLeanCols(guard)} ${COLL_JOINS} ${mem.sql})
+      SELECT ${sels.join(', ')} FROM coll`;
+    return { sql, params };
+  }
   const selects = keys.map((k) => k === 'all'
     ? `COUNT(*) "all"`
     : `SUM(CASE WHEN (${chipPredicateSql(k, predCtx)}) THEN 1 ELSE 0 END) "${k}"`);
@@ -1220,6 +1232,16 @@ export function collectionJumpOffset(db, { letter, ...opts } = {}) {
   const { sql, params } = buildCollCountSql({ ...opts, keys: [], jumpLetter: String(letter).toUpperCase().slice(0, 1) });
   const row = db.prepare(sql).get(params) || {};
   return Number(row.__total) || 0;
+}
+
+// Every letter's row offset in one query, for the A-Z rail: { '#': 0, A, B, …Z }.
+// '#' (digits/symbols) is always the first bucket at 0.
+export function collectionBuckets(db, opts = {}) {
+  const { sql, params } = buildCollCountSql({ ...opts, keys: [], buckets: true });
+  const row = db.prepare(sql).get(params) || {};
+  const out = { '#': 0 };
+  for (const L of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') out[L] = Number(row[L]) || 0;
+  return out;
 }
 
 // Hydrate the full row shape for a bounded, ordered list of series ids — the

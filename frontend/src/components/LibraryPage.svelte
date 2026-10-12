@@ -401,10 +401,10 @@
   const azCurrent = $derived.by(() => {
     void rail.rows;
     const c = view === 'grid' ? Math.max(1, cols) : 1;
-    // Sample ~a third of a viewport down, not the very top-left cell: in a grid
-    // the first title of a letter often sits at the end of a row that starts in
-    // the previous letter, and this reflects what the eye is actually on.
-    const y = scrollTop - listTop + viewH * 0.3;
+    // Sample the viewport's vertical centre, not the top-left cell: in a grid
+    // the first title of a letter often sits mid-row after the previous letter,
+    // and the centre reflects what the eye is actually resting on.
+    const y = scrollTop - listTop + viewH * 0.5;
     const row = Math.max(0, Math.floor(y / Math.max(1, stride)));
     const r = rail.rows[row * c];
     const ch = (r?.title || r?.folder || '').trimStart().charAt(0).toUpperCase();
@@ -414,23 +414,28 @@
     if (!scroller || azJumping) return;
     azJumping = true;
     try {
-      const offset = letter === '#' ? 0 : await collectionJumpOffset(letter);
-      if (offset > 0) await loadUpTo(offset);
+      // Offset is preloaded per scope (rail.buckets) so the click needs no round
+      // trip; fall back to a one-off fetch only if the preload hasn't landed.
+      const offset = letter === '#' ? 0
+        : (rail.buckets?.[letter] ?? await collectionJumpOffset(letter));
+      if (offset > 0 && offset >= rail.rows.length) await loadUpTo(offset);
       await tick();
       measure();
       const c = view === 'grid' ? Math.max(1, cols) : 1;
       const target = Math.max(0, listTop + Math.floor(offset / c) * stride);
+      const maxScroll = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
       const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
       const far = Math.abs(target - scroller.scrollTop) > viewH * 1.5;
       if (reduce || viewH <= 0) {
         scroller.scrollTop = target;                 // no motion
       } else {
-        // Glide a fixed short distance into the target regardless of how far it
-        // is: jump instantly to ~one viewport away (the virtualized rows render
-        // there), then smooth-scroll the last stretch so arrival reads as motion
-        // rather than a teleport.
+        // Glide a fixed short distance into the target, approaching from the
+        // direction of travel: pre-position one viewport before the target on
+        // the side we're coming from (the virtualized rows render there), then
+        // smooth-scroll onto it — so a backward jump scrolls up, not down.
         if (far) {
-          scroller.scrollTop = Math.max(0, target - viewH);
+          const down = target > scroller.scrollTop;
+          scroller.scrollTop = down ? Math.max(0, target - viewH) : Math.min(maxScroll, target + viewH);
           await tick();
         }
         scroller.scrollTo({ top: target, behavior: 'smooth' });
@@ -561,7 +566,7 @@
   {/if}
   {/if}
 
-  <div class="libx__scroll" id="series-list" bind:this={scroller} onscroll={onScroll} class:is-browse={!homeMode}>
+  <div class="libx__scroll" id="series-list" bind:this={scroller} onscroll={onScroll} class:is-browse={!homeMode} class:has-az={showAz}>
     <!-- Plugin home rail (reading shelves etc.) injects here — plain DOM, must
          stay mounted (never gate behind {#if}). Its height feeds listTop; it's
          hidden by CSS while browsing so rails are a Home-only surface. -->
@@ -760,6 +765,9 @@
   .libx__remove { margin-left: auto; height: 30px; padding: 0 13px; border: 1px solid rgba(255,90,82,.3); background: transparent; color: var(--red); border-radius: 7px; font: 600 12px var(--font-body); cursor: pointer; }
 
   .libx__scroll { flex: 1; overflow-y: auto; padding: 18px; position: relative; }
+  /* Reserve the rail's width so covers stop before it instead of sliding under. */
+  .libx__scroll.has-az { padding-right: 46px; }
+  @media (pointer: coarse) { .libx__scroll.has-az { padding-right: 52px; } }
   /* Reading rails are a Home-only surface — the plugin slot stays mounted, but
      hide it while browsing a library so the grid starts at the top. */
   .libx__scroll.is-browse :global(#home-plugin-rail) { display: none; }

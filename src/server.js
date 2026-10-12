@@ -7,7 +7,7 @@ import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
 import { initCountWorker, workerGetRow } from './countWorker.js';
-import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, collectionPage, collectionJumpOffset, buildCollCountSql, collCountRowToResult, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser, setMonitor, setIssueWants, clearIssuePicks, wantStates, MONITOR_STATES } from './db.js';
+import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, collectionPage, collectionJumpOffset, collectionBuckets, buildCollCountSql, collCountRowToResult, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser, setMonitor, setIssueWants, clearIssuePicks, wantStates, MONITOR_STATES } from './db.js';
 import { resolveSeriesDir, defaultRootedDir } from './paths.js';
 import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
@@ -1620,9 +1620,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       } catch { /* malformed facet param → ignore */ }
     }
     try {
-      res.json({ offset: collectionJumpOffset(db, opts) });
+      res.json(req.query.letter
+        ? { offset: collectionJumpOffset(db, opts) }    // one letter
+        : collectionBuckets(db, opts));                 // all 26 at once (rail preload)
     } catch {
-      res.json({ offset: 0 });
+      res.json(req.query.letter ? { offset: 0 } : { '#': 0 });
     }
   });
 

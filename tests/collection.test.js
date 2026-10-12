@@ -139,3 +139,22 @@ test('collectionJumpOffset: A-Z rail offsets match the binary title order', asyn
   assert.equal(collectionJumpOffset(db, { letter: 'a', filter: 'all' }), 1, 'lowercase is folded to the bucket');
   assert.equal(collectionJumpOffset(db, {}), 0, 'no letter -> 0');
 });
+
+test('collectionBuckets: all letter offsets in one shot match per-letter jumps', async () => {
+  const { openDb, upsertSeries, collectionBuckets, collectionJumpOffset } = await import('../src/db.js');
+  const db = openDb(':memory:');
+  for (const [i, title] of ['100 Bullets', 'Aquaman', 'Batman', 'Daredevil', 'Saga', 'Zatanna'].entries()) {
+    const id = upsertSeries(db, { title, url: 'cv:' + i, publisher: 'X' });
+    db.prepare('UPDATE series SET followed=1 WHERE id=?').run(id);
+  }
+  const b = collectionBuckets(db, { filter: 'all' });
+  assert.equal(b['#'], 0);
+  assert.equal(b.A, 1);
+  assert.equal(b.B, 2);
+  assert.equal(b.S, 4);
+  assert.equal(b.Z, 5);
+  // Every bucket agrees with the single-letter query.
+  for (const L of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') {
+    assert.equal(b[L], collectionJumpOffset(db, { letter: L, filter: 'all' }), 'bucket ' + L);
+  }
+});
