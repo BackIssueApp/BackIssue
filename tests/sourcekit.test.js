@@ -44,6 +44,9 @@ async function fakeSite() {
     if (u.pathname === '/img/2.png') return res.end(PNG);
     if (u.pathname === '/img/blocked.jpg') { res.setHeader('content-type', 'text/html'); return res.end('<html><title>Hotlink blocked</title></html>'); }
     if (u.pathname === '/cf') { res.statusCode = 503; return res.end('<html><title>Just a moment...</title></html>'); }
+    // A file host answering a download with a 200 web page (PixelDrain's
+    // challenge/rate-limit interstitial) — must never be saved as the file.
+    if (u.pathname === '/dl/html-200') { res.setHeader('content-type', 'text/html; charset=utf-8'); return res.end('<!doctype html><html><head><title>Saga 012.cbz ~ pixeldrain</title></head><body>wait</body></html>'); }
     if (u.pathname === '/ddg') { res.statusCode = 403; return res.end(DDG_HTML); }
     res.statusCode = 404; res.end('nope');
   });
@@ -119,6 +122,11 @@ test('fetchHtml/fetchJson/downloadToBuffer against a local site; a challenge is 
     const d = await downloadToBuffer(`${site.base}/dl/saga-12`, { rateMs: 0 });
     assert.equal(d.filename, 'Saga 012.cbz');
     assert.equal(sniffBuffer(d.buffer), 'cbz');
+    // A 200 that is a web page is a challenge/rate limit on the file host, not
+    // the file: it must not be returned as the archive, and it is flagged
+    // `challenged` (with the page title) so the caller can fall back to a browser.
+    await assert.rejects(downloadToBuffer(`${site.base}/dl/html-200`, { rateMs: 0 }),
+      (e) => e.challenged === true && e.htmlTitle === 'Saga 012.cbz ~ pixeldrain' && /sent a web page instead of the file/.test(e.message));
     await assert.rejects(fetchHtml(`${site.base}/cf`, { rateMs: 0, settingsHint: 'Settings → Sources → X' }), (e) => e.challenged === true && /FlareSolverr URL in Settings → Sources → X/.test(e.message));
     // DDoS-Guard is a challenge too — by its well-known paths, whatever the status.
     await assert.rejects(fetchHtml(`${site.base}/ddg`, { rateMs: 0 }), (e) => e.challenged === true);

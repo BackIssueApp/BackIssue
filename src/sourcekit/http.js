@@ -239,6 +239,10 @@ function plainDispatcher(proxyUrl) {
 export async function downloadToBuffer(url, {
   referer = '', headers = {}, session = {}, maxBytes = 2 * 1024 * 1024 * 1024,
   onProgress = null, onStage = null, proxyUrl = '', flareUrl = '', rateMs = null,
+  // A 2xx HTML body is normally intercepted as a challenge (see below). A
+  // caller that inspects HTML bodies itself (fetchPages names a hotlink block
+  // per page) passes allowHtml to receive the bytes as before.
+  allowHtml = false,
 } = {}) {
   assertPublicUrl(url);
   const stage = (name, host) => { try { onStage?.(name, host); } catch { /* best-effort */ } };
@@ -286,6 +290,34 @@ export async function downloadToBuffer(url, {
         continue;
       }
       throw Object.assign(new Error('download HTTP ' + res.statusCode), { status: res.statusCode, challenged: looksChallenged(body, res.statusCode) });
+    }
+    // A 2xx that is a web page is never the file: it's the host's challenge or
+    // rate-limit interstitial served with a 200 (PixelDrain does this). Don't
+    // stream it into the archive. Clear the host once through FlareSolverr if
+    // one is configured, else fail with a `challenged` error so the caller can
+    // fall back to a real browser, which passes what a plain request can't.
+    const ctRaw = res.headers['content-type'];
+    const ct0 = String(Array.isArray(ctRaw) ? ctRaw[0] : ctRaw || '').toLowerCase();
+    if (!allowHtml && /text\/html/.test(ct0)) {
+      const host = new URL(url).host;
+      const body = await res.body.text().catch(() => '');
+      const title = (/<title[^>]*>([^<]{0,120})/i.exec(body) || [])[1]?.trim() || '';
+      if (flareUrl && !solved.has(host)) {
+        clearanceJar.delete(host);
+        solved.add(host);
+        stage('solving', host);
+        try {
+          const r = await viaFlareSolverr(flareUrl, new URL(url).origin + '/');
+          hostCookies[host] = r.cookieHeader;
+          session.ua = r.ua;
+          clearanceSet(host, r.cookieHeader, r.ua);
+          continue;
+        } catch { /* the solver couldn't clear it — fall through to the fallback error */ }
+      }
+      throw Object.assign(
+        new Error(`${host} sent a web page instead of the file${title ? ` ("${title}")` : ''} — a challenge or rate limit on the download host`),
+        { status: res.statusCode, challenged: true, htmlTitle: title },
+      );
     }
     break;
   }

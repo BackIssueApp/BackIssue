@@ -37,7 +37,9 @@ export async function fetchPages({ pages, referer = '', headers = {}, session = 
     let lastErr = null;
     for (let att = 1; att <= 3; att++) {
       try {
-        const { buffer } = await downloadToBuffer(p.url, { referer: p.referer ?? referer, headers: { ...headers, ...(p.headers || {}) }, session, maxBytes, rateMs: att === 1 ? rateMs : null });
+        // allowHtml: an HTML body is inspected below and named per page (a
+        // hotlink block, usually), rather than intercepted as a file-host challenge.
+        const { buffer } = await downloadToBuffer(p.url, { referer: p.referer ?? referer, headers: { ...headers, ...(p.headers || {}) }, session, maxBytes, rateMs: att === 1 ? rateMs : null, allowHtml: true });
         if (!buffer.length) throw new Error('empty body');
         const kind = sniffBuffer(buffer);
         if (!['jpg', 'png', 'webp', 'gif'].includes(kind)) {

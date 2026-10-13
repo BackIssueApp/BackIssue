@@ -158,7 +158,25 @@ export function makeKit(def, ctx = {}, { session = {}, http = null } = {}) {
       }
     },
     json: (url, opts = {}) => fetchJson(url, { session, rateMs, ...opts }),
-    download: (url, opts = {}) => downloadToBuffer(url, { session, rateMs, flareUrl, proxyUrl, ...opts }),
+    download: async (url, opts = {}) => {
+      try {
+        return await downloadToBuffer(url, { session, rateMs, flareUrl, proxyUrl, ...opts });
+      } catch (e) {
+        if (!(e?.challenged && mayUseBrowser && browserAvailable())) throw e;
+        // Last resort: the FILE host served a challenge a plain request can't
+        // pass (and FlareSolverr couldn't clear). Let the browser open the host
+        // — it passes the challenge — remember its cookies for that host, and
+        // fetch the file as a plain request again. The bytes never stream
+        // through the browser, so a big archive costs nothing extra.
+        const host = new URL(url).host;
+        await browserHtml(new URL(url).origin + '/', { referer: opts.referer || '' }).catch(() => null);
+        const c = await browserClearance(host).catch(() => null);
+        if (!c?.cookieHeader) throw e;
+        rememberClearance(host, c.cookieHeader, c.ua);
+        session.cookieHeader = c.cookieHeader; if (c.ua) session.ua = c.ua;
+        return downloadToBuffer(url, { session, rateMs, flareUrl: '', proxyUrl, ...opts });
+      }
+    },
     image: (url, opts = {}) => browserImage(url, opts),
   };
   return {

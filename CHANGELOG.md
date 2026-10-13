@@ -18,6 +18,16 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   handful of series, and it works the same in the poster grid and the list, and
   across comic, book and audiobook libraries.
 
+### Fixed
+
+- **A download host's challenge page is no longer saved as the comic.** Some
+  file hosts answer a download with a normal-looking web page — a challenge or
+  rate-limit notice — rather than an error, and that page was being written to
+  disk as the archive and only caught at import. It is now recognised on the
+  way in: the host is cleared through FlareSolverr where one is configured, or
+  through the browser as a last resort, and the file is fetched again; failing
+  both, the error names the page so it is clear what happened.
+
 ## [0.9.0] — 2026-10-09
 
 ### Added
