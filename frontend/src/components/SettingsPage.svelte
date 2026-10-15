@@ -166,9 +166,17 @@
 
   // Swap client credential fields to the selected client, hint default ports,
   // and let plugins report whether their source is enabled.
-  // Show the rate-limit warning only when ComicVine-direct is selected.
-  let cvDirect = $state(false);
-  function syncMetaUI() { cvDirect = document.getElementById('set-metadataSource')?.value === 'comicvine'; }
+  // Show each provider's fields only while it is the selected source.
+  let metaSel = $state('hosted');
+  let cvDirect = $derived(metaSel === 'comicvine');
+  // Providers beyond the two original ones (Metron, plugin-registered) come
+  // from the server with the fields each needs and are rendered generically.
+  let metaProviders = $state([]);
+  let extraProviders = $derived(metaProviders.filter((p) => !['hosted', 'comicvine'].includes(p.id)));
+  const providerName = (p) => String(p?.label || p?.id || '').split(' (')[0];
+  function syncMetaUI() { metaSel = document.getElementById('set-metadataSource')?.value || 'hosted'; }
+  const testProvider = (p) => runTest(`prov-${p.id}`, '/api/metadata/providers/test',
+    () => ({ provider: p.id, values: Object.fromEntries(p.fields.map((f) => [f.key, v('#set-' + f.key)])) }));
 
   function syncSourceUI() {
     if (!root) return;
@@ -267,10 +275,12 @@
   }
 
   async function openSettings() {
-    const [s, srcInfo] = await Promise.all([apiGet('/api/settings'), apiGet('/api/sources').catch(() => ({}))]);
+    const [s, srcInfo, prov] = await Promise.all([apiGet('/api/settings'), apiGet('/api/sources').catch(() => ({})), apiGet('/api/metadata/providers').catch(() => [])]);
     loadedSettings = s || {};
-    // Toolkit source cards must exist in the DOM before the form is filled.
+    // Toolkit source cards and provider fields must exist in the DOM before
+    // the form is filled.
     kitCards = srcInfo?.cards || [];
+    metaProviders = Array.isArray(prov) ? prov : [];
     await tick();
     applySettingsToForm(s);
     indexerList = parseIndexerString(s.newznabIndexers);
@@ -295,6 +305,7 @@
     const s = loadedSettings;
     notifyChannels = document.getElementById('settings-plugin-notifications')?.children.length || 0;
     const cvKeys = parseRoots(s.comicvineKeys || '');
+    const metaExtra = extraProviders.find((p) => p.id === s.metadataSource) || null;
     const libFolders = libs.filter((l) => (l.folders || []).some((f) => f.trim())).length;
     const totalSeries = libs.reduce((n, l) => n + (l.series_count || 0), 0);
     const tone = (t) => t; // green | amber | red
@@ -303,11 +314,14 @@
         value: `${enabledSourceCount} enabled`, note: enabledSourceCount >= 2 ? 'Fallback order applies' : enabledSourceCount === 1 ? 'No fallback if it misses' : 'Nothing can download',
         tone: tone(enabledSourceCount >= 2 ? 'green' : enabledSourceCount === 1 ? 'amber' : 'red') },
       { id: 'comicvine', tab: 'metadata', icon: 'tag', label: 'Metadata',
-        value: s.metadataSource === 'comicvine' ? (cvKeys.length ? 'ComicVine (your key)' : 'ComicVine — no key') : 'Built-in service',
+        value: s.metadataSource === 'comicvine' ? (cvKeys.length ? 'ComicVine (your key)' : 'ComicVine — no key')
+          : metaExtra ? (metaExtra.configured ? `${providerName(metaExtra)} (your account)` : `${providerName(metaExtra)} — not set up`)
+          : 'Built-in service',
         note: s.metadataSource === 'comicvine'
           ? (cvKeys.length ? 'Direct lookups with your API key' : 'Add a key or switch to the built-in service')
+          : metaExtra ? (metaExtra.configured ? 'Direct lookups with your own sign-in' : 'Sign in or switch to the built-in service')
           : 'Cached + enriched, no setup needed',
-        tone: tone(s.metadataSource === 'comicvine' && !cvKeys.length ? 'red' : 'green') },
+        tone: tone((s.metadataSource === 'comicvine' && !cvKeys.length) || (metaExtra && !metaExtra.configured) ? 'red' : 'green') },
       { id: 'libraries', tab: 'library', icon: 'library', label: 'Libraries',
         value: `${libs.length} librar${libs.length === 1 ? 'y' : 'ies'}`, note: `${totalSeries} series in the collection`,
         tone: tone(libs.length ? 'green' : 'amber') },
@@ -323,6 +337,7 @@
     ];
     const attention = [];
     if (s.metadataSource === 'comicvine' && !cvKeys.length) attention.push({ tone: 'red', title: 'ComicVine API key is missing', body: 'The ComicVine source needs your own key (free at comicvine.gamespot.com) — or switch back to the built-in metadata service.', action: 'Add key', tab: 'metadata' });
+    if (metaExtra && !metaExtra.configured) attention.push({ tone: 'red', title: `${providerName(metaExtra)} is not signed in`, body: `Until its sign-in details are entered, lookups use the built-in metadata service instead of ${providerName(metaExtra)}.`, action: 'Set up', tab: 'metadata' });
     if (enabledSourceCount === 0) attention.push({ tone: 'red', title: 'No download sources enabled', body: 'New comics can’t be downloaded until a source is turned on.', action: 'Enable', tab: 'sources' });
     else if (enabledSourceCount === 1) attention.push({ tone: 'amber', title: 'Only one download source enabled', body: 'A second source gives searches a fallback when the first misses.', action: 'Review', tab: 'sources' });
     if (libs.length && !libFolders) attention.push({ tone: 'amber', title: 'No library has a folder', body: 'Downloads fall back to the downloads folder until a library gets one.', action: 'Set folder', tab: 'library' });
@@ -977,10 +992,11 @@
           <select id="set-metadataSource" onchange={syncMetaUI}>
             <option value="hosted">BackIssue metadata service (built-in, no setup)</option>
             <option value="comicvine">ComicVine directly (your own API key)</option>
+            {#each extraProviders as p (p.id)}<option value={p.id}>{p.label}</option>{/each}
           </select>
         </label>
-        <p class="modal__note">The built-in service works out of the box — cached ComicVine data with enrichment and no rate-limit pauses. Choose ComicVine to query the official API directly with your own key instead.</p>
-        <div hidden={cvDirect}>
+        <p class="modal__note">The built-in service works out of the box — cached data with enrichment and no rate-limit pauses. The other sources query a database directly with your own key or account, under its limits, and the built-in service is not contacted.</p>
+        <div hidden={metaSel !== 'hosted'}>
           <p class="modal__note">
             {#if loadedSettings.metadataInstanceKey}
               <Icon name="check" /> Registered with the metadata service (instance key ends in <b class="mono">{String(loadedSettings.metadataInstanceKey).slice(-6)}</b>).
@@ -1000,6 +1016,18 @@
           <div class="client-test"><button id="cv-test" class="btn btn--ghost" type="button" onclick={testCv}>Test key</button>
             {#if tests.cv}<span id="cv-test-result" class="client-status {tests.cv.cls}">{#if tests.cv.icon}<Icon name={tests.cv.icon} /> {/if}{tests.cv.text}</span>{/if}</div>
         </div>
+        <!-- Every other provider (Metron, plugin-registered): its fields stay
+             mounted too, shown only while it is the selected source. -->
+        {#each extraProviders as p (p.id)}
+          <div hidden={metaSel !== p.id}>
+            {#if p.note}<p class="modal__note list-note--warn"><Icon name="info" /> {p.note}</p>{/if}
+            {#each p.fields as f (f.key)}
+              <label class="field"><span>{f.label}</span><input id="set-{f.key}" class="mono" type={f.type === 'password' ? 'password' : 'text'} spellcheck="false" autocomplete="off" placeholder={f.placeholder || ''} /></label>
+            {/each}
+            <div class="client-test"><button class="btn btn--ghost" type="button" onclick={() => testProvider(p)}>Test {p.fields.length ? 'sign-in' : 'source'}</button>
+              {#if tests['prov-' + p.id]}<span class="client-status {tests['prov-' + p.id].cls}">{#if tests['prov-' + p.id].icon}<Icon name={tests['prov-' + p.id].icon} /> {/if}{tests['prov-' + p.id].text}</span>{/if}</div>
+          </div>
+        {/each}
         <!-- Service URL (self-hosted metadata instance) is an advanced escape
              hatch: kept mounted so a saved value persists, but not shown. It
              remains settable via the API / a previously saved value. -->

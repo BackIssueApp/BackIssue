@@ -43,7 +43,7 @@ if (process.env.BUILD_CHANNEL && process.env.BUILD_CHANNEL !== 'release') {
   APP_VERSION += `-${process.env.BUILD_CHANNEL}${sha ? '.' + sha : ''}`;
 }
 
-export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, listSourceCards, testSource, sourceCatalog, installSource: installSourceFn, uninstallSource: uninstallSourceFn, queueProgress, packProgress, activeMedia, cancelGrab, testCvKeys, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, supportPackage, supportSend, supportSendMobile, state }) {
+export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, listSourceCards, testSource, sourceCatalog, installSource: installSourceFn, uninstallSource: uninstallSourceFn, queueProgress, packProgress, activeMedia, cancelGrab, testCvKeys, metadataProviders, testMetadataProvider, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, supportPackage, supportSend, supportSendMobile, state }) {
   const startDownloads = (arg) => {
     if (!state.queue.running) {
       state.queue.running = true;
@@ -246,6 +246,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // without being able to reshape the library).
   const PERM_RULES = [
     [/^\/api\/settings/, 'settings.manage'], [/^\/api\/indexers/, 'settings.manage'],
+    [/^\/api\/metadata\/providers/, 'settings.manage'],
     // A mobile app's diagnostics may come from any signed-in user (the
     // handler sends a lite package unless they are an admin); the full
     // support package carries settings (redacted) and logs — admin only.
@@ -1107,7 +1108,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       // Live config when already in hosted mode so a provisioned key PERSISTS
       // (the persistence guard ignores clones); a clone only when the user is
       // on ComicVine-direct and just probing the built-in service.
-      const cv = makeCvClient(config.metadataSource === 'comicvine' ? { ...config, metadataSource: 'hosted' } : config);
+      const cv = makeCvClient(config.metadataSource !== 'hosted' ? { ...config, metadataSource: 'hosted' } : config);
       await cv.search('batman');
       const tail = String(config.metadataInstanceKey || '').slice(-6);
       res.json({ ok: true, registered: true, message: `Registered and responding — instance key …${tail}` });
@@ -1119,6 +1120,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       });
     }
   });
+
+  // Metadata providers (built-in + plugin-registered) for Settings → Metadata,
+  // and a Test button that proves one with the unsaved form values.
+  app.get('/api/metadata/providers', (req, res) => res.json(metadataProviders()));
+  app.post('/api/metadata/providers/test', async (req, res) => res.json(await testMetadataProvider(req.body || {})));
 
   // ---- Manual multi-source search + grab (per issue) ----
   // Queries every enabled source that supports it; a pick is pinned to the issue

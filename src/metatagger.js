@@ -6,6 +6,7 @@ import { logWarn } from './logstore.js';
 import { convertCbrToCbz, sidecarPath } from './archive.js';
 import { normalizeNumber } from './matcher.js';
 import { cvKey } from './cv.js';
+import { isMintedId } from './metron.js';
 import config from './config.js';
 
 // Native metadata tagger: builds a standard ComicInfo.xml from our cached
@@ -103,7 +104,10 @@ export function buildComicInfoXml({ series, issue }) {
 
   add('Publisher', series.publisher);
   add('Web', issue.site_detail_url || series.site_detail_url);
-  add('Notes', `Tagged by BackIssue from ComicVine issue ${issue.comicvine_id ?? issue.id}.`);
+  // The ComicVine id in Notes is what other taggers key on; a minted id (a
+  // provider without ComicVine ids) would only mislead them.
+  const noteId = issue.comicvine_id ?? issue.id;
+  add('Notes', isMintedId(noteId) ? 'Tagged by BackIssue.' : `Tagged by BackIssue from ComicVine issue ${noteId}.`);
 
   return `<?xml version="1.0" encoding="utf-8"?>\n<ComicInfo xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n${tags.join('\n')}\n</ComicInfo>`;
 }

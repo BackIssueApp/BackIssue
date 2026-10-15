@@ -124,7 +124,16 @@ export async function sendSupportPackage(config, buffer, { version = '', note = 
   return { code: data.code, expiresInDays: data.expires_in_days ?? null };
 }
 
-export function makeCvClient(config, { fetchImpl, key, politeMs } = {}) {
+// Other providers (Metron, plugin-registered ones) answer through a dispatcher
+// that metadata.js installs at boot: makeCvClient asks it first, so every
+// caller, plugins included, gets the active provider's client without knowing
+// one exists. null from the dispatcher means "a built-in source: carry on".
+let dispatcher = null;
+export function installMetadataDispatcher(fn) { dispatcher = typeof fn === 'function' ? fn : null; }
+
+export function makeCvClient(config, opts = {}) {
+  if (dispatcher && !opts.noDispatch) { const other = dispatcher(config, opts); if (other) return other; }
+  const { fetchImpl, key, politeMs } = opts;
   // Direct-ComicVine mode is an explicit user preference AND needs a key;
   // otherwise the hosted metadata service (or a self-hosted cvBaseUrl) with a
   // self-provisioned instance key — no configuration required.

@@ -22,7 +22,8 @@ import { initRssTables, unseenItems, markSeen, buildWantedIndex, matchFeedItems 
 import { findComicFiles, groupSeries, importMetaForFolder } from './scanner.js';
 import { extractYear } from './matcher.js';
 import { poolWithResource } from './pool.js';
-import { makeCvClient, cvKey, rankSearchResults } from './cv.js';
+import { makeCvClient, rankSearchResults } from './cv.js';
+import { metadataProviderList, testMetadataProvider } from './metadata.js';
 import { resolveBooks } from './cbl.js';
 import { tagFileFromCv, ensureCvIssueDetail, fetchAllIssueMetadata } from './metatagger.js';
 import { fetchWeeklyReleases, matchReleases, shiftWeek, currentWeek } from './releases.js';
@@ -958,13 +959,7 @@ async function runRssWatch() {
 // Try a real search with the given key (or the saved one) — the Settings
 // "Test" button for the API credential.
 async function testCvKeys(keysText) {
-  const key = cvKey(keysText || config.comicvineKeys);
-  if (!key) return { ok: false, message: 'Enter an API key.' };
-  try {
-    const client = makeCvClient(config, { key, politeMs: 0 });
-    const results = await client.search('batman');
-    return { ok: true, message: `Key valid — test search returned ${results.length} volumes.` };
-  } catch (e) { return { ok: false, message: String(e?.message || e) }; }
+  return testMetadataProvider(config, { provider: 'comicvine', values: { comicvineKeys: keysText || config.comicvineKeys } });
 }
 
 // Cancel an in-flight grab: remove the download from its client (with files —
@@ -1401,6 +1396,8 @@ const app = createApp({
   activeMedia: () => activeMediaList(db, downloadMonitor.getMediaProgress()),
   cancelGrab: cancelActiveGrab,
   testCvKeys,
+  metadataProviders: () => metadataProviderList(config),
+  testMetadataProvider: (body) => testMetadataProvider(config, body),
   usenetSearch,
   usenetGrab,
   torrentSearch,

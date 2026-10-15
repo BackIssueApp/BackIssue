@@ -15,6 +15,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import config from './config.js';
 import { SERIES_TYPES, SELF_DESCRIBED_TYPES } from './db.js';
+import { registerMetadataProvider } from './metadata.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PLUGINS_DIR = process.env.PLUGINS_DIR || path.join(root, 'plugins');
@@ -267,6 +268,11 @@ export const pluginApi = {
   // published_date,isbn_10,isbn_13,page_count,categories[],language,thumbnail}).
   // The ebooks plugin tries registered sources (by ascending `priority`, default
   // 100) BEFORE its built-in hosted fallback, so a lower number = preferred.
+  // A comic metadata provider (where series and issue data comes from) that
+  // the user can pick on Settings → Metadata. Contract in src/metadata.js.
+  registerMetadataProvider(provider) {
+    return registerMetadataProvider(provider, currentLoadingPlugin);
+  },
   registerBookMetadataSource(source) {
     if (!source?.id || typeof source.makeClient !== 'function') return;
     if (bookMetadataSources.some((s) => s.id === source.id)) return; // idempotent

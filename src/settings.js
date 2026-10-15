@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import config from './config.js';
 import { registeredSettings } from './plugins.js';
+import { metadataSourceIds } from './metadata.js';
 import { hoursToCron } from './cron.js';
 
 // settings.json lives alongside the database in the writable data dir (config
@@ -29,10 +30,12 @@ export const SETTING_FIELDS = {
   cvBaseUrl:           { type: 'string', allowEmpty: true },
   // Where metadata comes from: the hosted BackIssue metadata service (zero
   // setup, cached + enriched) or ComicVine directly with the user's own key.
-  metadataSource:      { type: 'enum', values: ['hosted', 'comicvine'] },
+  metadataSource:      { type: 'enum', values: metadataSourceIds }, // built-ins + plugin providers
   // Self-provisioned key for the hosted metadata service (issued on first
   // use; not user-facing).
   metadataInstanceKey: { type: 'string', allowEmpty: true },
+  metronUser:          { type: 'string', allowEmpty: true },
+  metronPass:          { type: 'string', allowEmpty: true },
   cvEnrich:            { type: 'bool' },
   cvEnrichDefaultApplied: { type: 'bool' },   // one-time: the default flipped on
   // One FlareSolverr for every source that needs to get past Cloudflare —
@@ -170,7 +173,8 @@ export function validateSettings(input = {}) {
     } else if (spec.type === 'bool') {
       v = v === true || v === 'true' || v === 'on' || v === 1 || v === '1';
     } else if (spec.type === 'enum') {
-      if (!spec.values.includes(v)) continue;
+      const allowed = typeof spec.values === 'function' ? spec.values() : spec.values;
+      if (!allowed.includes(v)) continue;
     } else {
       v = String(v).trim();
       if (!v && !spec.allowEmpty) continue; // allowEmpty fields can be cleared

@@ -17,6 +17,18 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   appears only under the A-Z sort and only once a library has more than a
   handful of series, and it works the same in the poster grid and the list, and
   across comic, book and audiobook libraries.
+- **Bring your own metadata provider.** Settings → Metadata now offers
+  **Metron directly**, signed in with your own Metron account, alongside the
+  built-in service and ComicVine. Series and issue data, covers, credits,
+  characters, story arcs and the issue extras then come straight from Metron,
+  under its own rate limits, and the built-in service is never contacted. The
+  source list is now a set of providers that plugins can extend
+  (`api.registerMetadataProvider`), each with its own fields and Test button on
+  the Metadata tab. Series added through a provider other than ComicVine keep
+  ids of their own that never collide with ComicVine's; switching providers
+  applies to new lookups, and series added under another provider keep their
+  local data but cannot refresh until that provider is selected again. Discover
+  still needs the built-in service or ComicVine.
 
 ### Fixed
 

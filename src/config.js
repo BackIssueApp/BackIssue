@@ -66,6 +66,9 @@ const config = {
   metadataSource: 'hosted',
   // Issued by the hosted service on first use; persisted via settings.
   metadataInstanceKey: '',
+  // Metron account, used only when metadataSource is 'metron'.
+  metronUser: '',
+  metronPass: '',
   // Alternative ComicVine-compatible API base (a self-hosted CloneVine). Blank
   // = the official API (rate-limited, proxied, politeness-paced).
   cvBaseUrl: '',
