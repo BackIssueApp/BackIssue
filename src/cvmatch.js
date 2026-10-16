@@ -3,6 +3,7 @@ import config from './config.js';
 import { upsertCvSeries, upsertCvIssue, setSeriesCv, seriesNeedingCvMatch, listCvIssues, linkFileCvIssue, getSeriesByCvId, createCvSeries, setFollowed, setMonitor, MONITOR_STATES, defaultLibrary, assignSeriesLibrary, getSeriesById, getCvSeries, setSeriesPath, mergeSeriesRows, fileIssueOverridesForSeries } from './db.js';
 import { parseIssueFromFilename } from './scanner.js';
 import { normVolume } from './cv.js';
+import { isMintedId } from './metron.js';
 import { poolWithResource } from './pool.js';
 
 // A file's issue number: prefer the embedded ComicInfo number, else parse the filename.
@@ -108,7 +109,23 @@ export function rankCandidates(series, candidates) {
 export async function cacheCvVolume(db, client, cvId) {
   const v = await client.volume(cvId);
   upsertCvSeries(db, v);
-  for (const iss of v.issues || []) upsertCvIssue(db, { id: iss.id, cv_series_id: v.id, number: iss.number, name: iss.name });
+  // A provider refreshing a volume first cached under another one hands back
+  // stubs in its own id space. The rows already here keep their ids (files,
+  // wanted rows and reading lists point at them): a foreign stub is matched to
+  // one by number and only a genuinely new number gets a row of its own.
+  const existing = listCvIssues(db, v.id);
+  const known = new Set(existing.map((ci) => ci.comicvine_id));
+  const byNum = new Map();
+  for (const ci of existing) { const k = normalizeNumber(ci.issue_number); if (k && !byNum.has(k)) byNum.set(k, ci.comicvine_id); }
+  for (const iss of v.issues || []) {
+    let id = iss.id;
+    if (!known.has(id) && isMintedId(id) !== isMintedId(v.id)) {
+      const k = normalizeNumber(iss.number);
+      const prior = k ? byNum.get(k) : null;
+      if (prior) id = prior;
+    }
+    upsertCvIssue(db, { id, cv_series_id: v.id, number: iss.number, name: iss.name });
+  }
   return v;
 }
 

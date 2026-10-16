@@ -270,40 +270,63 @@ export function makeMetronClient(config, { fetchImpl, username, password, polite
     return (d?.results || []).map(shapeSeriesRow).filter(Boolean);
   }
 
-  // Volume detail + every issue stub (paged).
+  // A series or issue the library first cached under ComicVine keeps its
+  // ComicVine id; Metron records that id on its own rows, so an unminted id is
+  // resolved through the cv_id filter (one extra paced call) to the Metron id.
+  // null when Metron has no row carrying it.
+  async function metronSeriesId(id) {
+    if (isMintedId(id)) return unmintId(id);
+    if (!(Number(id) > 0)) return null;
+    const d = await call(`/series/?cv_id=${Number(id)}`);
+    const row = (d?.results || [])[0];
+    return row?.id ? Number(row.id) : null;
+  }
+  async function metronIssueId(id) {
+    if (isMintedId(id)) return unmintId(id);
+    if (!(Number(id) > 0)) return null;
+    const d = await call(`/issue/?cv_id=${Number(id)}`);
+    const row = (d?.results || [])[0];
+    return row?.id ? Number(row.id) : null;
+  }
+
+  // Volume detail + every issue stub (paged). The result keeps the id it was
+  // asked for, so a ComicVine-keyed series stays on its key; the stubs carry
+  // Metron's minted ids and the cache step reconciles them by number.
   async function volume(id) {
-    const mid = unmintId(id);
-    if (!isMintedId(id) || !(mid > 0)) throw new Error('not a Metron series id');
+    const mid = await metronSeriesId(id);
+    if (!mid) throw new Error(isMintedId(id) ? 'Metron has no series with that id' : 'This series is not on Metron, so it cannot be refreshed from there');
     const d = await call(`/series/${mid}/`);
     if (!d) throw new Error('Metron has no series with that id');
     const stubs = await pages(`/series/${mid}/issue_list/`);
-    return shapeSeries(d, stubs);
+    return { ...shapeSeries(d, stubs), id: Number(id) };
   }
 
   async function issue(id) {
-    const mid = unmintId(id);
-    if (!isMintedId(id) || !(mid > 0)) throw new Error('not a Metron issue id');
+    const mid = await metronIssueId(id);
+    if (!mid) throw new Error(isMintedId(id) ? 'Metron has no issue with that id' : 'This issue is not on Metron');
     const d = await call(`/issue/${mid}/`);
     if (!d) throw new Error('Metron has no issue with that id');
-    return shapeIssue(d);
+    return { ...shapeIssue(d), id: Number(id) };
   }
 
-  // No batch endpoint: one paced detail call each; ids Metron no longer knows
-  // are simply absent (the ComicVine client's contract).
+  // No batch endpoint: one paced detail call each (two for a ComicVine id);
+  // ids Metron does not know are simply absent (the ComicVine client's contract).
   async function issuesByIds(ids) {
     const out = [];
     for (const id of ids) {
-      if (!isMintedId(id)) continue;
-      const d = await call(`/issue/${unmintId(id)}/`);
-      if (d) out.push(shapeIssueRow(d));
+      const mid = await metronIssueId(id);
+      if (!mid) continue;
+      const d = await call(`/issue/${mid}/`);
+      if (d) out.push({ ...shapeIssueRow(d), id: Number(id) });
     }
     return out;
   }
 
   async function findIssue(volumeId, number) {
-    if (!isMintedId(volumeId)) return null;
+    const mid = await metronSeriesId(volumeId);
+    if (!mid) return null;
     const want = String(number ?? '').trim();
-    const d = await call(`/issue/?series_id=${unmintId(volumeId)}&number=${encodeURIComponent(want)}`);
+    const d = await call(`/issue/?series_id=${mid}&number=${encodeURIComponent(want)}`);
     const rows = d?.results || [];
     const r = rows.find((x) => String(x.number ?? '').trim().toLowerCase() === want.toLowerCase()) || rows[0];
     return r ? shapeIssueRow(r) : null;

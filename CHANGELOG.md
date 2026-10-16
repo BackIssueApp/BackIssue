@@ -24,11 +24,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   under its own rate limits, and the built-in service is never contacted. The
   source list is now a set of providers that plugins can extend
   (`api.registerMetadataProvider`), each with its own fields and Test button on
-  the Metadata tab. Series added through a provider other than ComicVine keep
-  ids of their own that never collide with ComicVine's; switching providers
-  applies to new lookups, and series added under another provider keep their
-  local data but cannot refresh until that provider is selected again. Discover
-  still needs the built-in service or ComicVine.
+  the Metadata tab. Your existing library carries over: a series first added
+  through the built-in service or ComicVine refreshes through Metron as well,
+  keeping every issue row and file link, because Metron records the matching
+  ComicVine ids. Series added while Metron is the source keep ids of their own
+  that never collide with ComicVine's; those can only refresh while Metron is
+  selected. Discover still needs the built-in service or ComicVine.
 
 ### Fixed
 

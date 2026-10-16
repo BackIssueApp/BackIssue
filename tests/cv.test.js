@@ -396,6 +396,25 @@ test('autoLinkCvSeries is a no-op — catalog is a download-only source (no merg
   assert.equal(getSeriesById(db, bc).cv_id, null);      // catalog row untouched
 });
 
+test('refreshing through a provider with its own ids keeps the existing issue rows and adds only new numbers', async () => {
+  const db = openDb(':memory:');
+  const sid = upsertSeries(db, { title: 'Saga', url: '/c/saga' });
+  upsertCvSeries(db, { id: 46568, name: 'Saga', publisher: 'Image', start_year: '2012', count_of_issues: 2 });
+  upsertCvIssue(db, { id: 1, cv_series_id: 46568, number: '1', name: 'One' });
+  upsertCvIssue(db, { id: 2, cv_series_id: 46568, number: '2', name: 'Two' });
+  setSeriesCv(db, sid, 46568, { locked: 0 });
+  upsertLibraryFile(db, { path: '/s1.cbz', dir: '/', name: 'Saga #1.cbz', size: 1, mtime: 1, valid: 1, ci_number: '1' });
+  linkLibraryFile(db, '/s1.cbz', sid, 1);
+  // Minted ids (the Metron range) for every stub, including the two already here.
+  const M = 1_000_000_000;
+  const client = { async volume(id) { return { id, name: 'Saga', publisher: 'Image Comics', start_year: '2012', count_of_issues: 3, issues: [{ id: M + 100, number: '1', name: null }, { id: M + 101, number: '2', name: null }, { id: M + 102, number: '3', name: null }] }; } };
+  const r = await refreshCvVolume(db, client, sid);
+  assert.equal(r.ok, true);
+  const ids = listCvIssues(db, 46568).map((ci) => ci.comicvine_id);
+  assert.deepEqual(ids, [1, 2, M + 102]); // #1 and #2 keep their rows, #3 is new
+  assert.equal(db.prepare('SELECT cv_issue_id FROM library_files WHERE path=?').get('/s1.cbz').cv_issue_id, 1);
+});
+
 test('refreshCvVolume re-pulls metadata + issues from ComicVine and re-links files', async () => {
   const db = openDb(':memory:');
   const sid = upsertSeries(db, { title: 'Saga', url: '/c/saga' });

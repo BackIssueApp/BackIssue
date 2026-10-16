@@ -146,7 +146,34 @@ test('volume walks every issue_list page and unmints the id on the way out', asy
   assert.equal(v.issues[2].id, mintId(102));
   assert.equal(v.image_url, 'a');
   assert.ok(fetchImpl.calls.some((x) => x.url.endsWith('/series/7/')));
-  await assert.rejects(c.volume(7), /not a Metron series id/); // a raw ComicVine-range id is refused, never mistaken
+  await assert.rejects(c.volume(7), /not on Metron/); // a raw ComicVine-range id is looked up by cv_id, never mistaken for a Metron id
+});
+
+test('a ComicVine-keyed series resolves through cv_id and keeps the id it was asked for', async () => {
+  const fetchImpl = stubFetch([
+    ['/series/?cv_id=46568', { json: { count: 1, results: [{ id: 7, series: 'Saga (2012)', year_began: 2012 }] } }],
+    ['/series/7/issue_list/', { json: { count: 2, next: null, results: [{ id: 100, number: '1', image: 'a' }, { id: 101, number: '2', image: 'b' }] } }],
+    ['/series/7/', { json: { id: 7, name: 'Saga', publisher: { name: 'Image Comics' }, year_began: 2012, issue_count: 2 } }],
+  ]);
+  const c = makeMetronClient(cfg, { fetchImpl, politeMs: 0 });
+  const v = await c.volume(46568);
+  assert.equal(v.id, 46568);            // the library's key is untouched
+  assert.equal(v.metron.id, 7);         // the sidecar still names the Metron row
+  assert.equal(v.issues[0].id, mintId(100)); // stubs are Metron's; the cache step pairs them by number
+  assert.equal(fetchImpl.calls[0].url.includes('/series/?cv_id=46568'), true);
+});
+
+test('a ComicVine-keyed issue resolves through cv_id; one Metron lacks is a clear miss', async () => {
+  const c = client([
+    ['/issue/?cv_id=555', { json: { count: 1, results: [{ id: 9 }] } }],
+    ['/issue/?cv_id=556', { json: { count: 0, results: [] } }],
+    ['/issue/9/', { json: { id: 9, number: '1', name: ['Chapter One'], series: { id: 7, name: 'Saga' }, credits: [] } }],
+  ]);
+  const i = await c.issue(555);
+  assert.equal(i.id, 555);
+  assert.equal(i.name, 'Chapter One');
+  await assert.rejects(c.issue(556), /not on Metron/);
+  assert.deepEqual((await c.issuesByIds([555, 556])).map((x) => x.id), [555]);
 });
 
 test('a 404 detail is a clear error, a 401 never echoes the password', async () => {
