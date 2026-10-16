@@ -89,7 +89,9 @@
   // Only facts that have a value — an empty grid cell says nothing.
   const facts = $derived([
     ['Rating', info?.metron_rating],
-    ['Cover price', info?.metron_price && '$' + info.metron_price],
+    // A bare number is a dollar price; a source that prices in another
+    // currency sends it with the sign or code attached.
+    ['Cover price', info?.metron_price && (/^[\d.]+$/.test(String(info.metron_price)) ? '$' + info.metron_price : info.metron_price)],
     ['Final order cutoff', info?.metron_foc_date],
     ['UPC', info?.metron_upc],
     ['ISBN', info?.metron_isbn],

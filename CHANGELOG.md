@@ -33,6 +33,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **A cover price in another currency is shown as sent.** The issue panel used
+  to put a dollar sign in front of every price; a source that prices in euros
+  or francs now has its own sign or code kept.
 - **Metron's Test sign-in no longer spins forever** when metron.cloud cannot
   be reached. Every Metron request now gives up after 15 seconds and is
   retried once, and the message says the host timed out and may be blocking
