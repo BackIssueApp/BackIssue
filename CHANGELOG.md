@@ -32,6 +32,10 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **Metron's Test sign-in no longer spins forever** when metron.cloud cannot
+  be reached. Every Metron request now gives up after 15 seconds and is
+  retried once, and the message says the host timed out and may be blocking
+  the server, so a blocked address is told apart from a wrong password.
 - **A download host's challenge page is no longer saved as the comic.** Some
   file hosts answer a download with a normal-looking web page — a challenge or
   rate-limit notice — rather than an error, and that page was being written to

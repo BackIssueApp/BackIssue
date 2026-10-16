@@ -155,6 +155,30 @@ test('a 404 detail is a clear error, a 401 never echoes the password', async () 
   await assert.rejects(c.issue(mintId(6)), (e) => /username or password/.test(e.message) && !e.message.includes('hunter2'));
 });
 
+test('a host that never answers times out with a reason, after one retry', async () => {
+  let calls = 0;
+  const hang = (url, opts) => new Promise((_, reject) => {
+    calls++;
+    opts.signal.addEventListener('abort', () => reject(opts.signal.reason));
+  });
+  const c = makeMetronClient(cfg, { fetchImpl: hang, politeMs: 0, timeoutMs: 20 });
+  // AbortSignal.timeout's timer does not hold the event loop open; a server
+  // always has other work, a bare test does not.
+  const keepAlive = setInterval(() => {}, 10);
+  const t0 = Date.now();
+  try {
+    await assert.rejects(c.test(), /Could not reach Metron \(timed out/);
+  } finally { clearInterval(keepAlive); }
+  assert.equal(calls, 2);
+  assert.ok(Date.now() - t0 < 2000);
+});
+
+test('a connection refused is reported with its code, not "fetch failed"', async () => {
+  const refuse = () => Promise.reject(Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } }));
+  const c = makeMetronClient(cfg, { fetchImpl: refuse, politeMs: 0 });
+  await assert.rejects(c.test(), /Could not reach Metron \(ECONNREFUSED\)/);
+});
+
 test('a persistent 429 surfaces as rateLimited after the waits', async () => {
   const c = client([['/series/', { status: 429, headers: { 'retry-after': '0' }, json: {} }]]);
   await assert.rejects(c.search('batman'), (e) => e.rateLimited === true && /rate limit/.test(e.message));

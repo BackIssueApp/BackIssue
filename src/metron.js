@@ -32,6 +32,10 @@ const UA = (() => {
   return `BackIssue/${version} (${process.platform})`;
 })();
 const POLITE_MS = 3000;
+// A single request may not hang longer than this: a host that is blocking the
+// server's address drops the connection silently, and the Settings test must
+// come back with a reason rather than spin.
+const TIMEOUT_MS = 15000;
 const MAX_PAGES = 60; // issue_list pages per series: 28 rows each, so ~1,600 issues
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -197,7 +201,7 @@ export function shapeIssueRow(r) {
  * searchArcs, storyArcIssues. There is no `list` (that is ComicVine's query
  * syntax, and callers already treat it as optional).
  */
-export function makeMetronClient(config, { fetchImpl, username, password, politeMs, base } = {}) {
+export function makeMetronClient(config, { fetchImpl, username, password, politeMs, base, timeoutMs } = {}) {
   const user = String(username ?? config?.metronUser ?? '').trim();
   const pass = String(password ?? config?.metronPass ?? '');
   if (!user || !pass) throw new Error('Metron needs a username and password');
@@ -205,6 +209,7 @@ export function makeMetronClient(config, { fetchImpl, username, password, polite
   const root = String(base || process.env.METRON_BASE_OVERRIDE || BASE).trim().replace(/\/+$/, '');
   const pace = politeMs !== undefined ? politeMs : POLITE_MS;
   const doFetch = fetchImpl || fetch;
+  const timeout = timeoutMs !== undefined ? timeoutMs : TIMEOUT_MS;
   let nextAt = 0;
 
   // One paced HTTP call. null on 404 (the thing is not on Metron); .rateLimited
@@ -216,11 +221,17 @@ export function makeMetronClient(config, { fetchImpl, username, password, polite
     nextAt = Date.now() + pace;
     let resp;
     try {
-      resp = await doFetch(`${root}${pathAndQuery}`, { headers: { 'User-Agent': UA, Authorization: auth, Accept: 'application/json' } });
+      resp = await doFetch(`${root}${pathAndQuery}`, { headers: { 'User-Agent': UA, Authorization: auth, Accept: 'application/json' }, signal: AbortSignal.timeout(timeout) });
     } catch (e) {
-      if (attempt < 3) { await sleep(500); return call(pathAndQuery, attempt + 1); }
+      // One retry only: a host that is unreachable or blocking us does not
+      // recover in half a second, and each attempt can take the full timeout.
+      if (attempt < 1) { await sleep(500); return call(pathAndQuery, attempt + 1); }
       // Node's fetch says only "fetch failed"; the cause carries the real reason.
-      throw new Error(`Could not reach Metron (${e?.cause?.code || e?.cause?.message || e?.message || e})`);
+      const code = e?.cause?.code || e?.name;
+      const why = code === 'UND_ERR_CONNECT_TIMEOUT' || code === 'TimeoutError' || code === 'AbortError'
+        ? 'timed out; the host may be blocking this server'
+        : (e?.cause?.code || e?.cause?.message || e?.message || e);
+      throw new Error(`Could not reach Metron (${why})`);
     }
     if (resp.status === 429 || resp.status === 503) {
       if (attempt < 2) {
