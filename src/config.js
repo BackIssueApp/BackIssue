@@ -64,6 +64,9 @@ const config = {
   // 'hosted' (default: the BackIssue metadata service, zero setup) or
   // 'comicvine' (direct, requires comicvineKeys).
   metadataSource: 'hosted',
+  // The providers in use, best first, as a comma list of ids ("hosted,bnf").
+  // Blank = just metadataSource. See metadata.js for how several combine.
+  metadataSources: '',
   // Issued by the hosted service on first use; persisted via settings.
   metadataInstanceKey: '',
   // Metron account, used only when metadataSource is 'metron'.

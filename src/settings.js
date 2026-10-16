@@ -31,6 +31,10 @@ export const SETTING_FIELDS = {
   // Where metadata comes from: the hosted BackIssue metadata service (zero
   // setup, cached + enriched) or ComicVine directly with the user's own key.
   metadataSource:      { type: 'enum', values: metadataSourceIds }, // built-ins + plugin providers
+  // The providers in use, best first ("hosted,bnf"); see metadata.js. Kept
+  // as typed so a plugin's id survives a boot where that plugin is absent;
+  // `metadataSource` mirrors its first entry for older readers.
+  metadataSources:     { type: 'string', allowEmpty: true },
   // Self-provisioned key for the hosted metadata service (issued on first
   // use; not user-facing).
   metadataInstanceKey: { type: 'string', allowEmpty: true },
@@ -180,6 +184,20 @@ export function validateSettings(input = {}) {
       if (!v && !spec.allowEmpty) continue; // allowEmpty fields can be cleared
     }
     out[k] = v;
+  }
+  // The ordered list and the legacy single value describe the same choice:
+  // whichever arrives, keep the other in step (the list wins when both do).
+  if (out.metadataSources !== undefined) {
+    const ids = [];
+    for (const raw of out.metadataSources.split(',')) {
+      const id = raw.trim().toLowerCase();
+      if (/^[a-z0-9][a-z0-9_-]{0,31}$/.test(id) && !ids.includes(id)) ids.push(id);
+    }
+    out.metadataSources = ids.join(',');
+    const known = metadataSourceIds();
+    out.metadataSource = ids.find((id) => known.includes(id)) || 'hosted';
+  } else if (out.metadataSource !== undefined) {
+    out.metadataSources = out.metadataSource;
   }
   return out;
 }

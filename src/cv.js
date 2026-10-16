@@ -133,11 +133,14 @@ export function installMetadataDispatcher(fn) { dispatcher = typeof fn === 'func
 
 export function makeCvClient(config, opts = {}) {
   if (dispatcher && !opts.noDispatch) { const other = dispatcher(config, opts); if (other) return other; }
-  const { fetchImpl, key, politeMs } = opts;
+  const { fetchImpl, key, politeMs, source } = opts;
   // Direct-ComicVine mode is an explicit user preference AND needs a key;
   // otherwise the hosted metadata service (or a self-hosted cvBaseUrl) with a
-  // self-provisioned instance key — no configuration required.
-  const directCv = config?.metadataSource === 'comicvine' && !!(key || cvKey(config.comicvineKeys));
+  // self-provisioned instance key — no configuration required. The metadata
+  // dispatcher names the source it wants ('hosted' | 'comicvine'); a caller
+  // without one is read from the legacy single-source setting.
+  const wantDirect = source ? source === 'comicvine' : config?.metadataSource === 'comicvine';
+  const directCv = wantDirect && !!(key || cvKey(config.comicvineKeys));
   const doFetch = fetchImpl || fetch;
   let base;
   let fixedKey = null;

@@ -5,18 +5,31 @@
 // optionally list, searchArcs, storyArcIssues). Three are built in: the hosted
 // BackIssue metadata service (the default), ComicVine with the user's own key,
 // and Metron with the user's own account. Plugins add more through
-// api.registerMetadataProvider. `metadataSource` in settings names the one in
-// use; a selected provider that is not configured (no key, no account) falls
-// back to the hosted service rather than failing every lookup.
+// api.registerMetadataProvider.
+//
+// `metadataSources` in settings is an ordered list of the providers in use,
+// like `sourcePriority` for downloads. With several enabled, lookups go
+// through a composite client: a series or issue id is answered by the provider
+// that owns its id range (each provider mints ids into its own range), a
+// search asks every enabled provider and merges the answers in priority order,
+// and Discover uses the first provider that offers it. A provider in the list
+// that is not configured (no key, no account) is skipped rather than failing
+// every lookup; with nothing usable the hosted service answers.
 //
 // Every caller still builds its client through makeCvClient (plugins import
-// it), so the switch lives in a dispatcher installed into cv.js: for a
-// non-built-in source makeCvClient hands the config here and gets the
-// provider's client back. Nothing downstream knows which provider answered.
+// it), so the switch lives in a dispatcher installed into cv.js: makeCvClient
+// hands the config here and gets the right client back. Nothing downstream
+// knows which provider answered.
 import { makeCvClient, installMetadataDispatcher, cvKey } from './cv.js';
-import { makeMetronClient } from './metron.js';
+import { makeMetronClient, MINTED_BASE as METRON_BASE } from './metron.js';
+import { normalizeTitle } from './matcher.js';
 
 const SLUG = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+// ComicVine's own ids (and the hosted service's, which mirrors them) all sit
+// below one billion; other providers mint above it, each in its own range.
+const CV_LIMIT = METRON_BASE;
+const METRON_LIMIT = METRON_BASE + 100_000_000;
+const isCvId = (id) => Number(id) > 0 && Number(id) < CV_LIMIT;
 
 const providers = [
   {
@@ -25,7 +38,9 @@ const providers = [
     builtin: true,
     fields: [],
     isConfigured: () => true,
-    makeClient: (cfg, opts) => makeCvClient(cfg, { ...opts, noDispatch: true }),
+    owns: isCvId,
+    resolves: () => false,
+    makeClient: (cfg, opts) => makeCvClient(cfg, { ...opts, noDispatch: true, source: 'hosted' }),
   },
   {
     id: 'comicvine',
@@ -34,11 +49,13 @@ const providers = [
     note: "ComicVine's API is rate-limited (about 200 requests per resource per hour, with velocity checks on top). Big imports, library scans and release matching will pause when the limit is hit and can take much longer.",
     fields: [{ key: 'comicvineKeys', label: 'ComicVine API key', type: 'text', placeholder: 'Free at comicvine.gamespot.com' }],
     isConfigured: (cfg) => !!cvKey(cfg?.comicvineKeys),
-    makeClient: (cfg, opts) => makeCvClient(cfg, { ...opts, noDispatch: true }),
+    owns: isCvId,
+    resolves: () => false,
+    makeClient: (cfg, opts) => makeCvClient(cfg, { ...opts, noDispatch: true, source: 'comicvine' }),
     async test(cfg) {
       const key = cvKey(cfg?.comicvineKeys);
       if (!key) return { ok: false, message: 'Enter an API key.' };
-      const client = makeCvClient({ ...cfg, metadataSource: 'comicvine' }, { key, politeMs: 0, noDispatch: true });
+      const client = makeCvClient({ ...cfg, metadataSource: 'comicvine' }, { key, politeMs: 0, noDispatch: true, source: 'comicvine' });
       const results = await client.search('batman');
       return { ok: true, message: `Key valid. A test search returned ${results.length} volumes.` };
     },
@@ -53,21 +70,30 @@ const providers = [
       { key: 'metronPass', label: 'Metron password', type: 'password', placeholder: '' },
     ],
     isConfigured: (cfg) => !!(String(cfg?.metronUser || '').trim() && cfg?.metronPass),
+    owns: (id) => Number(id) >= METRON_BASE && Number(id) < METRON_LIMIT,
+    // Metron records ComicVine's ids on its own rows, so it can answer for a
+    // ComicVine-keyed series when no ComicVine-backed source is enabled.
+    resolves: isCvId,
     makeClient: (cfg, opts) => makeMetronClient(cfg, opts),
     test: (cfg) => makeMetronClient(cfg, { politeMs: 0 }).test(),
   },
 ];
 
 /**
- * Add a provider: { id, label, fields?, note?, isConfigured?(config), makeClient(config, opts), test?(config) }.
- *   id        a slug; this is what `metadataSource` holds when the provider is chosen
+ * Add a provider: { id, label, fields?, note?, isConfigured?(config), makeClient(config, opts), test?(config), owns?(id) | idRange?, resolves?(id) }.
+ *   id        a slug; this is what `metadataSources` holds when the provider is enabled
  *   fields    the settings the provider needs, rendered on Settings → Metadata:
  *             [{ key, label, type: 'text' | 'password', placeholder? }]. The keys
  *             must also be registered through api.registerSettings so they persist.
  *   makeClient(config, { fetchImpl?, politeMs? }) → the client (see cv.js makeCvClient
  *             for the method contract; `list` is optional and ComicVine-specific).
- *   isConfigured(config) → false means "fall back to the built-in service" (default: true).
+ *   isConfigured(config) → false means "skip this provider" (default: true).
  *   test(config) → { ok, message } for the Settings Test button (default: a search).
+ *   owns(id) → true for the ids this provider minted; or idRange: [low, high)
+ *             (default: nothing). With several providers enabled, a series or
+ *             issue is looked up through the provider that owns its id.
+ *   resolves(id) → true when the provider can also answer for a foreign id it
+ *             knows about (default: nothing); tried after every owner.
  * Idempotent per id; a built-in id cannot be replaced.
  */
 export function registerMetadataProvider(p, plugin = null) {
@@ -77,9 +103,20 @@ export function registerMetadataProvider(p, plugin = null) {
   const fields = (Array.isArray(p.fields) ? p.fields : [])
     .filter((f) => f?.key && /^[A-Za-z][A-Za-z0-9_]*$/.test(String(f.key)))
     .map((f) => ({ key: String(f.key), label: String(f.label || f.key), type: f.type === 'password' ? 'password' : 'text', placeholder: f.placeholder ? String(f.placeholder) : '' }));
+  // A provider that declares no range is assumed to own whatever id no
+  // declared provider claims, so a plugin written before ranges existed still
+  // answers for its own series when enabled alongside others.
+  let owns = null;
+  if (typeof p.owns === 'function') owns = (id) => !!p.owns(Number(id));
+  else if (Array.isArray(p.idRange) && p.idRange.length === 2) {
+    const [lo, hi] = p.idRange.map(Number);
+    owns = (id) => Number(id) >= lo && Number(id) < hi;
+  }
   providers.push({
     id, label: String(p.label), note: p.note ? String(p.note) : '', fields, plugin, builtin: false,
     isConfigured: typeof p.isConfigured === 'function' ? p.isConfigured : () => true,
+    owns,
+    resolves: typeof p.resolves === 'function' ? (id) => !!p.resolves(Number(id)) : () => false,
     makeClient: p.makeClient,
     test: typeof p.test === 'function' ? p.test : null,
   });
@@ -94,31 +131,138 @@ export function _resetMetadataProviders() {
 export const metadataSourceIds = () => providers.map((p) => p.id);
 
 const hosted = () => providers[0];
+const byId = (id) => providers.find((p) => p.id === id) || null;
 
-/** The provider `metadataSource` names (hosted when it names none). */
+/** Parse a `metadataSources` value ("hosted,bnf") into known, distinct ids.
+ *  Unknown ids are kept out of the result but never out of the setting: a
+ *  plugin that is not installed right now may be again later. */
+export function parseMetadataSources(value) {
+  const out = [];
+  for (const raw of String(value || '').split(',')) {
+    const id = raw.trim().toLowerCase();
+    if (id && byId(id) && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
+/** The providers in use, in priority order. An install that only ever set
+ *  the old single `metadataSource` reads as a one-entry list. */
+export function metadataSourceOrder(config) {
+  const list = parseMetadataSources(config?.metadataSources);
+  if (list.length) return list;
+  const single = String(config?.metadataSource || '').trim().toLowerCase();
+  return [byId(single) ? single : 'hosted'];
+}
+
+/** The providers lookups actually go to: the enabled ones that are
+ *  configured, in order; the hosted service when none is. */
+export function enabledMetadataProviders(config) {
+  const usable = metadataSourceOrder(config).map(byId).filter((p) => p && p.isConfigured(config));
+  return usable.length ? usable : [hosted()];
+}
+
+/** The first provider in the list (what the old single setting named). */
 export function selectedMetadataProvider(config) {
-  return providers.find((p) => p.id === String(config?.metadataSource || '')) || hosted();
+  return byId(metadataSourceOrder(config)[0]) || hosted();
 }
 
-/** The provider lookups actually go to: the selected one when it is
- *  configured, else the hosted service. */
+/** The provider that answers first: the top usable one. */
 export function activeMetadataProvider(config) {
-  const p = selectedMetadataProvider(config);
-  return p.isConfigured(config) ? p : hosted();
+  return enabledMetadataProviders(config)[0];
 }
 
-/** What Settings → Metadata renders. Never includes field values. */
+/** What Settings → Metadata renders, in priority order with the unused
+ *  providers after. Never includes field values. */
 export function metadataProviderList(config) {
-  const active = activeMetadataProvider(config).id;
-  return providers.map((p) => ({
+  const order = metadataSourceOrder(config);
+  const active = new Set(enabledMetadataProviders(config).map((p) => p.id));
+  const rank = (p) => { const i = order.indexOf(p.id); return i < 0 ? order.length + providers.indexOf(p) : i; };
+  return [...providers].sort((a, b) => rank(a) - rank(b)).map((p) => ({
     id: p.id, label: p.label, note: p.note || '', fields: p.fields, builtin: !!p.builtin, plugin: p.plugin || null,
-    configured: !!p.isConfigured(config), active: p.id === active, selected: selectedMetadataProvider(config).id === p.id,
+    configured: !!p.isConfigured(config), enabled: order.includes(p.id), active: active.has(p.id), selected: order[0] === p.id,
   }));
 }
 
-/** A client for the active provider. */
+const titleKey = (v) => `${normalizeTitle(String(v?.name || ''))}|${v?.start_year ?? ''}`;
+
+/** Merge candidate lists from several providers, best provider first: the
+ *  same id, or the same title and start year, is listed once. */
+export function mergeSearchResults(lists) {
+  const seenId = new Set();
+  const seenTitle = new Set();
+  const out = [];
+  for (const list of lists) {
+    for (const v of Array.isArray(list) ? list : []) {
+      if (!v) continue;
+      const id = v.id != null ? String(v.id) : null;
+      const key = titleKey(v);
+      if ((id && seenId.has(id)) || (key !== '|' && seenTitle.has(key))) continue;
+      if (id) seenId.add(id);
+      if (key !== '|') seenTitle.add(key);
+      out.push(v);
+    }
+  }
+  return out;
+}
+
+/** One client over every enabled provider. A single enabled provider gets
+ *  everything, as it always did; several are routed per call. */
+export function makeCompositeClient(config, opts = {}) {
+  const enabled = enabledMetadataProviders(config);
+  if (enabled.length === 1) return enabled[0].makeClient(config, opts);
+  const clients = enabled.map((p) => ({ p, c: p.makeClient(config, opts) }));
+  const ownerOf = (id) => clients.find((x) => x.p.owns && x.p.owns(id))
+    || clients.find((x) => x.p.resolves(id))
+    || clients.find((x) => !x.p.owns)
+    || null;
+  const route = (id) => {
+    const hit = ownerOf(id);
+    if (!hit) throw new Error('None of the enabled metadata sources knows this id');
+    return hit.c;
+  };
+  // Ask everyone; a source that fails is left out unless they all fail.
+  async function fanOut(method, ...args) {
+    const able = clients.filter((x) => typeof x.c[method] === 'function');
+    const settled = await Promise.allSettled(able.map((x) => x.c[method](...args)));
+    const lists = [];
+    let firstErr = null;
+    settled.forEach((r, i) => {
+      if (r.status === 'fulfilled') lists.push(r.value);
+      else { firstErr ??= r.reason; console.warn(`metadata ${method} failed on ${able[i].p.id}:`, r.reason?.message || r.reason); }
+    });
+    if (!lists.length && firstErr) throw firstErr;
+    return mergeSearchResults(lists);
+  }
+  const composite = {
+    search: (q, o) => fanOut('search', q, o),
+    volume: async (id) => route(id).volume(id),
+    issue: async (id) => route(id).issue(id),
+    findIssue: async (volumeId, number) => route(volumeId).findIssue(volumeId, number),
+    storyArcIssues: async (arcId) => route(arcId).storyArcIssues(arcId),
+    searchArcs: (q) => fanOut('searchArcs', q),
+    async issuesByIds(ids) {
+      const groups = new Map();
+      for (const id of ids || []) {
+        const hit = ownerOf(id);
+        if (!hit) continue; // an id nobody enabled can answer for is simply absent
+        if (!groups.has(hit)) groups.set(hit, []);
+        groups.get(hit).push(id);
+      }
+      const out = [];
+      for (const [hit, group] of groups) out.push(...(await hit.c.issuesByIds(group)));
+      return out;
+    },
+  };
+  // Discover and other list-driven features need a ComicVine-shaped feed;
+  // the first enabled provider that has one serves it.
+  const lister = clients.find((x) => typeof x.c.list === 'function');
+  if (lister) composite.list = (...args) => lister.c.list(...args);
+  return composite;
+}
+
+/** A client for the enabled providers. */
 export function makeMetadataClient(config, opts = {}) {
-  return activeMetadataProvider(config).makeClient(config, opts);
+  return makeCompositeClient(config, opts);
 }
 
 /** The Settings Test button: prove a provider with the values from the form
@@ -141,13 +285,9 @@ export async function testMetadataProvider(config, { provider, values = {} } = {
   }
 }
 
-// makeCvClient asks here first; null means "handle it yourself" (a built-in
-// source, or a plugin provider that is not configured, which falls back to
-// the hosted service exactly like ComicVine-direct without a key does).
+// makeCvClient asks here first; the answer is the client for the enabled
+// providers (the hosted service's own client when that is all there is).
 installMetadataDispatcher((config, opts) => {
   if (opts?.noDispatch) return null;
-  const p = selectedMetadataProvider(config);
-  if (p.builtin && p.id !== 'metron') return null;
-  if (!p.isConfigured(config)) return null;
-  return p.makeClient(config, opts);
+  return makeCompositeClient(config, opts);
 });

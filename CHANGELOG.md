@@ -10,6 +10,19 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Several metadata sources at once.** Settings → Metadata is now an ordered
+  list, like download sources: turn on every source you want data from and
+  move the one you trust most to the top. A search asks all of them and shows
+  the answers together, best first, dropping a series a higher source already
+  listed (same id, or same title and start year). A series keeps coming from
+  the source that found it, so refreshing it, opening its issues, matching
+  files and tagging go back there, and turning that source off leaves the
+  series as it is until it is on again. A source that is on but not set up yet
+  is skipped rather than failing lookups. Saved settings carry over: the single
+  source you had becomes a one-entry list. Plugin providers declare the id
+  range they mint (`idRange` or `owns`) so lookups route to them; one that
+  declares nothing is handed whatever id no other source claims.
+
 - **Jump to a letter in the Library** (#10). When the Library is sorted A-Z, a
   letter rail runs down the right edge: click a letter and the grid scrolls
   straight to the series starting with it, loading whatever it needs to get
@@ -28,8 +41,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   through the built-in service or ComicVine refreshes through Metron as well,
   keeping every issue row and file link, because Metron records the matching
   ComicVine ids. Series added while Metron is the source keep ids of their own
-  that never collide with ComicVine's; those can only refresh while Metron is
-  selected. Discover still needs the built-in service or ComicVine.
+  that never collide with ComicVine's; those refresh while Metron is on.
+  Discover still needs the built-in service or ComicVine.
 
 ### Fixed
 

@@ -161,20 +161,25 @@
     body.torznabIndexers = serializeIndexers(torznabList);
     // rootFolders is DERIVED from the libraries' folders — never sent.
     if (sourceOrder.length) body.sourcePriority = sourceOrder.map((s) => s.id).join(',');
+    body.metadataSources = metaOrder.filter((p) => p.enabled).map((p) => p.id).join(',');
     return body;
   }
 
-  // Swap client credential fields to the selected client, hint default ports,
-  // and let plugins report whether their source is enabled.
-  // Show each provider's fields only while it is the selected source.
-  let metaSel = $state('hosted');
-  let cvDirect = $derived(metaSel === 'comicvine');
-  // Providers beyond the two original ones (Metron, plugin-registered) come
-  // from the server with the fields each needs and are rendered generically.
-  let metaProviders = $state([]);
-  let extraProviders = $derived(metaProviders.filter((p) => !['hosted', 'comicvine'].includes(p.id)));
+  // Metadata providers come from the server in priority order with the
+  // fields each needs; every row is rendered generically and its fields stay
+  // mounted (their set-* ids are collected on save) whether or not it is on.
+  let metaOrder = $state([]);
   const providerName = (p) => String(p?.label || p?.id || '').split(' (')[0];
-  function syncMetaUI() { metaSel = document.getElementById('set-metadataSource')?.value || 'hosted'; }
+  function touchMeta() {
+    dirty = true;
+    if (!dirtySections.has('metadata')) dirtySections = new Set(dirtySections).add('metadata');
+  }
+  function moveMeta(i, dir) {
+    const j = i + dir;
+    [metaOrder[i], metaOrder[j]] = [metaOrder[j], metaOrder[i]];
+    touchMeta();
+  }
+  function toggleMeta(p, on) { p.enabled = on; touchMeta(); refreshOverview(); }
   const testProvider = (p) => runTest(`prov-${p.id}`, '/api/metadata/providers/test',
     () => ({ provider: p.id, values: Object.fromEntries(p.fields.map((f) => [f.key, v('#set-' + f.key)])) }));
 
@@ -280,7 +285,7 @@
     // Toolkit source cards and provider fields must exist in the DOM before
     // the form is filled.
     kitCards = srcInfo?.cards || [];
-    metaProviders = Array.isArray(prov) ? prov : [];
+    metaOrder = (Array.isArray(prov) ? prov : []).map((p) => ({ ...p }));
     await tick();
     applySettingsToForm(s);
     indexerList = parseIndexerString(s.newznabIndexers);
@@ -288,7 +293,6 @@
     sourceOrder = srcInfo?.sources || [];
     for (const cb of BackIssue._settingsHooks) { try { cb(s); } catch { /* ignore */ } }
     syncSourceUI();
-    syncMetaUI();
     previewNaming();
     for (const b of root.querySelectorAll('.src-block')) {
       const sw = b.querySelector('.switch input');
@@ -304,8 +308,8 @@
   function refreshOverview() {
     const s = loadedSettings;
     notifyChannels = document.getElementById('settings-plugin-notifications')?.children.length || 0;
-    const cvKeys = parseRoots(s.comicvineKeys || '');
-    const metaExtra = extraProviders.find((p) => p.id === s.metadataSource) || null;
+    const metaOn = metaOrder.filter((p) => p.enabled);
+    const metaBad = metaOn.filter((p) => !p.configured);
     const libFolders = libs.filter((l) => (l.folders || []).some((f) => f.trim())).length;
     const totalSeries = libs.reduce((n, l) => n + (l.series_count || 0), 0);
     const tone = (t) => t; // green | amber | red
@@ -314,14 +318,12 @@
         value: `${enabledSourceCount} enabled`, note: enabledSourceCount >= 2 ? 'Fallback order applies' : enabledSourceCount === 1 ? 'No fallback if it misses' : 'Nothing can download',
         tone: tone(enabledSourceCount >= 2 ? 'green' : enabledSourceCount === 1 ? 'amber' : 'red') },
       { id: 'comicvine', tab: 'metadata', icon: 'tag', label: 'Metadata',
-        value: s.metadataSource === 'comicvine' ? (cvKeys.length ? 'ComicVine (your key)' : 'ComicVine — no key')
-          : metaExtra ? (metaExtra.configured ? `${providerName(metaExtra)} (your account)` : `${providerName(metaExtra)} — not set up`)
-          : 'Built-in service',
-        note: s.metadataSource === 'comicvine'
-          ? (cvKeys.length ? 'Direct lookups with your API key' : 'Add a key or switch to the built-in service')
-          : metaExtra ? (metaExtra.configured ? 'Direct lookups with your own sign-in' : 'Sign in or switch to the built-in service')
+        value: metaOn.length >= 2 ? `${metaOn.length} sources` : metaOn[0] && metaOn[0].id !== 'hosted' ? providerName(metaOn[0]) : 'Built-in service',
+        note: metaBad.length ? `${providerName(metaBad[0])} is not set up`
+          : metaOn.length >= 2 ? 'Searches merge, best first'
+          : metaOn[0] && metaOn[0].id !== 'hosted' ? 'Direct lookups with your own key or account'
           : 'Cached + enriched, no setup needed',
-        tone: tone((s.metadataSource === 'comicvine' && !cvKeys.length) || (metaExtra && !metaExtra.configured) ? 'red' : 'green') },
+        tone: tone(metaBad.length ? 'red' : 'green') },
       { id: 'libraries', tab: 'library', icon: 'library', label: 'Libraries',
         value: `${libs.length} librar${libs.length === 1 ? 'y' : 'ies'}`, note: `${totalSeries} series in the collection`,
         tone: tone(libs.length ? 'green' : 'amber') },
@@ -336,8 +338,7 @@
         tone: tone(notifyChannels ? 'green' : 'amber') },
     ];
     const attention = [];
-    if (s.metadataSource === 'comicvine' && !cvKeys.length) attention.push({ tone: 'red', title: 'ComicVine API key is missing', body: 'The ComicVine source needs your own key (free at comicvine.gamespot.com) — or switch back to the built-in metadata service.', action: 'Add key', tab: 'metadata' });
-    if (metaExtra && !metaExtra.configured) attention.push({ tone: 'red', title: `${providerName(metaExtra)} is not signed in`, body: `Until its sign-in details are entered, lookups use the built-in metadata service instead of ${providerName(metaExtra)}.`, action: 'Set up', tab: 'metadata' });
+    for (const p of metaBad) attention.push({ tone: 'red', title: `${providerName(p)} is not set up`, body: `It is turned on as a metadata source, but until its key or sign-in details are entered it is skipped${metaOn.length >= 2 ? ' and the other sources answer' : ' and the built-in service answers'}.`, action: 'Set up', tab: 'metadata' });
     if (enabledSourceCount === 0) attention.push({ tone: 'red', title: 'No download sources enabled', body: 'New comics can’t be downloaded until a source is turned on.', action: 'Enable', tab: 'sources' });
     else if (enabledSourceCount === 1) attention.push({ tone: 'amber', title: 'Only one download source enabled', body: 'A second source gives searches a fallback when the first misses.', action: 'Review', tab: 'sources' });
     if (libs.length && !libFolders) attention.push({ tone: 'amber', title: 'No library has a folder', body: 'Downloads fall back to the downloads folder until a library gets one.', action: 'Set folder', tab: 'library' });
@@ -496,7 +497,6 @@
     delugeSsl: checked('#set-delugeSsl'),
     delugePass: v('#set-delugePass'),
   }));
-  const testCv = () => runTest('cv', '/api/cv/test', () => ({ keys: v('#set-comicvineKeys') }));
   // Built-in service: registration + round trip. A success may have JUST
   // provisioned the key — refresh loadedSettings so the status line updates.
   const testMeta = async () => {
@@ -986,48 +986,43 @@
       <h3 class="setx-panel__title">Metadata</h3>
       <p class="setx-panel__sub">Where series and issue data comes from.</p>
       <div class="setx-card">
-        <h4 class="setx-card__head">Metadata source</h4>
-        <label class="field">
-          <span>Source</span>
-          <select id="set-metadataSource" onchange={syncMetaUI}>
-            <option value="hosted">BackIssue metadata service (built-in, no setup)</option>
-            <option value="comicvine">ComicVine directly (your own API key)</option>
-            {#each extraProviders as p (p.id)}<option value={p.id}>{p.label}</option>{/each}
-          </select>
-        </label>
-        <p class="modal__note">The built-in service works out of the box — cached data with enrichment and no rate-limit pauses. The other sources query a database directly with your own key or account, under its limits, and the built-in service is not contacted.</p>
-        <div hidden={metaSel !== 'hosted'}>
-          <p class="modal__note">
-            {#if loadedSettings.metadataInstanceKey}
-              <Icon name="check" /> Registered with the metadata service (instance key ends in <b class="mono">{String(loadedSettings.metadataInstanceKey).slice(-6)}</b>).
-            {:else}
-              Not registered yet — this install provisions its key automatically on first use.
-            {/if}
-          </p>
-          <div class="client-test"><button class="btn btn--ghost" type="button" onclick={testMeta}>Test service</button>
-            {#if tests.meta}<span class="client-status {tests.meta.cls}">{#if tests.meta.icon}<Icon name={tests.meta.icon} /> {/if}{tests.meta.text}</span>{/if}</div>
+        <h4 class="setx-card__head">Metadata sources</h4>
+        <p class="modal__note">Turn on every source you want series and issue data from. Searches ask all of them and show the answers together, best first, so the order decides which wins when two know the same series. A series keeps coming from the source that found it. The built-in service works out of the box; the others query a database directly with your own key or account, under its limits.</p>
+        <div id="metadata-source-list">
+          {#each metaOrder as p, i (p.id)}
+            <div class="metasrc" class:is-on={p.enabled}>
+              <div class="srcpri-row">
+                <span class="srcpri-rank">{i + 1}</span>
+                <label class="switch"><input type="checkbox" checked={p.enabled} aria-label="Use {providerName(p)}" onchange={(e) => toggleMeta(p, e.currentTarget.checked)} /><span class="switch__track"></span></label>
+                <span class="srcpri-name">{p.label}{#if p.enabled && !p.configured}<span class="metasrc__warn">not set up</span>{/if}</span>
+                <button class="srcpri-btn" type="button" disabled={i === 0} onclick={() => moveMeta(i, -1)} aria-label="Move up"><Icon name="arrow-up" /></button>
+                <button class="srcpri-btn" type="button" disabled={i === metaOrder.length - 1} onclick={() => moveMeta(i, 1)} aria-label="Move down"><Icon name="arrow-down" /></button>
+              </div>
+              <!-- Each source's details stay mounted (their set-* ids are
+                   collected on save); hidden just removes them from view. -->
+              <div class="metasrc__body" hidden={!p.enabled}>
+                {#if p.id === 'hosted'}
+                  <p class="modal__note">
+                    {#if loadedSettings.metadataInstanceKey}
+                      <Icon name="check" /> Registered with the metadata service (instance key ends in <b class="mono">{String(loadedSettings.metadataInstanceKey).slice(-6)}</b>).
+                    {:else}
+                      Not registered yet — this install provisions its key automatically on first use.
+                    {/if}
+                  </p>
+                  <div class="client-test"><button class="btn btn--ghost" type="button" onclick={testMeta}>Test service</button>
+                    {#if tests.meta}<span class="client-status {tests.meta.cls}">{#if tests.meta.icon}<Icon name={tests.meta.icon} /> {/if}{tests.meta.text}</span>{/if}</div>
+                {:else}
+                  {#if p.note}<p class="modal__note list-note--warn"><Icon name="info" /> {p.note}</p>{/if}
+                  {#each p.fields as f (f.key)}
+                    <label class="field"><span>{f.label}</span><input id="set-{f.key}" class="mono" type={f.type === 'password' ? 'password' : 'text'} spellcheck="false" autocomplete="off" placeholder={f.placeholder || ''} /></label>
+                  {/each}
+                  <div class="client-test"><button class="btn btn--ghost" type="button" onclick={() => testProvider(p)}>Test {p.fields.length ? (p.fields.length === 1 ? 'key' : 'sign-in') : 'source'}</button>
+                    {#if tests['prov-' + p.id]}<span class="client-status {tests['prov-' + p.id].cls}">{#if tests['prov-' + p.id].icon}<Icon name={tests['prov-' + p.id].icon} /> {/if}{tests['prov-' + p.id].text}</span>{/if}</div>
+                {/if}
+              </div>
+            </div>
+          {/each}
         </div>
-        <!-- The ComicVine fields stay mounted (their set-* ids are collected on
-             save); hidden attr just removes them from view on the built-in source. -->
-        <div hidden={!cvDirect}>
-          <p class="modal__note list-note--warn"><Icon name="info" /> ComicVine's API is rate-limited (about 200 requests per resource per hour, with velocity checks on top). Big imports, library scans and release matching will pause when the limit is hit and can take much longer. The built-in service has no such limits.</p>
-          <label class="field"><span>ComicVine API key</span><input id="set-comicvineKeys" class="mono" type="text" spellcheck="false" autocomplete="off" placeholder="Only used with the ComicVine source…" /></label>
-          <p class="modal__note">Free at comicvine.gamespot.com. Only used when the source above is set to ComicVine.</p>
-          <div class="client-test"><button id="cv-test" class="btn btn--ghost" type="button" onclick={testCv}>Test key</button>
-            {#if tests.cv}<span id="cv-test-result" class="client-status {tests.cv.cls}">{#if tests.cv.icon}<Icon name={tests.cv.icon} /> {/if}{tests.cv.text}</span>{/if}</div>
-        </div>
-        <!-- Every other provider (Metron, plugin-registered): its fields stay
-             mounted too, shown only while it is the selected source. -->
-        {#each extraProviders as p (p.id)}
-          <div hidden={metaSel !== p.id}>
-            {#if p.note}<p class="modal__note list-note--warn"><Icon name="info" /> {p.note}</p>{/if}
-            {#each p.fields as f (f.key)}
-              <label class="field"><span>{f.label}</span><input id="set-{f.key}" class="mono" type={f.type === 'password' ? 'password' : 'text'} spellcheck="false" autocomplete="off" placeholder={f.placeholder || ''} /></label>
-            {/each}
-            <div class="client-test"><button class="btn btn--ghost" type="button" onclick={() => testProvider(p)}>Test {p.fields.length ? 'sign-in' : 'source'}</button>
-              {#if tests['prov-' + p.id]}<span class="client-status {tests['prov-' + p.id].cls}">{#if tests['prov-' + p.id].icon}<Icon name={tests['prov-' + p.id].icon} /> {/if}{tests['prov-' + p.id].text}</span>{/if}</div>
-          </div>
-        {/each}
         <!-- Service URL (self-hosted metadata instance) is an advanced escape
              hatch: kept mounted so a saved value persists, but not shown. It
              remains settable via the API / a previously saved value. -->

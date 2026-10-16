@@ -14,7 +14,7 @@ import JSZip from 'jszip';
 // cookies, credentials: replaced by a marker that keeps the length, so
 // "is it set, and is it the right length" is still answerable.
 export const SECRET_KEY_RE = /(key|keys|pass|passwd|password|token|secret|cookie|credential|auth)(?!or|orised|orized|entic)/i;
-const KEEP_KEY_RE = /^(passwordLoginDisabled|metadataSource|keepSharing|.*(Enabled|Disabled|Events|Mode|Hours|Cron|Count|Path|Dir|Placement|Url|Host|Port|Ssl|UrlBase|Base|Kind|Provider|Name|Label))$/;
+const KEEP_KEY_RE = /^(passwordLoginDisabled|metadataSources?|keepSharing|.*(Enabled|Disabled|Events|Mode|Hours|Cron|Count|Path|Dir|Placement|Url|Host|Port|Ssl|UrlBase|Base|Kind|Provider|Name|Label))$/;
 
 export function redactValue(key, value) {
   if (typeof value !== 'string' || !value.length) return value;
