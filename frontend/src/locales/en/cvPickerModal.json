@@ -1,0 +1,21 @@
+{
+  "title": "Match series metadata",
+  "lookingUp": "Looking up the series…",
+  "searching": "Searching the metadata source…",
+  "noVolumeWithId": "No series with that id.",
+  "searchFailed": "Search failed.",
+  "noVolumes": "No series found.",
+  "linkFailed": "Link failed",
+  "linkFailedWith": "Link failed: {error}",
+  "matchedTo": "Matched to {name}.",
+  "matchedToYear": "Matched to {name} ({year}).",
+  "unknownPublisher": "Unknown publisher",
+  "idBadge": "ID {id}",
+  "equalsFiles": "= your {count} files",
+  "nearFiles": "≈ your {count} files",
+  "sourceLink": "Source page",
+  "linking": "Linking…",
+  "use": "Use",
+  "filesNote": { "one": "You have {count} file on disk — series with the closest issue count are listed first.", "other": "You have {count} files on disk — series with the closest issue count are listed first." },
+  "searchPlaceholder": "Search by name — or paste the series URL / id…"
+}
