@@ -1,0 +1,14 @@
+{
+  "title": "Search packs · {series}",
+  "dialogLabel": "Search packs",
+  "searching": "Searching enabled sources for packs…",
+  "noSources": "No pack-capable sources are enabled.",
+  "noneFound": "No packs found across your sources. Try a broader query (series name only).",
+  "intro": "Multi-issue packs (whole series, TPBs, issue ranges) across every enabled source. Download one — every issue this series is <b>missing</b> is imported from it; owned issues are skipped. Torrents/usenet download via your client; other sources download in-app.",
+  "queryPlaceholder": "Series name…",
+  "queued": "Pack queued via {source} — this series’ missing issues import automatically (watch the queue / Jobs).",
+  "failed": "Download failed: {error}",
+  "unknownError": "unknown error",
+  "sending": "Sending…",
+  "download": "Download"
+}
