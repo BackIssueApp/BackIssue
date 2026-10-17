@@ -5,6 +5,7 @@
   //   await inputDialog({ title, message, value, textarea, placeholder }) → string | null
   //   await choiceDialog({ title, message, buttons: [{ label, value, danger }] }) → value | null
   import { openModal, closeModal, modals } from '../lib/modals.svelte.js';
+  import { t } from '../lib/i18n.svelte.js';
   import Icon from '../lib/Icon.svelte';
 
   const m = $state({ title: '', message: '', input: null, textarea: false, placeholder: '', buttons: [] });
@@ -31,11 +32,12 @@
     if (r) r(value);
   }
 
-  export function confirmDialog({ title = 'Are you sure?', message = '', confirmLabel = 'OK', danger = false } = {}) {
+  // Defaults are resolved per call, so they follow the active language.
+  export function confirmDialog({ title = t('dialogModal.areYouSure'), message = '', confirmLabel = t('common.ok'), danger = false } = {}) {
     return new Promise((resolve) => open({
       title, message,
       buttons: [
-        { label: 'Cancel', value: null, ghost: true },
+        { label: t('common.cancel'), value: null, ghost: true },
         { label: confirmLabel, value: true, danger },
       ],
     }, (v) => resolve(v === true)));
@@ -44,15 +46,15 @@
   export function choiceDialog({ title = '', message = '', buttons = [] } = {}) {
     return new Promise((resolve) => open({
       title, message,
-      buttons: [{ label: 'Cancel', value: null, ghost: true }, ...buttons],
+      buttons: [{ label: t('common.cancel'), value: null, ghost: true }, ...buttons],
     }, resolve));
   }
 
-  export function inputDialog({ title = '', message = '', value = '', textarea = false, placeholder = '', confirmLabel = 'Save' } = {}) {
+  export function inputDialog({ title = '', message = '', value = '', textarea = false, placeholder = '', confirmLabel = t('common.save') } = {}) {
     return new Promise((resolve) => open({
       title, message, input: value, textarea, placeholder,
       buttons: [
-        { label: 'Cancel', value: null, ghost: true },
+        { label: t('common.cancel'), value: null, ghost: true },
         { label: confirmLabel, value: 'submit' },
       ],
     }, resolve));
@@ -89,10 +91,10 @@
 
 {#if open_}
   <div id="dialog-modal" class="modal" onclick={(e) => { if (e.target === e.currentTarget) settleDialog(null); }}>
-    <div class="modal__panel" use:trapFocus role="dialog" aria-label={m.title || 'Confirm'}>
+    <div class="modal__panel" use:trapFocus role="dialog" aria-label={m.title || t('dialogModal.confirm')}>
       <div class="modal__head" style="display:flex;justify-content:space-between;align-items:center;">
         <h3 style="margin:0;">{m.title}</h3>
-        <button class="modal__x" aria-label="Close" onclick={() => settleDialog(null)}><Icon name="close" /></button>
+        <button class="modal__x" aria-label={t('common.close')} onclick={() => settleDialog(null)}><Icon name="close" /></button>
       </div>
       <div class="modal__body">
         {#if m.message}<p class="dialog-message">{m.message}</p>{/if}
