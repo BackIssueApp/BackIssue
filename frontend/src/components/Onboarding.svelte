@@ -10,6 +10,7 @@
   import { route, setQuery } from '../lib/router.svelte.js';
   import { flags, loadFlags, loadCollection } from '../lib/store.svelte.js';
   import { notify } from '../lib/toasts.svelte.js';
+  import { t, th } from '../lib/i18n.svelte.js';
   import Icon from '../lib/Icon.svelte';
 
   // ?onboarding=1 forces the wizard regardless of state — for testing/demoing
@@ -18,8 +19,9 @@
   const open = $derived(flags.needsOnboarding || forced);
 
   let step = $state(0);
-  const STEPS = ['Welcome', 'Library', 'Downloads', 'Plugins', 'Finish'];
-  const EYEBROWS = ['', 'Step 2 · Storage', 'Step 3 · Sources', 'Step 4 · Extend', ''];
+  // Catalog keys; resolved with t() where rendered.
+  const STEPS = ['onboarding.stepWelcome', 'onboarding.stepLibrary', 'onboarding.stepDownloads', 'onboarding.stepPlugins', 'onboarding.stepFinish'];
+  const EYEBROWS = ['', 'onboarding.eyebrowStorage', 'onboarding.eyebrowSources', 'onboarding.eyebrowExtend', ''];
   let source = $state('none'); // 'none' | 'usenet' | 'torrent'
   // usenet
   let ixName = $state(''), ixUrl = $state(''), ixKey = $state('');
@@ -30,8 +32,8 @@
   const tcDefaultPort = $derived(torrentClient === 'transmission' ? '9091' : torrentClient === 'deluge' ? '8112' : '8080');
 
   // Named libraries (the new model — no rootFolders). Seed one Comics library.
-  let libs = $state([{ id: 1, name: 'Comics', type: 'comic', folder: '' }]);
-  let libTypes = $state([{ id: 'comic', label: 'Comics' }, { id: 'manga', label: 'Manga' }]);
+  let libs = $state([{ id: 1, name: t('onboarding.defaultLibraryName'), type: 'comic', folder: '' }]);
+  let libTypes = $state([{ id: 'comic', label: t('onboarding.libTypeComics') }, { id: 'manga', label: t('onboarding.libTypeManga') }]);
   let libTypesFetched = false;
   async function loadLibTypes() {
     if (libTypesFetched) return; libTypesFetched = true;
@@ -60,7 +62,7 @@
   // Shared test-button state
   let tests = $state({ ix: null, client: null });
   async function runTest(slot, endpoint, body) {
-    tests[slot] = { cls: 'is-testing', text: 'Testing…' };
+    tests[slot] = { cls: 'is-testing', text: t('onboarding.testing') };
     let r;
     try { r = await apiPost(endpoint, body); }
     catch (e) { r = { ok: false, message: String(e) }; }
@@ -129,16 +131,16 @@
       flags.needsOnboarding = false;
       if (forced) setQuery({ onboarding: null });
       if (chosen.length) {
-        notify('Plugins installed — restarting BackIssue to activate them…', 'ok');
+        notify(t('onboarding.installedRestarting'), 'ok');
         try { await apiPost('/api/restart'); } catch { /* the connection drops as it restarts */ }
         setTimeout(() => location.reload(), 4000);
         return;
       }
       await loadFlags();
       loadCollection();
-      notify('You’re set up — add a series with “+ Add”, or import an existing library from the sidebar.', 'ok');
+      notify(t('onboarding.allSet'), 'ok');
     } catch {
-      notify('Could not save setup — check the app is reachable and try again.', 'error');
+      notify(t('onboarding.saveFailed'), 'error');
     }
     saving = false;
   }
@@ -149,12 +151,14 @@
     if (forced) setQuery({ onboarding: null });
   }
 
-  const nextLabel = $derived(step === STEPS.length - 1 ? (installing ? 'Installing plugins…' : saving ? 'Saving…' : 'Finish setup') : step === 0 ? 'Get started' : 'Continue');
+  const nextLabel = $derived(step === STEPS.length - 1
+    ? (installing ? t('onboarding.installingPlugins') : saving ? t('onboarding.saving') : t('onboarding.finishSetup'))
+    : step === 0 ? t('onboarding.getStarted') : t('onboarding.continue'));
   const summaryRows = $derived([
-    { label: 'Metadata', value: 'Built-in service', tone: 'var(--green)', icon: 'tag' },
-    { label: 'Libraries', value: namedLibs.length ? `${namedLibs.length} ${namedLibs.length === 1 ? 'library' : 'libraries'}` : 'None', tone: namedLibs.length ? 'var(--green)' : 'var(--muted)', icon: 'book' },
-    { label: 'Download source', value: source === 'usenet' ? 'Usenet' : source === 'torrent' ? 'Torrents' : 'None yet', tone: source === 'none' ? 'var(--muted)' : 'var(--green)', icon: 'download' },
-    { label: 'Plugins', value: `${catalogPlugins.filter((p) => pluginSel[p.id]).length} selected`, tone: 'var(--green)', icon: 'puzzle' },
+    { label: t('onboarding.summaryMetadata'), value: t('onboarding.summaryMetadataValue'), tone: 'var(--green)', icon: 'tag' },
+    { label: t('onboarding.summaryLibraries'), value: namedLibs.length ? t('onboarding.summaryLibrariesValue', { count: namedLibs.length }) : t('common.none'), tone: namedLibs.length ? 'var(--green)' : 'var(--muted)', icon: 'book' },
+    { label: t('onboarding.summaryDownloadSource'), value: source === 'usenet' ? t('onboarding.usenet') : source === 'torrent' ? t('onboarding.torrents') : t('onboarding.summaryNoneYet'), tone: source === 'none' ? 'var(--muted)' : 'var(--green)', icon: 'download' },
+    { label: t('onboarding.summaryPlugins'), value: t('onboarding.summaryPluginsValue', { count: catalogPlugins.filter((p) => pluginSel[p.id]).length }), tone: 'var(--green)', icon: 'puzzle' },
   ]);
 </script>
 
@@ -163,47 +167,47 @@
     <aside class="obx__rail">
       <div class="obx__brand"><span class="obx__logo">BackIssue</span></div>
       <div class="obx__steps">
-        {#each STEPS as label, i (label)}
+        {#each STEPS as key, i (key)}
           <button class="obx__step" class:is-active={i === step} class:is-done={i < step} onclick={() => { step = i; }}>
             <span class="obx__dot">{#if i < step}<Icon name="check" size={13} />{:else}{i + 1}{/if}</span>
-            <span class="obx__step-label">{label}</span>
+            <span class="obx__step-label">{t(key)}</span>
           </button>
         {/each}
       </div>
       <div class="obx__progress">
         <div class="obx__progress-track"><div class="obx__progress-fill" style="width:{Math.round((step / (STEPS.length - 1)) * 100)}%"></div></div>
-        <div class="obx__progress-text">Step {step + 1} of {STEPS.length} · about two minutes</div>
+        <div class="obx__progress-text">{t('onboarding.progress', { step: step + 1, total: STEPS.length })}</div>
       </div>
     </aside>
 
-    <div class="obx__main" use:trapFocus role="dialog" aria-label="First-run setup">
+    <div class="obx__main" use:trapFocus role="dialog" aria-label={t('onboarding.dialogLabel')}>
       <div class="obx__content">
         <div class="obx__inner">
-          {#if EYEBROWS[step]}<div class="obx__eyebrow">{EYEBROWS[step]}</div>{/if}
+          {#if EYEBROWS[step]}<div class="obx__eyebrow">{t(EYEBROWS[step])}</div>{/if}
 
           {#if step === 0}
             <div class="obx__hero obx__hero--brand"><Icon name="book" size={30} /></div>
-            <h1 class="obx__h1 obx__h1--big">Welcome to BackIssue</h1>
-            <p class="obx__lead">A self-hosted manager for your comic collection — track the series you want, download new issues as they release, and keep everything tagged and organized on disk.</p>
-            <p class="obx__sub">Setup takes about two minutes: where your comics live and optionally a download source — metadata works out of the box. Everything can be changed later in <b>Settings</b>.</p>
+            <h1 class="obx__h1 obx__h1--big">{t('onboarding.welcomeTitle')}</h1>
+            <p class="obx__lead">{t('onboarding.welcomeLead')}</p>
+            <p class="obx__sub">{@html th('onboarding.welcomeSub')}</p>
             <div class="obx__bullets">
-              <div class="obx__bullet"><span class="obx__bullet-ico"><Icon name="tag" size={16} /></span><div><div class="obx__bullet-t">Rich metadata</div><div class="obx__bullet-b">Covers, credits and issue lists — built in, no API key needed.</div></div></div>
-              <div class="obx__bullet"><span class="obx__bullet-ico"><Icon name="download" size={16} /></span><div><div class="obx__bullet-t">Automatic downloads</div><div class="obx__bullet-b">New issues grabbed as they release.</div></div></div>
-              <div class="obx__bullet"><span class="obx__bullet-ico"><Icon name="folder" size={16} /></span><div><div class="obx__bullet-t">Organized on disk</div><div class="obx__bullet-b">Tagged and filed into a clean folder tree.</div></div></div>
+              <div class="obx__bullet"><span class="obx__bullet-ico"><Icon name="tag" size={16} /></span><div><div class="obx__bullet-t">{t('onboarding.bulletMetadataTitle')}</div><div class="obx__bullet-b">{t('onboarding.bulletMetadataBody')}</div></div></div>
+              <div class="obx__bullet"><span class="obx__bullet-ico"><Icon name="download" size={16} /></span><div><div class="obx__bullet-t">{t('onboarding.bulletDownloadsTitle')}</div><div class="obx__bullet-b">{t('onboarding.bulletDownloadsBody')}</div></div></div>
+              <div class="obx__bullet"><span class="obx__bullet-ico"><Icon name="folder" size={16} /></span><div><div class="obx__bullet-t">{t('onboarding.bulletOrganizedTitle')}</div><div class="obx__bullet-b">{t('onboarding.bulletOrganizedBody')}</div></div></div>
             </div>
           {:else if step === 1}
-            <h1 class="obx__h1">Set up your libraries</h1>
-            <p class="obx__lead">A library is a named collection with a type and a folder on disk. Create one to start — add more here or in <b>Settings</b> later. Files are organized into <b>folder</b>/Publisher/Title (Year).</p>
+            <h1 class="obx__h1">{t('onboarding.libraryTitle')}</h1>
+            <p class="obx__lead">{@html th('onboarding.libraryLead')}</p>
             <div class="obx__libs">
               {#each libs as l (l.id)}
                 <div class="obx__lib">
                   <div class="obx__lib-top">
                     <span class="obx__lib-ico"><Icon name="book" size={16} /></span>
-                    <input class="obx__lib-name" placeholder="Library name" bind:value={l.name} />
+                    <input class="obx__lib-name" placeholder={t('onboarding.libraryNamePlaceholder')} bind:value={l.name} />
                     <select class="obx__lib-type" bind:value={l.type}>
-                      {#each libTypes as t (t.id)}<option value={t.id}>{t.label}</option>{/each}
+                      {#each libTypes as lt (lt.id)}<option value={lt.id}>{lt.label}</option>{/each}
                     </select>
-                    {#if libs.length > 1}<button class="obx__lib-rm" aria-label="Remove library" onclick={() => removeLib(l.id)}><Icon name="close" size={14} /></button>{/if}
+                    {#if libs.length > 1}<button class="obx__lib-rm" aria-label={t('onboarding.removeLibrary')} onclick={() => removeLib(l.id)}><Icon name="close" size={14} /></button>{/if}
                   </div>
                   <div class="obx__lib-folder">
                     <span class="obx__lib-fico"><Icon name="folder" size={16} /></span>
@@ -212,69 +216,69 @@
                 </div>
               {/each}
             </div>
-            <button class="obx__addlib" onclick={addLib}><Icon name="plus" size={14} /> Add another library</button>
-            <div class="obx__note obx__note--amber"><span class="obx__note-ico"><Icon name="info" size={16} /></span><p>Already have comics in these folders? After setup, use <b>Import</b> in the sidebar to match them to ComicVine and pull them into the collection. Leave a folder blank to decide later.</p></div>
+            <button class="obx__addlib" onclick={addLib}><Icon name="plus" size={14} /> {t('onboarding.addAnotherLibrary')}</button>
+            <div class="obx__note obx__note--amber"><span class="obx__note-ico"><Icon name="info" size={16} /></span><p>{@html th('onboarding.libraryNote')}</p></div>
           {:else if step === 2}
-            <h1 class="obx__h1">Download source</h1>
-            <p class="obx__lead">How should BackIssue download issues? Pick one to configure now — enable more or fine-tune later in Settings.</p>
+            <h1 class="obx__h1">{t('onboarding.sourceTitle')}</h1>
+            <p class="obx__lead">{t('onboarding.sourceLead')}</p>
             <div class="obx__sources">
               <button class="obx__source" class:is-active={source === 'usenet'} onclick={() => { source = 'usenet'; tests.ix = tests.client = null; }}>
-                <span class="obx__source-ico"><Icon name="download" size={16} /></span><span class="obx__source-label">Usenet</span><span class="obx__source-desc">SABnzbd / NZBGet</span></button>
+                <span class="obx__source-ico"><Icon name="download" size={16} /></span><span class="obx__source-label">{t('onboarding.usenet')}</span><span class="obx__source-desc">{'SABnzbd / NZBGet'}</span></button>
               <button class="obx__source" class:is-active={source === 'torrent'} onclick={() => { source = 'torrent'; tests.ix = tests.client = null; }}>
-                <span class="obx__source-ico"><Icon name="globe" size={16} /></span><span class="obx__source-label">Torrents</span><span class="obx__source-desc">qBittorrent / Transmission / Deluge</span></button>
+                <span class="obx__source-ico"><Icon name="globe" size={16} /></span><span class="obx__source-label">{t('onboarding.torrents')}</span><span class="obx__source-desc">{'qBittorrent / Transmission / Deluge'}</span></button>
               <button class="obx__source" class:is-active={source === 'none'} onclick={() => { source = 'none'; }}>
-                <span class="obx__source-ico"><Icon name="info" size={16} /></span><span class="obx__source-label">Decide later</span><span class="obx__source-desc">Skip for now</span></button>
+                <span class="obx__source-ico"><Icon name="info" size={16} /></span><span class="obx__source-label">{t('onboarding.decideLater')}</span><span class="obx__source-desc">{t('onboarding.skipForNow')}</span></button>
             </div>
             {#if source === 'usenet'}
               <div class="obx__cfg">
                 <div>
-                  <div class="obx__cfg-h">Indexer (Newznab)</div>
-                  <div class="obx__grid2"><input class="obx__input" placeholder="Name (NZBgeek)" bind:value={ixName} /><input class="obx__input obx__input--mono" placeholder="https://api.nzbgeek.info" bind:value={ixUrl} /></div>
-                  <input class="obx__input obx__input--mono obx__mt" placeholder="API key" bind:value={ixKey} />
-                  <div class="obx__testrow obx__mt"><button class="obx__test" type="button" disabled={!ixUrl.trim()} onclick={testIx}>Test indexer</button>{#if tests.ix}<span class="obx__teststatus obx__ts--{tests.ix.cls}">{#if tests.ix.icon}<Icon name={tests.ix.icon} size={14} /> {/if}{tests.ix.text}</span>{/if}</div>
+                  <div class="obx__cfg-h">{t('onboarding.indexerNewznab')}</div>
+                  <div class="obx__grid2"><input class="obx__input" placeholder={t('onboarding.namePlaceholderExample')} bind:value={ixName} /><input class="obx__input obx__input--mono" placeholder={'https://api.nzbgeek.info'} bind:value={ixUrl} /></div>
+                  <input class="obx__input obx__input--mono obx__mt" placeholder={t('onboarding.apiKey')} bind:value={ixKey} />
+                  <div class="obx__testrow obx__mt"><button class="obx__test" type="button" disabled={!ixUrl.trim()} onclick={testIx}>{t('onboarding.testIndexer')}</button>{#if tests.ix}<span class="obx__teststatus obx__ts--{tests.ix.cls}">{#if tests.ix.icon}<Icon name={tests.ix.icon} size={14} /> {/if}{tests.ix.text}</span>{/if}</div>
                 </div>
                 <div>
-                  <div class="obx__cfg-h">Download client</div>
-                  <select class="obx__input" bind:value={nzbClient}><option value="sabnzbd">SABnzbd</option><option value="nzbget">NZBGet</option></select>
-                  <div class="obx__grid-hp obx__mt"><input class="obx__input" placeholder="Host" bind:value={nzbHost} /><input class="obx__input" placeholder="Port" bind:value={nzbPort} /></div>
+                  <div class="obx__cfg-h">{t('onboarding.downloadClient')}</div>
+                  <select class="obx__input" bind:value={nzbClient}><option value="sabnzbd">{'SABnzbd'}</option><option value="nzbget">{'NZBGet'}</option></select>
+                  <div class="obx__grid-hp obx__mt"><input class="obx__input" placeholder={t('onboarding.host')} bind:value={nzbHost} /><input class="obx__input" placeholder={t('onboarding.port')} bind:value={nzbPort} /></div>
                   {#if nzbClient === 'sabnzbd'}
-                    <input class="obx__input obx__input--mono obx__mt" placeholder="API key" bind:value={nzbApiKey} />
+                    <input class="obx__input obx__input--mono obx__mt" placeholder={t('onboarding.apiKey')} bind:value={nzbApiKey} />
                   {:else}
-                    <div class="obx__grid2 obx__mt"><input class="obx__input" placeholder="Username" bind:value={nzbUser} /><input class="obx__input" type="password" placeholder="Password" bind:value={nzbPass} /></div>
+                    <div class="obx__grid2 obx__mt"><input class="obx__input" placeholder={t('onboarding.username')} bind:value={nzbUser} /><input class="obx__input" type="password" placeholder={t('onboarding.password')} bind:value={nzbPass} /></div>
                   {/if}
-                  <div class="obx__testrow obx__mt"><button class="obx__test" type="button" disabled={!nzbHost.trim()} onclick={testClient}>Test connection</button>{#if tests.client}<span class="obx__teststatus obx__ts--{tests.client.cls}">{#if tests.client.icon}<Icon name={tests.client.icon} size={14} /> {/if}{tests.client.text}</span>{/if}</div>
+                  <div class="obx__testrow obx__mt"><button class="obx__test" type="button" disabled={!nzbHost.trim()} onclick={testClient}>{t('onboarding.testConnection')}</button>{#if tests.client}<span class="obx__teststatus obx__ts--{tests.client.cls}">{#if tests.client.icon}<Icon name={tests.client.icon} size={14} /> {/if}{tests.client.text}</span>{/if}</div>
                 </div>
               </div>
             {:else if source === 'torrent'}
               <div class="obx__cfg">
                 <div>
-                  <div class="obx__cfg-h">Indexer (Torznab — Jackett/Prowlarr)</div>
-                  <div class="obx__grid2"><input class="obx__input" placeholder="Name" bind:value={tzName} /><input class="obx__input obx__input--mono" placeholder="http://prowlarr:9696/1/api" bind:value={tzUrl} /></div>
-                  <input class="obx__input obx__input--mono obx__mt" placeholder="API key" bind:value={tzKey} />
-                  <div class="obx__testrow obx__mt"><button class="obx__test" type="button" disabled={!tzUrl.trim()} onclick={testIx}>Test indexer</button>{#if tests.ix}<span class="obx__teststatus obx__ts--{tests.ix.cls}">{#if tests.ix.icon}<Icon name={tests.ix.icon} size={14} /> {/if}{tests.ix.text}</span>{/if}</div>
+                  <div class="obx__cfg-h">{t('onboarding.indexerTorznab')}</div>
+                  <div class="obx__grid2"><input class="obx__input" placeholder={t('onboarding.namePlaceholder')} bind:value={tzName} /><input class="obx__input obx__input--mono" placeholder={'http://prowlarr:9696/1/api'} bind:value={tzUrl} /></div>
+                  <input class="obx__input obx__input--mono obx__mt" placeholder={t('onboarding.apiKey')} bind:value={tzKey} />
+                  <div class="obx__testrow obx__mt"><button class="obx__test" type="button" disabled={!tzUrl.trim()} onclick={testIx}>{t('onboarding.testIndexer')}</button>{#if tests.ix}<span class="obx__teststatus obx__ts--{tests.ix.cls}">{#if tests.ix.icon}<Icon name={tests.ix.icon} size={14} /> {/if}{tests.ix.text}</span>{/if}</div>
                 </div>
                 <div>
-                  <div class="obx__cfg-h">Download client</div>
-                  <select class="obx__input" bind:value={torrentClient} onchange={() => { tests.client = null; }}><option value="qbittorrent">qBittorrent</option><option value="transmission">Transmission</option><option value="deluge">Deluge</option></select>
-                  <div class="obx__grid-hp obx__mt"><input class="obx__input" placeholder="Host" bind:value={tcHost} /><input class="obx__input" placeholder={tcDefaultPort} bind:value={tcPort} /></div>
+                  <div class="obx__cfg-h">{t('onboarding.downloadClient')}</div>
+                  <select class="obx__input" bind:value={torrentClient} onchange={() => { tests.client = null; }}><option value="qbittorrent">{'qBittorrent'}</option><option value="transmission">{'Transmission'}</option><option value="deluge">{'Deluge'}</option></select>
+                  <div class="obx__grid-hp obx__mt"><input class="obx__input" placeholder={t('onboarding.host')} bind:value={tcHost} /><input class="obx__input" placeholder={tcDefaultPort} bind:value={tcPort} /></div>
                   {#if torrentClient === 'deluge'}
-                    <input class="obx__input obx__mt" type="password" placeholder="Web UI password" bind:value={tcPass} />
+                    <input class="obx__input obx__mt" type="password" placeholder={t('onboarding.webUiPassword')} bind:value={tcPass} />
                   {:else}
-                    <div class="obx__grid2 obx__mt"><input class="obx__input" placeholder="Username" bind:value={tcUser} /><input class="obx__input" type="password" placeholder="Password" bind:value={tcPass} /></div>
+                    <div class="obx__grid2 obx__mt"><input class="obx__input" placeholder={t('onboarding.username')} bind:value={tcUser} /><input class="obx__input" type="password" placeholder={t('onboarding.password')} bind:value={tcPass} /></div>
                   {/if}
-                  <div class="obx__testrow obx__mt"><button class="obx__test" type="button" disabled={!tcHost.trim()} onclick={testClient}>Test connection</button>{#if tests.client}<span class="obx__teststatus obx__ts--{tests.client.cls}">{#if tests.client.icon}<Icon name={tests.client.icon} size={14} /> {/if}{tests.client.text}</span>{/if}</div>
+                  <div class="obx__testrow obx__mt"><button class="obx__test" type="button" disabled={!tcHost.trim()} onclick={testClient}>{t('onboarding.testConnection')}</button>{#if tests.client}<span class="obx__teststatus obx__ts--{tests.client.cls}">{#if tests.client.icon}<Icon name={tests.client.icon} size={14} /> {/if}{tests.client.text}</span>{/if}</div>
                 </div>
               </div>
             {:else}
-              <div class="obx__note">No usenet or torrent setup? That's fine — plugins can add other download sources later from the <b>Plugins</b> page. You can still track series and import files you already have.</div>
+              <div class="obx__note">{@html th('onboarding.noSourceNote')}</div>
             {/if}
           {:else if step === 3}
-            <h1 class="obx__h1">Add plugins</h1>
-            <p class="obx__lead">BackIssue is modular — pick plugins to install now, or add them anytime from the <b>Plugins</b> page. Selected plugins activate when you finish.</p>
+            <h1 class="obx__h1">{t('onboarding.pluginsTitle')}</h1>
+            <p class="obx__lead">{@html th('onboarding.pluginsLead')}</p>
             {#if !pluginsFetched}
-              <div class="obx__note">Loading catalog…</div>
+              <div class="obx__note">{t('onboarding.loadingCatalog')}</div>
             {:else if !catalogPlugins.length}
-              <div class="obx__note">No plugins available right now — you can add them later from the Plugins page.</div>
+              <div class="obx__note">{t('onboarding.noPlugins')}</div>
             {:else}
               <div class="obx__plugins">
                 {#each catalogPlugins as p (p.id)}
@@ -291,22 +295,22 @@
             {/if}
           {:else}
             <div class="obx__hero obx__hero--done"><Icon name="check" size={30} /></div>
-            <h1 class="obx__h1 obx__h1--big">Ready to go</h1>
-            <p class="obx__lead">Your setup is complete. Here's what you configured:</p>
+            <h1 class="obx__h1 obx__h1--big">{t('onboarding.readyTitle')}</h1>
+            <p class="obx__lead">{t('onboarding.readyLead')}</p>
             <div class="obx__summary">
               {#each summaryRows as r (r.label)}
                 <div class="obx__srow"><span class="obx__sico" style="color:{r.tone}; background:color-mix(in srgb, {r.tone} 12%, transparent);"><Icon name={r.icon} size={14} /></span><span class="obx__slabel">{r.label}</span><span class="obx__svalue" style="color:{r.tone};">{r.value}</span></div>
               {/each}
             </div>
-            <p class="obx__sub">Next: add a series with <b>+ Add</b> (searches the metadata library), or pull in an existing library via <b>Import</b> in the sidebar.</p>
+            <p class="obx__sub">{@html th('onboarding.readySub')}</p>
           {/if}
         </div>
       </div>
 
       <div class="obx__foot">
-        <button class="obx__skip" onclick={skip}>Skip setup</button>
+        <button class="obx__skip" onclick={skip}>{t('onboarding.skipSetup')}</button>
         <div class="obx__foot-right">
-          {#if step > 0}<button class="obx__back" onclick={() => { step -= 1; }}>Back</button>{/if}
+          {#if step > 0}<button class="obx__back" onclick={() => { step -= 1; }}>{t('common.back')}</button>{/if}
           {#if step < STEPS.length - 1}
             <button class="obx__next" onclick={() => { step += 1; }}>{nextLabel} <Icon name="arrow-right" size={16} /></button>
           {:else}
@@ -349,7 +353,7 @@
   .obx__h1--big { font-size: 36px; }
   .obx__lead { font-size: 14px; color: #b3adc4; line-height: 1.6; margin: 0 0 22px; }
   .obx__sub { font-size: 13.5px; color: var(--faint); line-height: 1.65; margin: 0; }
-  .obx__lead b, .obx__sub b { color: var(--text); }
+  .obx__lead :global(b), .obx__sub :global(b) { color: var(--text); }
 
   .obx__bullets { display: flex; flex-direction: column; gap: 12px; }
   .obx__bullet { display: flex; align-items: center; gap: 13px; padding: 13px 15px; background: rgba(255,255,255,.02); border: 1px solid #2a2536; border-radius: 11px; }
@@ -372,7 +376,7 @@
   .obx__ts--is-bad { color: var(--red); }
   .obx__ts--is-testing { color: var(--muted); }
   .obx__note { margin-top: 22px; padding: 13px 15px; border: 1px solid #2a2536; background: rgba(255,255,255,.02); border-radius: 11px; font-size: 12.5px; color: var(--muted); line-height: 1.55; display: flex; gap: 11px; align-items: flex-start; }
-  .obx__note b { color: var(--text); }
+  .obx__note :global(b) { color: var(--text); }
   .obx__note p { margin: 0; }
   .obx__note--cyan { border-color: rgba(43,212,217,.25); background: rgba(43,212,217,.05); color: #9fd9dc; }
   .obx__note--amber .obx__note-ico { color: var(--amber); flex: none; display: flex; margin-top: 1px; }
