@@ -1,0 +1,113 @@
+{
+  "title": "Help · {page}",
+  "footer": "Tip: press <kbd>Esc</kbd> to close. Buttons you don’t see may need a higher permission.",
+  "whatThisIs": "What this is",
+  "fallback": {
+    "title": "BackIssue",
+    "s1h": "This page",
+    "s1p": "No page-specific help yet — pick a section from the left menu."
+  },
+  "series": {
+    "title": "Series",
+    "s1h": "What this is",
+    "s1p": "Every issue the metadata source lists for this series. Owned issues show a cover and green check; missing ones are yours to download.",
+    "s2h": "Reading & downloading",
+    "s2p": "Use the download button on a row (or select several and “Download selected”) to download missing issues. Owned issues show reader actions (read, mark read) if the reader plugin is on.",
+    "s3h": "List vs grid",
+    "s3p": "Toggle grid/list at the top. The list view adds cover date, page count, file size, and the file format per issue; the grid shows covers.",
+    "s4h": "Managing it",
+    "s4p": "With library-management rights you can Refresh the metadata, Fix the match, Scan the folder, Tag files, set the location, add alt search names, or Remove the series. “Add to list” puts the selection (or the whole series) on a reading list."
+  },
+  "library": {
+    "title": "Library",
+    "s1h": "What this is",
+    "s1p": "Every series you track. Each shows how many issues you own vs. how many exist, with a progress bar.",
+    "s2h": "Finding things",
+    "s2p": "The top search box filters your collection. The filter chips narrow to Incomplete, Not followed, Problems, or Unmatched (no metadata match yet); the sort menu orders A–Z, recently added, or most-missing.",
+    "s3h": "Views",
+    "s3p": "Grid is a poster wall; list is a dense table showing publisher, year, download activity, latest issue date, and size on disk.",
+    "s4h": "Adding & bulk actions",
+    "s4p": "“+ Add” searches the metadata source and adds a series (which, by default, immediately queues its issues to download). “Select” enables bulk follow/unfollow, download-missing, and remove."
+  },
+  "wanted": {
+    "title": "Wanted",
+    "s1h": "What this is",
+    "s1p": "Every missing issue across your whole collection, grouped by series — your backlog of things to download.",
+    "s2h": "Using it",
+    "s2p": "Download an individual issue, or “Download shown” to queue everything matching the current filters (capped per pass). Filter to followed-only or hide unreleased issues."
+  },
+  "queue": {
+    "title": "Download queue",
+    "s1h": "What this is",
+    "s1p": "What’s downloading now and what’s waiting. The active item shows a progress bar with speed and source.",
+    "s2h": "Controls",
+    "s2p": "Pause/resume the queue, clear queued items, or retry/clear failed ones (library-management rights). The × on a row cancels that download and removes it from the client.",
+    "s3h": "After a restart",
+    "s3p": "A queue that was mid-download resumes automatically when the app starts."
+  },
+  "releases": {
+    "title": "Releases",
+    "s1h": "What this is",
+    "s1p": "New comics shipping this week (browse other weeks with the arrows). Issues of series you track are flagged, and can be added or downloaded right here."
+  },
+  "lists": {
+    "title": "Reading lists",
+    "s1h": "What this is",
+    "s1p": "Personal, ordered lists of issues — hand-built or imported from a story arc. Lists are private to your account.",
+    "s2h": "Building a list",
+    "s2p": "Create one, then add issues from any series page (“Add to list”). Reorder with the up/down controls. Items you don’t own show a download button, or “+ Add series” if the whole series isn’t in your library yet.",
+    "s3h": "Story arcs",
+    "s3p": "“Import story arc” searches the metadata source and pulls an arc’s issues in cover-date reading order — great for crossovers that span several series."
+  },
+  "history": {
+    "title": "History",
+    "s1h": "What this is",
+    "s1p": "A log of issues imported into your library — what came in, when, and from which source. Filter by source at the top."
+  },
+  "stats": {
+    "title": "Stats",
+    "s1h": "What this is",
+    "s1p": "A snapshot of your collection — totals by publisher, completeness, file counts and sizes."
+  },
+  "users": {
+    "title": "Users & roles",
+    "s1h": "Accounts",
+    "s1p": "Create accounts, assign roles, disable, or delete them. Toggle self-registration (new signups start as viewers). At least one admin must always remain.",
+    "s2h": "Roles & permissions",
+    "s2p": "Built-in roles (Viewer, Trusted, Admin) grant increasing permissions. Create a custom role and tick exactly the permissions it should hold — including permissions that plugins register (reading, OPDS, requests, etc.)."
+  },
+  "plugins": {
+    "title": "Plugins",
+    "s1h": "What this is",
+    "s1p": "Everything installed under the plugins folder, with what each one registered (routes, sources, jobs, UI). Enable or disable each; changes apply after a restart.",
+    "s2h": "Restart",
+    "s2p": "The “Restart now” button restarts the app so plugin changes take effect."
+  },
+  "jobs": {
+    "title": "Jobs",
+    "s1h": "What this is",
+    "s1p": "Background tasks (release checks, metadata matching, crawls, backfills) and their schedules. Edit a task’s cron schedule, toggle it, or run it now."
+  },
+  "tools": {
+    "title": "Tools",
+    "s1h": "What this is",
+    "s1p": "One-off library maintenance: scan everything, tag untagged files, convert CBR→CBZ, remove duplicates, and verify archives for corruption."
+  },
+  "logs": {
+    "title": "Logs",
+    "s1h": "What this is",
+    "s1p": "Recent application messages — useful when a download or tag fails. Filter by level and category, or clear the buffer."
+  },
+  "settings": {
+    "title": "Settings",
+    "s1h": "What this is",
+    "s1p": "App configuration: library root folders, download format and behavior, metadata sources, indexers/download clients, notifications, and plugin settings.",
+    "s2h": "Download on add",
+    "s2p": "Under Downloading, “Download on add” controls whether adding a series immediately queues its issues (on by default)."
+  },
+  "import": {
+    "title": "Import",
+    "s1h": "What this is",
+    "s1p": "Bring an existing comic library on disk into BackIssue: scan your folders, review the matched candidates, and confirm to file them under the matching series."
+  }
+}
