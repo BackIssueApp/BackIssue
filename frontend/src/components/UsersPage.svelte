@@ -8,7 +8,7 @@
   import { auth } from '../lib/auth.svelte.js';
   import { notify } from '../lib/toasts.svelte.js';
   import { confirmDialog } from './DialogModal.svelte';
-  import { t, currentLang, st } from '../lib/i18n.svelte.js';
+  import { t, currentLang, st, roleName } from '../lib/i18n.svelte.js';
 
   let { active = false } = $props();
   let users = $state([]);
@@ -87,7 +87,7 @@
   const providerLabel = (id) => PROVIDER_LABELS[id] || String(id || '').toUpperCase();
 
   // ---- roles ----
-  const roleLabel = (name) => roles.find((r) => r.name === name)?.label || name;
+  const roleLabel = (name) => roleName(name, roles.find((r) => r.name === name)?.label);
   const permLabel = (key) => perms.find((p) => p.key === key)?.label || key;
   // Presentational role tint/icon — admin star, trusted shield, viewer eye,
   // custom violet shield. Nothing in the data requires this mapping.
@@ -169,7 +169,7 @@
               </div>
               <span class="usx__col-seen usx__seen">{seenText(u)}</span>
               <select class="usx__rolesel" value={u.role} onchange={(e) => setRole(u, e.currentTarget.value)} disabled={isSelf(u)}>
-                {#each roles as r (r.name)}<option value={r.name}>{r.label}</option>{/each}
+                {#each roles as r (r.name)}<option value={r.name}>{roleName(r.name, r.label)}</option>{/each}
               </select>
               <div class="usx__uactions">
                 {#if !isSelf(u)}
@@ -186,7 +186,7 @@
           <form class="usx__create-form" onsubmit={(e) => { e.preventDefault(); create(); }}>
             <label class="usx__field"><span class="usx__label">{t('usersPage.username')}</span><input type="text" placeholder={t('usersPage.usernamePlaceholder')} bind:value={nu.username} required minlength="2" maxlength="32" autocomplete="off" /></label>
             <label class="usx__field"><span class="usx__label">{t('usersPage.password')}</span><input type="password" placeholder={t('usersPage.passwordPlaceholder')} bind:value={nu.password} required minlength="8" autocomplete="new-password" /></label>
-            <label class="usx__field"><span class="usx__label">{t('usersPage.role')}</span><select bind:value={nu.role}>{#each roles as r (r.name)}<option value={r.name}>{r.label}</option>{/each}</select></label>
+            <label class="usx__field"><span class="usx__label">{t('usersPage.role')}</span><select bind:value={nu.role}>{#each roles as r (r.name)}<option value={r.name}>{roleName(r.name, r.label)}</option>{/each}</select></label>
             <button class="usx__primary">{t('usersPage.create')}</button>
           </form>
         </div>
@@ -200,7 +200,7 @@
           <div class="usx__role">
             <div class="usx__role-head">
               <span class="usx__role-ico" style="background:color-mix(in srgb, {roleTone(r.name)} 12%, transparent); color:{roleTone(r.name)};"><Icon name={roleIcon(r.name)} size={16} /></span>
-              <span class="usx__role-name">{r.label}</span>
+              <span class="usx__role-name">{r.builtin ? roleName(r.name, r.label) : r.label}</span>
               {#if r.builtin}<span class="usx__builtin">{t('usersPage.builtIn')}</span>{/if}
               <span class="usx__role-users">{t('usersPage.roleUsers', { count: r.users })}</span>
               {#if !r.builtin}

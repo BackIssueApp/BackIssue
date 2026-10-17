@@ -7,7 +7,7 @@
   import { fmt } from '../lib/util.js';
   import { auth, logout, can, isTrusted } from '../lib/auth.svelte.js';
   import Icon from '../lib/Icon.svelte';
-  import { t, hasMessage } from '../lib/i18n.svelte.js';
+  import { t, hasMessage, roleName } from '../lib/i18n.svelte.js';
 
   let userMenuOpen = $state(false);
 
@@ -137,7 +137,7 @@
       <button class="sideuser__chip" class:is-open={userMenuOpen} aria-haspopup="menu" aria-expanded={userMenuOpen} onclick={() => { userMenuOpen = !userMenuOpen; }}>
         <span class="sideuser__avatar">{auth.user.username.slice(0, 1).toUpperCase()}</span>
         <span class="sideuser__name">{auth.user.username}</span>
-        <span class="sideuser__role sideuser__role--{auth.user.role}">{auth.user.role}</span>
+        <span class="sideuser__role sideuser__role--{auth.user.role}">{roleName(auth.user.role)}</span>
         <span class="sideuser__caret" class:is-open={userMenuOpen}><Icon name="chevron-down" size={15} /></span>
       </button>
       {#if userMenuOpen}

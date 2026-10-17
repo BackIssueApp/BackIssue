@@ -51,6 +51,13 @@ export function hasMessage(key) { void state.version; return core.hasMessage(key
  *  the catalog knows its English; see i18n.js serverText. */
 export function st(ns, text) { void state.version; return core.serverText(ns, text); }
 
+/** A role's display name: built-in roles from the catalog, custom roles as
+ *  their admin named them (label, else the id). */
+export function roleName(id, label) {
+  void state.version;
+  return core.hasMessage('roles.' + id) ? core.t('roles.' + id) : (label || id || '');
+}
+
 /** The language's own name for itself ("Deutsch"), for pickers. */
 export function languageName(code) {
   try {

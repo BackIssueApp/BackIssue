@@ -9,7 +9,7 @@
   import { notify } from '../lib/toasts.svelte.js';
   import { confirmDialog } from './DialogModal.svelte';
   import { loadCollection } from '../lib/store.svelte.js';
-  import { t, th, LANGUAGES, languageName, matchLanguage, storedLanguage, rememberLanguage, currentLang } from '../lib/i18n.svelte.js';
+  import { t, th, LANGUAGES, languageName, matchLanguage, storedLanguage, rememberLanguage, currentLang, roleName } from '../lib/i18n.svelte.js';
   import Icon from '../lib/Icon.svelte';
 
   let { active = false } = $props();
@@ -144,7 +144,7 @@
         <div class="pfx__hero-main">
           <div class="pfx__hero-top">
             <span class="pfx__name">{auth.user?.username}</span>
-            <span class="pfx__roletag">{auth.user?.role}</span>
+            <span class="pfx__roletag">{roleName(auth.user?.role)}</span>
             {#each profile?.providers || [] as p (p)}<span class="pfx__provider" title={t('profile.linkedTo', { provider: providerLabel(p) })}>{providerLabel(p)}</span>{/each}
           </div>
           {#if profile}

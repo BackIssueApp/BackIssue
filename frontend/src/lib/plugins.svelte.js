@@ -12,7 +12,7 @@ import { auth } from './auth.svelte.js';
 import { detailSelected } from './store.svelte.js';
 import { navigate } from './router.svelte.js';
 import { status } from './status.svelte.js';
-import { t, th, currentLang, addMessages } from './i18n.svelte.js';
+import { t, th, st, currentLang, addMessages } from './i18n.svelte.js';
 
 // Flips when plugin assets have loaded — the Settings page watches it so
 // plugin-injected fields get populated even if Settings was opened first.
@@ -191,7 +191,7 @@ const bi = {
         if (section) {
           const head = document.createElement('div');
           head.className = 'sidenav__head';
-          head.textContent = section;
+          head.textContent = st('menuSections', section);
           group.appendChild(head);
         }
         area.appendChild(group);
