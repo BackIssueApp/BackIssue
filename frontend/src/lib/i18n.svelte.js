@@ -78,11 +78,26 @@ async function loadCatalog(lang) {
   return assemble(entries);
 }
 
+// Plugin catalogs: the shell inlines English plus the account's saved
+// language (window.__BI_PLUGIN_MESSAGES__); any other language is fetched.
+// Added after the language is active, since addMessages() keeps only English
+// and the active language.
+async function pullPluginMessages(lang) {
+  if (typeof window === 'undefined') return;
+  const inline = window.__BI_PLUGIN_MESSAGES__;
+  if (inline && (lang === core.FALLBACK || inline[lang])) { core.addMessages(inline); return; }
+  try {
+    const r = await fetch('/api/i18n/plugins?lang=' + encodeURIComponent(lang));
+    if (r.ok) core.addMessages(await r.json());
+  } catch { /* offline, or the login page: plugins do not render there */ }
+}
+
 /** Load and activate a language. Unknown codes fall back to English. */
 export async function setLanguage(code) {
   const lang = core.matchLanguage(code) || core.FALLBACK;
   core.activate(lang, await loadCatalog(lang));
   if (typeof document !== 'undefined') document.documentElement.lang = lang;
+  await pullPluginMessages(lang);
   return lang;
 }
 

@@ -10,7 +10,7 @@ import { registeredSourceCards, registeredSources, loadBundledSources } from './
 import { pluginCatalog as supportPluginCatalog, registeredSources as supportSources, registeredNotifiers as supportNotifiers, pluginsDir as supportPluginsDir } from './plugins.js';
 import { listLibraries as supportLibraries, libraryStats as supportLibraryStats, listImportHistory as supportImportHistory } from './db.js';
 import { loadAttestation as supportBuildInfo } from './attest.js';
-import { loadPlugins, registeredStartups, registeredRoutes, registeredJobs, registeredClientAssets, registeredImportHandlers } from './plugins.js';
+import { loadPlugins, registeredStartups, registeredRoutes, registeredJobs, registeredClientAssets, registeredImportHandlers, registeredMessages } from './plugins.js';
 import { spawn } from 'node:child_process';
 import fsp from 'node:fs/promises';
 import fss from 'node:fs';
@@ -1410,6 +1410,7 @@ const app = createApp({
   setAliases,
   pluginRoutes: registeredRoutes(),
   pluginClientAssets: registeredClientAssets(),
+  pluginMessages: registeredMessages(),
   matchImportCandidate,
   confirmImportCandidate,
   skipImportCandidate,

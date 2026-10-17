@@ -43,7 +43,7 @@ if (process.env.BUILD_CHANNEL && process.env.BUILD_CHANNEL !== 'release') {
   APP_VERSION += `-${process.env.BUILD_CHANNEL}${sha ? '.' + sha : ''}`;
 }
 
-export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, listSourceCards, testSource, sourceCatalog, installSource: installSourceFn, uninstallSource: uninstallSourceFn, queueProgress, packProgress, activeMedia, cancelGrab, testCvKeys, metadataProviders, testMetadataProvider, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, supportPackage, supportSend, supportSendMobile, state }) {
+export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, listSourceCards, testSource, sourceCatalog, installSource: installSourceFn, uninstallSource: uninstallSourceFn, queueProgress, packProgress, activeMedia, cancelGrab, testCvKeys, metadataProviders, testMetadataProvider, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], pluginMessages = {}, matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, supportPackage, supportSend, supportSendMobile, state }) {
   const startDownloads = (arg) => {
     if (!state.queue.running) {
       state.queue.running = true;
@@ -845,6 +845,17 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   });
   app.get('/api/plugins/client', (req, res) => res.json(stampedAssets()));
 
+  // Plugin UI strings: English (the fallback) plus one requested language.
+  // The shell inlines the same for the account's saved language; this route
+  // covers a browser-detected language and sign-in without a reload.
+  const messagesFor = (lang) => {
+    const out = {};
+    if (pluginMessages.en) out.en = pluginMessages.en;
+    if (lang && lang !== 'en' && users.LANG_RE.test(lang) && pluginMessages[lang]) out[lang] = pluginMessages[lang];
+    return out;
+  };
+  app.get('/api/i18n/plugins', (req, res) => res.json(messagesFor(String(req.query.lang || ''))));
+
   // The served shell embeds each plugin's <script>/<link> tags directly, so
   // plugin assets load in parallel with the app bundle — the sidebar's plugin
   // entries render with the rest of the menu, with no list fetch and no
@@ -867,6 +878,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
         tags.unshift(`<script>window.__BI_LANG__=${JSON.stringify(u.lang)};</script>`);
         html = html.replace('<html lang="en">', `<html lang="${u.lang}">`);
       }
+      // Plugin UI strings for English and the saved language, so plugin
+      // screens are translated on first paint too. JSON inside a script tag:
+      // escape the one sequence that could close it early.
+      const msgs = messagesFor(u?.lang || '');
+      if (Object.keys(msgs).length) tags.unshift(`<script>window.__BI_PLUGIN_MESSAGES__=${JSON.stringify(msgs).replace(/</g, '\\u003c')};</script>`);
       for (const a of stampedAssets()) {
         const v = a.v ? `?v=${a.v}` : '';
         if (a.css) tags.push(`<link rel="stylesheet" href="/plugins/${a.name}/${a.css}${v}">`);

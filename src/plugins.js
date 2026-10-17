@@ -87,6 +87,35 @@ const remoteMediaSources = []; // { id, mediaType, label, listPage, materialize?
 const collectionFilters = []; // { id, resolve(selection, ctx) -> number[] } — resolve a Library facet selection to matching series ids (narrows /api/collection)
 const mediaHandlers = []; // { type, exts, file({ path, files, libraryId, hint, source, log }) -> { issueId, seriesId } } — files a downloaded book/audiobook into a plugin library
 const mediaListeners = []; // (event) => void — told when a media download lands or fails ({ event:'imported'|'failed', type, ref, … })
+// UI translations plugins contribute: lang → namespace → { key: message }.
+// Filled by api.registerMessages() and by plugins/<name>/locales/<lang>.json
+// (keys land under the plugin's own name). Core inlines English plus the
+// account's language into the served shell; see /api/i18n/plugins.
+const messageCatalogs = {};
+function mergeMessages(catalogs) {
+  if (!catalogs || typeof catalogs !== 'object') return;
+  for (const [lang, byNs] of Object.entries(catalogs)) {
+    if (!byNs || typeof byNs !== 'object' || !/^[a-z]{2,3}(-[a-z0-9]{2,8}){0,2}$/i.test(lang)) continue;
+    for (const [ns, messages] of Object.entries(byNs)) {
+      if (!messages || typeof messages !== 'object' || Array.isArray(messages)) continue;
+      const target = (messageCatalogs[lang] ??= {});
+      target[ns] = { ...(target[ns] || {}), ...messages };
+    }
+  }
+}
+// plugins/<name>/locales/<lang>.json → { lang: { <name>: messages } }.
+function loadPluginLocales(dir, name) {
+  const ldir = path.join(dir, name, 'locales');
+  let files = [];
+  try { files = fs.readdirSync(ldir).filter((f) => f.endsWith('.json')); } catch { return; }
+  for (const f of files) {
+    const lang = f.replace(/\.json$/, '');
+    try {
+      const messages = JSON.parse(fs.readFileSync(path.join(ldir, f), 'utf8'));
+      mergeMessages({ [lang]: { [name]: messages } });
+    } catch (e) { console.warn(`plugin "${name}": could not read locales/${f}:`, e?.message || e); }
+  }
+}
 
 // Per-plugin catalog for the management page: everything discovered on disk,
 // loaded or not. name → { name, version, description, enabled, loaded, error, counts }.
@@ -173,6 +202,11 @@ export const pluginApi = {
   registerJob(job) {
     if (job?.id && typeof job.run === 'function') { jobs.push(job); bump('jobs'); }
   },
+  // UI strings for the plugin's own screens: { lang: { namespace: { key:
+  // message } } }, read on the client with api.t('namespace.key'). The simpler
+  // route is a locales/<lang>.json file per language next to index.js, which
+  // core picks up by itself under the plugin's name as namespace.
+  registerMessages(catalogs) { mergeMessages(catalogs); },
   // Front-end assets: js/css paths relative to the plugin's own directory. Core
   // serves them at /plugins/<name>/<path> and injects them into the page, where
   // the script wires its UI via window.BackIssue.
@@ -370,6 +404,8 @@ export function registeredIndexerProviders() { return indexerProviders; }
 export function registeredRoutes() { return routes; }
 export function registeredJobs() { return jobs; }
 export function registeredClientAssets() { return clientAssets; }
+export function registeredMessages() { return messageCatalogs; }
+export function _resetMessagesForTests() { for (const k of Object.keys(messageCatalogs)) delete messageCatalogs[k]; }
 export function registeredPermissions() { return permissions; }
 export function registeredImportHandlers() { return importHandlers; }
 export function registeredLibraryScanners() { return libraryScanners; }
@@ -458,6 +494,7 @@ export async function loadPluginsFromDir(dir, api = pluginApi, disabled = [], ki
       }
       currentLoadingPlugin = name;
       try { await register(api); } finally { currentLoadingPlugin = null; }
+      loadPluginLocales(dir, name);
       info.loaded = true;
       loaded.push(name);
       console.log(`Loaded ${kind}: ${name}`);
