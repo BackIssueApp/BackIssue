@@ -1,0 +1,22 @@
+{
+  "title": "Geschiedenis",
+  "nFailures": { "one": "{count} mislukking", "other": "{count} mislukkingen" },
+  "nBlocked": { "one": "{count} geblokkeerde release", "other": "{count} geblokkeerde releases" },
+  "nImports": { "one": "{count} import", "other": "{count} imports" },
+  "statFailures": "Mislukt",
+  "statBlocked": "Geblokkeerd",
+  "statImports": "Imports",
+  "emptyFailedTitle": "Geen mislukte downloads",
+  "emptyFailedBody": "Downloads die op een fout stuiten worden hier vastgelegd — het record blijft bestaan, ook nadat de wachtrij is geleegd.",
+  "emptyBlockedTitle": "Niets geblokkeerd",
+  "emptyBlockedBody": "Mislukte usenet-releases komen hier terecht zodat latere zoekopdrachten ze overslaan. Verwijder er een om hem weer toe te laten.",
+  "emptyImportsTitle": "Nog niets geïmporteerd",
+  "emptyImportsBody": "Dit vult zich zodra downloads binnenkomen. Imports van de achtergrondmonitor worden hier bijgehouden.",
+  "filterPlaceholder": "Filter…",
+  "clearAll": "Alles wissen",
+  "chipAll": "Alles",
+  "chipFailed": "Mislukt",
+  "chipBlocklist": "Blokkeerlijst",
+  "removeFromBlocklist": "Van blokkeerlijst halen — automatisch ophalen weer toestaan",
+  "loadMore": "Meer laden"
+}

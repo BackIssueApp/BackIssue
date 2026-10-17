@@ -1,0 +1,14 @@
+{
+  "dialogLabel": "Indexer",
+  "kindIndexer": "indexer",
+  "kindTorrentIndexer": "torrent-indexer",
+  "addTitle": "{kind} toevoegen",
+  "editTitle": "{kind} bewerken",
+  "name": "Naam",
+  "url": "URL",
+  "apiKey": "API-sleutel",
+  "enterUrlFirst": "Vul eerst een URL in.",
+  "urlRequired": "Een URL is verplicht.",
+  "testing": "Testen…",
+  "test": "Testen"
+}

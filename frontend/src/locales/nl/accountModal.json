@@ -1,0 +1,10 @@
+{
+  "dialogLabel": "Account",
+  "title": "Account — {username}",
+  "currentPassword": "Huidig wachtwoord",
+  "newPassword": "Nieuw wachtwoord (8+ tekens)",
+  "confirmNewPassword": "Bevestig nieuw wachtwoord",
+  "mismatch": "nieuwe wachtwoorden komen niet overeen",
+  "changePassword": "Wachtwoord wijzigen",
+  "changed": "Wachtwoord gewijzigd."
+}

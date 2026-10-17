@@ -1,0 +1,17 @@
+{
+  "fallbackSeries": "Nummer",
+  "title": "Bronnen doorzoeken",
+  "searchFailed": "Zoeken mislukt — draait de app?",
+  "noSources": "Er zijn geen downloadbronnen ingeschakeld (Instellingen → Downloadbronnen).",
+  "noneFound": "Geen releases gevonden in je bronnen. Probeer een bredere zoekopdracht of voeg een alternatieve naam toe aan de reeks.",
+  "queryPlaceholder": "Reeks en nummer, of een willekeurige zoekopdracht…",
+  "searched": "Doorzocht",
+  "searching": "Ingeschakelde bronnen doorzoeken…",
+  "pack": "Pakket",
+  "packQueued": "Pakket in de wachtrij gezet via {source} — de ontbrekende nummers worden automatisch geïmporteerd (zie de wachtrij).",
+  "queued": "Download in de wachtrij gezet via {source} — zie de wachtrij.",
+  "failed": "Download mislukt: {error}",
+  "unknownError": "onbekende fout",
+  "sending": "Verzenden…",
+  "download": "Downloaden"
+}

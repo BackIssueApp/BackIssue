@@ -1,0 +1,14 @@
+{
+  "intro": "Welkom bij BackIssue. Maak je account aan om te beginnen — het wordt de <b>beheerder</b>, en vanaf dan is aanmelden verplicht.",
+  "signIn": "Aanmelden",
+  "createAccount": "Account aanmaken",
+  "createAdmin": "Beheerdersaccount aanmaken",
+  "username": "Gebruikersnaam",
+  "password": "Wachtwoord",
+  "confirmPassword": "Bevestig wachtwoord",
+  "passwordsMismatch": "wachtwoorden komen niet overeen",
+  "or": "of",
+  "signInWith": "Aanmelden met {provider}",
+  "noMethod": "Er is geen aanmeldmethode beschikbaar — een beheerder moet SSO instellen of aanmelden met wachtwoord weer inschakelen.",
+  "registrationDisabled": "Registratie is uitgeschakeld — vraag een beheerder om een account."
+}

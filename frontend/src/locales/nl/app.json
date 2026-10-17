@@ -1,0 +1,21 @@
+{
+  "pageSettings": "Instellingen",
+  "pageSystem": "Systeem",
+  "pageWanted": "Gezocht",
+  "pageQueue": "Wachtrij",
+  "pageReleases": "Nieuwe uitgaven",
+  "pageHistory": "Geschiedenis",
+  "pageLists": "Leeslijsten",
+  "pageImport": "Importeren",
+  "pageStats": "Statistieken",
+  "pagePlugins": "Plugins",
+  "pageUsers": "Gebruikers",
+  "pageProfile": "Profiel",
+  "pageSeries": "Reeks",
+  "pageCollections": "Verzamelingen",
+  "notFoundTitle": "Pagina niet gevonden",
+  "notFoundText": "Er is niets op dit adres. Het is misschien verplaatst, of de link klopt niet.",
+  "noAccessTitle": "Je hebt geen toegang tot deze pagina",
+  "noAccessText": "Je account mag deze pagina niet openen. Vraag een beheerder als je denkt dat dit wel zou moeten.",
+  "goHome": "Naar Home"
+}

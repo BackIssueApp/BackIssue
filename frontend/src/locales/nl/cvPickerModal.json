@@ -1,0 +1,21 @@
+{
+  "title": "Reeksmetadata koppelen",
+  "lookingUp": "Reeks opzoeken…",
+  "searching": "Zoeken in de metadatabron…",
+  "noVolumeWithId": "Geen reeks met dat id.",
+  "searchFailed": "Zoeken mislukt.",
+  "noVolumes": "Geen reeksen gevonden.",
+  "linkFailed": "Koppelen mislukt",
+  "linkFailedWith": "Koppelen mislukt: {error}",
+  "matchedTo": "Gekoppeld aan {name}.",
+  "matchedToYear": "Gekoppeld aan {name} ({year}).",
+  "unknownPublisher": "Onbekende uitgever",
+  "idBadge": "ID {id}",
+  "equalsFiles": "= jouw {count} bestanden",
+  "nearFiles": "≈ jouw {count} bestanden",
+  "sourceLink": "Bronpagina",
+  "linking": "Koppelen…",
+  "use": "Gebruiken",
+  "filesNote": { "one": "Je hebt {count} bestand op schijf — reeksen met het dichtstbijzijnde aantal nummers staan bovenaan.", "other": "Je hebt {count} bestanden op schijf — reeksen met het dichtstbijzijnde aantal nummers staan bovenaan." },
+  "searchPlaceholder": "Zoek op naam — of plak de URL / het id van de reeks…"
+}

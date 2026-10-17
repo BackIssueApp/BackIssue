@@ -1,0 +1,8 @@
+{
+  "requestFailed": "verzoek mislukt",
+  "noResponse": "geen antwoord",
+  "downloadFailed": "Download kon niet in de wachtrij: {error}",
+  "downloadFailedUnreachable": "Download kon niet in de wachtrij — is de app bereikbaar?",
+  "redownloadFailed": "Opnieuw downloaden mislukt: {error}",
+  "redownloadFailedUnreachable": "Opnieuw downloaden mislukt — is de app bereikbaar?"
+}

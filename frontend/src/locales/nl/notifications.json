@@ -1,0 +1,31 @@
+{
+  "releaseWeek": {
+    "title": "Nieuwe uitgaven deze week",
+    "body": { "one": "{count} nummer van reeksen die je volgt verschijnt deze week.", "other": "{count} nummers van reeksen die je volgt verschijnen deze week." },
+    "bodyNamed": { "one": "{count} nummer van reeksen die je volgt verschijnt deze week: {named}.", "other": "{count} nummers van reeksen die je volgt verschijnen deze week: {named}." },
+    "bodyNamedMore": { "one": "{count} nummer van reeksen die je volgt verschijnt deze week: {named} en nog {more}.", "other": "{count} nummers van reeksen die je volgt verschijnen deze week: {named} en nog {more}." }
+  },
+  "pickArrived": {
+    "title": "Een nummer dat je hebt aangevraagd is binnen",
+    "body": "{series} #{number}",
+    "bodyNamed": "{series} #{number} — {name}"
+  },
+  "packDone": {
+    "title": "Pakket geïmporteerd",
+    "body": { "one": "{title} — {count} nieuw nummer", "other": "{title} — {count} nieuwe nummers" },
+    "bodyFailed": { "one": "{title} — {count} nieuw nummer, {failed} mislukt", "other": "{title} — {count} nieuwe nummers, {failed} mislukt" }
+  },
+  "packFailed": {
+    "title": "Pakket mislukt",
+    "body": "{title} — {error}"
+  },
+  "importDone": {
+    "title": "Gedownload",
+    "body": "{title}",
+    "bodySource": "{title} · {source}"
+  },
+  "importFailed": {
+    "title": "Download mislukt",
+    "body": "{title} — {error}"
+  }
+}

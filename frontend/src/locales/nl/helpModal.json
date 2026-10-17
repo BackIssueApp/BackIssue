@@ -1,0 +1,113 @@
+{
+  "title": "Hulp · {page}",
+  "footer": "Tip: druk op <kbd>Esc</kbd> om te sluiten. Knoppen die je niet ziet, vereisen mogelijk een hogere machtiging.",
+  "whatThisIs": "Wat dit is",
+  "fallback": {
+    "title": "BackIssue",
+    "s1h": "Deze pagina",
+    "s1p": "Nog geen hulp voor deze pagina — kies een onderdeel in het menu links."
+  },
+  "series": {
+    "title": "Reeks",
+    "s1h": "Wat dit is",
+    "s1p": "Elk nummer dat de metadatabron voor deze reeks kent. Nummers die je hebt tonen een cover en een groen vinkje; ontbrekende kun je downloaden.",
+    "s2h": "Lezen en downloaden",
+    "s2p": "Gebruik de downloadknop op een rij (of selecteer er meerdere en kies “Selectie downloaden”) om ontbrekende nummers te downloaden. Nummers die je hebt tonen leesacties (lezen, als gelezen markeren) als de reader-plugin aanstaat.",
+    "s3h": "Lijst of raster",
+    "s3p": "Schakel bovenaan tussen raster en lijst. De lijstweergave toont per nummer ook de coverdatum, het aantal pagina's, de bestandsgrootte en het bestandsformaat; het raster toont covers.",
+    "s4h": "Beheren",
+    "s4p": "Met bibliotheekbeheerrechten kun je de metadata vernieuwen, de koppeling herstellen, de map scannen, bestanden taggen, de locatie instellen, alternatieve zoeknamen toevoegen of de reeks verwijderen. “Aan lijst toevoegen” zet de selectie (of de hele reeks) op een leeslijst."
+  },
+  "library": {
+    "title": "Bibliotheek",
+    "s1h": "Wat dit is",
+    "s1p": "Elke reeks die je volgt. Elke reeks toont hoeveel nummers je hebt ten opzichte van hoeveel er bestaan, met een voortgangsbalk.",
+    "s2h": "Dingen vinden",
+    "s2p": "Het zoekvak bovenaan filtert je verzameling. De filterchips beperken tot Onvolledig, Niet gevolgd, Problemen of Niet gekoppeld (nog geen metadatamatch); het sorteermenu ordent A–Z, recent toegevoegd of meeste ontbrekend.",
+    "s3h": "Weergaven",
+    "s3p": "Raster is een postermuur; lijst is een compacte tabel met uitgever, jaar, downloadactiviteit, datum van het nieuwste nummer en grootte op schijf.",
+    "s4h": "Toevoegen en bulkacties",
+    "s4p": "“+ Toevoegen” zoekt in de metadatabron en voegt een reeks toe (die standaard meteen haar nummers in de downloadwachtrij zet). “Selecteren” schakelt bulkacties in: volgen/ontvolgen, ontbrekende downloaden en verwijderen."
+  },
+  "wanted": {
+    "title": "Gezocht",
+    "s1h": "Wat dit is",
+    "s1p": "Elk ontbrekend nummer in je hele verzameling, gegroepeerd per reeks — je achterstand aan downloads.",
+    "s2h": "Gebruik",
+    "s2p": "Download een los nummer, of kies “Getoonde downloaden” om alles in de wachtrij te zetten dat aan de huidige filters voldoet (met een maximum per ronde). Filter op alleen gevolgde reeksen of verberg nog niet verschenen nummers."
+  },
+  "queue": {
+    "title": "Downloadwachtrij",
+    "s1h": "Wat dit is",
+    "s1p": "Wat nu wordt gedownload en wat nog wacht. Het actieve item toont een voortgangsbalk met snelheid en bron.",
+    "s2h": "Bediening",
+    "s2p": "Pauzeer of hervat de wachtrij, wis wachtende items, of probeer mislukte opnieuw of wis ze (bibliotheekbeheerrechten). De × op een rij annuleert die download en verwijdert hem uit de client.",
+    "s3h": "Na een herstart",
+    "s3p": "Een wachtrij die midden in een download zat, gaat automatisch verder zodra de app start."
+  },
+  "releases": {
+    "title": "Nieuwe uitgaven",
+    "s1h": "Wat dit is",
+    "s1p": "Nieuwe comics die deze week verschijnen (blader met de pijlen door andere weken). Nummers van reeksen die je volgt zijn gemarkeerd en kun je hier direct toevoegen of downloaden."
+  },
+  "lists": {
+    "title": "Leeslijsten",
+    "s1h": "Wat dit is",
+    "s1p": "Persoonlijke, geordende lijsten van nummers — zelf samengesteld of geïmporteerd uit een verhaallijn. Lijsten zijn privé voor je account.",
+    "s2h": "Een lijst opbouwen",
+    "s2p": "Maak er een aan en voeg dan nummers toe vanaf elke reekspagina (“Aan lijst toevoegen”). Herschik met de omhoog/omlaag-knoppen. Items die je niet hebt tonen een downloadknop, of “+ Reeks toevoegen” als de hele reeks nog niet in je bibliotheek staat.",
+    "s3h": "Verhaallijnen",
+    "s3p": "“Verhaallijn importeren” zoekt in de metadatabron en haalt de nummers van een verhaallijn op in leesvolgorde op coverdatum — ideaal voor crossovers die meerdere reeksen beslaan."
+  },
+  "history": {
+    "title": "Geschiedenis",
+    "s1h": "Wat dit is",
+    "s1p": "Een logboek van nummers die in je bibliotheek zijn geïmporteerd — wat binnenkwam, wanneer en uit welke bron. Filter bovenaan op bron."
+  },
+  "stats": {
+    "title": "Statistieken",
+    "s1h": "Wat dit is",
+    "s1p": "Een momentopname van je verzameling — totalen per uitgever, volledigheid, aantallen bestanden en groottes."
+  },
+  "users": {
+    "title": "Gebruikers en rollen",
+    "s1h": "Accounts",
+    "s1p": "Maak accounts aan, wijs rollen toe, schakel ze uit of verwijder ze. Zet zelfregistratie aan of uit (nieuwe aanmeldingen beginnen als kijker). Er moet altijd minstens één beheerder overblijven.",
+    "s2h": "Rollen en machtigingen",
+    "s2p": "Ingebouwde rollen (Kijker, Vertrouwd, Beheerder) geven steeds meer machtigingen. Maak een eigen rol en vink precies de machtigingen aan die hij moet hebben — ook machtigingen die plugins registreren (lezen, OPDS, verzoeken enz.)."
+  },
+  "plugins": {
+    "title": "Plugins",
+    "s1h": "Wat dit is",
+    "s1p": "Alles wat in de pluginmap is geïnstalleerd, met wat elke plugin heeft geregistreerd (routes, bronnen, taken, UI). Schakel elke plugin in of uit; wijzigingen gelden na een herstart.",
+    "s2h": "Herstarten",
+    "s2p": "De knop “Nu herstarten” herstart de app zodat pluginwijzigingen van kracht worden."
+  },
+  "jobs": {
+    "title": "Taken",
+    "s1h": "Wat dit is",
+    "s1p": "Achtergrondtaken (controles op nieuwe uitgaven, metadatakoppeling, crawls, aanvullingen) en hun schema's. Bewerk het cron-schema van een taak, schakel hem in of uit, of voer hem nu uit."
+  },
+  "tools": {
+    "title": "Hulpmiddelen",
+    "s1h": "Wat dit is",
+    "s1p": "Eenmalig bibliotheekonderhoud: alles scannen, ongetagde bestanden taggen, CBR→CBZ converteren, duplicaten verwijderen en archieven op beschadiging controleren."
+  },
+  "logs": {
+    "title": "Logboek",
+    "s1h": "Wat dit is",
+    "s1p": "Recente meldingen van de app — handig als een download of het taggen mislukt. Filter op niveau en categorie, of wis de buffer."
+  },
+  "settings": {
+    "title": "Instellingen",
+    "s1h": "Wat dit is",
+    "s1p": "App-configuratie: hoofdmappen van bibliotheken, downloadformaat en -gedrag, metadatabronnen, indexers/downloadclients, meldingen en plugininstellingen.",
+    "s2h": "Downloaden bij toevoegen",
+    "s2p": "Onder Downloaden bepaalt “Downloaden bij toevoegen” of het toevoegen van een reeks haar nummers meteen in de wachtrij zet (standaard aan)."
+  },
+  "import": {
+    "title": "Importeren",
+    "s1h": "Wat dit is",
+    "s1p": "Breng een bestaande comicbibliotheek op schijf in BackIssue: scan je mappen, bekijk de gevonden kandidaten en bevestig om ze onder de juiste reeks op te bergen."
+  }
+}

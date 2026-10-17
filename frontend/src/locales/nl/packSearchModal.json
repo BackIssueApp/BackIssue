@@ -1,0 +1,14 @@
+{
+  "title": "Pakketten zoeken · {series}",
+  "dialogLabel": "Pakketten zoeken",
+  "searching": "Ingeschakelde bronnen doorzoeken op pakketten…",
+  "noSources": "Er zijn geen bronnen met pakketondersteuning ingeschakeld.",
+  "noneFound": "Geen pakketten gevonden in je bronnen. Probeer een bredere zoekopdracht (alleen de reeksnaam).",
+  "intro": "Pakketten met meerdere nummers (hele reeksen, TPB's, nummerreeksen) uit elke ingeschakelde bron. Download er een — elk nummer dat in deze reeks <b>ontbreekt</b> wordt eruit geïmporteerd; nummers die je al hebt worden overgeslagen. Torrents/usenet downloaden via je client; andere bronnen downloaden in de app.",
+  "queryPlaceholder": "Reeksnaam…",
+  "queued": "Pakket in de wachtrij gezet via {source} — de ontbrekende nummers van deze reeks worden automatisch geïmporteerd (zie de wachtrij / Taken).",
+  "failed": "Download mislukt: {error}",
+  "unknownError": "onbekende fout",
+  "sending": "Verzenden…",
+  "download": "Downloaden"
+}
