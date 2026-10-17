@@ -3,6 +3,7 @@
   import { goBack, navigate } from '../lib/router.svelte.js';
   import { apiGet } from '../lib/api.js';
   import { fmt, humanBytes, spct } from '../lib/util.js';
+  import { t, th } from '../lib/i18n.svelte.js';
 
   let { active = false } = $props();
 
@@ -36,26 +37,26 @@
     { key: 'cbz', label: 'CBZ', color: 'var(--accent)' },
     { key: 'cbr', label: 'CBR', color: 'var(--amber)' },
     { key: 'pdf', label: 'PDF', color: 'var(--cyan)' },
-    { key: 'other', label: 'Other', color: '#6f6885' },
+    { key: 'other', label: null, color: '#6f6885' },
   ];
   const formatSegs = $derived(f ? FMT.filter((x) => f.formats[x.key]).map((x) => ({
-    label: x.label, color: x.color, count: f.formats[x.key], pct: ((f.formats[x.key] / fmTotal) * 100).toFixed(1) + '%',
+    label: x.label || t('statsPage.formatOther'), color: x.color, count: f.formats[x.key], pct: ((f.formats[x.key] / fmTotal) * 100).toFixed(1) + '%',
   })) : []);
 </script>
 
 <main id="stats-page" class="scan-page stats-page statx">
   <div class="statx__head">
-    <button id="stats-back" class="statx__iconbtn" aria-label="Back" onclick={goBack}><Icon name="arrow-left" size={16} /></button>
-    <h2 class="statx__title">Stats</h2>
-    <span id="stats-summary" class="statx__summary">{s ? `${fmt(c.series)} series · ${fmt(c.ownedIssues)} issues · ${humanBytes(f.bytes)}` : ''}</span>
-    <button id="stats-refresh" class="statx__refresh" onclick={renderStats}><Icon name="refresh" size={14} /> Refresh</button>
+    <button id="stats-back" class="statx__iconbtn" aria-label={t('common.back')} onclick={goBack}><Icon name="arrow-left" size={16} /></button>
+    <h2 class="statx__title">{t('statsPage.title')}</h2>
+    <span id="stats-summary" class="statx__summary">{s ? t('statsPage.summary', { series: fmt(c.series), issues: fmt(c.ownedIssues), size: humanBytes(f.bytes) }) : ''}</span>
+    <button id="stats-refresh" class="statx__refresh" onclick={renderStats}><Icon name="refresh" size={14} /> {t('common.refresh')}</button>
   </div>
 
   <div class="statx__scroll" id="stats-body">
     {#if failed}
-      <div class="statx__note">Could not load stats — is the app running?</div>
+      <div class="statx__note">{t('statsPage.couldNotLoad')}</div>
     {:else if !s}
-      <div class="statx__note">Loading…</div>
+      <div class="statx__note">{t('common.loading')}</div>
     {:else}
       <div class="statx__inner">
 
@@ -65,30 +66,30 @@
             <div class="statx__ring" style="background:conic-gradient(var(--accent) {completionPct}%, #2c2740 {completionPct}% 100%);">
               <div class="statx__ring-hole">
                 <span class="statx__ring-pct">{completionPct}<span class="statx__ring-sym">%</span></span>
-                <span class="statx__ring-cap">Complete</span>
+                <span class="statx__ring-cap">{t('statsPage.complete')}</span>
               </div>
             </div>
             <div class="statx__ring-side">
-              <div class="statx__ring-copy">You own <b>{fmt(c.ownedIssues)}</b> of <b>{fmt(comp.cvIssuesTotal)}</b> known issues.</div>
+              <div class="statx__ring-copy">{@html th('statsPage.youOwn', { owned: fmt(c.ownedIssues), total: fmt(comp.cvIssuesTotal) })}</div>
               <div class="statx__ring-breakdown">
-                <div><div class="statx__bd-num" style="color:var(--green);">{fmt(comp.complete)}</div><div class="statx__bd-lbl">Complete</div></div>
-                <div><div class="statx__bd-num" style="color:var(--amber);">{fmt(comp.incomplete)}</div><div class="statx__bd-lbl">Incomplete</div></div>
-                <div><div class="statx__bd-num" style="color:var(--red);">{fmt(comp.missingIssues)}</div><div class="statx__bd-lbl">Missing</div></div>
+                <div><div class="statx__bd-num" style="color:var(--green);">{fmt(comp.complete)}</div><div class="statx__bd-lbl">{t('statsPage.complete')}</div></div>
+                <div><div class="statx__bd-num" style="color:var(--amber);">{fmt(comp.incomplete)}</div><div class="statx__bd-lbl">{t('statsPage.incomplete')}</div></div>
+                <div><div class="statx__bd-num" style="color:var(--red);">{fmt(comp.missingIssues)}</div><div class="statx__bd-lbl">{t('statsPage.missing')}</div></div>
               </div>
             </div>
           </div>
           <div class="statx__kpis">
-            <div class="statx__kpi"><div class="statx__kpi-head" style="color:var(--accent);"><Icon name="book" size={15} /><span class="statx__kpi-lbl">Series</span></div><div class="statx__kpi-val">{fmt(c.series)}</div><div class="statx__kpi-sub">{fmt(cv.seriesMatched)} matched</div></div>
-            <div class="statx__kpi"><div class="statx__kpi-head" style="color:var(--cyan);"><Icon name="layers" size={15} /><span class="statx__kpi-lbl">Issues owned</span></div><div class="statx__kpi-val">{fmt(c.ownedIssues)}</div><div class="statx__kpi-sub">of {fmt(comp.cvIssuesTotal)} known</div></div>
-            <div class="statx__kpi"><div class="statx__kpi-head" style="color:var(--green);"><Icon name="hard-drive" size={15} /><span class="statx__kpi-lbl">Library size</span></div><div class="statx__kpi-val">{humanBytes(f.bytes)}</div><div class="statx__kpi-sub">{fmt(f.total)} files · {fmt(f.pages)} pp</div></div>
-            <div class="statx__kpi"><div class="statx__kpi-head" style="color:{f.corrupt ? 'var(--red)' : '#a78bfa'};"><Icon name={f.corrupt ? 'alert-triangle' : 'tag'} size={15} /><span class="statx__kpi-lbl">Tagged</span></div><div class="statx__kpi-val">{spct(f.tagged, f.valid)}%</div><div class="statx__kpi-sub">{f.corrupt ? `${fmt(f.corrupt)} corrupt` : 'all valid'}</div></div>
+            <div class="statx__kpi"><div class="statx__kpi-head" style="color:var(--accent);"><Icon name="book" size={15} /><span class="statx__kpi-lbl">{t('statsPage.series')}</span></div><div class="statx__kpi-val">{fmt(c.series)}</div><div class="statx__kpi-sub">{t('statsPage.nMatched', { count: fmt(cv.seriesMatched) })}</div></div>
+            <div class="statx__kpi"><div class="statx__kpi-head" style="color:var(--cyan);"><Icon name="layers" size={15} /><span class="statx__kpi-lbl">{t('statsPage.issuesOwned')}</span></div><div class="statx__kpi-val">{fmt(c.ownedIssues)}</div><div class="statx__kpi-sub">{t('statsPage.ofKnown', { count: fmt(comp.cvIssuesTotal) })}</div></div>
+            <div class="statx__kpi"><div class="statx__kpi-head" style="color:var(--green);"><Icon name="hard-drive" size={15} /><span class="statx__kpi-lbl">{t('statsPage.librarySize')}</span></div><div class="statx__kpi-val">{humanBytes(f.bytes)}</div><div class="statx__kpi-sub">{t('statsPage.filesAndPages', { files: fmt(f.total), pages: fmt(f.pages) })}</div></div>
+            <div class="statx__kpi"><div class="statx__kpi-head" style="color:{f.corrupt ? 'var(--red)' : '#a78bfa'};"><Icon name={f.corrupt ? 'alert-triangle' : 'tag'} size={15} /><span class="statx__kpi-lbl">{t('statsPage.tagged')}</span></div><div class="statx__kpi-val">{spct(f.tagged, f.valid)}%</div><div class="statx__kpi-sub">{f.corrupt ? t('statsPage.nCorrupt', { count: fmt(f.corrupt) }) : t('statsPage.allValid')}</div></div>
           </div>
         </div>
 
         <!-- gaps + format/CV -->
         <div class="statx__mid">
           <div class="statx__panel">
-            <div class="statx__panel-head"><span class="statx__panel-title">Biggest gaps</span><span class="statx__panel-note">issues missing</span></div>
+            <div class="statx__panel-head"><span class="statx__panel-title">{t('statsPage.biggestGaps')}</span><span class="statx__panel-note">{t('statsPage.issuesMissing')}</span></div>
             {#if comp.topGaps.length}
               {#each comp.topGaps as g (g.id)}
                 {@const p = spct(g.owned, g.total)}
@@ -100,13 +101,13 @@
                 </a>
               {/each}
             {:else}
-              <div class="statx__empty">Every matched series is complete. 🎉</div>
+              <div class="statx__empty">{t('statsPage.allComplete')}</div>
             {/if}
           </div>
 
           <div class="statx__midcol">
             <div class="statx__panel statx__panel--pad">
-              <div class="statx__panel-title statx__mb">Format mix</div>
+              <div class="statx__panel-title statx__mb">{t('statsPage.formatMix')}</div>
               <div class="statx__fmtbar">
                 {#each formatSegs as fs (fs.label)}<div style="width:{fs.pct}; background:{fs.color};"></div>{/each}
               </div>
@@ -115,11 +116,11 @@
               </div>
             </div>
             <div class="statx__panel statx__panel--pad">
-              <div class="statx__cvhead"><span class="statx__panel-title">{cv.source === 'hosted' ? 'Metadata' : 'ComicVine'}</span><span class="statx__cvkey" class:is-off={cv.source !== 'hosted' && !cv.keys}>{cv.source === 'hosted' ? 'Built-in service' : cv.keys ? 'Key set' : 'No key'}</span></div>
+              <div class="statx__cvhead"><span class="statx__panel-title">{t('statsPage.metadata')}</span><span class="statx__cvkey" class:is-off={cv.source !== 'hosted' && !cv.keys}>{cv.source === 'hosted' ? t('statsPage.builtInService') : cv.keys ? t('statsPage.keySet') : t('statsPage.noKey')}</span></div>
               <div class="statx__cvrows">
-                <div class="statx__cvrow"><span class="statx__cvlbl">Series matched</span><span class="statx__cvval">{fmt(cv.seriesMatched)}</span><span class="statx__cvsub">{fmt(cv.seriesUnmatched)} unmatched</span></div>
-                <div class="statx__cvrow"><span class="statx__cvlbl">Issues cached</span><span class="statx__cvval">{fmt(cv.issues)}</span><span class="statx__cvsub">{spct(cv.detailed, cv.issues)}% detailed</span></div>
-                <div class="statx__cvrow"><span class="statx__cvlbl">Files linked</span><span class="statx__cvval">{fmt(cv.filesLinked)}</span><span class="statx__cvsub">{fmt(cv.filesUnlinked)} unlinked</span></div>
+                <div class="statx__cvrow"><span class="statx__cvlbl">{t('statsPage.seriesMatched')}</span><span class="statx__cvval">{fmt(cv.seriesMatched)}</span><span class="statx__cvsub">{t('statsPage.nUnmatched', { count: fmt(cv.seriesUnmatched) })}</span></div>
+                <div class="statx__cvrow"><span class="statx__cvlbl">{t('statsPage.issuesCached')}</span><span class="statx__cvval">{fmt(cv.issues)}</span><span class="statx__cvsub">{t('statsPage.pctDetailed', { pct: spct(cv.detailed, cv.issues) })}</span></div>
+                <div class="statx__cvrow"><span class="statx__cvlbl">{t('statsPage.filesLinked')}</span><span class="statx__cvval">{fmt(cv.filesLinked)}</span><span class="statx__cvsub">{t('statsPage.nUnlinked', { count: fmt(cv.filesUnlinked) })}</span></div>
               </div>
             </div>
           </div>
@@ -127,8 +128,8 @@
 
         <!-- by publisher -->
         <div class="statx__panel">
-          <div class="statx__panel-head"><span class="statx__panel-title">By publisher</span></div>
-          <div class="statx__pubhead"><span>Publisher</span><span class="statx__r">Series</span><span class="statx__r">Issues</span><span class="statx__r">Files</span><span class="statx__r">Size</span></div>
+          <div class="statx__panel-head"><span class="statx__panel-title">{t('statsPage.byPublisher')}</span></div>
+          <div class="statx__pubhead"><span>{t('statsPage.colPublisher')}</span><span class="statx__r">{t('statsPage.colSeries')}</span><span class="statx__r">{t('statsPage.colIssues')}</span><span class="statx__r">{t('statsPage.colFiles')}</span><span class="statx__r">{t('statsPage.colSize')}</span></div>
           {#each c.byPublisher as p, i (p.publisher)}
             <div class="statx__pubrow">
               <span class="statx__pubname"><span class="statx__pubdot" style="background:{PUB_DOTS[i % PUB_DOTS.length]};"></span><a href={'/?q=' + encodeURIComponent(p.publisher)} onclick={(e) => pickPublisher(e, p.publisher)}>{p.publisher}</a></span>
@@ -143,28 +144,28 @@
         <!-- downloads -->
         <div class="statx__panel statx__panel--pad">
           <div class="statx__dlhead">
-            <span class="statx__panel-title">Downloads</span>
+            <span class="statx__panel-title">{t('statsPage.downloads')}</span>
             <div class="statx__dlkpis">
-              <span>Imported <b style="color:var(--green);">{fmt(act.grabs.imported)}</b></span>
-              <span>In progress <b style="color:var(--cyan);">{fmt(act.grabs.active)}</b></span>
-              <span>Failed <b style="color:var(--red);">{fmt(act.grabs.failed)}</b></span>
+              <span>{t('statsPage.imported')} <b style="color:var(--green);">{fmt(act.grabs.imported)}</b></span>
+              <span>{t('statsPage.inProgress')} <b style="color:var(--cyan);">{fmt(act.grabs.active)}</b></span>
+              <span>{t('statsPage.failed')} <b style="color:var(--red);">{fmt(act.grabs.failed)}</b></span>
             </div>
           </div>
-          <div class="statx__eyebrow">Imports · last 14 days</div>
+          <div class="statx__eyebrow">{t('statsPage.importsLast14')}</div>
           <div class="statx__spark">
             {#each act.perDay as d, i (d.day)}
               <div class="statx__sparkbar" style="height:{Math.max(4, Math.round((d.n / sparkMax) * 100))}%; background:{i === act.perDay.length - 1 ? 'var(--accent)' : '#4a4266'};" title="{d.day}: {d.n}"></div>
             {/each}
           </div>
-          <div class="statx__eyebrow statx__eyebrow--gap">Recent imports</div>
+          <div class="statx__eyebrow statx__eyebrow--gap">{t('statsPage.recentImports')}</div>
           {#if act.recent.length}
             {#each act.recent as r, i (i)}
-              <div class="statx__recent"><span class="statx__recent-t">{r.title || 'download'}</span><span class="statx__recent-d">{String(r.imported_at || '').slice(0, 10)}</span></div>
+              <div class="statx__recent"><span class="statx__recent-t">{r.title || t('statsPage.download')}</span><span class="statx__recent-d">{String(r.imported_at || '').slice(0, 10)}</span></div>
             {/each}
           {:else}
-            <div class="statx__empty">No downloads imported yet.</div>
+            <div class="statx__empty">{t('statsPage.noImports')}</div>
           {/if}
-          <p class="statx__foot">Tracks downloads handled by the background monitor (sources that download via a client, like usenet and torrents).</p>
+          <p class="statx__foot">{t('statsPage.footnote')}</p>
         </div>
 
       </div>
