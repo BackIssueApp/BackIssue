@@ -9,6 +9,7 @@
   import { confirmDialog } from './DialogModal.svelte';
   import Icon from '../lib/Icon.svelte';
   import { hscroll } from '../lib/hscroll.js';
+  import { t, th, currentLang } from '../lib/i18n.svelte.js';
 
   let { active = false } = $props();
 
@@ -50,7 +51,7 @@
       catalogError = r.error ? String(r.error) : '';
     } catch {
       catalog = [];
-      catalogError = 'Could not reach the plugin catalog.';
+      catalogError = t('pluginsPage.catalogUnreachable');
     }
   }
 
@@ -61,7 +62,7 @@
       srcCatalogError = r.error ? String(r.error) : '';
     } catch {
       srcCatalog = [];
-      srcCatalogError = 'Could not reach the download-site catalog.';
+      srcCatalogError = t('pluginsPage.siteCatalogUnreachable');
     }
   }
 
@@ -96,9 +97,9 @@
     return [...byId.values()].sort((a, b) => Number(b.installed) - Number(a.installed) || a.name.localeCompare(b.name));
   })());
   const siteFilters = $derived([
-    { id: 'all', label: 'All', count: siteRows.length },
-    { id: 'comics', label: 'Comics', count: siteRows.filter((r) => r.content === 'comics').length },
-    { id: 'manga', label: 'Manga', count: siteRows.filter((r) => r.content === 'manga').length },
+    { id: 'all', label: t('pluginsPage.filterAll'), count: siteRows.length },
+    { id: 'comics', label: t('pluginsPage.filterComics'), count: siteRows.filter((r) => r.content === 'comics').length },
+    { id: 'manga', label: t('pluginsPage.filterManga'), count: siteRows.filter((r) => r.content === 'manga').length },
   ].filter((f) => f.id === 'all' || f.count));
   const sitesVis = $derived(siteRows
     .filter((r) => srcFilter === 'all' || r.content === srcFilter)
@@ -112,11 +113,11 @@
     try {
       const r = await apiPost('/api/sources/install', { id: row.id });
       if (r?.error) return notify(r.error, 'error');
-      notify(`${row.name} installed — restart to start using it.`, 'ok');
+      notify(t('pluginsPage.siteInstalled', { name: row.name }), 'ok');
       await refresh();
       await loadSourceCatalog();
     } catch (e) {
-      notify(`Could not install ${row.name}: ${String(e)}`, 'error');
+      notify(t('pluginsPage.siteInstallFailed', { name: row.name, error: String(e) }), 'error');
     } finally {
       busy = { ...busy, [row.id]: false };
     }
@@ -124,9 +125,9 @@
 
   async function removeSite(row) {
     const ok = await confirmDialog({
-      title: `Remove ${row.name}?`,
-      body: 'The site is deleted from this install. Anything already downloaded from it stays in your library.',
-      confirmText: 'Remove',
+      title: t('pluginsPage.removeSiteTitle', { name: row.name }),
+      message: t('pluginsPage.removeSiteMessage'),
+      confirmLabel: t('common.remove'),
       danger: true,
     });
     if (!ok) return;
@@ -134,11 +135,11 @@
     try {
       const r = await apiPost('/api/sources/uninstall', { id: row.id });
       if (r?.error) return notify(r.error, 'error');
-      notify(`${row.name} removed — restart to finish.`, 'ok');
+      notify(t('pluginsPage.siteRemoved', { name: row.name }), 'ok');
       await refresh();
       await loadSourceCatalog();
     } catch (e) {
-      notify(`Could not remove ${row.name}: ${String(e)}`, 'error');
+      notify(t('pluginsPage.siteRemoveFailed', { name: row.name, error: String(e) }), 'error');
     } finally {
       busy = { ...busy, [row.id]: false };
     }
@@ -153,9 +154,11 @@
       if (r.error) throw new Error(r.error);
       await refresh(); await loadCatalog();
       restartRequired = true; // the server agrees (it recorded the change), but never let a slow refresh hide the banner
-      notify(r.updated ? `Updated ${entry.name} to v${r.version || entry.version} — restart BackIssue to switch to it.` : `Installed ${entry.name} — restart BackIssue to activate it.`, 'ok');
+      notify(r.updated
+        ? t('pluginsPage.pluginUpdated', { name: entry.name, version: r.version || entry.version })
+        : t('pluginsPage.pluginInstalled', { name: entry.name }), 'ok');
     } catch (e) {
-      notify('Install failed: ' + String(e.message || e), 'error');
+      notify(t('pluginsPage.installFailed', { error: String(e.message || e) }), 'error');
     } finally {
       busy = { ...busy, [entry.id]: false };
     }
@@ -167,9 +170,9 @@
   // destructive, so confirm first.
   async function removeInstalled(p) {
     if (!(await confirmDialog({
-      title: `Remove ${p.name}?`,
-      message: 'The plugin’s folder is deleted from disk. Restart BackIssue to finish removing it — its saved settings are kept in case you reinstall.',
-      confirmLabel: 'Remove', danger: true,
+      title: t('pluginsPage.removePluginTitle', { name: p.name }),
+      message: t('pluginsPage.removePluginMessage'),
+      confirmLabel: t('common.remove'), danger: true,
     }))) return;
     await uninstall({ id: p.name, name: p.name });
   }
@@ -181,9 +184,9 @@
       if (r.error) throw new Error(r.error);
       await refresh(); await loadCatalog();
       restartRequired = true;
-      notify(`Removed ${entry.name} — restart BackIssue to finish.`, 'ok');
+      notify(t('pluginsPage.pluginRemoved', { name: entry.name }), 'ok');
     } catch (e) {
-      notify('Remove failed: ' + String(e.message || e), 'error');
+      notify(t('pluginsPage.removeFailed', { error: String(e.message || e) }), 'error');
     } finally {
       busy = { ...busy, [entry.id]: false };
     }
@@ -195,28 +198,28 @@
       const r = await apiPost(`/api/plugins/${encodeURIComponent(p.name)}/enabled`, { enabled });
       plugins = r.plugins || [];
       restartRequired = !!r.restartRequired;
-      notify(`${p.name} ${enabled ? 'enabled' : 'disabled'} — restart BackIssue to apply.`, 'ok');
+      notify(t(enabled ? 'pluginsPage.pluginEnabled' : 'pluginsPage.pluginDisabled', { name: p.name }), 'ok');
     } catch {
-      notify('Could not update the plugin — is the app running?', 'error');
+      notify(t('pluginsPage.toggleFailed'), 'error');
     }
   }
 
-  // Capability summary → chips. Same label logic as before (COUNT_LABELS), one
-  // pill per non-zero count, singular/plural, plus a per-capability icon.
+  // Capability summary → chips. One pill per non-zero count (plural forms from
+  // the catalog), plus a per-capability icon.
   const CAP_META = {
-    sources:  { icon: 'globe',    s: 'download source', p: 'download sources' },
-    routes:   { icon: 'route',    s: 'API route',       p: 'API routes' },
-    jobs:     { icon: 'clock',    s: 'job',             p: 'jobs' },
-    assets:   { icon: 'panel',    label: 'UI' },
-    settings: { icon: 'settings', s: 'settings section', p: 'settings sections' },
-    startups: { icon: 'zap',      s: 'startup task',    p: 'startup tasks' },
+    sources:  { icon: 'globe',    key: 'pluginsPage.capSources' },
+    routes:   { icon: 'route',    key: 'pluginsPage.capRoutes' },
+    jobs:     { icon: 'clock',    key: 'pluginsPage.capJobs' },
+    assets:   { icon: 'panel',    key: 'pluginsPage.capUi', flat: true },
+    settings: { icon: 'settings', key: 'pluginsPage.capSettings' },
+    startups: { icon: 'zap',      key: 'pluginsPage.capStartups' },
   };
   function capsOf(p) {
     const out = [];
     for (const [key, meta] of Object.entries(CAP_META)) {
       const n = p.counts?.[key] || 0;
       if (!n) continue;
-      out.push({ icon: meta.icon, label: key === 'assets' ? meta.label : `${n} ${n === 1 ? meta.s : meta.p}` });
+      out.push({ icon: meta.icon, label: meta.flat ? t(meta.key) : t(meta.key, { count: n }) });
     }
     return out;
   }
@@ -225,21 +228,23 @@
   // all — it is not "disabled", it has been replaced, and saying so is what
   // tells someone it is safe to delete.
   const statusOf = (p) => p.error ? 'failed' : p.superseded ? 'superseded' : p.restartRequired ? 'restart' : p.loaded ? 'running' : 'disabled';
-  const PENDING_LABEL = { installed: 'restart to activate', updated: 'restart to update', removed: 'restart to remove' };
-  const statusLabel = (p) => p.error ? 'failed'
-    : p.superseded ? 'replaced'
-    : p.pending ? PENDING_LABEL[p.pending] || 'restart required'
-    : p.restartRequired ? `restart to ${p.enabled ? 'enable' : 'disable'}`
-    : p.loaded ? 'running' : 'disabled';
+  const PENDING_LABEL = { installed: 'pluginsPage.statusRestartToActivate', updated: 'pluginsPage.statusRestartToUpdate', removed: 'pluginsPage.statusRestartToRemove' };
+  const statusLabel = (p) => p.error ? t('pluginsPage.statusFailed')
+    : p.superseded ? t('pluginsPage.statusReplaced')
+    : p.pending ? t(PENDING_LABEL[p.pending] || 'pluginsPage.statusRestartRequired')
+    : p.restartRequired ? t(p.enabled ? 'pluginsPage.statusRestartToEnable' : 'pluginsPage.statusRestartToDisable')
+    : p.loaded ? t('pluginsPage.statusRunning') : t('pluginsPage.statusDisabled');
 
   // The banner names what is waiting: "Installed X 1.2.5, updated Y to 2.0 — restart to apply."
   const pendingText = $derived.by(() => {
-    const parts = pending.map((c) => c.action === 'installed' ? `installed ${c.name}${c.version ? ' ' + c.version : ''}`
-      : c.action === 'updated' ? `updated ${c.name}${c.version ? ' to ' + c.version : ''}`
-      : `removed ${c.name}`);
-    if (!parts.length) return 'Changes saved — restart BackIssue to apply them. Plugins register routes, jobs and sources at boot.';
-    const list = parts[0].charAt(0).toUpperCase() + parts[0].slice(1) + (parts.length > 1 ? ', ' + parts.slice(1).join(', ') : '');
-    return `${list} — restart BackIssue to apply. Plugins load at boot, so nothing changes until then.`;
+    const parts = pending.map((c) => c.action === 'installed'
+      ? (c.version ? t('pluginsPage.pendingInstalledVersion', { name: c.name, version: c.version }) : t('pluginsPage.pendingInstalled', { name: c.name }))
+      : c.action === 'updated'
+        ? (c.version ? t('pluginsPage.pendingUpdatedTo', { name: c.name, version: c.version }) : t('pluginsPage.pendingUpdated', { name: c.name }))
+        : t('pluginsPage.pendingRemoved', { name: c.name }));
+    if (!parts.length) return t('pluginsPage.pendingNone');
+    const list = parts[0].charAt(0).toLocaleUpperCase(currentLang()) + parts[0].slice(1) + (parts.length > 1 ? ', ' + parts.slice(1).join(', ') : '');
+    return t('pluginsPage.pendingList', { list });
   });
 
   // The catalog and manifests carry no category yet — respect an explicit
@@ -247,11 +252,11 @@
   // and its name. Purely cosmetic (tab grouping + icon tint); a wrong guess only
   // changes which tab a card sits under.
   const CAT_META = {
-    notifications: { label: 'Notifications',   icon: 'bell',   tone: 'var(--accent)' },
-    sources:       { label: 'Download source', icon: 'globe',  tone: 'var(--cyan)' },
-    metadata:      { label: 'Metadata',        icon: 'tag',    tone: 'var(--green)' },
-    auth:          { label: 'Authentication',  icon: 'shield', tone: 'var(--amber)' },
-    utility:       { label: 'Utility',         icon: 'tools',  tone: 'var(--muted)' },
+    notifications: { key: 'pluginsPage.catNotifications', icon: 'bell',   tone: 'var(--accent)' },
+    sources:       { key: 'pluginsPage.catSources',       icon: 'globe',  tone: 'var(--cyan)' },
+    metadata:      { key: 'pluginsPage.catMetadata',      icon: 'tag',    tone: 'var(--green)' },
+    auth:          { key: 'pluginsPage.catAuth',          icon: 'shield', tone: 'var(--amber)' },
+    utility:       { key: 'pluginsPage.catUtility',       icon: 'tools',  tone: 'var(--muted)' },
   };
   function categoryOf(p) {
     if (p.category && CAT_META[p.category]) return p.category;
@@ -266,12 +271,12 @@
   }
 
   const CATS = [
-    { id: 'all', label: 'All', icon: 'grid' },
-    { id: 'notifications', label: 'Notifications', icon: 'bell' },
-    { id: 'sources', label: 'Sources', icon: 'globe' },
-    { id: 'metadata', label: 'Metadata', icon: 'tag' },
-    { id: 'auth', label: 'Auth', icon: 'shield' },
-    { id: 'utility', label: 'Utility', icon: 'tools' },
+    { id: 'all', key: 'pluginsPage.tabAll', icon: 'grid' },
+    { id: 'notifications', key: 'pluginsPage.tabNotifications', icon: 'bell' },
+    { id: 'sources', key: 'pluginsPage.tabSources', icon: 'globe' },
+    { id: 'metadata', key: 'pluginsPage.tabMetadata', icon: 'tag' },
+    { id: 'auth', key: 'pluginsPage.tabAuth', icon: 'shield' },
+    { id: 'utility', key: 'pluginsPage.tabUtility', icon: 'tools' },
   ];
 
   const ql = $derived(q.trim().toLowerCase());
@@ -320,35 +325,35 @@
         await apiGet('/api/status');
         await refresh();
         restarting = false;
-        notify('BackIssue restarted — plugin changes are live.', 'ok');
+        notify(t('pluginsPage.restarted'), 'ok');
         return;
       } catch { /* still coming up */ }
       await new Promise((r) => setTimeout(r, 1000));
     }
     restarting = false;
-    notify('The app has not come back yet — check the server, then reload this page.', 'error');
+    notify(t('pluginsPage.restartTimeout'), 'error');
   }
 </script>
 
 <main id="plugins-page" class="scan-page plugins-page plx">
   <!-- header -->
   <div class="plx__head">
-    <h2 class="plx__title">Plugins</h2>
+    <h2 class="plx__title">{t('pluginsPage.title')}</h2>
     <span class="plx__summary">{loaded ? (view === 'sources'
-      ? `${sitesInstalled.length} site${sitesInstalled.length === 1 ? '' : 's'} installed`
-      : `${installedVis.length + (plugins.length - installedVis.length - installedSites.length)} installed · ${nRunning} running`) : ''}</span>
+      ? t('pluginsPage.sitesInstalledCount', { count: sitesInstalled.length })
+      : t('pluginsPage.pluginsSummary', { installed: installedVis.length + (plugins.length - installedVis.length - installedSites.length), running: nRunning })) : ''}</span>
     <div class="plx__views">
       <button class="plx__view" class:is-active={view === 'plugins'} onclick={() => (view = 'plugins')}>
-        <Icon name="puzzle" size={15} />Plugins
+        <Icon name="puzzle" size={15} />{t('pluginsPage.viewPlugins')}
       </button>
       <button class="plx__view" class:is-active={view === 'sources'} onclick={() => (view = 'sources')}>
-        <Icon name="download" size={15} />Download sites
+        <Icon name="download" size={15} />{t('pluginsPage.viewSites')}
         {#if siteUpdates}<span class="plx__view-badge">{siteUpdates}</span>{/if}
       </button>
     </div>
     <div class="plx__search">
       <Icon name="search" size={16} />
-      <input placeholder={view === 'sources' ? 'Search sites…' : 'Search plugins…'} bind:value={q} spellcheck="false" />
+      <input placeholder={view === 'sources' ? t('pluginsPage.searchSites') : t('pluginsPage.searchPlugins')} bind:value={q} spellcheck="false" />
     </div>
   </div>
 
@@ -356,9 +361,9 @@
   {#if restartRequired || restarting}
     <div class="plx__banner">
       <Icon name="alert-triangle" size={16} />
-      <span class="plx__banner-text">{restarting ? 'Restarting BackIssue…' : pendingText}</span>
+      <span class="plx__banner-text">{restarting ? t('pluginsPage.restarting') : pendingText}</span>
       <button id="restart-app-btn" class="plx__banner-btn" disabled={restarting} onclick={restartApp}>
-        <span class="plx__banner-ico" class:is-spin={restarting}><Icon name="refresh" size={14} /></span>{restarting ? 'Restarting…' : 'Restart now'}</button>
+        <span class="plx__banner-ico" class:is-spin={restarting}><Icon name="refresh" size={14} /></span>{restarting ? t('pluginsPage.restartingShort') : t('pluginsPage.restartNow')}</button>
     </div>
   {/if}
 
@@ -377,7 +382,7 @@
     {#each CATS as c (c.id)}
       {@const n = catCount(c.id)}
       <button class="plx__tab" class:is-active={cat === c.id} onclick={() => (cat = c.id)}>
-        <Icon name={c.icon} size={15} />{c.label}{#if n}<span class="plx__tab-count">{n}</span>{/if}
+        <Icon name={c.icon} size={15} />{t(c.key)}{#if n}<span class="plx__tab-count">{n}</span>{/if}
       </button>
     {/each}
   </div>
@@ -389,10 +394,10 @@
       {#if isEmpty}
         <div class="plx__empty">
           <div class="plx__empty-art"><Icon name="puzzle" size={26} /></div>
-          <div class="plx__empty-title">{ql || cat !== 'all' ? 'No matching plugins' : 'No plugins installed'}</div>
+          <div class="plx__empty-title">{ql || cat !== 'all' ? t('pluginsPage.noMatchingPlugins') : t('pluginsPage.noPluginsInstalled')}</div>
           <p class="plx__empty-body">{ql || cat !== 'all'
-            ? 'Try a different category or search term.'
-            : (catalogError || 'Install plugins from the catalog, or drop a folder with an index.js into plugins/ and restart.')}</p>
+            ? t('pluginsPage.tryDifferent')
+            : (catalogError || t('pluginsPage.installHint'))}</p>
         </div>
       {/if}
 
@@ -403,12 +408,12 @@
         {#if !sitesVis.length}
           <div class="plx__empty">
             <div class="plx__empty-art"><Icon name="download" size={26} /></div>
-            <div class="plx__empty-title">{ql || srcFilter !== 'all' ? 'No matching sites' : 'No download sites yet'}</div>
-            <p class="plx__empty-note">Sites are where issues and chapters come from. Install one here, then switch it on in <b>Settings → Sources</b>.</p>
+            <div class="plx__empty-title">{ql || srcFilter !== 'all' ? t('pluginsPage.noMatchingSites') : t('pluginsPage.noSitesYet')}</div>
+            <p class="plx__empty-note">{@html th('pluginsPage.sitesHint')}</p>
           </div>
         {/if}
 
-        {#each [{ key: 'installed', label: 'Installed', rows: sitesInstalled }, { key: 'available', label: 'Available', rows: sitesAvailable }] as group (group.key)}
+        {#each [{ key: 'installed', label: t('pluginsPage.sectionInstalled'), rows: sitesInstalled }, { key: 'available', label: t('pluginsPage.sectionAvailable'), rows: sitesAvailable }] as group (group.key)}
           {#if group.rows.length}
             <div class="plx__section">
               <span class="plx__section-name">{group.label}</span>
@@ -423,30 +428,30 @@
                       <span class="plx__name">{sRow.name}</span>
                       {#if sRow.version}<span class="plx__ver">v{sRow.version}</span>{/if}
                       {#if sRow.content}<span class="plx__site-tag">{sRow.content}</span>{/if}
-                      {#if sRow.updateAvailable}<span class="plx__site-upd">Update to v{sRow.catalogVersion}</span>{/if}
+                      {#if sRow.updateAvailable}<span class="plx__site-upd">{t('pluginsPage.updateTo', { version: sRow.catalogVersion })}</span>{/if}
                     </div>
                     {#if sRow.description}<p class="plx__desc">{sRow.description}</p>{/if}
                     {#if sRow.requires === 'flaresolverr'}
-                      <p class="plx__site-note"><Icon name="alert-triangle" size={13} /> Behind Cloudflare — set the FlareSolverr URL in Settings → Downloading.</p>
+                      <p class="plx__site-note"><Icon name="alert-triangle" size={13} /> {t('pluginsPage.needsFlaresolverr')}</p>
                     {:else if sRow.requires === 'browser'}
-                      <p class="plx__site-note"><Icon name="alert-triangle" size={13} /> Needs the browser build of the app (the image tagged -browser) — the site checks for a real browser.</p>
+                      <p class="plx__site-note"><Icon name="alert-triangle" size={13} /> {t('pluginsPage.needsBrowser')}</p>
                     {/if}
-                    {#if sRow.error}<div class="plx__err">Load error: {sRow.error}</div>{/if}
+                    {#if sRow.error}<div class="plx__err">{t('pluginsPage.loadError', { error: sRow.error })}</div>{/if}
                   </div>
                   <div class="plx__site-actions">
                     {#if sRow.installed}
-                      <button class="plx__btn" onclick={configureSite}>Configure</button>
+                      <button class="plx__btn" onclick={configureSite}>{t('pluginsPage.configure')}</button>
                       {#if sRow.updateAvailable}
                         <button class="plx__btn plx__btn--go" disabled={!!busy[sRow.id]} onclick={() => installSite(sRow)}>
-                          {busy[sRow.id] ? 'Updating…' : 'Update'}
+                          {busy[sRow.id] ? t('pluginsPage.updating') : t('pluginsPage.update')}
                         </button>
                       {/if}
                       <button class="plx__btn plx__btn--danger" disabled={!!busy[sRow.id]} onclick={() => removeSite(sRow)}>
-                        {busy[sRow.id] ? 'Removing…' : 'Remove'}
+                        {busy[sRow.id] ? t('pluginsPage.removing') : t('common.remove')}
                       </button>
                     {:else}
                       <button class="plx__btn plx__btn--go" disabled={!!busy[sRow.id]} onclick={() => installSite(sRow)}>
-                        {busy[sRow.id] ? 'Installing…' : 'Install'}
+                        {busy[sRow.id] ? t('pluginsPage.installing') : t('pluginsPage.install')}
                       </button>
                     {/if}
                   </div>
@@ -459,7 +464,7 @@
 
       {#if view === 'plugins'}
       {#if installedVis.length}
-        <div class="plx__section"><span class="plx__section-name">Installed</span><span class="plx__section-count">{installedVis.length} shown</span></div>
+        <div class="plx__section"><span class="plx__section-name">{t('pluginsPage.sectionInstalled')}</span><span class="plx__section-count">{t('pluginsPage.shownCount', { count: installedVis.length })}</span></div>
         <div class="plx__grid">
           {#each installedVis as p (p.name)}
             {@const cm = CAT_META[categoryOf(p)]}
@@ -471,15 +476,15 @@
                 <div class="plx__ico" style="background:color-mix(in srgb, {cm.tone} 14%, transparent); color:{cm.tone};"><Icon name={cm.icon} size={20} /></div>
                 <div class="plx__card-id">
                   <div class="plx__card-title"><span class="plx__name">{p.name}</span>{#if p.version}<span class="plx__ver">v{p.version}</span>{/if}</div>
-                  <div class="plx__catlabel">{cm.label}</div>
+                  <div class="plx__catlabel">{t(cm.key)}</div>
                 </div>
                 <span class="plx__status plx__status--{st}"><span class="plx__dot"></span>{statusLabel(p)}</span>
               </div>
               {#if p.description}<p class="plx__desc">{p.description}</p>{/if}
               {#if p.superseded}
-                <div class="plx__note plx__note--card">This is now a download site, and you already have it installed there. The plugin is not loaded — you can remove it.</div>
+                <div class="plx__note plx__note--card">{t('pluginsPage.superseded')}</div>
               {/if}
-              {#if p.error}<div class="plx__err">Load error: {p.error}</div>{/if}
+              {#if p.error}<div class="plx__err">{t('pluginsPage.loadError', { error: p.error })}</div>{/if}
               {#if caps.length && !p.error}
                 <div class="plx__caps">
                   {#each caps as cap (cap.label)}
@@ -491,19 +496,19 @@
                 {#if !p.superseded}
                 <label class="plx__toggle">
                   <span class="switch switch--sm"><input type="checkbox" checked={p.enabled} onchange={() => toggle(p)} /><span class="switch__track"></span></span>
-                  <span class="plx__toggle-label">{p.enabled ? 'Enabled' : 'Disabled'}</span>
+                  <span class="plx__toggle-label">{p.enabled ? t('common.enabled') : t('common.disabled')}</span>
                 </label>
                 {/if}
                 <div class="plx__foot-actions">
                   {#if !p.superseded}
                     {#if upd}
-                      <button class="plx__install plx__install--sm" disabled={busy[upd.id]} onclick={() => install(upd)}>{busy[upd.id] ? '…' : `Update → v${upd.version}`}</button>
+                      <button class="plx__install plx__install--sm" disabled={busy[upd.id]} onclick={() => install(upd)}>{busy[upd.id] ? '…' : t('pluginsPage.updateArrow', { version: upd.version })}</button>
                     {/if}
                     {#if p.counts?.settings && !p.error}
-                      <button class="plx__configure" onclick={() => navigate('/settings?tab=' + settingsTabFor(p))}>Configure</button>
+                      <button class="plx__configure" onclick={() => navigate('/settings?tab=' + settingsTabFor(p))}>{t('pluginsPage.configure')}</button>
                     {/if}
                   {/if}
-                  <button class="plx__uninstall" disabled={busy[p.name]} onclick={() => removeInstalled(p)}>{busy[p.name] ? 'Removing…' : 'Remove'}</button>
+                  <button class="plx__uninstall" disabled={busy[p.name]} onclick={() => removeInstalled(p)}>{busy[p.name] ? t('pluginsPage.removing') : t('common.remove')}</button>
                 </div>
               </div>
             </div>
@@ -512,7 +517,7 @@
       {/if}
 
       {#if catalogVis.length}
-        <div class="plx__section plx__section--gap"><span class="plx__section-name">Available</span><span class="plx__section-count">{catalogVis.length} shown</span></div>
+        <div class="plx__section plx__section--gap"><span class="plx__section-name">{t('pluginsPage.sectionAvailable')}</span><span class="plx__section-count">{t('pluginsPage.shownCount', { count: catalogVis.length })}</span></div>
         {#if catalogError}<div class="plx__cat-note">{catalogError}</div>{/if}
         <div class="plx__grid">
           {#each catalogVis as c (c.id)}
@@ -524,21 +529,21 @@
                   <div class="plx__card-title">
                     <span class="plx__name">{c.name}</span>
                     {#if c.version}<span class="plx__ver">v{c.version}</span>{/if}
-                    {#if c.updateAvailable}<span class="plx__badge plx__badge--update">Update</span>
-                    {:else if c.installed}<span class="plx__badge plx__badge--installed">Installed</span>{/if}
+                    {#if c.updateAvailable}<span class="plx__badge plx__badge--update">{t('pluginsPage.badgeUpdate')}</span>
+                    {:else if c.installed}<span class="plx__badge plx__badge--installed">{t('pluginsPage.badgeInstalled')}</span>{/if}
                   </div>
-                  <div class="plx__catlabel">{cm.label}</div>
+                  <div class="plx__catlabel">{t(cm.key)}</div>
                 </div>
               </div>
               {#if c.description}<p class="plx__desc plx__desc--grow">{c.description}</p>{/if}
               <div class="plx__card-actions">
                 {#if c.installed}
                   {#if c.updateAvailable}
-                    <button class="plx__install" disabled={busy[c.id]} onclick={() => install(c)}>{busy[c.id] ? '…' : `Update → v${c.version}`}</button>
+                    <button class="plx__install" disabled={busy[c.id]} onclick={() => install(c)}>{busy[c.id] ? '…' : t('pluginsPage.updateArrow', { version: c.version })}</button>
                   {/if}
-                  <button class="plx__remove" disabled={busy[c.id]} onclick={() => uninstall(c)}>Remove</button>
+                  <button class="plx__remove" disabled={busy[c.id]} onclick={() => uninstall(c)}>{t('common.remove')}</button>
                 {:else}
-                  <button class="plx__install" disabled={busy[c.id]} onclick={() => install(c)}>{busy[c.id] ? 'Installing…' : 'Install'}</button>
+                  <button class="plx__install" disabled={busy[c.id]} onclick={() => install(c)}>{busy[c.id] ? t('pluginsPage.installing') : t('pluginsPage.install')}</button>
                 {/if}
               </div>
             </div>
