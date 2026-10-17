@@ -10,6 +10,7 @@
   import { can, isTrusted } from '../lib/auth.svelte.js';
   import { fmt, windowRange } from '../lib/util.js';
   import { arcModel, arcTicks, arcStatus, pickResume } from '../lib/arcs.js';
+  import { t } from '../lib/i18n.svelte.js';
   import Cover from './Cover.svelte';
   import Icon from '../lib/Icon.svelte';
 
@@ -240,7 +241,7 @@
   }
   function openInReader(r) {
     const a = readerAction();
-    if (!a) return notify('The reader plugin is not installed.', 'info');
+    if (!a) return notify(t('listsPage.readerMissing'), 'info');
     a.run({ ...r, arc_id: listId }, null);
   }
   function continueArc() {
@@ -248,7 +249,7 @@
   }
 
   async function createList() {
-    const name = await inputDialog({ title: 'New reading list', placeholder: 'e.g. Sunday backlog', confirmLabel: 'Create' });
+    const name = await inputDialog({ title: t('listsPage.newList'), placeholder: t('listsPage.newListPlaceholder'), confirmLabel: t('listsPage.create') });
     if (!name) return;
     const r = await apiPost('/api/lists', { name });
     if (r.error) return notify(r.error, 'error');
@@ -262,12 +263,12 @@
     const r = await apiPost(`/api/lists/${l.id}/public`, { public: next });
     if (r.error) return notify(r.error, 'error');
     l.public = next;
-    notify(next ? 'Shared — every user can see this list.' : 'No longer shared.', 'ok');
-    await load();
+    notify(t(next ? 'listsPage.sharedToast' : 'listsPage.unsharedToast'), 'ok');
+    refresh(); // was a call to an undefined load(): threw after every share toggle
   }
 
   async function renameList(l) {
-    const name = await inputDialog({ title: 'Rename list', value: l.name, confirmLabel: 'Rename' });
+    const name = await inputDialog({ title: t('listsPage.renameList'), value: l.name, confirmLabel: t('common.rename') });
     if (!name || name === l.name) return;
     const r = await apiPatch('/api/lists/' + l.id, { name });
     if (r.error) return notify(r.error, 'error');
@@ -275,9 +276,9 @@
   }
   async function deleteList(l) {
     if (!(await confirmDialog({
-      title: `Delete "${l.name}"?`,
-      message: 'The list is removed — your comics and read history are untouched.',
-      confirmLabel: 'Delete', danger: true,
+      title: t('listsPage.deleteTitle', { name: l.name }),
+      message: t('listsPage.deleteMessage'),
+      confirmLabel: t('common.delete'), danger: true,
     }))) return;
     const r = await apiDelete('/api/lists/' + l.id);
     if (r.error) return notify(r.error, 'error');
@@ -312,10 +313,10 @@
     addingSeries = 0;
     if (r.error) return notify(r.error, 'error');
     const queued = r.queued ? (r.scope === 'requested'
-      ? ` — queued ${fmt(r.queued)} issue${r.queued === 1 ? '' : 's'} from this list`
-      : ` — queued ${fmt(r.queued)} missing issue${r.queued === 1 ? '' : 's'}`)
-      : r.picked ? ` — wanting ${fmt(r.picked)} issue${r.picked === 1 ? '' : 's'} from this list` : '';
-    notify(`Added "${it.series_title || 'series'}" to the library${queued}.`, 'ok');
+      ? t('listsPage.queuedFromList', { count: r.queued })
+      : t('listsPage.queuedMissing', { count: r.queued }))
+      : r.picked ? t('listsPage.wantingFromList', { count: r.picked }) : '';
+    notify(t('listsPage.addedSeriesToast', { name: it.series_title || t('listsPage.seriesFallback'), queued }), 'ok');
     refresh(); // every item of that series resolves its series_id now
   }
 
@@ -328,24 +329,27 @@
     if (!wantable.length || wanting) return;
     const unadded = new Set(wantable.filter((r) => !r.series_id).map((r) => r.cv_series_id)).size;
     if (!(await confirmDialog({
-      title: `Want ${fmt(wantable.length)} issue${wantable.length === 1 ? '' : 's'} from this list?`,
-      message: (unadded ? `${fmt(unadded)} series ${unadded === 1 ? 'is' : 'are'} not in the library yet — ${unadded === 1 ? 'it is' : 'they are'} added without monitoring, so only the issues on this list are fetched. ` : '')
-        + 'Automation searches for every wanted issue and downloads it when a source has it.',
-      confirmLabel: 'Want them',
+      title: t('listsPage.wantTitle', { count: wantable.length }),
+      message: (unadded ? t('listsPage.wantUnadded', { count: unadded }) : '') + t('listsPage.wantMessage'),
+      confirmLabel: t('listsPage.wantThem'),
     }))) return;
     wanting = true;
     let r;
-    try { r = await apiPost(`/api/lists/${det.id}/want`, {}); } catch { r = { error: 'Could not reach the app.' }; }
+    try { r = await apiPost(`/api/lists/${det.id}/want`, {}); } catch { r = { error: t('listsPage.cantReach') }; }
     wanting = false;
     if (r?.error) return notify(r.error, 'error');
-    notify(`Wanting ${fmt(r.issues)} issue${r.issues === 1 ? '' : 's'}${r.added ? ` — added ${fmt(r.added)} series` : ''}${r.failed ? ` (${fmt(r.failed)} series could not be added)` : ''}.`, r.failed ? 'warn' : 'ok');
+    notify(t('listsPage.wantingToast', {
+      issues: t('common.nIssues', { count: fmt(r.issues) }),
+      added: r.added ? t('listsPage.wantingAdded', { count: fmt(r.added) }) : '',
+      failed: r.failed ? t('listsPage.wantingFailed', { count: fmt(r.failed) }) : '',
+    }), r.failed ? 'warn' : 'ok');
     refresh();
   }
 
   async function downloadItem(it) {
     const r = await apiPost(`/api/collection/${it.series_id}/download`, { cvIssueIds: [it.cv_issue_id] });
     if (r.error) return notify(r.error, 'error');
-    notify(`Queued ${it.series_title || ''} #${it.issue_number ?? '?'}`, 'ok');
+    notify(t('listsPage.queuedIssue', { series: it.series_title || '', number: it.issue_number ?? '?' }), 'ok');
   }
   async function downloadMissing() {
     const bySeries = new Map();
@@ -354,7 +358,7 @@
       bySeries.get(it.series_id).push(it.cv_issue_id);
     }
     for (const [sid, ids] of bySeries) await apiPost(`/api/collection/${sid}/download`, { cvIssueIds: ids });
-    notify(`Queued ${fmt(missing.length)} issue(s) from ${bySeries.size} series.`, 'ok');
+    notify(t('listsPage.queuedMissingToast', { issues: t('common.nIssues', { count: fmt(missing.length) }), series: t('common.nSeries', { count: bySeries.size }) }), 'ok');
   }
 
   // ---- story-arc import ----
@@ -373,7 +377,7 @@
     const r = await apiPost('/api/lists/import-arc', { arcId: a.id });
     arcBusy = false;
     if (r.error) return notify(r.error, 'error');
-    notify(`Imported "${a.name}" — ${fmt(r.issues)} issues in cover-date order.`, 'ok');
+    notify(t('listsPage.importedArc', { name: a.name, issues: t('common.nIssues', { count: fmt(r.issues) }) }), 'ok');
     arcResults = null; arcQ = '';
     setQuery({ list: r.id });
     refresh();
@@ -398,7 +402,7 @@
     if (r.error) return notify(r.error, 'error');
     cblResult = r;
     const skipped = r.total - r.imported;
-    notify(`Imported "${r.name}" — ${fmt(r.imported)} of ${fmt(r.total)} issues${skipped ? ` (${fmt(skipped)} couldn't be matched)` : ''}.`, skipped ? 'error' : 'ok');
+    notify(t('listsPage.importedCbl', { name: r.name, imported: fmt(r.imported), total: fmt(r.total), skipped: skipped ? t('listsPage.skippedSuffix', { count: fmt(skipped) }) : '' }), skipped ? 'error' : 'ok');
     refresh();
     // Clean import: go straight to the list, and drop the result so the panel
     // comes back fresh (with the drop zone) next time it's opened.
@@ -414,7 +418,7 @@
   // you already own — and only imported from the preview's button.
   async function previewCblText(file) {
     if (!file || cblBusy || cblPreviewBusy) return;
-    if (file.size > 4 * 1024 * 1024) return notify('That file is over the 4 MB limit.', 'error');
+    if (file.size > 4 * 1024 * 1024) return notify(t('listsPage.fileTooBig'), 'error');
     const xml = await file.text();
     cblPreviewBusy = true;
     showPreview(await apiPostText('/api/lists/cbl-preview', xml, 'application/xml'), { path: null, xml });
@@ -458,26 +462,26 @@
   <aside class="listx__rail">
     <div class="listx__rail-head">
       <div class="listx__rail-top">
-        <button class="listx__iconbtn" aria-label="Back" onclick={goBack}><Icon name="arrow-left" size={16} /></button>
-        <div class="listx__rail-title">Reading lists</div>
-        <span class="listx__rail-count">{loaded ? `${lists.length} list${lists.length === 1 ? '' : 's'}` : ''}</span>
+        <button class="listx__iconbtn" aria-label={t('common.back')} onclick={goBack}><Icon name="arrow-left" size={16} /></button>
+        <div class="listx__rail-title">{t('listsPage.title')}</div>
+        <span class="listx__rail-count">{loaded ? t('listsPage.nLists', { count: lists.length }) : ''}</span>
       </div>
       <div class="listx__rail-actions">
-        <button class="listx__new" title="New list" aria-label="New list" onclick={createList}><Icon name="plus" size={14} /> New</button>
-        <button class="listx__arcbtn" class:is-on={arcResults !== null} title="Import a ComicVine story arc" aria-label="Import arc" onclick={toggleArc}><Icon name="diamond" size={14} /> Arc</button>
-        <button class="listx__arcbtn" class:is-on={cblOpen} title="Import a CBL reading list" aria-label="Import CBL" onclick={toggleCbl}><Icon name="import" size={14} /> CBL</button>
+        <button class="listx__new" title={t('listsPage.newList')} aria-label={t('listsPage.newList')} onclick={createList}><Icon name="plus" size={14} /> {t('listsPage.new')}</button>
+        <button class="listx__arcbtn" class:is-on={arcResults !== null} title={t('listsPage.importArcTitle')} aria-label={t('listsPage.importArc')} onclick={toggleArc}><Icon name="diamond" size={14} /> {t('listsPage.arc')}</button>
+        <button class="listx__arcbtn" class:is-on={cblOpen} title={t('listsPage.importCblTitle')} aria-label={t('listsPage.importCbl')} onclick={toggleCbl}><Icon name="import" size={14} /> {t('listsPage.cbl')}</button>
       </div>
     </div>
     <div class="listx__rail-scroll">
       {#if loaded && !lists.length}
         <div class="listx__rail-empty">
           <div class="listx__rail-empty-art"><Icon name="list" size={22} /></div>
-          <div>No reading lists yet. Create one, add issues from any series page, or import a ComicVine story arc.</div>
+          <div>{t('listsPage.railEmpty')}</div>
         </div>
       {/if}
       {#if resumeArc && !listId}
         <button class="listx__resume" onclick={() => setQuery({ list: resumeArc.list.id })}>
-          <span class="listx__resume-lbl">Continue</span>
+          <span class="listx__resume-lbl">{t('listsPage.continue')}</span>
           <span class="listx__resume-body">
             <span class="listx__resume-name">{resumeArc.list.name}</span>
             <span class="listx__resume-next">#{resumeArc.pr.next.issue_number ?? '?'} · {resumeArc.pr.next.series || ''}</span>
@@ -492,9 +496,9 @@
         <button class="listx__card" class:is-active={listId === l.id} onclick={() => { arcResults = null; cblOpen = false; setQuery({ list: l.id }); }}>
           <div class="listx__card-top">
             <span class="listx__card-name">{l.name}</span>
-            {#if l.arc_cv_id}<span class="listx__card-arc" title="From a ComicVine story arc"><Icon name="diamond" size={13} /></span>{/if}
-            {#if l.source}<span class="listx__card-arc" title="Imported from a CBL reading list"><Icon name="import" size={13} /></span>{/if}
-            {#if l.public}<span class="listx__card-arc" title={l.mine ? 'Shared with every user' : `Shared by ${l.owner || 'another user'}`}><Icon name="users" size={13} /></span>{/if}
+            {#if l.arc_cv_id}<span class="listx__card-arc" title={t('listsPage.fromArc')}><Icon name="diamond" size={13} /></span>{/if}
+            {#if l.source}<span class="listx__card-arc" title={t('listsPage.fromCbl')}><Icon name="import" size={13} /></span>{/if}
+            {#if l.public}<span class="listx__card-arc" title={l.mine ? t('listsPage.sharedWithEveryUser') : t('listsPage.sharedBy', { owner: l.owner || t('listsPage.anotherUser') })}><Icon name="users" size={13} /></span>{/if}
           </div>
           {#if status}
             <!-- One tick per issue: a 12-issue run is legible at a glance in a
@@ -503,9 +507,9 @@
               {#each ticks(l) as lit}<span class="listx__tick" class:is-lit={lit}></span>{/each}
             </div>
             <div class="listx__card-prog">
-              <span class="listx__card-sub">{fmt(l.owned)}/{fmt(l.items)} owned</span>
+              <span class="listx__card-sub">{t('listsPage.ownedOf', { owned: fmt(l.owned), total: fmt(l.items) })}</span>
               <span class="listx__status listx__status--{status}">
-                {status === 'done' ? 'Done' : status === 'new' ? 'New' : `${fmt(pr.read)} of ${fmt(pr.total)}`}
+                {status === 'done' ? t('listsPage.done') : status === 'new' ? t('listsPage.statusNew') : t('listsPage.readOf', { read: fmt(pr.read), total: fmt(pr.total) })}
               </span>
             </div>
           {:else}
@@ -525,27 +529,27 @@
     {#if arcOpen}
       <div class="listx__scroll">
         <div class="listx__arc">
-          <div class="listx__arc-head"><span class="listx__arc-ico"><Icon name="diamond" size={16} /></span><div class="listx__arc-title">Import a story arc</div></div>
-          <p class="listx__arc-sub">Search ComicVine for a story arc — its issues import as a new list in cover-date order.</p>
+          <div class="listx__arc-head"><span class="listx__arc-ico"><Icon name="diamond" size={16} /></span><div class="listx__arc-title">{t('listsPage.importArcTitle')}</div></div>
+          <p class="listx__arc-sub">{t('listsPage.arcSub')}</p>
           <form class="listx__arc-form" onsubmit={(e) => { e.preventDefault(); searchArcs(); }}>
             <div class="listx__arc-field">
               <Icon name="search" size={15} />
-              <input placeholder="e.g. Infinity Gauntlet" bind:value={arcQ} spellcheck="false" />
+              <input placeholder={t('listsPage.arcPlaceholder')} bind:value={arcQ} spellcheck="false" />
             </div>
-            <button class="listx__arc-go" disabled={arcBusy}>{arcBusy ? 'Working…' : 'Search'}</button>
+            <button class="listx__arc-go" disabled={arcBusy}>{arcBusy ? t('common.working') : t('common.search')}</button>
           </form>
           {#each arcResults as a (a.id)}
             <div class="listx__arc-hit">
               <div class="listx__arc-cover"><Cover coverUrl={a.image_url} title={a.name || '?'} /></div>
               <div class="listx__arc-info">
                 <div class="listx__arc-name">{a.name}</div>
-                <div class="listx__arc-meta">{[a.publisher, a.issues ? `${fmt(a.issues)} issues` : null].filter(Boolean).join(' · ')}</div>
+                <div class="listx__arc-meta">{[a.publisher, a.issues ? t('common.nIssues', { count: fmt(a.issues) }) : null].filter(Boolean).join(' · ')}</div>
                 {#if a.deck}<div class="listx__arc-deck">{a.deck}</div>{/if}
               </div>
-              <button class="listx__arc-import" disabled={arcBusy} onclick={() => importArc(a)}>Import</button>
+              <button class="listx__arc-import" disabled={arcBusy} onclick={() => importArc(a)}>{t('listsPage.import')}</button>
             </div>
           {/each}
-          {#if arcResults.length === 0 && arcQ.trim()}<div class="listx__arc-empty">No arcs found for “{arcQ}”.</div>{/if}
+          {#if arcResults.length === 0 && arcQ.trim()}<div class="listx__arc-empty">{t('listsPage.noArcs', { query: arcQ })}</div>{/if}
         </div>
       </div>
     {:else if cblShown}
@@ -557,50 +561,50 @@
           <div class="listx__prev-head">
             <div class="listx__prev-inner">
               <div class="listx__prev-top">
-                <button class="listx__prev-back" onclick={() => (cblPreview = null)}><Icon name="arrow-left" size={15} /> Back</button>
+                <button class="listx__prev-back" onclick={() => (cblPreview = null)}><Icon name="arrow-left" size={15} /> {t('common.back')}</button>
                 <div class="listx__prev-titles">
-                  <div class="listx__prev-tags"><span class="listx__prev-pill">Preview</span><span class="listx__prev-prov">{cblPreview.path ? cblPreview.path.split('/').slice(0, -1).join(' / ') : 'from your file'}</span></div>
+                  <div class="listx__prev-tags"><span class="listx__prev-pill">{t('listsPage.preview')}</span><span class="listx__prev-prov">{cblPreview.path ? cblPreview.path.split('/').slice(0, -1).join(' / ') : t('listsPage.fromYourFile')}</span></div>
                   <div class="listx__prev-name">{cblPreview.name}</div>
-                  <div class="listx__prev-sub">Nothing is imported yet — this is read straight from the file.</div>
+                  <div class="listx__prev-sub">{t('listsPage.previewSub')}</div>
                 </div>
               </div>
               <div class="listx__prev-stats">
-                <div class="listx__prev-stat" style="--tone:var(--muted)"><div class="listx__prev-stat-l"><span class="listx__prev-dot"></span>Issues</div><div class="listx__prev-stat-v">{fmt(cblPreview.total)}</div></div>
-                <div class="listx__prev-stat" style="--tone:var(--green)"><div class="listx__prev-stat-l"><span class="listx__prev-dot"></span>Already owned</div><div class="listx__prev-stat-v">{fmt(cblPreview.owned)}</div></div>
-                <div class="listx__prev-stat" style="--tone:var(--amber)"><div class="listx__prev-stat-l"><span class="listx__prev-dot"></span>Missing</div><div class="listx__prev-stat-v">{fmt(missing)}</div></div>
-                <div class="listx__prev-stat" style="--tone:{noId ? '#ff8f3d' : 'var(--green)'}"><div class="listx__prev-stat-l"><span class="listx__prev-dot"></span>No ComicVine id</div><div class="listx__prev-stat-v">{fmt(noId)}</div></div>
+                <div class="listx__prev-stat" style="--tone:var(--muted)"><div class="listx__prev-stat-l"><span class="listx__prev-dot"></span>{t('common.issues')}</div><div class="listx__prev-stat-v">{fmt(cblPreview.total)}</div></div>
+                <div class="listx__prev-stat" style="--tone:var(--green)"><div class="listx__prev-stat-l"><span class="listx__prev-dot"></span>{t('listsPage.alreadyOwned')}</div><div class="listx__prev-stat-v">{fmt(cblPreview.owned)}</div></div>
+                <div class="listx__prev-stat" style="--tone:var(--amber)"><div class="listx__prev-stat-l"><span class="listx__prev-dot"></span>{t('listsPage.missing')}</div><div class="listx__prev-stat-v">{fmt(missing)}</div></div>
+                <div class="listx__prev-stat" style="--tone:{noId ? '#ff8f3d' : 'var(--green)'}"><div class="listx__prev-stat-l"><span class="listx__prev-dot"></span>{t('listsPage.noId')}</div><div class="listx__prev-stat-v">{fmt(noId)}</div></div>
               </div>
               <div class="listx__prev-segbar">
-                {#if cblPreview.owned}<div class="is-owned" style="width:{pct(cblPreview.owned)}%" title="{cblPreview.owned} already in your library"></div>{/if}
-                {#if missing}<div class="is-missing" style="width:{pct(missing)}%" title="{missing} matched but not owned"></div>{/if}
-                {#if noId}<div class="is-byname" style="width:{pct(noId)}%" title="{noId} carry no ComicVine id"></div>{/if}
+                {#if cblPreview.owned}<div class="is-owned" style="width:{pct(cblPreview.owned)}%" title={t('listsPage.segOwnedTitle', { count: cblPreview.owned })}></div>{/if}
+                {#if missing}<div class="is-missing" style="width:{pct(missing)}%" title={t('listsPage.segMissingTitle', { count: missing })}></div>{/if}
+                {#if noId}<div class="is-byname" style="width:{pct(noId)}%" title={t('listsPage.segNoIdTitle', { count: noId })}></div>{/if}
               </div>
               <div class="listx__prev-legend">
-                {#if cblPreview.owned}<span style="--tone:var(--green)"><i></i>Owned <b>{fmt(cblPreview.owned)}</b></span>{/if}
-                {#if missing}<span style="--tone:var(--amber)"><i></i>Missing <b>{fmt(missing)}</b></span>{/if}
-                {#if noId}<span style="--tone:#ff8f3d"><i></i>Matched by name <b>{fmt(noId)}</b></span>{/if}
+                {#if cblPreview.owned}<span style="--tone:var(--green)"><i></i>{t('listsPage.owned')} <b>{fmt(cblPreview.owned)}</b></span>{/if}
+                {#if missing}<span style="--tone:var(--amber)"><i></i>{t('listsPage.missing')} <b>{fmt(missing)}</b></span>{/if}
+                {#if noId}<span style="--tone:#ff8f3d"><i></i>{t('listsPage.matchedByName')} <b>{fmt(noId)}</b></span>{/if}
               </div>
               {#if noId > 0}
-                <div class="listx__prev-note"><Icon name="alert-triangle" size={15} /><span>{fmt(noId)} book{noId === 1 ? '' : 's'} carr{noId === 1 ? 'ies' : 'y'} no ComicVine id and will be matched by name — {noId === 1 ? 'that is the one' : 'those are the ones'} most likely to be skipped.</span></div>
+                <div class="listx__prev-note"><Icon name="alert-triangle" size={15} /><span>{t('listsPage.noIdNote', { count: noId })}</span></div>
               {/if}
               <div class="listx__prev-filters">
-                {#each [['all', 'All', cblPreview.total], ['missing', 'Missing', missing], ['noid', 'No id', noId], ['owned', 'Owned', cblPreview.owned]] as [id, label, count] (id)}
-                  <button class="listx__prev-filter" class:is-on={cblPrevFilter === id} onclick={() => { cblPrevFilter = id; cblPrevPage = 60; }}>{label}<span>{fmt(count)}</span></button>
+                {#each [['all', 'common.all', cblPreview.total], ['missing', 'listsPage.missing', missing], ['noid', 'listsPage.filterNoId', noId], ['owned', 'listsPage.owned', cblPreview.owned]] as [id, label, count] (id)}
+                  <button class="listx__prev-filter" class:is-on={cblPrevFilter === id} onclick={() => { cblPrevFilter = id; cblPrevPage = 60; }}>{t(label)}<span>{fmt(count)}</span></button>
                 {/each}
-                <button class="listx__prev-group" class:is-on={cblPrevGroup} onclick={() => (cblPrevGroup = !cblPrevGroup)}><Icon name="layers" size={13} /> Group by series</button>
+                <button class="listx__prev-group" class:is-on={cblPrevGroup} onclick={() => (cblPrevGroup = !cblPrevGroup)}><Icon name="layers" size={13} /> {t('listsPage.groupBySeries')}</button>
               </div>
             </div>
           </div>
           <div class="listx__prev-body">
             {#if !cblPrevFiltered.length}
-              <div class="listx__arc-empty">{cblPrevFilter === 'noid' ? 'Every book carries a ComicVine id.' : cblPrevFilter === 'missing' ? 'You already own every matched book.' : 'Nothing to show.'}</div>
+              <div class="listx__arc-empty">{t(cblPrevFilter === 'noid' ? 'listsPage.everyHasId' : cblPrevFilter === 'missing' ? 'listsPage.ownEveryMatched' : 'listsPage.nothingToShow')}</div>
             {/if}
             {#each cblPrevRuns as r, ri (ri)}
               {#if cblPrevGroup}
                 <div class="listx__prev-run">
                   <span class="listx__prev-run-series">{r.series}</span>
                   {#if r.volume}<span class="listx__prev-run-vol">({r.volume})</span>{/if}
-                  <span class="listx__prev-run-own" class:is-all={r.owned === r.books.length} class:is-some={r.owned > 0 && r.owned < r.books.length}>{r.owned}/{r.books.length} owned</span>
+                  <span class="listx__prev-run-own" class:is-all={r.owned === r.books.length} class:is-some={r.owned > 0 && r.owned < r.books.length}>{t('listsPage.ownedOf', { owned: r.owned, total: r.books.length })}</span>
                   <span class="listx__prev-run-line"></span>
                   <span class="listx__prev-run-range">{r.range}</span>
                 </div>
@@ -611,20 +615,20 @@
                   <span class="listx__prev-n">{b.n}</span>
                   <span class="listx__prev-rdot"></span>
                   <span class="listx__prev-rname">{#if !cblPrevGroup}<span class="listx__prev-rseries">{b.series} </span>{/if}<b>#{b.number}</b>{#if b.volume}<span class="listx__prev-rvol"> ({b.volume})</span>{/if}</span>
-                  <span class="listx__prev-badge">{st === 'owned' ? 'Owned' : st === 'missing' ? 'Missing' : 'by name'}</span>
+                  <span class="listx__prev-badge">{t(st === 'owned' ? 'listsPage.owned' : st === 'missing' ? 'listsPage.missing' : 'listsPage.byName')}</span>
                 </div>
               {/each}
             {/each}
             {#if cblPrevFiltered.length > cblPrevPage}
-              <button class="listx__cbl-more" onclick={() => (cblPrevPage += 120)}>Show more ({fmt(cblPrevFiltered.length - cblPrevPage)} more)</button>
+              <button class="listx__cbl-more" onclick={() => (cblPrevPage += 120)}>{t('listsPage.showMore', { count: fmt(cblPrevFiltered.length - cblPrevPage) })}</button>
             {/if}
-            {#if cblPreview.truncated}<div class="listx__prev-trunc">This list is very long — previewing the first 3,000 of {fmt(cblPreview.total)} books. The import has the same cap.</div>{/if}
+            {#if cblPreview.truncated}<div class="listx__prev-trunc">{t('listsPage.previewTruncated', { total: fmt(cblPreview.total) })}</div>{/if}
           </div>
           <div class="listx__prev-foot">
             <div class="listx__prev-inner listx__prev-foot-row">
-              <span class="listx__prev-outcome">Imports in reading order · {fmt(cblPreview.withIds)} book{cblPreview.withIds === 1 ? '' : 's'} match by id{noId ? `, ${fmt(noId)} by name` : ''} · {fmt(cblPreview.owned)} already owned</span>
-              <button class="listx__prev-cancel" onclick={() => (cblPreview = null)}>Cancel</button>
-              <button class="listx__prev-import" disabled={cblBusy} onclick={importPreview}><Icon name="import" size={15} /> {cblBusy ? 'Importing…' : 'Import this list'}</button>
+              <span class="listx__prev-outcome">{t('listsPage.outcome', { matched: t('listsPage.outcomeById', { count: cblPreview.withIds }) + (noId ? ', ' + t('listsPage.outcomeByName', { count: fmt(noId) }) : ''), owned: fmt(cblPreview.owned) })}</span>
+              <button class="listx__prev-cancel" onclick={() => (cblPreview = null)}>{t('common.cancel')}</button>
+              <button class="listx__prev-import" disabled={cblBusy} onclick={importPreview}><Icon name="import" size={15} /> {cblBusy ? t('listsPage.importing') : t('listsPage.importThisList')}</button>
             </div>
           </div>
         </div>
@@ -634,8 +638,8 @@
           <div class="listx__cbl-head">
             <span class="listx__cbl-ico"><Icon name="import" size={19} /></span>
             <div>
-              <div class="listx__arc-title">Import a CBL reading list</div>
-              <p class="listx__cbl-sub">CBL is a widely used reading-list format. Bring in a file of your own, or pick from the community's 1,700+ curated lists — whole events, character runs and alternate universes, in reading order. Issues you don't own stay in place, so you can download what's missing.</p>
+              <div class="listx__arc-title">{t('listsPage.importCblTitle')}</div>
+              <p class="listx__cbl-sub">{t('listsPage.cblSub')}</p>
             </div>
           </div>
 
@@ -645,25 +649,25 @@
               <div class="listx__cbl-result-row">
                 <span class="listx__cbl-result-ico"><Icon name={skipped ? 'alert-triangle' : 'check'} size={17} /></span>
                 <div class="listx__cbl-result-text">
-                  <div class="listx__cbl-result-title">Imported “{cblResult.name}”</div>
-                  <div class="listx__cbl-result-sub">{fmt(cblResult.imported)} of {fmt(cblResult.total)} issues in reading order</div>
+                  <div class="listx__cbl-result-title">{t('listsPage.importedName', { name: cblResult.name })}</div>
+                  <div class="listx__cbl-result-sub">{t('listsPage.importedOf', { imported: fmt(cblResult.imported), total: fmt(cblResult.total) })}</div>
                 </div>
-                <button class="listx__cbl-ghost" onclick={() => (cblResult = null)}>Dismiss</button>
-                <button class="listx__cbl-primary" onclick={() => { cblOpen = false; setQuery({ list: cblResult.id }); }}>Open list</button>
+                <button class="listx__cbl-ghost" onclick={() => (cblResult = null)}>{t('listsPage.dismiss')}</button>
+                <button class="listx__cbl-primary" onclick={() => { cblOpen = false; setQuery({ list: cblResult.id }); }}>{t('listsPage.openList')}</button>
               </div>
               <div class="listx__cbl-tiles">
-                <div class="listx__cbl-tile is-ok"><div class="listx__cbl-tile-n">{fmt(cblResult.imported)}</div><div class="listx__cbl-tile-l">Matched</div></div>
-                <div class="listx__cbl-tile" class:is-warn={skipped > 0}><div class="listx__cbl-tile-n">{fmt(skipped)}</div><div class="listx__cbl-tile-l">Couldn't match</div></div>
+                <div class="listx__cbl-tile is-ok"><div class="listx__cbl-tile-n">{fmt(cblResult.imported)}</div><div class="listx__cbl-tile-l">{t('listsPage.matched')}</div></div>
+                <div class="listx__cbl-tile" class:is-warn={skipped > 0}><div class="listx__cbl-tile-n">{fmt(skipped)}</div><div class="listx__cbl-tile-l">{t('listsPage.couldntMatch')}</div></div>
               </div>
               {#if cblResult.unmatched?.length}
                 <div class="listx__cbl-unmatched">
-                  <div class="listx__cbl-unmatched-head"><Icon name="alert-triangle" size={15} /><span>Not found on ComicVine — these stay out of the list</span></div>
+                  <div class="listx__cbl-unmatched-head"><Icon name="alert-triangle" size={15} /><span>{t('listsPage.unmatchedHead')}</span></div>
                   {#each cblResult.unmatched as u}
-                    <div class="listx__cbl-unmatched-row"><span class="listx__cbl-unmatched-label">{u.series} #{u.number}{u.volume ? ` (${u.volume})` : ''}</span><span class="listx__cbl-unmatched-why">{u.reason || 'no match'}</span></div>
+                    <div class="listx__cbl-unmatched-row"><span class="listx__cbl-unmatched-label">{u.series} #{u.number}{u.volume ? ` (${u.volume})` : ''}</span><span class="listx__cbl-unmatched-why">{u.reason || t('listsPage.noMatch')}</span></div>
                   {/each}
                 </div>
               {/if}
-              {#if cblResult.truncated}<div class="listx__cbl-trunc">This list is very long — the first 3,000 books were imported.</div>{/if}
+              {#if cblResult.truncated}<div class="listx__cbl-trunc">{t('listsPage.importTruncated')}</div>{/if}
             </div>
           {:else}
             <label class="listx__cbl-drop" class:is-busy={cblBusy || cblPreviewBusy} class:is-drag={cblDrag}
@@ -671,50 +675,50 @@
               ondragleave={() => (cblDrag = false)} ondrop={cblDrop}>
               <span class="listx__cbl-drop-ico"><Icon name="upload" size={20} /></span>
               <span class="listx__cbl-drop-text">
-                <span class="listx__cbl-drop-title">{cblBusy ? 'Importing your list…' : cblPreviewBusy ? 'Reading your list…' : 'Choose a .cbl file'}</span>
-                <span class="listx__cbl-drop-sub">{cblBusy ? 'Matching each book on ComicVine' : 'Or drop one here — .cbl and .xml, up to 4 MB. You’ll see its books before anything is imported.'}</span>
+                <span class="listx__cbl-drop-title">{t(cblBusy ? 'listsPage.dropImporting' : cblPreviewBusy ? 'listsPage.dropReading' : 'listsPage.dropChoose')}</span>
+                <span class="listx__cbl-drop-sub">{t(cblBusy ? 'listsPage.dropMatching' : 'listsPage.dropHint')}</span>
               </span>
-              {#if cblBusy || cblPreviewBusy}<span class="listx__cbl-drop-busy">{cblBusy ? 'Importing…' : 'Reading…'}</span>{/if}
+              {#if cblBusy || cblPreviewBusy}<span class="listx__cbl-drop-busy">{t(cblBusy ? 'listsPage.importing' : 'listsPage.reading')}</span>{/if}
               <input type="file" accept=".cbl,.xml,text/xml,application/xml" disabled={cblBusy || cblPreviewBusy} onchange={importCblFile} />
             </label>
           {/if}
 
           <div class="listx__cbl-cathead">
-            <span class="listx__cbl-cattitle">Community lists</span>
-            {#if cblFiles?.length}<span class="listx__cbl-catcount">{fmt(cblFiles.length)} lists</span>{/if}
-            <a class="listx__cbl-catsrc" href="https://github.com/DieselTech/CBL-ReadingLists" target="_blank" rel="noreferrer">DieselTech/CBL-ReadingLists <Icon name="external-link" size={11} /></a>
+            <span class="listx__cbl-cattitle">{t('listsPage.communityLists')}</span>
+            {#if cblFiles?.length}<span class="listx__cbl-catcount">{t('listsPage.nLists', { count: fmt(cblFiles.length) })}</span>{/if}
+            <a class="listx__cbl-catsrc" href="https://github.com/DieselTech/CBL-ReadingLists" target="_blank" rel="noreferrer">{'DieselTech/CBL-ReadingLists'} <Icon name="external-link" size={11} /></a>
           </div>
           <div class="listx__arc-field listx__cbl-filter">
             <Icon name="search" size={15} />
-            <input placeholder="Filter every list, e.g. Civil War" bind:value={cblQ} oninput={() => (cblPage = CBL_PAGE)} spellcheck="false" />
+            <input placeholder={t('listsPage.filterPlaceholder')} bind:value={cblQ} oninput={() => (cblPage = CBL_PAGE)} spellcheck="false" />
           </div>
           <div class="listx__cbl-crumbs">
-            <button class="listx__cbl-crumb" class:is-cur={!cblDir.length && !cblSearching} onclick={() => cblGo([])}>All publishers</button>
+            <button class="listx__cbl-crumb" class:is-cur={!cblDir.length && !cblSearching} onclick={() => cblGo([])}>{t('listsPage.allPublishers')}</button>
             {#each cblDir as seg, i}
               <span class="listx__cbl-sep"><Icon name="chevron-right" size={14} /></span>
               <button class="listx__cbl-crumb" class:is-cur={i === cblDir.length - 1 && !cblSearching} onclick={() => cblGo(cblDir.slice(0, i + 1))}>{seg}</button>
             {/each}
-            {#if cblSearching}<span class="listx__cbl-searching">searching all folders</span>{/if}
+            {#if cblSearching}<span class="listx__cbl-searching">{t('listsPage.searchingAll')}</span>{/if}
           </div>
 
           {#if cblFiles === null}
-            <div class="listx__arc-empty">Loading the catalog…</div>
+            <div class="listx__arc-empty">{t('listsPage.loadingCatalog')}</div>
           {:else if cblErr}
-            <div class="listx__cbl-error"><Icon name="alert-triangle" size={15} /><span>{cblErr}</span><button class="listx__cbl-ghost" onclick={loadCatalog}>Try again</button></div>
+            <div class="listx__cbl-error"><Icon name="alert-triangle" size={15} /><span>{cblErr}</span><button class="listx__cbl-ghost" onclick={loadCatalog}>{t('listsPage.tryAgain')}</button></div>
           {:else}
             {#if cblFolders.length}
               <div class="listx__cbl-folders">
                 {#each cblFolders as f (f.name)}
                   <button class="listx__cbl-folder" onclick={() => cblGo([...cblDir, f.name])}>
                     <span class="listx__cbl-folder-ico" style="--tone:{f.tone}"><Icon name="folder" size={16} /></span>
-                    <span class="listx__cbl-folder-text"><span class="listx__cbl-folder-name">{f.name}</span><span class="listx__cbl-folder-meta">{fmt(f.lists)} list{f.lists === 1 ? '' : 's'}{f.subs ? ` · ${fmt(f.subs)} folder${f.subs === 1 ? '' : 's'}` : ''}</span></span>
+                    <span class="listx__cbl-folder-text"><span class="listx__cbl-folder-name">{f.name}</span><span class="listx__cbl-folder-meta">{t('listsPage.nLists', { count: f.lists })}{f.subs ? ' · ' + t('listsPage.nFolders', { count: f.subs }) : ''}</span></span>
                     <Icon name="chevron-right" size={14} />
                   </button>
                 {/each}
               </div>
             {/if}
             {#if !cblFolders.length && !cblHits.length}
-              <div class="listx__arc-empty">{cblSearching ? `No lists match “${cblQ}”.` : 'This folder has no reading lists.'}</div>
+              <div class="listx__arc-empty">{cblSearching ? t('listsPage.noListsMatch', { query: cblQ }) : t('listsPage.folderEmpty')}</div>
             {/if}
             <div class="listx__cbl-cards">
               {#each cblVisible as c (c.path)}
@@ -725,14 +729,14 @@
                     <div class="listx__cbl-card-title">{c.title}</div>
                     <div class="listx__cbl-card-meta"><span>{c.publisher}</span>{#if c.date}<span class="listx__cbl-dot">·</span><span>{c.date}</span>{/if}{#if c.dir.length > 1}<span class="listx__cbl-dot">·</span><span class="listx__cbl-crumbtxt">{c.dir.slice(1).join(' / ')}</span>{/if}</div>
                   </div>
-                  {#if done}<span class="listx__cbl-done">Imported</span>{/if}
-                  <button class="listx__cbl-ghost" disabled={cblPreviewBusy || cblBusy} onclick={() => previewCatalog(c.path)}>Preview</button>
-                  <button class="listx__cbl-import" class:is-again={done} disabled={cblBusy} onclick={() => importCatalog(c.path)}>{done ? 'Re-import' : 'Import'}</button>
+                  {#if done}<span class="listx__cbl-done">{t('listsPage.imported')}</span>{/if}
+                  <button class="listx__cbl-ghost" disabled={cblPreviewBusy || cblBusy} onclick={() => previewCatalog(c.path)}>{t('listsPage.preview')}</button>
+                  <button class="listx__cbl-import" class:is-again={done} disabled={cblBusy} onclick={() => importCatalog(c.path)}>{t(done ? 'listsPage.reimport' : 'listsPage.import')}</button>
                 </div>
               {/each}
             </div>
             {#if cblHits.length > cblVisible.length}
-              <button class="listx__cbl-more" onclick={() => (cblPage += CBL_PAGE)}>Show more ({fmt(cblHits.length - cblVisible.length)} more)</button>
+              <button class="listx__cbl-more" onclick={() => (cblPage += CBL_PAGE)}>{t('listsPage.showMore', { count: fmt(cblHits.length - cblVisible.length) })}</button>
             {/if}
           {/if}
         </div>
@@ -740,55 +744,61 @@
       {/if}
     {:else if det}
       <div class="listx__dhead">
-        <button class="listx__iconbtn listx__back" aria-label="Lists" onclick={() => setQuery({ list: null })}><Icon name="arrow-left" size={16} /></button>
+        <button class="listx__iconbtn listx__back" aria-label={t('listsPage.lists')} onclick={() => setQuery({ list: null })}><Icon name="arrow-left" size={16} /></button>
         <div class="listx__dtitle-wrap">
           <div class="listx__dtitle-row">
             <span class="listx__dtitle">{det.name}</span>
-            {#if isTrusted() && det.mine !== false}<button class="listx__edit" title="Rename list" onclick={() => renameList(det)}><Icon name="edit" size={15} /></button>{/if}
+            {#if isTrusted() && det.mine !== false}<button class="listx__edit" title={t('listsPage.renameList')} onclick={() => renameList(det)}><Icon name="edit" size={15} /></button>{/if}
           </div>
-          <div class="listx__dsummary">{fmt(rows.length)} issue{rows.length === 1 ? '' : 's'} · {fmt(seriesCount)} series{det.arc_cv_id ? ' · from a ComicVine arc' : det.source ? ' · from a CBL reading list' : ''}{det.mine === false ? ` · shared by ${det.owner || 'another user'}` : ''}{det.public && det.mine !== false ? ' · shared with everyone' : ''}</div>
+          <div class="listx__dsummary">{[
+            t('common.nIssues', { count: fmt(rows.length) }),
+            t('common.nSeries', { count: fmt(seriesCount) }),
+            det.arc_cv_id ? t('listsPage.fromArcSuffix') : det.source ? t('listsPage.fromCblSuffix') : null,
+            det.mine === false ? t('listsPage.sharedBySuffix', { owner: det.owner || t('listsPage.anotherUser') }) : null,
+            det.public && det.mine !== false ? t('listsPage.sharedWithEveryoneSuffix') : null,
+          ].filter(Boolean).join(' · ')}</div>
         </div>
         <div class="listx__dactions">
           {#if hasReader && rows.length}
             <button class="listx__continue" disabled={!arc.nextReadable}
-              title={arc.done ? 'Every issue in this run is read' : arc.nextReadable ? 'Open the next issue you have not read' : 'The next issue in the run is not on your shelf yet'}
+              title={t(arc.done ? 'listsPage.everyRead' : arc.nextReadable ? 'listsPage.openNext' : 'listsPage.nextNotOnShelf')}
               onclick={continueArc}>
               <Icon name={arc.done ? 'check' : 'play'} size={15} />
-              {arc.done ? 'Arc complete' : arc.nextReadable ? `Continue · #${arc.nextReadable.issue_number ?? '?'}` : 'Blocked by a gap'}
+              {arc.done ? t('listsPage.arcComplete') : arc.nextReadable ? t('listsPage.continueIssue', { number: arc.nextReadable.issue_number ?? '?' }) : t('listsPage.blockedByGap')}
             </button>
           {/if}
           {#if wantable.length && can('library.manage')}
-            <button class="listx__want" disabled={wanting} title="Make every issue on this list wanted — series not in the library yet are added for just these issues" onclick={wantList}><Icon name="target" size={15} /> {wanting ? 'Wanting…' : `Want all (${fmt(wantable.length)})`}</button>
+            <button class="listx__want" disabled={wanting} title={t('listsPage.wantAllTitle')} onclick={wantList}><Icon name="target" size={15} /> {wanting ? t('listsPage.wanting') : t('listsPage.wantAll', { count: fmt(wantable.length) })}</button>
           {/if}
           {#if missing.length && can('downloads.grab')}
-            <button class="listx__dl" onclick={downloadMissing}><Icon name="download" size={15} /> Download missing ({fmt(missing.length)})</button>
+            <button class="listx__dl" onclick={downloadMissing}><Icon name="download" size={15} /> {t('listsPage.downloadMissing', { count: fmt(missing.length) })}</button>
           {/if}
           {#if det.mine !== false && can('lists.share')}
             <button class="listx__share" onclick={() => toggleShared(det)}
-              title={det.public ? 'Stop sharing this list' : 'Let every user see this list'}>
-              <Icon name="users" size={15} /> {det.public ? 'Shared' : 'Share'}
+              title={t(det.public ? 'listsPage.stopSharing' : 'listsPage.letEveryoneSee')}>
+              <Icon name="users" size={15} /> {t(det.public ? 'listsPage.shared' : 'listsPage.share')}
             </button>
           {/if}
-          {#if det.mine !== false}<button class="listx__del" onclick={() => deleteList(det)}>Delete</button>{/if}
+          {#if det.mine !== false}<button class="listx__del" onclick={() => deleteList(det)}>{t('common.delete')}</button>{/if}
         </div>
       </div>
       <div class="listx__dbar">
         <span class="listx__dbar-track"><span class="listx__dbar-fill" class:is-done={detPct >= 100} style="width:{detPct}%"></span></span>
         {#if hasReader}
-          <span class="listx__dbar-num">{fmt(arc.readCount)} of {fmt(rows.length)} read{arc.inProgressCount ? ` · ${fmt(arc.inProgressCount)} in progress` : ''}</span>
+          <span class="listx__dbar-num">{t('listsPage.readOfTotal', { read: fmt(arc.readCount), total: fmt(rows.length) })}{arc.inProgressCount ? t('listsPage.inProgress', { count: fmt(arc.inProgressCount) }) : ''}</span>
         {:else}
           <!-- No reader plugin: we genuinely do not know what has been read,
                so show what we DO know rather than dressing ownership up. -->
-          <span class="listx__dbar-num">{fmt(ownedCount)} of {fmt(rows.length)} owned</span>
+          <span class="listx__dbar-num">{t('listsPage.ownedOfTotal', { owned: fmt(ownedCount), total: fmt(rows.length) })}</span>
         {/if}
-        {#if missing.length}<span class="listx__dbar-gaps">{fmt(missing.length)} missing</span>{/if}
+        {#if missing.length}<span class="listx__dbar-gaps">{t('listsPage.nMissing', { count: fmt(missing.length) })}</span>{/if}
       </div>
       <div class="listx__scroll" bind:this={scroller} onscroll={onListScroll}>
         <div class="listx__items" bind:this={itemsEl}>
           {#if !rows.length}
             <div class="listx__d-empty">
               <div class="listx__d-empty-art"><Icon name="list" size={22} /></div>
-              <div>This list is empty — add issues from any series page (“Add to list”).</div>
+              <div>{t('listsPage.emptyList')}</div>
             </div>
           {/if}
           {#if range.padTop > 0}<div style="height:{range.padTop}px"></div>{/if}
@@ -802,33 +812,33 @@
               <!-- The rail: filled up to where the run has got to, grey after.
                    It stops AT a gap on purpose — see positionIndex. -->
               <span class="listx__spine" class:is-done={arc.spineDone(idx)}></span>
-              <span class="listx__node listx__node--{kind}" title={kind === 'current' ? 'Where you are in this run' : kind === 'read' ? 'Read' : kind === 'missing' ? 'Not on your shelf' : 'Not read yet'}>
+              <span class="listx__node listx__node--{kind}" title={t(kind === 'current' ? 'listsPage.nodeCurrent' : kind === 'read' ? 'listsPage.nodeRead' : kind === 'missing' ? 'listsPage.nodeMissing' : 'listsPage.nodeUnread')}>
                 {#if kind === 'read'}<Icon name="check" size={12} />{/if}
               </span>
               <div class="listx__cover" class:is-read={kind === 'read'} class:is-gap={kind === 'missing'}>
                 {#if kind === 'missing'}
-                  <div class="listx__gapcover" aria-label="Not owned">#{it.issue_number ?? '?'}</div>
+                  <div class="listx__gapcover" aria-label={t('listsPage.notOwned')}>#{it.issue_number ?? '?'}</div>
                 {:else}
                   <Cover coverUrl={coverOf(it)} title={it.series_title || '?'} />
                 {/if}
               </div>
               <div class="listx__imain">
                 {#if it.series_id}
-                  <a class="listx__iseries" href={'/volume/' + it.series_id} onclick={(e) => { e.preventDefault(); navigate('/volume/' + it.series_id); }}>{it.series_title || 'Unknown series'} <span class="listx__inum">#{it.issue_number ?? '?'}</span></a>
-                {:else}<span class="listx__iseries">{it.series_title || 'Unknown series'} <span class="listx__inum">#{it.issue_number ?? '?'}</span></span>{/if}
+                  <a class="listx__iseries" href={'/volume/' + it.series_id} onclick={(e) => { e.preventDefault(); navigate('/volume/' + it.series_id); }}>{it.series_title || t('listsPage.unknownSeries')} <span class="listx__inum">#{it.issue_number ?? '?'}</span></a>
+                {:else}<span class="listx__iseries">{it.series_title || t('listsPage.unknownSeries')} <span class="listx__inum">#{it.issue_number ?? '?'}</span></span>{/if}
                 {#if kind === 'missing'}
-                  <div class="listx__isub listx__isub--gap">Not owned · position {idx + 1} in this run</div>
+                  <div class="listx__isub listx__isub--gap">{t('listsPage.notOwnedPosition', { position: idx + 1 })}</div>
                 {:else}
                   <div class="listx__isub">{[it.title, it.cover_date].filter(Boolean).join(' · ')}</div>
                 {/if}
-                {#if kind === 'current'}<div class="listx__nexttag">Read next</div>{/if}
+                {#if kind === 'current'}<div class="listx__nexttag">{t('listsPage.readNext')}</div>{/if}
               </div>
               {#if !hasReader || kind === 'missing'}
-                <span class="listx__badge listx__badge--{st}">{st === 'owned' ? 'Owned' : st === 'missing' ? 'Missing' : 'Not in library'}</span>
+                <span class="listx__badge listx__badge--{st}">{t(st === 'owned' ? 'listsPage.badgeOwned' : st === 'missing' ? 'listsPage.badgeMissing' : 'listsPage.badgeNotInLibrary')}</span>
               {/if}
               <div class="listx__iact">
                 {#if kind === 'current'}
-                  <button class="listx__readnow" onclick={() => openInReader(it)}><Icon name="play" size={13} /> Read</button>
+                  <button class="listx__readnow" onclick={() => openInReader(it)}><Icon name="play" size={13} /> {t('listsPage.read')}</button>
                 {/if}
                 {#each issueActions as a (a.id + ':' + issueActionsTick.n)}
                   {#if !a.when || a.when(it)}
@@ -836,13 +846,13 @@
                   {/if}
                 {/each}
                 {#if !it.owned && it.series_id && can('downloads.grab')}
-                  <button class="listx__ibtn" title="Download this issue" onclick={() => downloadItem(it)}><Icon name="download" size={14} /></button>
+                  <button class="listx__ibtn" title={t('listsPage.downloadThis')} onclick={() => downloadItem(it)}><Icon name="download" size={14} /></button>
                 {:else if !it.series_id && it.cv_series_id && isTrusted()}
-                  <button class="listx__addbtn" disabled={addingSeries === it.cv_series_id} title="Add this series to the library so its issues can be downloaded" onclick={() => addSeries(it)}>{addingSeries === it.cv_series_id ? 'Adding…' : '+ Add series'}</button>
+                  <button class="listx__addbtn" disabled={addingSeries === it.cv_series_id} title={t('listsPage.addSeriesTitle')} onclick={() => addSeries(it)}>{addingSeries === it.cv_series_id ? t('listsPage.adding') : t('listsPage.addSeries')}</button>
                 {/if}
-                <button class="listx__ibtn" title="Move up" disabled={idx === 0} onclick={() => move(idx, -1)}><Icon name="arrow-up" size={14} /></button>
-                <button class="listx__ibtn" title="Move down" disabled={idx === rows.length - 1} onclick={() => move(idx, 1)}><Icon name="arrow-down" size={14} /></button>
-                <button class="listx__ibtn" title="Remove from list" onclick={() => removeItem(it)}><Icon name="close" size={14} /></button>
+                <button class="listx__ibtn" title={t('listsPage.moveUp')} disabled={idx === 0} onclick={() => move(idx, -1)}><Icon name="arrow-up" size={14} /></button>
+                <button class="listx__ibtn" title={t('listsPage.moveDown')} disabled={idx === rows.length - 1} onclick={() => move(idx, 1)}><Icon name="arrow-down" size={14} /></button>
+                <button class="listx__ibtn" title={t('listsPage.removeFromList')} onclick={() => removeItem(it)}><Icon name="close" size={14} /></button>
               </div>
             </div>
           {/each}
@@ -852,8 +862,8 @@
     {:else}
       <div class="listx__placeholder">
         <div class="listx__ph-art"><Icon name="list" size={26} /></div>
-        <div class="listx__ph-title">Pick a list</div>
-        <p class="listx__ph-body">Select a reading list on the left, or create a new one to start collecting issues into an ordered run.</p>
+        <div class="listx__ph-title">{t('listsPage.pickList')}</div>
+        <p class="listx__ph-body">{t('listsPage.pickListBody')}</p>
       </div>
     {/if}
   </div>
