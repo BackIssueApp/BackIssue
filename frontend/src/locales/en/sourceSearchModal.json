@@ -1,0 +1,17 @@
+{
+  "fallbackSeries": "Issue",
+  "title": "Search sources",
+  "searchFailed": "Search failed — is the app running?",
+  "noSources": "No download sources are enabled (Settings → Download sources).",
+  "noneFound": "No releases found across your sources. Try a broader query, or add an alt name to the series.",
+  "queryPlaceholder": "Series and issue, or any query…",
+  "searched": "Searched",
+  "searching": "Searching enabled sources…",
+  "pack": "Pack",
+  "packQueued": "Pack queued via {source} — its missing issues import automatically (watch the queue).",
+  "queued": "Download queued via {source} — watch the queue.",
+  "failed": "Download failed: {error}",
+  "unknownError": "unknown error",
+  "sending": "Sending…",
+  "download": "Download"
+}

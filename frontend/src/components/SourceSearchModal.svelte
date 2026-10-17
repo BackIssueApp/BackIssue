@@ -2,13 +2,13 @@
   import { openModal, closeModal, modals } from '../lib/modals.svelte.js';
   import { detail } from '../lib/store.svelte.js';
   import { apiPost } from '../lib/api.js';
+  import { t } from '../lib/i18n.svelte.js';
 
-  const m = $state({ target: null, title: '', context: '', query: '', results: null, searched: null, errors: [], note: '', searching: false });
+  const m = $state({ target: null, context: '', query: '', results: null, searched: null, errors: [], note: '', searching: false });
 
   export function openSourceSearch(cvIssueId, number) {
     m.target = { cvIssueId, number };
-    m.context = `${detail.series?.title || 'Issue'} #${number ?? '?'}`;
-    m.title = `Search sources — ${m.context}`;
+    m.context = `${detail.series?.title || t('sourceSearchModal.fallbackSeries')} #${number ?? '?'}`;
     m.query = '';
     m.results = null; m.searched = null; m.errors = []; m.note = ''; m.searching = false;
     openModal('search');
@@ -25,14 +25,14 @@
     m.searching = true; m.note = ''; m.results = null; m.errors = [];
     let data;
     try { data = await apiPost('/api/search', body); }
-    catch { m.searching = false; m.note = 'Search failed — is the app running?'; return; }
+    catch { m.searching = false; m.note = t('sourceSearchModal.searchFailed'); return; }
     m.searching = false;
     m.errors = data.errors || [];
-    if (!data.sources || !data.sources.length) { m.note = 'No download sources are enabled (Settings → Download sources).'; m.results = []; return; }
+    if (!data.sources || !data.sources.length) { m.note = t('sourceSearchModal.noSources'); m.results = []; return; }
     const results = data.results || [];
     m.searched = (data.searched && data.searched.length) ? data.searched : null;
     m.results = results.map((r) => ({ ...r, _busy: false }));
-    m.note = results.length ? '' : 'No releases found across your sources. Try a broader query, or add an alt name to the series.';
+    m.note = results.length ? '' : t('sourceSearchModal.noneFound');
   }
 </script>
 
@@ -71,12 +71,10 @@
     } catch (e) { res = { error: String(e) }; }
     if (res && (res.queued || res.grabbed)) {
       closeModal('search');
-      notify(r.isPack
-        ? `Pack queued via ${r.source} — its missing issues import automatically (watch the queue).`
-        : `Download queued via ${r.source} — watch the queue.`, 'ok');
+      notify(t(r.isPack ? 'sourceSearchModal.packQueued' : 'sourceSearchModal.queued', { source: r.source }), 'ok');
       reloadDetail();
     } else {
-      notify('Download failed: ' + (res?.error || 'unknown error'), 'error');
+      notify(t('sourceSearchModal.failed', { error: res?.error || t('sourceSearchModal.unknownError') }), 'error');
       r._busy = false;
     }
   }
@@ -84,31 +82,31 @@
 
 {#if open}
   <div id="search-modal" class="modal srchx-overlay" onclick={(e) => { if (e.target === e.currentTarget) closeModal('search'); }}>
-    <div class="srchx" use:trapFocus role="dialog" aria-label="Search sources">
+    <div class="srchx" use:trapFocus role="dialog" aria-label={t('sourceSearchModal.title')}>
       <div class="srchx__head">
         <div class="srchx__icon"><Icon name="search" size={16} /></div>
         <div class="srchx__titles">
-          <div class="srchx__title">Search sources</div>
+          <div class="srchx__title">{t('sourceSearchModal.title')}</div>
           <div class="srchx__sub">{m.context}</div>
         </div>
-        <button class="srchx__x" aria-label="Close" onclick={() => closeModal('search')}><Icon name="close" size={16} /></button>
+        <button class="srchx__x" aria-label={t('common.close')} onclick={() => closeModal('search')}><Icon name="close" size={16} /></button>
       </div>
 
       <div class="srchx__searchrow">
         <div class="srchx__field">
           <Icon name="search" size={16} />
-          <input id="search-input" type="search" spellcheck="false" placeholder="Series and issue, or any query…" bind:this={searchEl} bind:value={m.query}
+          <input id="search-input" type="search" spellcheck="false" placeholder={t('sourceSearchModal.queryPlaceholder')} bind:this={searchEl} bind:value={m.query}
             onkeydown={(e) => { if (e.key === 'Enter') runSearch(); }} />
         </div>
-        <button class="srchx__go" type="button" onclick={runSearch}>Search</button>
+        <button class="srchx__go" type="button" onclick={runSearch}>{t('common.search')}</button>
       </div>
       {#if m.searched}
-        <div class="srchx__searched"><span class="srchx__searched-label">Searched</span>{#each m.searched as c (c)}<span class="srchx__chip">{c}</span>{/each}</div>
+        <div class="srchx__searched"><span class="srchx__searched-label">{t('sourceSearchModal.searched')}</span>{#each m.searched as c (c)}<span class="srchx__chip">{c}</span>{/each}</div>
       {/if}
 
       <div id="search-results" class="srchx__results">
         {#if m.searching}
-          <div class="srchx__busy"><span class="srchx__spin"><Icon name="refresh" size={16} /></span><div>Searching enabled sources…</div></div>
+          <div class="srchx__busy"><span class="srchx__spin"><Icon name="refresh" size={16} /></span><div>{t('sourceSearchModal.searching')}</div></div>
         {:else}
           {#each m.errors as err, i (i)}
             <div class="srchx__err"><Icon name="alert-triangle" size={14} /> {err}</div>
@@ -118,7 +116,7 @@
               <div class="srchx__info">
                 <div class="srchx__toprow">
                   <span class="srchx__srcbadge" style="color:{srcTone(r.source)}; border-color:color-mix(in srgb, {srcTone(r.source)} 45%, transparent); background:color-mix(in srgb, {srcTone(r.source)} 12%, transparent);">{r.source}</span>
-                  {#if r.isPack}<span class="srchx__pack">Pack</span>{/if}
+                  {#if r.isPack}<span class="srchx__pack">{t('sourceSearchModal.pack')}</span>{/if}
                   <span class="srchx__rtitle">{r.title}</span>
                 </div>
                 <div class="srchx__rmeta">
@@ -127,7 +125,7 @@
                   {#if metaText(r)}<span>{metaText(r)}</span>{/if}
                 </div>
               </div>
-              <button class="srchx__grab" disabled={r._busy} onclick={() => grab(r)}>{r._busy ? 'Sending…' : 'Download'}</button>
+              <button class="srchx__grab" disabled={r._busy} onclick={() => grab(r)}>{r._busy ? t('sourceSearchModal.sending') : t('sourceSearchModal.download')}</button>
             </div>
           {/each}
           {#if m.note}<div class="srchx__note">{m.note}</div>{/if}
