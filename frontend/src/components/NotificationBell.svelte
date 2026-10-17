@@ -6,6 +6,8 @@
   import { subscribe } from '../lib/events.svelte.js';
   import { navigate } from '../lib/router.svelte.js';
   import { fmtAgo } from '../lib/util.js';
+  import { t } from '../lib/i18n.svelte.js';
+  import { notificationText } from '../lib/notifyText.js';
   import Icon from '../lib/Icon.svelte';
 
   let open = $state(false);
@@ -50,26 +52,27 @@
 <svelte:window onclick={onWindowClick} />
 
 <div class="notif">
-  <button class="notif__bell" title="Notifications" aria-label="Notifications" onclick={toggle}>
+  <button class="notif__bell" title={t('notificationBell.title')} aria-label={t('notificationBell.title')} onclick={toggle}>
     <Icon name="bell" />{#if unread > 0}<span class="notif__badge">{unread > 99 ? '99+' : unread}</span>{/if}
   </button>
   {#if open}
     <div class="notif__panel">
       <div class="notif__head">
-        <span>Notifications</span>
-        {#if unread > 0}<button class="notif__mark" onclick={markAll}>Mark all read</button>{/if}
+        <span>{t('notificationBell.title')}</span>
+        {#if unread > 0}<button class="notif__mark" onclick={markAll}>{t('notificationBell.markAllRead')}</button>{/if}
       </div>
       <div class="notif__list">
         {#if !items.length}
-          <div class="notif__empty">Nothing yet — imports, releases, and request activity show up here.</div>
+          <div class="notif__empty">{t('notificationBell.empty')}</div>
         {/if}
         {#each items as it (it.id)}
+          {@const text = notificationText(it)}
           <button class="notif-item notif-item--{it.level}" class:is-unread={!it.read}
             onclick={() => openItem(it)}>
             <span class="notif-item__dot"><Icon name={ICON[it.level] || 'info'} size={14} /></span>
             <span class="notif-item__main">
-              <span class="notif-item__title">{it.title}</span>
-              {#if it.body}<span class="notif-item__body">{it.body}</span>{/if}
+              <span class="notif-item__title">{text.title}</span>
+              {#if text.body}<span class="notif-item__body">{text.body}</span>{/if}
               <span class="notif-item__time">{fmtAgo(Date.now() - it.ts)}</span>
             </span>
           </button>
