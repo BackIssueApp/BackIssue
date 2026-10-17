@@ -1,0 +1,22 @@
+{
+  "title": "Historial",
+  "nFailures": { "one": "{count} fallo", "other": "{count} fallos" },
+  "nBlocked": { "one": "{count} lanzamiento bloqueado", "other": "{count} lanzamientos bloqueados" },
+  "nImports": { "one": "{count} importación", "other": "{count} importaciones" },
+  "statFailures": "Fallos",
+  "statBlocked": "Bloqueados",
+  "statImports": "Importaciones",
+  "emptyFailedTitle": "No hay descargas fallidas",
+  "emptyFailedBody": "Las descargas que fallan quedan registradas aquí — el registro se conserva aunque se vacíe la cola.",
+  "emptyBlockedTitle": "Nada bloqueado",
+  "emptyBlockedBody": "Los lanzamientos de usenet fallidos acaban aquí para que las próximas búsquedas los omitan. Quita uno para que vuelva a ser elegible.",
+  "emptyImportsTitle": "Todavía no se ha importado nada",
+  "emptyImportsBody": "Esto se va llenando a medida que llegan las descargas. Aquí se registran las importaciones gestionadas por el monitor en segundo plano.",
+  "filterPlaceholder": "Filtrar…",
+  "clearAll": "Borrar todo",
+  "chipAll": "Todo",
+  "chipFailed": "Fallidas",
+  "chipBlocklist": "Lista de bloqueo",
+  "removeFromBlocklist": "Quitar de la lista de bloqueo — permitir de nuevo la captura automática",
+  "loadMore": "Cargar más"
+}

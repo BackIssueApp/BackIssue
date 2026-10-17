@@ -1,0 +1,11 @@
+{
+  "new": "novo",
+  "queued": "na fila",
+  "sent": "enviado",
+  "saving": "a guardar",
+  "tagging": "a etiquetar",
+  "saved": "guardado",
+  "noTags": "sem etiquetas",
+  "corrupt": "corrompido",
+  "failed": "falhou"
+}

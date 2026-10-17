@@ -1,0 +1,17 @@
+{
+  "fallbackSeries": "Albo",
+  "title": "Cerca nelle fonti",
+  "searchFailed": "Ricerca fallita — l'app è in esecuzione?",
+  "noSources": "Nessuna fonte di download attiva (Impostazioni → Fonti di download).",
+  "noneFound": "Nessuna release trovata nelle tue fonti. Prova una ricerca più ampia, o aggiungi un nome alternativo alla serie.",
+  "queryPlaceholder": "Serie e numero, o qualsiasi ricerca…",
+  "searched": "Cercato",
+  "searching": "Ricerca nelle fonti attive…",
+  "pack": "Pacchetto",
+  "packQueued": "Pacchetto in coda tramite {source} — i suoi albi mancanti vengono importati automaticamente (controlla la coda).",
+  "queued": "Download in coda tramite {source} — controlla la coda.",
+  "failed": "Download fallito: {error}",
+  "unknownError": "errore sconosciuto",
+  "sending": "Invio…",
+  "download": "Scarica"
+}

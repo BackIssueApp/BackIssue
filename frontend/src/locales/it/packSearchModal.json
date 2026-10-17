@@ -1,0 +1,14 @@
+{
+  "title": "Cerca pacchetti · {series}",
+  "dialogLabel": "Cerca pacchetti",
+  "searching": "Ricerca di pacchetti nelle fonti attive…",
+  "noSources": "Nessuna fonte attiva supporta i pacchetti.",
+  "noneFound": "Nessun pacchetto trovato nelle tue fonti. Prova una ricerca più ampia (solo il nome della serie).",
+  "intro": "Pacchetti con più albi (serie complete, volumi brossurati, intervalli di numeri) da ogni fonte attiva. Scaricane uno — ogni albo <b>mancante</b> di questa serie viene importato da lì; quelli già posseduti vengono saltati. Torrent e usenet scaricano tramite il tuo client; le altre fonti scaricano nell'app.",
+  "queryPlaceholder": "Nome della serie…",
+  "queued": "Pacchetto in coda tramite {source} — gli albi mancanti di questa serie vengono importati automaticamente (controlla la coda / Attività).",
+  "failed": "Download fallito: {error}",
+  "unknownError": "errore sconosciuto",
+  "sending": "Invio…",
+  "download": "Scarica"
+}

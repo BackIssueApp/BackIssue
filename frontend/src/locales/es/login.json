@@ -1,0 +1,14 @@
+{
+  "intro": "Bienvenido a BackIssue. Crea tu cuenta para empezar — será la cuenta de <b>administrador</b> y, a partir de entonces, habrá que iniciar sesión.",
+  "signIn": "Iniciar sesión",
+  "createAccount": "Crear cuenta",
+  "createAdmin": "Crear cuenta de administrador",
+  "username": "Usuario",
+  "password": "Contraseña",
+  "confirmPassword": "Confirmar contraseña",
+  "passwordsMismatch": "las contraseñas no coinciden",
+  "or": "o",
+  "signInWith": "Iniciar sesión con {provider}",
+  "noMethod": "No hay ningún método de inicio de sesión disponible — un administrador debe configurar SSO o volver a activar el inicio de sesión con contraseña.",
+  "registrationDisabled": "El registro está desactivado — pide una cuenta a un administrador."
+}

@@ -1,0 +1,14 @@
+{
+  "title": "Pesquisar pacotes · {series}",
+  "dialogLabel": "Pesquisar pacotes",
+  "searching": "A pesquisar pacotes nas fontes ativas…",
+  "noSources": "Nenhuma fonte com suporte a pacotes está ativa.",
+  "noneFound": "Nenhum pacote encontrado nas suas fontes. Tente uma pesquisa mais ampla (só o nome da série).",
+  "intro": "Pacotes de várias edições (séries completas, TPBs, intervalos de números) em todas as fontes ativas. Descarregue um — todas as edições <b>em falta</b> nesta série são importadas dele; as que já tem são ignoradas. Torrents/usenet descarregam através do seu cliente; as outras fontes descarregam na aplicação.",
+  "queryPlaceholder": "Nome da série…",
+  "queued": "Pacote na fila via {source} — as edições em falta desta série importam automaticamente (acompanhe a fila / Tarefas).",
+  "failed": "O download falhou: {error}",
+  "unknownError": "erro desconhecido",
+  "sending": "A enviar…",
+  "download": "Download"
+}

@@ -1,0 +1,22 @@
+{
+  "title": "Cronologia",
+  "nFailures": { "one": "{count} errore", "other": "{count} errori" },
+  "nBlocked": { "one": "{count} release bloccata", "other": "{count} release bloccate" },
+  "nImports": { "one": "{count} importazione", "other": "{count} importazioni" },
+  "statFailures": "Errori",
+  "statBlocked": "Bloccate",
+  "statImports": "Importazioni",
+  "emptyFailedTitle": "Nessun download fallito",
+  "emptyFailedBody": "I download che vanno in errore vengono registrati qui — il record resta anche dopo che la coda è stata svuotata.",
+  "emptyBlockedTitle": "Niente di bloccato",
+  "emptyBlockedBody": "Le release usenet fallite finiscono qui, così le ricerche future le saltano. Rimuovine una per renderla di nuovo idonea.",
+  "emptyImportsTitle": "Ancora nessuna importazione",
+  "emptyImportsBody": "Si riempie man mano che i download arrivano. Le importazioni gestite dal monitor in background vengono tracciate qui.",
+  "filterPlaceholder": "Filtra…",
+  "clearAll": "Cancella tutto",
+  "chipAll": "Tutte",
+  "chipFailed": "Fallite",
+  "chipBlocklist": "Lista di blocco",
+  "removeFromBlocklist": "Rimuovi dalla lista di blocco — consenti di nuovo il prelievo automatico",
+  "loadMore": "Carica altro"
+}

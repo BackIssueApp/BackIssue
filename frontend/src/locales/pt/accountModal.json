@@ -1,0 +1,10 @@
+{
+  "dialogLabel": "Conta",
+  "title": "Conta — {username}",
+  "currentPassword": "Palavra-passe atual",
+  "newPassword": "Nova palavra-passe (8+ caracteres)",
+  "confirmNewPassword": "Confirmar a nova palavra-passe",
+  "mismatch": "as novas palavras-passe não coincidem",
+  "changePassword": "Alterar palavra-passe",
+  "changed": "Palavra-passe alterada."
+}

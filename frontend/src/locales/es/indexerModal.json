@@ -1,0 +1,14 @@
+{
+  "dialogLabel": "Indexador",
+  "kindIndexer": "indexador",
+  "kindTorrentIndexer": "indexador de torrents",
+  "addTitle": "Añadir {kind}",
+  "editTitle": "Editar {kind}",
+  "name": "Nombre",
+  "url": "URL",
+  "apiKey": "Clave de API",
+  "enterUrlFirst": "Introduce primero una URL.",
+  "urlRequired": "Se necesita una URL.",
+  "testing": "Probando…",
+  "test": "Probar"
+}

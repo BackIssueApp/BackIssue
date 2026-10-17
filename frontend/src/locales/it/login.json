@@ -1,0 +1,14 @@
+{
+  "intro": "Benvenuto in BackIssue. Crea il tuo account per iniziare — diventerà l'<b>amministratore</b> e da quel momento sarà necessario accedere.",
+  "signIn": "Accedi",
+  "createAccount": "Crea account",
+  "createAdmin": "Crea account amministratore",
+  "username": "Nome utente",
+  "password": "Password",
+  "confirmPassword": "Conferma password",
+  "passwordsMismatch": "le password non coincidono",
+  "or": "oppure",
+  "signInWith": "Accedi con {provider}",
+  "noMethod": "Nessun metodo di accesso disponibile — un amministratore deve configurare l'SSO o riattivare l'accesso con password.",
+  "registrationDisabled": "La registrazione è disattivata — chiedi un account a un amministratore."
+}

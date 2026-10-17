@@ -1,0 +1,113 @@
+{
+  "title": "Hilfe · {page}",
+  "footer": "Tipp: <kbd>Esc</kbd> schließt das Fenster. Schaltflächen, die du nicht siehst, brauchen vielleicht eine höhere Berechtigung.",
+  "whatThisIs": "Worum es geht",
+  "fallback": {
+    "title": "BackIssue",
+    "s1h": "Diese Seite",
+    "s1p": "Noch keine Hilfe zu dieser Seite – wähle links einen Bereich."
+  },
+  "series": {
+    "title": "Reihe",
+    "s1h": "Worum es geht",
+    "s1p": "Jedes Heft, das die Metadatenquelle für diese Reihe führt. Vorhandene Hefte zeigen ein Cover und einen grünen Haken; fehlende kannst du herunterladen.",
+    "s2h": "Lesen & herunterladen",
+    "s2p": "Nutze den Download-Button in einer Zeile (oder wähle mehrere aus und „Auswahl herunterladen“), um fehlende Hefte zu laden. Vorhandene Hefte zeigen Reader-Aktionen (lesen, als gelesen markieren), wenn das Reader-Plugin aktiv ist.",
+    "s3h": "Liste oder Raster",
+    "s3p": "Oben zwischen Raster und Liste umschalten. Die Listenansicht ergänzt Cover-Datum, Seitenzahl, Dateigröße und Dateiformat pro Heft; das Raster zeigt Cover.",
+    "s4h": "Verwalten",
+    "s4p": "Mit Bibliotheksrechten kannst du Metadaten aktualisieren, die Zuordnung korrigieren, den Ordner scannen, Dateien taggen, den Speicherort festlegen, alternative Suchnamen hinzufügen oder die Reihe entfernen. „Zur Liste hinzufügen“ setzt die Auswahl (oder die ganze Reihe) auf eine Leseliste."
+  },
+  "library": {
+    "title": "Bibliothek",
+    "s1h": "Worum es geht",
+    "s1p": "Jede Reihe, die du verfolgst. Jede zeigt, wie viele Hefte du besitzt und wie viele es gibt, mit Fortschrittsbalken.",
+    "s2h": "Finden",
+    "s2p": "Das Suchfeld oben filtert deine Sammlung. Die Filter-Chips grenzen auf Unvollständig, Nicht verfolgt, Probleme oder Nicht zugeordnet (noch keine Metadaten) ein; das Sortiermenü ordnet A–Z, zuletzt hinzugefügt oder nach den meisten fehlenden Heften.",
+    "s3h": "Ansichten",
+    "s3p": "Das Raster ist eine Posterwand; die Liste eine dichte Tabelle mit Verlag, Jahr, Download-Aktivität, Datum des neuesten Hefts und Größe auf der Festplatte.",
+    "s4h": "Hinzufügen & Massenaktionen",
+    "s4p": "„+ Hinzufügen“ durchsucht die Metadatenquelle und fügt eine Reihe hinzu (die standardmäßig sofort ihre Hefte zum Download einreiht). „Auswählen“ ermöglicht Folgen/Entfolgen, Fehlendes herunterladen und Entfernen für mehrere Reihen auf einmal."
+  },
+  "wanted": {
+    "title": "Gesucht",
+    "s1h": "Worum es geht",
+    "s1p": "Jedes fehlende Heft deiner gesamten Sammlung, nach Reihe gruppiert – dein Rückstand an Dingen zum Herunterladen.",
+    "s2h": "Verwendung",
+    "s2p": "Lade ein einzelnes Heft herunter oder reihe mit „Angezeigte herunterladen“ alles ein, was zu den aktuellen Filtern passt (begrenzt pro Durchlauf). Filtere auf verfolgte Reihen oder blende unveröffentlichte Hefte aus."
+  },
+  "queue": {
+    "title": "Download-Warteschlange",
+    "s1h": "Worum es geht",
+    "s1p": "Was gerade lädt und was wartet. Der aktive Eintrag zeigt einen Fortschrittsbalken mit Geschwindigkeit und Quelle.",
+    "s2h": "Steuerung",
+    "s2p": "Warteschlange pausieren/fortsetzen, wartende Einträge entfernen oder fehlgeschlagene wiederholen/entfernen (Bibliotheksrechte). Das × in einer Zeile bricht den Download ab und entfernt ihn aus dem Client.",
+    "s3h": "Nach einem Neustart",
+    "s3p": "Eine Warteschlange, die mitten im Download war, wird beim Start der App automatisch fortgesetzt."
+  },
+  "releases": {
+    "title": "Neuerscheinungen",
+    "s1h": "Worum es geht",
+    "s1p": "Neue Comics, die diese Woche erscheinen (andere Wochen über die Pfeile). Hefte verfolgter Reihen sind markiert und lassen sich direkt hier hinzufügen oder herunterladen."
+  },
+  "lists": {
+    "title": "Leselisten",
+    "s1h": "Worum es geht",
+    "s1p": "Persönliche, geordnete Heftlisten – von Hand erstellt oder aus einem Handlungsbogen importiert. Listen sind privat für dein Konto.",
+    "s2h": "Eine Liste aufbauen",
+    "s2p": "Erstelle eine und füge dann von jeder Reihenseite Hefte hinzu („Zur Liste hinzufügen“). Mit den Auf/Ab-Schaltflächen umsortieren. Einträge, die du nicht besitzt, zeigen einen Download-Button oder „+ Reihe hinzufügen“, wenn die ganze Reihe noch nicht in deiner Bibliothek ist.",
+    "s3h": "Handlungsbögen",
+    "s3p": "„Handlungsbogen importieren“ durchsucht die Metadatenquelle und holt die Hefte eines Bogens in Lesereihenfolge nach Cover-Datum – ideal für Crossover über mehrere Reihen."
+  },
+  "history": {
+    "title": "Verlauf",
+    "s1h": "Worum es geht",
+    "s1p": "Ein Protokoll der in deine Bibliothek importierten Hefte – was wann aus welcher Quelle kam. Oben nach Quelle filtern."
+  },
+  "stats": {
+    "title": "Statistik",
+    "s1h": "Worum es geht",
+    "s1p": "Ein Überblick über deine Sammlung – Summen nach Verlag, Vollständigkeit, Dateianzahl und Größen."
+  },
+  "users": {
+    "title": "Benutzer & Rollen",
+    "s1h": "Konten",
+    "s1p": "Konten erstellen, Rollen zuweisen, deaktivieren oder löschen. Selbstregistrierung ein- oder ausschalten (neue Anmeldungen starten als Betrachter). Mindestens ein Admin muss immer bleiben.",
+    "s2h": "Rollen & Berechtigungen",
+    "s2p": "Die eingebauten Rollen (Betrachter, Vertraut, Admin) gewähren aufsteigend mehr Berechtigungen. Erstelle eine eigene Rolle und hake genau die Berechtigungen an, die sie haben soll – auch solche, die Plugins registrieren (Lesen, OPDS, Anfragen usw.)."
+  },
+  "plugins": {
+    "title": "Plugins",
+    "s1h": "Worum es geht",
+    "s1p": "Alles, was im Plugins-Ordner installiert ist, mit dem, was jedes registriert hat (Routen, Quellen, Jobs, UI). Jedes ein- oder ausschalten; Änderungen gelten nach einem Neustart.",
+    "s2h": "Neustart",
+    "s2p": "„Jetzt neu starten“ startet die App neu, damit Plugin-Änderungen wirksam werden."
+  },
+  "jobs": {
+    "title": "Jobs",
+    "s1h": "Worum es geht",
+    "s1p": "Hintergrundaufgaben (Release-Prüfungen, Metadatenabgleich, Crawls, Nachfüllen) und ihre Zeitpläne. Cron-Zeitplan einer Aufgabe bearbeiten, sie ein-/ausschalten oder sofort ausführen."
+  },
+  "tools": {
+    "title": "Werkzeuge",
+    "s1h": "Worum es geht",
+    "s1p": "Einmalige Bibliothekswartung: alles scannen, ungetaggte Dateien taggen, CBR→CBZ umwandeln, Duplikate entfernen und Archive auf Defekte prüfen."
+  },
+  "logs": {
+    "title": "Protokolle",
+    "s1h": "Worum es geht",
+    "s1p": "Aktuelle Meldungen der App – hilfreich, wenn ein Download oder Tagging fehlschlägt. Nach Stufe und Kategorie filtern oder den Puffer leeren."
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "s1h": "Worum es geht",
+    "s1p": "App-Konfiguration: Stammordner der Bibliotheken, Download-Format und -Verhalten, Metadatenquellen, Indexer/Download-Clients, Benachrichtigungen und Plugin-Einstellungen.",
+    "s2h": "Beim Hinzufügen herunterladen",
+    "s2p": "Unter „Downloads“ steuert „Beim Hinzufügen herunterladen“, ob eine neu hinzugefügte Reihe sofort ihre Hefte einreiht (standardmäßig an)."
+  },
+  "import": {
+    "title": "Import",
+    "s1h": "Worum es geht",
+    "s1p": "Hole eine bestehende Comicbibliothek von der Festplatte in BackIssue: Ordner scannen, zugeordnete Kandidaten prüfen und bestätigen, um sie unter der passenden Reihe abzulegen."
+  }
+}

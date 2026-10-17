@@ -1,0 +1,113 @@
+{
+  "title": "Aiuto · {page}",
+  "footer": "Suggerimento: premi <kbd>Esc</kbd> per chiudere. I pulsanti che non vedi potrebbero richiedere un permesso superiore.",
+  "whatThisIs": "Che cos'è",
+  "fallback": {
+    "title": "BackIssue",
+    "s1h": "Questa pagina",
+    "s1p": "Nessun aiuto specifico per questa pagina — scegli una sezione dal menu a sinistra."
+  },
+  "series": {
+    "title": "Serie",
+    "s1h": "Che cos'è",
+    "s1p": "Tutti gli albi che la fonte di metadati elenca per questa serie. Gli albi posseduti mostrano la copertina e una spunta verde; quelli mancanti puoi scaricarli.",
+    "s2h": "Lettura e download",
+    "s2p": "Usa il pulsante di download su una riga (o selezionane diverse e “Scarica selezionati”) per scaricare gli albi mancanti. Gli albi posseduti mostrano le azioni di lettura (leggi, segna come letto) se il plugin del lettore è attivo.",
+    "s3h": "Elenco o griglia",
+    "s3p": "Passa da griglia a elenco in alto. La vista elenco aggiunge data di copertina, numero di pagine, dimensione e formato del file per ogni albo; la griglia mostra le copertine.",
+    "s4h": "Gestione",
+    "s4p": "Con i diritti di gestione della biblioteca puoi aggiornare i metadati, correggere l'abbinamento, scansionare la cartella, taggare i file, impostare la posizione, aggiungere nomi alternativi per la ricerca o rimuovere la serie. “Aggiungi alla lista” mette la selezione (o l'intera serie) in una lista di lettura."
+  },
+  "library": {
+    "title": "Biblioteca",
+    "s1h": "Che cos'è",
+    "s1p": "Tutte le serie che segui. Ognuna mostra quanti albi possiedi rispetto a quanti ne esistono, con una barra di avanzamento.",
+    "s2h": "Trovare le cose",
+    "s2p": "La casella di ricerca in alto filtra la collezione. I filtri restringono a Incomplete, Non seguite, Problemi o Non abbinate (ancora senza corrispondenza nei metadati); il menu di ordinamento dispone A–Z, aggiunte di recente o con più mancanze.",
+    "s3h": "Viste",
+    "s3p": "La griglia è una parete di poster; l'elenco è una tabella compatta con editore, anno, attività di download, data dell'ultimo albo e spazio su disco.",
+    "s4h": "Aggiunta e azioni di massa",
+    "s4p": "“+ Aggiungi” cerca nella fonte di metadati e aggiunge una serie (che, per impostazione predefinita, mette subito in coda i suoi albi da scaricare). “Seleziona” abilita segui/non seguire, scarica mancanti e rimuovi in blocco."
+  },
+  "wanted": {
+    "title": "Mancanti",
+    "s1h": "Che cos'è",
+    "s1p": "Tutti gli albi mancanti in tutta la collezione, raggruppati per serie — l'arretrato di cose da scaricare.",
+    "s2h": "Come si usa",
+    "s2p": "Scarica un singolo albo, oppure “Scarica mostrati” per mettere in coda tutto ciò che corrisponde ai filtri attuali (con un limite per passaggio). Filtra solo le serie seguite o nascondi gli albi non ancora usciti."
+  },
+  "queue": {
+    "title": "Coda di download",
+    "s1h": "Che cos'è",
+    "s1p": "Cosa si sta scaricando ora e cosa è in attesa. L'elemento attivo mostra una barra di avanzamento con velocità e fonte.",
+    "s2h": "Controlli",
+    "s2p": "Metti in pausa/riprendi la coda, svuota gli elementi in coda, oppure riprova/cancella quelli falliti (diritti di gestione della biblioteca). La × su una riga annulla quel download e lo rimuove dal client.",
+    "s3h": "Dopo un riavvio",
+    "s3p": "Una coda interrotta a metà download riprende automaticamente all'avvio dell'app."
+  },
+  "releases": {
+    "title": "Uscite",
+    "s1h": "Che cos'è",
+    "s1p": "I nuovi fumetti in uscita questa settimana (sfoglia altre settimane con le frecce). Gli albi delle serie che segui sono evidenziati e si possono aggiungere o scaricare direttamente da qui."
+  },
+  "lists": {
+    "title": "Liste di lettura",
+    "s1h": "Che cos'è",
+    "s1p": "Liste personali e ordinate di albi — costruite a mano o importate da un arco narrativo. Le liste sono private del tuo account.",
+    "s2h": "Costruire una lista",
+    "s2p": "Creane una, poi aggiungi albi da qualsiasi pagina di serie (“Aggiungi alla lista”). Riordina con i controlli su/giù. Gli elementi che non possiedi mostrano un pulsante di download, oppure “+ Aggiungi serie” se l'intera serie non è ancora nella biblioteca.",
+    "s3h": "Archi narrativi",
+    "s3p": "“Importa arco narrativo” cerca nella fonte di metadati e recupera gli albi di un arco nell'ordine di lettura per data di copertina — ideale per i crossover che attraversano più serie."
+  },
+  "history": {
+    "title": "Cronologia",
+    "s1h": "Che cos'è",
+    "s1p": "Un registro degli albi importati nella biblioteca — cosa è arrivato, quando e da quale fonte. Filtra per fonte in alto."
+  },
+  "stats": {
+    "title": "Statistiche",
+    "s1h": "Che cos'è",
+    "s1p": "Un'istantanea della collezione — totali per editore, completezza, numero e dimensione dei file."
+  },
+  "users": {
+    "title": "Utenti e ruoli",
+    "s1h": "Account",
+    "s1p": "Crea account, assegna ruoli, disabilitali o eliminali. Attiva o disattiva l'auto-registrazione (i nuovi iscritti partono come visualizzatori). Deve sempre restare almeno un amministratore.",
+    "s2h": "Ruoli e permessi",
+    "s2p": "I ruoli integrati (Visualizzatore, Fidato, Amministratore) concedono permessi crescenti. Crea un ruolo personalizzato e spunta esattamente i permessi che deve avere — inclusi quelli registrati dai plugin (lettura, OPDS, richieste, ecc.)."
+  },
+  "plugins": {
+    "title": "Plugin",
+    "s1h": "Che cos'è",
+    "s1p": "Tutto ciò che è installato nella cartella dei plugin, con ciò che ognuno ha registrato (route, fonti, attività, interfaccia). Abilita o disabilita ciascuno; le modifiche si applicano dopo un riavvio.",
+    "s2h": "Riavvio",
+    "s2p": "Il pulsante “Riavvia ora” riavvia l'app in modo che le modifiche ai plugin abbiano effetto."
+  },
+  "jobs": {
+    "title": "Attività",
+    "s1h": "Che cos'è",
+    "s1p": "Attività in background (controllo uscite, abbinamento metadati, scansioni, recuperi) e le loro pianificazioni. Modifica la pianificazione cron di un'attività, attivala o disattivala, oppure eseguila ora."
+  },
+  "tools": {
+    "title": "Strumenti",
+    "s1h": "Che cos'è",
+    "s1p": "Manutenzione una tantum della biblioteca: scansiona tutto, tagga i file senza tag, converti CBR→CBZ, rimuovi i duplicati e verifica gli archivi alla ricerca di corruzioni."
+  },
+  "logs": {
+    "title": "Registri",
+    "s1h": "Che cos'è",
+    "s1p": "I messaggi recenti dell'applicazione — utili quando un download o un tag fallisce. Filtra per livello e categoria, oppure svuota il buffer."
+  },
+  "settings": {
+    "title": "Impostazioni",
+    "s1h": "Che cos'è",
+    "s1p": "Configurazione dell'app: cartelle radice della biblioteca, formato e comportamento dei download, fonti di metadati, indexer/client di download, notifiche e impostazioni dei plugin.",
+    "s2h": "Scarica all'aggiunta",
+    "s2p": "Sotto Download, “Scarica all'aggiunta” decide se aggiungere una serie mette subito in coda i suoi albi (attivo per impostazione predefinita)."
+  },
+  "import": {
+    "title": "Importa",
+    "s1h": "Che cos'è",
+    "s1p": "Porta in BackIssue una biblioteca di fumetti già presente su disco: scansiona le cartelle, controlla i candidati abbinati e conferma per archiviarli sotto la serie corrispondente."
+  }
+}

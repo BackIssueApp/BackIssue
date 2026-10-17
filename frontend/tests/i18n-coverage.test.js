@@ -44,6 +44,34 @@ describe('UI text comes from the catalog', () => {
       }
     }
   });
+  test('every translation keeps the English placeholders and inline tags', () => {
+    const dir = path.join(SRC, 'locales');
+    const flat = (node, p = '', out = {}) => {
+      for (const [k, v] of Object.entries(node)) {
+        if (typeof v === 'string' || (v && ('other' in v || 'one' in v))) out[p + k] = v;
+        else flat(v, p + k + '.', out);
+      }
+      return out;
+    };
+    const ph = (s) => (String(s).match(/\{\w+\}/g) || []).sort().join(',');
+    const tags = (s) => (String(s).match(/<\/?(b|i|em|strong|code|br|kbd)>/g) || []).length;
+    const sample = (v) => (typeof v === 'string' ? v : (v.other ?? v.one));
+    const bad = [];
+    for (const lang of fs.readdirSync(dir)) {
+      if (lang === 'en') continue;
+      for (const f of fs.readdirSync(path.join(dir, lang))) {
+        const en = flat(JSON.parse(fs.readFileSync(path.join(dir, 'en', f), 'utf8')));
+        const tr = flat(JSON.parse(fs.readFileSync(path.join(dir, lang, f), 'utf8')));
+        for (const [k, v] of Object.entries(tr)) {
+          if (!(k in en)) continue;
+          const e = sample(en[k]), t = sample(v);
+          if (ph(e) !== ph(t) || tags(e) !== tags(t)) bad.push(`${lang}/${f} ${k}`);
+          if (typeof v === 'object') for (const form of Object.values(v)) if (ph(form) !== ph(e)) bad.push(`${lang}/${f} ${k} (plural form)`);
+        }
+      }
+    }
+    expect(bad, 'These translations lost or changed a {placeholder} or an inline tag').toEqual([]);
+  });
   test('every other language only has keys English has', () => {
     const dir = path.join(SRC, 'locales');
     const flat = (node, p = '', out = {}) => {

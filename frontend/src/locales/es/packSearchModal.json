@@ -1,0 +1,14 @@
+{
+  "title": "Buscar packs · {series}",
+  "dialogLabel": "Buscar packs",
+  "searching": "Buscando packs en las fuentes activadas…",
+  "noSources": "No hay fuentes activadas que admitan packs.",
+  "noneFound": "No se encontraron packs en tus fuentes. Prueba con una búsqueda más amplia (solo el nombre de la serie).",
+  "intro": "Packs de varios números (series completas, tomos recopilatorios, rangos de números) en todas las fuentes activadas. Descarga uno — se importan de él todos los números que <b>faltan</b> en esta serie; los que ya tienes se omiten. Los torrents y usenet se descargan con tu cliente; el resto de fuentes, dentro de la aplicación.",
+  "queryPlaceholder": "Nombre de la serie…",
+  "queued": "Pack en cola mediante {source} — los números que faltan en esta serie se importan automáticamente (vigila la cola / Tareas).",
+  "failed": "La descarga falló: {error}",
+  "unknownError": "error desconocido",
+  "sending": "Enviando…",
+  "download": "Descargar"
+}

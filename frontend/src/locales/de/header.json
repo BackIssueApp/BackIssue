@@ -1,0 +1,11 @@
+{
+  "openNav": "Navigation öffnen",
+  "searchPlaceholder": "Sammlung durchsuchen…",
+  "reconnecting": "verbindet neu…",
+  "reconnectingTitle": "Live-Verbindung zum Server verloren – wird neu aufgebaut. Daten können veraltet sein.",
+  "helpForPage": "Hilfe zu dieser Seite",
+  "pillSaved": "gespeichert",
+  "pillQueued": "wartend",
+  "pillFailed": "fehlgeschlagen",
+  "pillDownloading": "lädt"
+}

@@ -1,0 +1,21 @@
+{
+  "title": "Associer les métadonnées de la série",
+  "lookingUp": "Recherche de la série…",
+  "searching": "Recherche dans la source de métadonnées…",
+  "noVolumeWithId": "Aucune série avec cet identifiant.",
+  "searchFailed": "La recherche a échoué.",
+  "noVolumes": "Aucune série trouvée.",
+  "linkFailed": "Échec de l'association",
+  "linkFailedWith": "Échec de l'association : {error}",
+  "matchedTo": "Associée à {name}.",
+  "matchedToYear": "Associée à {name} ({year}).",
+  "unknownPublisher": "Éditeur inconnu",
+  "idBadge": "ID {id}",
+  "equalsFiles": "= vos {count} fichiers",
+  "nearFiles": "≈ vos {count} fichiers",
+  "sourceLink": "Page source",
+  "linking": "Association…",
+  "use": "Utiliser",
+  "filesNote": { "one": "Vous avez {count} fichier sur le disque — les séries dont le nombre de numéros est le plus proche sont listées en premier.", "other": "Vous avez {count} fichiers sur le disque — les séries dont le nombre de numéros est le plus proche sont listées en premier." },
+  "searchPlaceholder": "Rechercher par nom — ou coller l'URL / l'identifiant de la série…"
+}

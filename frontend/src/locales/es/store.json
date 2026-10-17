@@ -1,0 +1,8 @@
+{
+  "requestFailed": "la solicitud falló",
+  "noResponse": "sin respuesta",
+  "downloadFailed": "No se pudo poner la descarga en cola: {error}",
+  "downloadFailedUnreachable": "No se pudo poner la descarga en cola — ¿está accesible la aplicación?",
+  "redownloadFailed": "La nueva descarga falló: {error}",
+  "redownloadFailedUnreachable": "La nueva descarga falló — ¿está accesible la aplicación?"
+}

@@ -1,0 +1,22 @@
+{
+  "title": "Historique",
+  "nFailures": { "one": "{count} échec", "other": "{count} échecs" },
+  "nBlocked": { "one": "{count} parution bloquée", "other": "{count} parutions bloquées" },
+  "nImports": { "one": "{count} import", "other": "{count} imports" },
+  "statFailures": "Échecs",
+  "statBlocked": "Bloquées",
+  "statImports": "Imports",
+  "emptyFailedTitle": "Aucun téléchargement en échec",
+  "emptyFailedBody": "Les téléchargements qui échouent sont consignés ici — l'enregistrement reste même après vidage de la file d'attente.",
+  "emptyBlockedTitle": "Rien de bloqué",
+  "emptyBlockedBody": "Les parutions usenet en échec arrivent ici pour que les prochaines recherches les ignorent. Retirez-en une pour la rendre à nouveau éligible.",
+  "emptyImportsTitle": "Rien d'importé pour l'instant",
+  "emptyImportsBody": "Cette liste se remplit à mesure que les téléchargements aboutissent. Les imports gérés par le moniteur en arrière-plan sont suivis ici.",
+  "filterPlaceholder": "Filtrer…",
+  "clearAll": "Tout effacer",
+  "chipAll": "Tout",
+  "chipFailed": "Échecs",
+  "chipBlocklist": "Liste de blocage",
+  "removeFromBlocklist": "Retirer de la liste de blocage — autoriser à nouveau la récupération automatique",
+  "loadMore": "Charger plus"
+}

@@ -1,0 +1,113 @@
+{
+  "title": "Aide · {page}",
+  "footer": "Astuce : appuyez sur <kbd>Échap</kbd> pour fermer. Les boutons que vous ne voyez pas peuvent nécessiter une permission supérieure.",
+  "whatThisIs": "De quoi s'agit-il",
+  "fallback": {
+    "title": "BackIssue",
+    "s1h": "Cette page",
+    "s1p": "Pas encore d'aide spécifique à cette page — choisissez une section dans le menu de gauche."
+  },
+  "series": {
+    "title": "Série",
+    "s1h": "De quoi s'agit-il",
+    "s1p": "Chaque numéro que la source de métadonnées liste pour cette série. Les numéros possédés affichent une couverture et une coche verte ; les manquants sont à télécharger.",
+    "s2h": "Lire et télécharger",
+    "s2p": "Utilisez le bouton de téléchargement d'une ligne (ou sélectionnez-en plusieurs puis « Télécharger la sélection ») pour télécharger les numéros manquants. Les numéros possédés affichent les actions du lecteur (lire, marquer comme lu) si l'extension de lecture est activée.",
+    "s3h": "Liste ou grille",
+    "s3p": "Basculez entre grille et liste en haut. La vue liste ajoute la date de couverture, le nombre de pages, la taille et le format du fichier pour chaque numéro ; la grille affiche les couvertures.",
+    "s4h": "Gestion",
+    "s4p": "Avec les droits de gestion de bibliothèque, vous pouvez actualiser les métadonnées, corriger la correspondance, analyser le dossier, étiqueter les fichiers, définir l'emplacement, ajouter des noms de recherche alternatifs ou retirer la série. « Ajouter à une liste » place la sélection (ou toute la série) dans une liste de lecture."
+  },
+  "library": {
+    "title": "Bibliothèque",
+    "s1h": "De quoi s'agit-il",
+    "s1p": "Chaque série que vous suivez. Chacune indique combien de numéros vous possédez par rapport au nombre existant, avec une barre de progression.",
+    "s2h": "Trouver des choses",
+    "s2p": "La zone de recherche en haut filtre votre collection. Les puces de filtre limitent aux séries incomplètes, non suivies, à problèmes ou non associées (pas encore de correspondance de métadonnées) ; le menu de tri classe par A–Z, ajouts récents ou plus de manquants.",
+    "s3h": "Vues",
+    "s3p": "La grille est un mur d'affiches ; la liste est un tableau dense montrant l'éditeur, l'année, l'activité de téléchargement, la date du dernier numéro et la taille sur le disque.",
+    "s4h": "Ajout et actions groupées",
+    "s4p": "« + Ajouter » recherche dans la source de métadonnées et ajoute une série (qui, par défaut, met immédiatement ses numéros en file de téléchargement). « Sélectionner » active le suivi/non-suivi, le téléchargement des manquants et la suppression en masse."
+  },
+  "wanted": {
+    "title": "Manquants",
+    "s1h": "De quoi s'agit-il",
+    "s1p": "Chaque numéro manquant de toute votre collection, groupé par série — votre liste de choses à télécharger.",
+    "s2h": "Utilisation",
+    "s2p": "Téléchargez un numéro individuel, ou « Télécharger les éléments affichés » pour mettre en file tout ce qui correspond aux filtres actuels (limité par passage). Filtrez sur les séries suivies ou masquez les numéros non parus."
+  },
+  "queue": {
+    "title": "File de téléchargement",
+    "s1h": "De quoi s'agit-il",
+    "s1p": "Ce qui se télécharge maintenant et ce qui attend. L'élément actif affiche une barre de progression avec la vitesse et la source.",
+    "s2h": "Commandes",
+    "s2p": "Mettez la file en pause ou reprenez-la, retirez les éléments en attente, ou réessayez/retirez ceux en échec (droits de gestion de bibliothèque). Le × d'une ligne annule ce téléchargement et le retire du client.",
+    "s3h": "Après un redémarrage",
+    "s3p": "Une file interrompue en plein téléchargement reprend automatiquement au démarrage de l'application."
+  },
+  "releases": {
+    "title": "Sorties",
+    "s1h": "De quoi s'agit-il",
+    "s1p": "Les nouveaux comics qui sortent cette semaine (parcourez les autres semaines avec les flèches). Les numéros des séries que vous suivez sont signalés et peuvent être ajoutés ou téléchargés directement ici."
+  },
+  "lists": {
+    "title": "Listes de lecture",
+    "s1h": "De quoi s'agit-il",
+    "s1p": "Des listes personnelles et ordonnées de numéros — construites à la main ou importées depuis un arc narratif. Les listes sont privées à votre compte.",
+    "s2h": "Construire une liste",
+    "s2p": "Créez-en une, puis ajoutez des numéros depuis n'importe quelle page de série (« Ajouter à une liste »). Réordonnez avec les flèches haut/bas. Les éléments que vous ne possédez pas affichent un bouton de téléchargement, ou « + Ajouter la série » si toute la série n'est pas encore dans votre bibliothèque.",
+    "s3h": "Arcs narratifs",
+    "s3p": "« Importer un arc narratif » recherche dans la source de métadonnées et récupère les numéros d'un arc dans l'ordre de lecture par date de couverture — idéal pour les crossovers qui traversent plusieurs séries."
+  },
+  "history": {
+    "title": "Historique",
+    "s1h": "De quoi s'agit-il",
+    "s1p": "Un journal des numéros importés dans votre bibliothèque — ce qui est arrivé, quand, et depuis quelle source. Filtrez par source en haut."
+  },
+  "stats": {
+    "title": "Statistiques",
+    "s1h": "De quoi s'agit-il",
+    "s1p": "Un instantané de votre collection — totaux par éditeur, complétude, nombre et taille des fichiers."
+  },
+  "users": {
+    "title": "Utilisateurs et rôles",
+    "s1h": "Comptes",
+    "s1p": "Créez des comptes, attribuez des rôles, désactivez-les ou supprimez-les. Activez ou non l'auto-inscription (les nouveaux inscrits commencent comme lecteurs). Au moins un administrateur doit toujours rester.",
+    "s2h": "Rôles et permissions",
+    "s2p": "Les rôles intégrés (Lecteur, Confiance, Admin) accordent des permissions croissantes. Créez un rôle personnalisé et cochez exactement les permissions qu'il doit détenir — y compris celles enregistrées par les extensions (lecture, OPDS, demandes, etc.)."
+  },
+  "plugins": {
+    "title": "Extensions",
+    "s1h": "De quoi s'agit-il",
+    "s1p": "Tout ce qui est installé dans le dossier des extensions, avec ce que chacune a enregistré (routes, sources, tâches, interface). Activez ou désactivez chacune ; les changements s'appliquent après un redémarrage.",
+    "s2h": "Redémarrage",
+    "s2p": "Le bouton « Redémarrer maintenant » redémarre l'application pour appliquer les changements d'extensions."
+  },
+  "jobs": {
+    "title": "Tâches",
+    "s1h": "De quoi s'agit-il",
+    "s1p": "Les tâches en arrière-plan (vérification des sorties, association de métadonnées, exploration, rattrapages) et leurs planifications. Modifiez la planification cron d'une tâche, activez-la ou lancez-la maintenant."
+  },
+  "tools": {
+    "title": "Outils",
+    "s1h": "De quoi s'agit-il",
+    "s1p": "Maintenance ponctuelle de la bibliothèque : tout analyser, étiqueter les fichiers sans tags, convertir CBR→CBZ, supprimer les doublons et vérifier les archives corrompues."
+  },
+  "logs": {
+    "title": "Journaux",
+    "s1h": "De quoi s'agit-il",
+    "s1p": "Les messages récents de l'application — utiles quand un téléchargement ou un étiquetage échoue. Filtrez par niveau et catégorie, ou videz le tampon."
+  },
+  "settings": {
+    "title": "Paramètres",
+    "s1h": "De quoi s'agit-il",
+    "s1p": "La configuration de l'application : dossiers racines des bibliothèques, format et comportement des téléchargements, sources de métadonnées, indexeurs et clients de téléchargement, notifications et paramètres des extensions.",
+    "s2h": "Télécharger à l'ajout",
+    "s2p": "Sous Téléchargement, « Télécharger à l'ajout » détermine si l'ajout d'une série met immédiatement ses numéros en file d'attente (activé par défaut)."
+  },
+  "import": {
+    "title": "Import",
+    "s1h": "De quoi s'agit-il",
+    "s1p": "Intégrez une bibliothèque de comics existante sur le disque dans BackIssue : analysez vos dossiers, vérifiez les candidats associés et confirmez pour les classer sous la série correspondante."
+  }
+}

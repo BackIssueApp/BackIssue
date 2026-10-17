@@ -1,0 +1,14 @@
+{
+  "title": "Pakete suchen · {series}",
+  "dialogLabel": "Pakete suchen",
+  "searching": "Aktivierte Quellen werden nach Paketen durchsucht…",
+  "noSources": "Keine paketfähigen Quellen aktiviert.",
+  "noneFound": "In deinen Quellen wurden keine Pakete gefunden. Versuch eine weiter gefasste Suche (nur der Name der Reihe).",
+  "intro": "Pakete mit mehreren Heften (ganze Reihen, Sammelbände, Heftbereiche) aus allen aktivierten Quellen. Lade eines herunter – jedes Heft, das dieser Reihe <b>fehlt</b>, wird daraus importiert; vorhandene Hefte werden übersprungen. Torrents/Usenet laden über deinen Client, andere Quellen direkt in der App.",
+  "queryPlaceholder": "Name der Reihe…",
+  "queued": "Paket über {source} eingereiht – die fehlenden Hefte dieser Reihe werden automatisch importiert (siehe Warteschlange/Jobs).",
+  "failed": "Download fehlgeschlagen: {error}",
+  "unknownError": "unbekannter Fehler",
+  "sending": "Wird gesendet…",
+  "download": "Herunterladen"
+}

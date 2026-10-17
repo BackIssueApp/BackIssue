@@ -1,0 +1,17 @@
+{
+  "fallbackSeries": "Heft",
+  "title": "Quellen durchsuchen",
+  "searchFailed": "Suche fehlgeschlagen – läuft die App?",
+  "noSources": "Keine Downloadquellen aktiviert (Einstellungen → Downloadquellen).",
+  "noneFound": "In deinen Quellen wurden keine Releases gefunden. Versuch eine weiter gefasste Suche oder gib der Reihe einen alternativen Namen.",
+  "queryPlaceholder": "Reihe und Heft oder beliebige Suche…",
+  "searched": "Durchsucht",
+  "searching": "Aktivierte Quellen werden durchsucht…",
+  "pack": "Paket",
+  "packQueued": "Paket über {source} eingereiht – die fehlenden Hefte werden automatisch importiert (siehe Warteschlange).",
+  "queued": "Download über {source} eingereiht – siehe Warteschlange.",
+  "failed": "Download fehlgeschlagen: {error}",
+  "unknownError": "unbekannter Fehler",
+  "sending": "Wird gesendet…",
+  "download": "Herunterladen"
+}

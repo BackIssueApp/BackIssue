@@ -1,0 +1,22 @@
+{
+  "title": "Verlauf",
+  "nFailures": { "one": "{count} Fehlschlag", "other": "{count} Fehlschläge" },
+  "nBlocked": { "one": "{count} gesperrtes Release", "other": "{count} gesperrte Releases" },
+  "nImports": { "one": "{count} Import", "other": "{count} Importe" },
+  "statFailures": "Fehlschläge",
+  "statBlocked": "Gesperrt",
+  "statImports": "Importe",
+  "emptyFailedTitle": "Keine fehlgeschlagenen Downloads",
+  "emptyFailedBody": "Downloads, die mit Fehler enden, werden hier festgehalten – der Eintrag bleibt auch, wenn die Warteschlange geleert wird.",
+  "emptyBlockedTitle": "Nichts gesperrt",
+  "emptyBlockedBody": "Fehlgeschlagene Usenet-Releases landen hier, damit künftige Suchen sie überspringen. Entferne eines, um es wieder zuzulassen.",
+  "emptyImportsTitle": "Noch nichts importiert",
+  "emptyImportsBody": "Füllt sich, sobald Downloads eintreffen. Importe des Hintergrundmonitors werden hier erfasst.",
+  "filterPlaceholder": "Filtern…",
+  "clearAll": "Alle löschen",
+  "chipAll": "Alle",
+  "chipFailed": "Fehlgeschlagen",
+  "chipBlocklist": "Sperrliste",
+  "removeFromBlocklist": "Von der Sperrliste entfernen – automatisches Holen wieder erlauben",
+  "loadMore": "Mehr laden"
+}

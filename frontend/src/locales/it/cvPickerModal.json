@@ -1,0 +1,21 @@
+{
+  "title": "Abbina i metadati della serie",
+  "lookingUp": "Ricerca della serie…",
+  "searching": "Ricerca nella fonte di metadati…",
+  "noVolumeWithId": "Nessuna serie con quell'id.",
+  "searchFailed": "Ricerca fallita.",
+  "noVolumes": "Nessuna serie trovata.",
+  "linkFailed": "Collegamento fallito",
+  "linkFailedWith": "Collegamento fallito: {error}",
+  "matchedTo": "Abbinata a {name}.",
+  "matchedToYear": "Abbinata a {name} ({year}).",
+  "unknownPublisher": "Editore sconosciuto",
+  "idBadge": "ID {id}",
+  "equalsFiles": "= i tuoi {count} file",
+  "nearFiles": "≈ i tuoi {count} file",
+  "sourceLink": "Pagina della fonte",
+  "linking": "Collegamento…",
+  "use": "Usa",
+  "filesNote": { "one": "Hai {count} file su disco — le serie con il numero di albi più vicino sono elencate per prime.", "other": "Hai {count} file su disco — le serie con il numero di albi più vicino sono elencate per prime." },
+  "searchPlaceholder": "Cerca per nome — o incolla l'URL / l'id della serie…"
+}

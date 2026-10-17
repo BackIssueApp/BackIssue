@@ -1,0 +1,21 @@
+{
+  "pageSettings": "Einstellungen",
+  "pageSystem": "System",
+  "pageWanted": "Gesucht",
+  "pageQueue": "Warteschlange",
+  "pageReleases": "Neuerscheinungen",
+  "pageHistory": "Verlauf",
+  "pageLists": "Leselisten",
+  "pageImport": "Import",
+  "pageStats": "Statistik",
+  "pagePlugins": "Plugins",
+  "pageUsers": "Benutzer",
+  "pageProfile": "Profil",
+  "pageSeries": "Reihe",
+  "pageCollections": "Sammlungen",
+  "notFoundTitle": "Seite nicht gefunden",
+  "notFoundText": "Unter dieser Adresse gibt es nichts. Sie wurde vielleicht verschoben, oder der Link ist falsch.",
+  "noAccessTitle": "Du hast keinen Zugriff auf diese Seite",
+  "noAccessText": "Dein Konto darf sie nicht öffnen. Frag einen Admin, wenn du meinst, dass es das sollte.",
+  "goHome": "Zur Startseite"
+}

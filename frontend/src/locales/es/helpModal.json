@@ -1,0 +1,113 @@
+{
+  "title": "Ayuda · {page}",
+  "footer": "Consejo: pulsa <kbd>Esc</kbd> para cerrar. Los botones que no ves pueden requerir un permiso superior.",
+  "whatThisIs": "Qué es esto",
+  "fallback": {
+    "title": "BackIssue",
+    "s1h": "Esta página",
+    "s1p": "Todavía no hay ayuda específica para esta página — elige una sección en el menú de la izquierda."
+  },
+  "series": {
+    "title": "Serie",
+    "s1h": "Qué es esto",
+    "s1p": "Todos los números que la fuente de metadatos lista para esta serie. Los números que tienes muestran portada y una marca verde; los que faltan puedes descargarlos.",
+    "s2h": "Leer y descargar",
+    "s2p": "Usa el botón de descarga de una fila (o selecciona varias y “Descargar seleccionados”) para descargar los números que faltan. Los números que tienes muestran acciones del lector (leer, marcar como leído) si el plugin del lector está activado.",
+    "s3h": "Lista o cuadrícula",
+    "s3p": "Alterna entre cuadrícula y lista en la parte superior. La vista de lista añade fecha de portada, páginas, tamaño de archivo y formato por número; la cuadrícula muestra las portadas.",
+    "s4h": "Gestión",
+    "s4p": "Con permisos de gestión de biblioteca puedes actualizar los metadatos, corregir la coincidencia, escanear la carpeta, etiquetar archivos, fijar la ubicación, añadir nombres alternativos de búsqueda o quitar la serie. “Añadir a lista” pone la selección (o la serie entera) en una lista de lectura."
+  },
+  "library": {
+    "title": "Biblioteca",
+    "s1h": "Qué es esto",
+    "s1p": "Todas las series que sigues. Cada una muestra cuántos números tienes frente a cuántos existen, con una barra de progreso.",
+    "s2h": "Encontrar cosas",
+    "s2p": "El cuadro de búsqueda superior filtra tu colección. Los chips de filtro acotan a Incompletas, No seguidas, Problemas o Sin emparejar (todavía sin coincidencia de metadatos); el menú de orden las ordena de A–Z, por añadidas recientemente o por más números faltantes.",
+    "s3h": "Vistas",
+    "s3p": "La cuadrícula es un muro de pósteres; la lista es una tabla densa con editorial, año, actividad de descarga, fecha del último número y tamaño en disco.",
+    "s4h": "Añadir y acciones en lote",
+    "s4p": "“+ Añadir” busca en la fuente de metadatos y añade una serie (que, por defecto, pone sus números en cola de descarga de inmediato). “Seleccionar” habilita seguir/dejar de seguir, descargar faltantes y quitar en lote."
+  },
+  "wanted": {
+    "title": "Pendientes",
+    "s1h": "Qué es esto",
+    "s1p": "Todos los números que faltan en toda tu colección, agrupados por serie — tu lista de cosas por descargar.",
+    "s2h": "Cómo usarlo",
+    "s2p": "Descarga un número concreto o usa “Descargar mostrados” para poner en cola todo lo que coincide con los filtros actuales (con un límite por pasada). Filtra solo las seguidas u oculta los números aún no publicados."
+  },
+  "queue": {
+    "title": "Cola de descargas",
+    "s1h": "Qué es esto",
+    "s1p": "Lo que se está descargando ahora y lo que espera. El elemento activo muestra una barra de progreso con velocidad y fuente.",
+    "s2h": "Controles",
+    "s2p": "Pausa o reanuda la cola, vacía los elementos en cola, o reintenta o descarta los fallidos (permisos de gestión de biblioteca). La × de una fila cancela esa descarga y la elimina del cliente.",
+    "s3h": "Tras un reinicio",
+    "s3p": "Una cola que estaba a medio descargar se reanuda automáticamente cuando la aplicación arranca."
+  },
+  "releases": {
+    "title": "Novedades",
+    "s1h": "Qué es esto",
+    "s1p": "Los cómics nuevos que salen esta semana (recorre otras semanas con las flechas). Los números de las series que sigues aparecen marcados y se pueden añadir o descargar desde aquí."
+  },
+  "lists": {
+    "title": "Listas de lectura",
+    "s1h": "Qué es esto",
+    "s1p": "Listas personales y ordenadas de números — creadas a mano o importadas desde un arco argumental. Las listas son privadas de tu cuenta.",
+    "s2h": "Crear una lista",
+    "s2p": "Crea una y luego añade números desde cualquier página de serie (“Añadir a lista”). Reordena con los controles arriba/abajo. Los elementos que no tienes muestran un botón de descarga, o “+ Añadir serie” si la serie entera aún no está en tu biblioteca.",
+    "s3h": "Arcos argumentales",
+    "s3p": "“Importar arco argumental” busca en la fuente de metadatos y trae los números de un arco en orden de lectura por fecha de portada — ideal para crossovers que abarcan varias series."
+  },
+  "history": {
+    "title": "Historial",
+    "s1h": "Qué es esto",
+    "s1p": "Un registro de los números importados a tu biblioteca — qué llegó, cuándo y desde qué fuente. Filtra por fuente en la parte superior."
+  },
+  "stats": {
+    "title": "Estadísticas",
+    "s1h": "Qué es esto",
+    "s1p": "Una instantánea de tu colección — totales por editorial, completitud, cantidad y tamaño de archivos."
+  },
+  "users": {
+    "title": "Usuarios y roles",
+    "s1h": "Cuentas",
+    "s1p": "Crea cuentas, asigna roles, desactívalas o elimínalas. Activa o desactiva el autorregistro (las cuentas nuevas empiezan como espectadores). Siempre debe quedar al menos un administrador.",
+    "s2h": "Roles y permisos",
+    "s2p": "Los roles integrados (Espectador, De confianza, Administrador) otorgan permisos crecientes. Crea un rol personalizado y marca exactamente los permisos que debe tener — incluidos los que registran los plugins (lectura, OPDS, solicitudes, etc.)."
+  },
+  "plugins": {
+    "title": "Plugins",
+    "s1h": "Qué es esto",
+    "s1p": "Todo lo instalado en la carpeta de plugins, con lo que cada uno registró (rutas, fuentes, tareas, interfaz). Activa o desactiva cada uno; los cambios se aplican tras un reinicio.",
+    "s2h": "Reiniciar",
+    "s2p": "El botón “Reiniciar ahora” reinicia la aplicación para que los cambios de plugins surtan efecto."
+  },
+  "jobs": {
+    "title": "Tareas",
+    "s1h": "Qué es esto",
+    "s1p": "Tareas en segundo plano (comprobación de novedades, emparejado de metadatos, rastreos, rellenos) y sus programaciones. Edita la programación cron de una tarea, actívala o desactívala, o ejecútala ahora."
+  },
+  "tools": {
+    "title": "Herramientas",
+    "s1h": "Qué es esto",
+    "s1p": "Mantenimiento puntual de la biblioteca: escanear todo, etiquetar archivos sin etiquetas, convertir CBR→CBZ, eliminar duplicados y verificar archivos dañados."
+  },
+  "logs": {
+    "title": "Registros",
+    "s1h": "Qué es esto",
+    "s1p": "Mensajes recientes de la aplicación — útiles cuando falla una descarga o un etiquetado. Filtra por nivel y categoría, o vacía el búfer."
+  },
+  "settings": {
+    "title": "Ajustes",
+    "s1h": "Qué es esto",
+    "s1p": "Configuración de la aplicación: carpetas raíz de la biblioteca, formato y comportamiento de descarga, fuentes de metadatos, indexadores y clientes de descarga, notificaciones y ajustes de plugins.",
+    "s2h": "Descargar al añadir",
+    "s2p": "En Descargas, “Descargar al añadir” controla si añadir una serie pone sus números en cola de inmediato (activado por defecto)."
+  },
+  "import": {
+    "title": "Importar",
+    "s1h": "Qué es esto",
+    "s1p": "Incorpora a BackIssue una biblioteca de cómics que ya tienes en disco: escanea tus carpetas, revisa los candidatos emparejados y confirma para archivarlos bajo la serie correspondiente."
+  }
+}

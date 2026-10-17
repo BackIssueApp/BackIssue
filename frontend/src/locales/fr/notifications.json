@@ -1,0 +1,31 @@
+{
+  "releaseWeek": {
+    "title": "Nouvelles sorties cette semaine",
+    "body": { "one": "{count} numéro d'une série que vous suivez sort cette semaine.", "other": "{count} numéros de séries que vous suivez sortent cette semaine." },
+    "bodyNamed": { "one": "{count} numéro d'une série que vous suivez sort cette semaine : {named}.", "other": "{count} numéros de séries que vous suivez sortent cette semaine : {named}." },
+    "bodyNamedMore": { "one": "{count} numéro d'une série que vous suivez sort cette semaine : {named} et {more} de plus.", "other": "{count} numéros de séries que vous suivez sortent cette semaine : {named} et {more} de plus." }
+  },
+  "pickArrived": {
+    "title": "Un numéro que vous avez demandé est arrivé",
+    "body": "{series} #{number}",
+    "bodyNamed": "{series} #{number} — {name}"
+  },
+  "packDone": {
+    "title": "Pack importé",
+    "body": { "one": "{title} — {count} nouveau numéro", "other": "{title} — {count} nouveaux numéros" },
+    "bodyFailed": { "one": "{title} — {count} nouveau numéro, {failed} en échec", "other": "{title} — {count} nouveaux numéros, {failed} en échec" }
+  },
+  "packFailed": {
+    "title": "Échec du pack",
+    "body": "{title} — {error}"
+  },
+  "importDone": {
+    "title": "Téléchargé",
+    "body": "{title}",
+    "bodySource": "{title} · {source}"
+  },
+  "importFailed": {
+    "title": "Échec du téléchargement",
+    "body": "{title} — {error}"
+  }
+}

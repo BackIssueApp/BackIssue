@@ -1,0 +1,113 @@
+{
+  "title": "Ajuda · {page}",
+  "footer": "Dica: prima <kbd>Esc</kbd> para fechar. Os botões que não vê podem exigir uma permissão superior.",
+  "whatThisIs": "O que é isto",
+  "fallback": {
+    "title": "BackIssue",
+    "s1h": "Esta página",
+    "s1p": "Ainda não há ajuda específica para esta página — escolha uma secção no menu da esquerda."
+  },
+  "series": {
+    "title": "Série",
+    "s1h": "O que é isto",
+    "s1p": "Todas as edições que a fonte de metadados lista para esta série. As edições que possui mostram a capa e um visto verde; as que faltam estão à sua espera para descarregar.",
+    "s2h": "Ler e descarregar",
+    "s2p": "Use o botão de download numa linha (ou selecione várias e escolha “Descarregar selecionadas”) para descarregar as edições em falta. As edições que possui mostram as ações do leitor (ler, marcar como lida) se o plugin do leitor estiver ativo.",
+    "s3h": "Lista ou grelha",
+    "s3p": "Alterne entre grelha e lista no topo. A vista de lista acrescenta a data de capa, o número de páginas, o tamanho do ficheiro e o formato de cada edição; a grelha mostra as capas.",
+    "s4h": "Gerir",
+    "s4p": "Com permissões de gestão da biblioteca pode atualizar os metadados, corrigir a correspondência, analisar a pasta, etiquetar os ficheiros, definir a localização, acrescentar nomes alternativos de pesquisa ou remover a série. “Adicionar à lista” coloca a seleção (ou a série inteira) numa lista de leitura."
+  },
+  "library": {
+    "title": "Biblioteca",
+    "s1h": "O que é isto",
+    "s1p": "Todas as séries que segue. Cada uma mostra quantas edições possui em relação às que existem, com uma barra de progresso.",
+    "s2h": "Encontrar coisas",
+    "s2p": "A caixa de pesquisa no topo filtra a sua coleção. Os filtros restringem a Incompletas, Não seguidas, Problemas ou Sem correspondência (ainda sem correspondência de metadados); o menu de ordenação ordena por A–Z, adicionadas recentemente ou com mais em falta.",
+    "s3h": "Vistas",
+    "s3p": "A grelha é uma parede de capas; a lista é uma tabela densa com editora, ano, atividade de downloads, data da edição mais recente e tamanho em disco.",
+    "s4h": "Adicionar e ações em massa",
+    "s4p": "“+ Adicionar” pesquisa a fonte de metadados e adiciona uma série (que, por predefinição, põe logo as suas edições na fila de download). “Selecionar” permite seguir/deixar de seguir, descarregar em falta e remover em massa."
+  },
+  "wanted": {
+    "title": "Em falta",
+    "s1h": "O que é isto",
+    "s1p": "Todas as edições em falta em toda a sua coleção, agrupadas por série — a sua lista de coisas por descarregar.",
+    "s2h": "Como usar",
+    "s2p": "Descarregue uma edição individual ou use “Descarregar as mostradas” para pôr na fila tudo o que corresponde aos filtros atuais (com limite por passagem). Filtre apenas as seguidas ou oculte as edições ainda não publicadas."
+  },
+  "queue": {
+    "title": "Fila de downloads",
+    "s1h": "O que é isto",
+    "s1p": "O que está a ser descarregado agora e o que está à espera. O item ativo mostra uma barra de progresso com velocidade e fonte.",
+    "s2h": "Controlos",
+    "s2p": "Pause/retome a fila, limpe os itens em espera ou repita/limpe os falhados (permissões de gestão da biblioteca). O × numa linha cancela esse download e remove-o do cliente.",
+    "s3h": "Depois de um reinício",
+    "s3p": "Uma fila que estava a meio de um download retoma automaticamente quando a aplicação arranca."
+  },
+  "releases": {
+    "title": "Lançamentos",
+    "s1h": "O que é isto",
+    "s1p": "As novas bandas desenhadas que saem esta semana (navegue noutras semanas com as setas). As edições das séries que segue ficam assinaladas e podem ser adicionadas ou descarregadas aqui mesmo."
+  },
+  "lists": {
+    "title": "Listas de leitura",
+    "s1h": "O que é isto",
+    "s1p": "Listas pessoais e ordenadas de edições — construídas à mão ou importadas de um arco narrativo. As listas são privadas da sua conta.",
+    "s2h": "Construir uma lista",
+    "s2p": "Crie uma e depois adicione edições a partir de qualquer página de série (“Adicionar à lista”). Reordene com os controlos para cima/baixo. Os itens que não possui mostram um botão de download, ou “+ Adicionar série” se a série inteira ainda não estiver na sua biblioteca.",
+    "s3h": "Arcos narrativos",
+    "s3p": "“Importar arco narrativo” pesquisa a fonte de metadados e traz as edições de um arco pela ordem de leitura por data de capa — ótimo para crossovers que atravessam várias séries."
+  },
+  "history": {
+    "title": "Histórico",
+    "s1h": "O que é isto",
+    "s1p": "Um registo das edições importadas para a sua biblioteca — o que entrou, quando e de que fonte. Filtre por fonte no topo."
+  },
+  "stats": {
+    "title": "Estatísticas",
+    "s1h": "O que é isto",
+    "s1p": "Um retrato da sua coleção — totais por editora, completude, número e tamanho dos ficheiros."
+  },
+  "users": {
+    "title": "Utilizadores e funções",
+    "s1h": "Contas",
+    "s1p": "Crie contas, atribua funções, desative-as ou elimine-as. Ative ou desative o registo autónomo (as novas inscrições começam como visualizadores). Tem de existir sempre pelo menos um administrador.",
+    "s2h": "Funções e permissões",
+    "s2p": "As funções incorporadas (Visualizador, De confiança, Administrador) concedem permissões crescentes. Crie uma função personalizada e marque exatamente as permissões que deve ter — incluindo as permissões registadas por plugins (leitura, OPDS, pedidos, etc.)."
+  },
+  "plugins": {
+    "title": "Plugins",
+    "s1h": "O que é isto",
+    "s1p": "Tudo o que está instalado na pasta de plugins, com o que cada um registou (rotas, fontes, tarefas, interface). Ative ou desative cada um; as alterações aplicam-se após um reinício.",
+    "s2h": "Reiniciar",
+    "s2p": "O botão “Reiniciar agora” reinicia a aplicação para que as alterações aos plugins entrem em vigor."
+  },
+  "jobs": {
+    "title": "Tarefas",
+    "s1h": "O que é isto",
+    "s1p": "Tarefas em segundo plano (verificação de lançamentos, correspondência de metadados, rastreios, preenchimentos) e os seus agendamentos. Edite o agendamento cron de uma tarefa, ative-a ou desative-a, ou execute-a agora."
+  },
+  "tools": {
+    "title": "Ferramentas",
+    "s1h": "O que é isto",
+    "s1p": "Manutenção pontual da biblioteca: analisar tudo, etiquetar ficheiros sem etiquetas, converter CBR→CBZ, remover duplicados e verificar se os arquivos estão corrompidos."
+  },
+  "logs": {
+    "title": "Registos",
+    "s1h": "O que é isto",
+    "s1p": "Mensagens recentes da aplicação — úteis quando um download ou uma etiquetagem falha. Filtre por nível e categoria, ou limpe o buffer."
+  },
+  "settings": {
+    "title": "Definições",
+    "s1h": "O que é isto",
+    "s1p": "Configuração da aplicação: pastas raiz da biblioteca, formato e comportamento dos downloads, fontes de metadados, indexadores/clientes de download, notificações e definições de plugins.",
+    "s2h": "Descarregar ao adicionar",
+    "s2p": "Em Downloads, “Descarregar ao adicionar” controla se adicionar uma série põe logo as suas edições na fila (ativo por predefinição)."
+  },
+  "import": {
+    "title": "Importar",
+    "s1h": "O que é isto",
+    "s1p": "Traga para o BackIssue uma biblioteca de banda desenhada que já tem em disco: analise as pastas, reveja os candidatos encontrados e confirme para os arquivar na série correspondente."
+  }
+}

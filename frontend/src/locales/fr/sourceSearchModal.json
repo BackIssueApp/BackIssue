@@ -1,0 +1,17 @@
+{
+  "fallbackSeries": "Numéro",
+  "title": "Rechercher sur les sources",
+  "searchFailed": "La recherche a échoué — l'application est-elle lancée ?",
+  "noSources": "Aucune source de téléchargement n'est activée (Paramètres → Sources de téléchargement).",
+  "noneFound": "Aucune parution trouvée sur vos sources. Essayez une requête plus large, ou ajoutez un nom alternatif à la série.",
+  "queryPlaceholder": "Série et numéro, ou toute requête…",
+  "searched": "Recherche effectuée",
+  "searching": "Recherche sur les sources activées…",
+  "pack": "Pack",
+  "packQueued": "Pack mis en file d'attente via {source} — ses numéros manquants s'importent automatiquement (surveillez la file d'attente).",
+  "queued": "Téléchargement mis en file d'attente via {source} — surveillez la file d'attente.",
+  "failed": "Le téléchargement a échoué : {error}",
+  "unknownError": "erreur inconnue",
+  "sending": "Envoi…",
+  "download": "Télécharger"
+}

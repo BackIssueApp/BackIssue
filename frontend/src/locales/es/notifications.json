@@ -1,0 +1,31 @@
+{
+  "releaseWeek": {
+    "title": "Novedades de esta semana",
+    "body": { "one": "Esta semana sale {count} número de las series que sigues.", "other": "Esta semana salen {count} números de las series que sigues." },
+    "bodyNamed": { "one": "Esta semana sale {count} número de las series que sigues: {named}.", "other": "Esta semana salen {count} números de las series que sigues: {named}." },
+    "bodyNamedMore": { "one": "Esta semana sale {count} número de las series que sigues: {named} y {more} más.", "other": "Esta semana salen {count} números de las series que sigues: {named} y {more} más." }
+  },
+  "pickArrived": {
+    "title": "Ha llegado un número que pediste",
+    "body": "{series} #{number}",
+    "bodyNamed": "{series} #{number} — {name}"
+  },
+  "packDone": {
+    "title": "Pack importado",
+    "body": { "one": "{title} — {count} número nuevo", "other": "{title} — {count} números nuevos" },
+    "bodyFailed": { "one": "{title} — {count} número nuevo, {failed} fallidos", "other": "{title} — {count} números nuevos, {failed} fallidos" }
+  },
+  "packFailed": {
+    "title": "El pack falló",
+    "body": "{title} — {error}"
+  },
+  "importDone": {
+    "title": "Descargado",
+    "body": "{title}",
+    "bodySource": "{title} · {source}"
+  },
+  "importFailed": {
+    "title": "La descarga falló",
+    "body": "{title} — {error}"
+  }
+}

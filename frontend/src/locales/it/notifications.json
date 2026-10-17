@@ -1,0 +1,31 @@
+{
+  "releaseWeek": {
+    "title": "Nuove uscite questa settimana",
+    "body": { "one": "{count} albo delle serie che segui esce questa settimana.", "other": "{count} albi delle serie che segui escono questa settimana." },
+    "bodyNamed": { "one": "{count} albo delle serie che segui esce questa settimana: {named}.", "other": "{count} albi delle serie che segui escono questa settimana: {named}." },
+    "bodyNamedMore": { "one": "{count} albo delle serie che segui esce questa settimana: {named} e altri {more}.", "other": "{count} albi delle serie che segui escono questa settimana: {named} e altri {more}." }
+  },
+  "pickArrived": {
+    "title": "È arrivato un albo che avevi chiesto",
+    "body": "{series} #{number}",
+    "bodyNamed": "{series} #{number} — {name}"
+  },
+  "packDone": {
+    "title": "Pacchetto importato",
+    "body": { "one": "{title} — {count} nuovo albo", "other": "{title} — {count} nuovi albi" },
+    "bodyFailed": { "one": "{title} — {count} nuovo albo, {failed} falliti", "other": "{title} — {count} nuovi albi, {failed} falliti" }
+  },
+  "packFailed": {
+    "title": "Pacchetto fallito",
+    "body": "{title} — {error}"
+  },
+  "importDone": {
+    "title": "Scaricato",
+    "body": "{title}",
+    "bodySource": "{title} · {source}"
+  },
+  "importFailed": {
+    "title": "Download fallito",
+    "body": "{title} — {error}"
+  }
+}

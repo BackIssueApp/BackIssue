@@ -1,0 +1,17 @@
+{
+  "fallbackSeries": "Número",
+  "title": "Buscar en las fuentes",
+  "searchFailed": "La búsqueda falló — ¿está en marcha la aplicación?",
+  "noSources": "No hay fuentes de descarga activadas (Ajustes → Fuentes de descarga).",
+  "noneFound": "No se encontraron lanzamientos en tus fuentes. Prueba con una búsqueda más amplia o añade un nombre alternativo a la serie.",
+  "queryPlaceholder": "Serie y número, o cualquier búsqueda…",
+  "searched": "Buscado en",
+  "searching": "Buscando en las fuentes activadas…",
+  "pack": "Pack",
+  "packQueued": "Pack en cola mediante {source} — sus números que faltan se importan automáticamente (vigila la cola).",
+  "queued": "Descarga en cola mediante {source} — vigila la cola.",
+  "failed": "La descarga falló: {error}",
+  "unknownError": "error desconocido",
+  "sending": "Enviando…",
+  "download": "Descargar"
+}

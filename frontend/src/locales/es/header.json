@@ -1,0 +1,11 @@
+{
+  "openNav": "Abrir la navegación",
+  "searchPlaceholder": "Buscar en tu colección…",
+  "reconnecting": "reconectando…",
+  "reconnectingTitle": "Se perdió la conexión en directo con el servidor — reconectando. Los datos pueden estar desactualizados.",
+  "helpForPage": "Ayuda de esta página",
+  "pillSaved": "guardados",
+  "pillQueued": "en cola",
+  "pillFailed": "fallidos",
+  "pillDownloading": "descargando"
+}

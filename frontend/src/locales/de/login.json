@@ -1,0 +1,14 @@
+{
+  "intro": "Willkommen bei BackIssue. Lege zum Start dein Konto an – es wird zum <b>Admin</b>, und ab dann ist eine Anmeldung erforderlich.",
+  "signIn": "Anmelden",
+  "createAccount": "Konto erstellen",
+  "createAdmin": "Admin-Konto erstellen",
+  "username": "Benutzername",
+  "password": "Passwort",
+  "confirmPassword": "Passwort bestätigen",
+  "passwordsMismatch": "die Passwörter stimmen nicht überein",
+  "or": "oder",
+  "signInWith": "Mit {provider} anmelden",
+  "noMethod": "Keine Anmeldemethode verfügbar – ein Admin muss SSO einrichten oder die Passwort-Anmeldung wieder aktivieren.",
+  "registrationDisabled": "Die Registrierung ist deaktiviert – bitte einen Admin um ein Konto."
+}

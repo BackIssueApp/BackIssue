@@ -1,0 +1,11 @@
+{
+  "openNav": "Ouvrir la navigation",
+  "searchPlaceholder": "Rechercher dans votre collection…",
+  "reconnecting": "reconnexion…",
+  "reconnectingTitle": "Connexion en direct au serveur perdue — reconnexion en cours. Les données peuvent être obsolètes.",
+  "helpForPage": "Aide pour cette page",
+  "pillSaved": "enregistrés",
+  "pillQueued": "en attente",
+  "pillFailed": "échoués",
+  "pillDownloading": "en cours"
+}

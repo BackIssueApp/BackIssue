@@ -1,0 +1,8 @@
+{
+  "requestFailed": "Anfrage fehlgeschlagen",
+  "noResponse": "keine Antwort",
+  "downloadFailed": "Download konnte nicht eingereiht werden: {error}",
+  "downloadFailedUnreachable": "Download konnte nicht eingereiht werden – ist die App erreichbar?",
+  "redownloadFailed": "Erneuter Download fehlgeschlagen: {error}",
+  "redownloadFailedUnreachable": "Erneuter Download fehlgeschlagen – ist die App erreichbar?"
+}

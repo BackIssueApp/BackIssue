@@ -1,0 +1,14 @@
+{
+  "intro": "Bienvenue dans BackIssue. Créez votre compte pour commencer — il devient l'<b>administrateur</b>, et la connexion sera ensuite obligatoire.",
+  "signIn": "Se connecter",
+  "createAccount": "Créer un compte",
+  "createAdmin": "Créer le compte administrateur",
+  "username": "Nom d'utilisateur",
+  "password": "Mot de passe",
+  "confirmPassword": "Confirmer le mot de passe",
+  "passwordsMismatch": "les mots de passe ne correspondent pas",
+  "or": "ou",
+  "signInWith": "Se connecter avec {provider}",
+  "noMethod": "Aucune méthode de connexion n'est disponible — un administrateur doit configurer le SSO ou réactiver la connexion par mot de passe.",
+  "registrationDisabled": "Les inscriptions sont désactivées — demandez un compte à un administrateur."
+}

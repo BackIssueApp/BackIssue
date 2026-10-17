@@ -1,0 +1,10 @@
+{
+  "dialogLabel": "Account",
+  "title": "Account — {username}",
+  "currentPassword": "Password attuale",
+  "newPassword": "Nuova password (almeno 8 caratteri)",
+  "confirmNewPassword": "Conferma la nuova password",
+  "mismatch": "le nuove password non coincidono",
+  "changePassword": "Cambia password",
+  "changed": "Password cambiata."
+}

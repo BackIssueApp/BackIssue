@@ -1,0 +1,21 @@
+{
+  "pageSettings": "Ajustes",
+  "pageSystem": "Sistema",
+  "pageWanted": "Buscados",
+  "pageQueue": "Cola",
+  "pageReleases": "Novedades",
+  "pageHistory": "Historial",
+  "pageLists": "Listas de lectura",
+  "pageImport": "Importar",
+  "pageStats": "Estadísticas",
+  "pagePlugins": "Plugins",
+  "pageUsers": "Usuarios",
+  "pageProfile": "Perfil",
+  "pageSeries": "Serie",
+  "pageCollections": "Colecciones",
+  "notFoundTitle": "Página no encontrada",
+  "notFoundText": "No hay nada en esta dirección. Puede que se haya movido o que el enlace sea incorrecto.",
+  "noAccessTitle": "No tienes acceso a esta página",
+  "noAccessText": "Tu cuenta no puede abrirla. Pregunta a un administrador si crees que debería poder.",
+  "goHome": "Ir a Inicio"
+}

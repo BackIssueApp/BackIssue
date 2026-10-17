@@ -1,0 +1,31 @@
+{
+  "releaseWeek": {
+    "title": "Neuerscheinungen dieser Woche",
+    "body": { "one": "{count} Heft aus Reihen, denen du folgst, erscheint diese Woche.", "other": "{count} Hefte aus Reihen, denen du folgst, erscheinen diese Woche." },
+    "bodyNamed": { "one": "{count} Heft aus Reihen, denen du folgst, erscheint diese Woche: {named}.", "other": "{count} Hefte aus Reihen, denen du folgst, erscheinen diese Woche: {named}." },
+    "bodyNamedMore": { "one": "{count} Heft aus Reihen, denen du folgst, erscheint diese Woche: {named} und {more} weitere.", "other": "{count} Hefte aus Reihen, denen du folgst, erscheinen diese Woche: {named} und {more} weitere." }
+  },
+  "pickArrived": {
+    "title": "Ein gewünschtes Heft ist da",
+    "body": "{series} #{number}",
+    "bodyNamed": "{series} #{number} – {name}"
+  },
+  "packDone": {
+    "title": "Paket importiert",
+    "body": { "one": "{title} – {count} neues Heft", "other": "{title} – {count} neue Hefte" },
+    "bodyFailed": { "one": "{title} – {count} neues Heft, {failed} fehlgeschlagen", "other": "{title} – {count} neue Hefte, {failed} fehlgeschlagen" }
+  },
+  "packFailed": {
+    "title": "Paket fehlgeschlagen",
+    "body": "{title} – {error}"
+  },
+  "importDone": {
+    "title": "Heruntergeladen",
+    "body": "{title}",
+    "bodySource": "{title} · {source}"
+  },
+  "importFailed": {
+    "title": "Download fehlgeschlagen",
+    "body": "{title} – {error}"
+  }
+}

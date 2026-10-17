@@ -1,0 +1,8 @@
+{
+  "requestFailed": "richiesta fallita",
+  "noResponse": "nessuna risposta",
+  "downloadFailed": "Impossibile mettere in coda il download: {error}",
+  "downloadFailedUnreachable": "Impossibile mettere in coda il download — l'app è raggiungibile?",
+  "redownloadFailed": "Nuovo download fallito: {error}",
+  "redownloadFailedUnreachable": "Nuovo download fallito — l'app è raggiungibile?"
+}

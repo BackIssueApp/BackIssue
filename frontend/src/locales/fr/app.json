@@ -1,0 +1,21 @@
+{
+  "pageSettings": "Paramètres",
+  "pageSystem": "Système",
+  "pageWanted": "Manquants",
+  "pageQueue": "File d'attente",
+  "pageReleases": "Sorties",
+  "pageHistory": "Historique",
+  "pageLists": "Listes de lecture",
+  "pageImport": "Import",
+  "pageStats": "Statistiques",
+  "pagePlugins": "Extensions",
+  "pageUsers": "Utilisateurs",
+  "pageProfile": "Profil",
+  "pageSeries": "Série",
+  "pageCollections": "Collections",
+  "notFoundTitle": "Page introuvable",
+  "notFoundText": "Il n'y a rien à cette adresse. Elle a peut-être été déplacée, ou le lien est erroné.",
+  "noAccessTitle": "Vous n'avez pas accès à cette page",
+  "noAccessText": "Votre compte n'est pas autorisé à l'ouvrir. Demandez à un administrateur si vous pensez qu'il devrait l'être.",
+  "goHome": "Aller à l'accueil"
+}

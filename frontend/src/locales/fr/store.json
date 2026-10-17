@@ -1,0 +1,8 @@
+{
+  "requestFailed": "la requête a échoué",
+  "noResponse": "aucune réponse",
+  "downloadFailed": "Impossible de mettre le téléchargement en file d'attente : {error}",
+  "downloadFailedUnreachable": "Impossible de mettre le téléchargement en file d'attente — l'application est-elle joignable ?",
+  "redownloadFailed": "Le retéléchargement a échoué : {error}",
+  "redownloadFailedUnreachable": "Le retéléchargement a échoué — l'application est-elle joignable ?"
+}

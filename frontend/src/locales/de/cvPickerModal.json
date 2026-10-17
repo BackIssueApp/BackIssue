@@ -1,0 +1,21 @@
+{
+  "title": "Metadaten der Reihe zuordnen",
+  "lookingUp": "Reihe wird nachgeschlagen…",
+  "searching": "Metadatenquelle wird durchsucht…",
+  "noVolumeWithId": "Keine Reihe mit dieser ID.",
+  "searchFailed": "Suche fehlgeschlagen.",
+  "noVolumes": "Keine Reihe gefunden.",
+  "linkFailed": "Verknüpfung fehlgeschlagen",
+  "linkFailedWith": "Verknüpfung fehlgeschlagen: {error}",
+  "matchedTo": "Zugeordnet zu {name}.",
+  "matchedToYear": "Zugeordnet zu {name} ({year}).",
+  "unknownPublisher": "Unbekannter Verlag",
+  "idBadge": "ID {id}",
+  "equalsFiles": "= deine {count} Dateien",
+  "nearFiles": "≈ deine {count} Dateien",
+  "sourceLink": "Quellseite",
+  "linking": "Wird verknüpft…",
+  "use": "Verwenden",
+  "filesNote": { "one": "Du hast {count} Datei auf der Festplatte – Reihen mit der nächstliegenden Heftanzahl stehen oben.", "other": "Du hast {count} Dateien auf der Festplatte – Reihen mit der nächstliegenden Heftanzahl stehen oben." },
+  "searchPlaceholder": "Nach Namen suchen – oder URL / ID der Reihe einfügen…"
+}

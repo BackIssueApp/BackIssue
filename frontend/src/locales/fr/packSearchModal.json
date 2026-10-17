@@ -1,0 +1,14 @@
+{
+  "title": "Rechercher des packs · {series}",
+  "dialogLabel": "Rechercher des packs",
+  "searching": "Recherche de packs sur les sources activées…",
+  "noSources": "Aucune source gérant les packs n'est activée.",
+  "noneFound": "Aucun pack trouvé sur vos sources. Essayez une requête plus large (nom de la série seulement).",
+  "intro": "Packs de plusieurs numéros (séries complètes, TPB, plages de numéros) sur toutes les sources activées. Téléchargez-en un — chaque numéro <b>manquant</b> de cette série en est importé ; les numéros possédés sont ignorés. Les torrents et l'usenet passent par votre client ; les autres sources téléchargent dans l'application.",
+  "queryPlaceholder": "Nom de la série…",
+  "queued": "Pack mis en file d'attente via {source} — les numéros manquants de cette série s'importent automatiquement (surveillez la file d'attente / les tâches).",
+  "failed": "Le téléchargement a échoué : {error}",
+  "unknownError": "erreur inconnue",
+  "sending": "Envoi…",
+  "download": "Télécharger"
+}
