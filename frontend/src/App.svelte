@@ -1,12 +1,13 @@
 <script>
   import { untrack } from 'svelte';
   import { route, navigate, goBack, OVERLAY_PATHS, activeDrawer } from './lib/router.svelte.js';
-  import { rail, railSelect, detail, loadCollection, openVolume, clearDetail, loadFlags, startOpsTracking, librarySort } from './lib/store.svelte.js';
+  import { rail, railSelect, detail, loadCollection, openVolume, clearDetail, loadFlags, startOpsTracking, librarySort, PLACEHOLDER_TITLE } from './lib/store.svelte.js';
   import Icon from './lib/Icon.svelte';
   import { startStatusPolling } from './lib/status.svelte.js';
   import { startEvents } from './lib/events.svelte.js';
   import { loadClientPlugins } from './lib/plugins.svelte.js';
   import { closeTopModal } from './lib/modals.svelte.js';
+  import { t } from './lib/i18n.svelte.js';
 
   import Header from './components/Header.svelte';
   import Sidebar from './components/Sidebar.svelte';
@@ -84,17 +85,19 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
   const page = $derived(denied || unknown ? null : route.path);
 
   // Browser tab, history and Back button name the page, not just the app.
+  // Catalog keys, resolved inside the effect so the tab title follows the
+  // language.
   const PAGE_TITLES = {
-    '/settings': 'Settings', '/system': 'System', '/wanted': 'Wanted', '/queue': 'Queue', '/releases': 'Releases',
-    '/history': 'History', '/lists': 'Reading lists', '/import': 'Import', '/stats': 'Stats', '/plugins': 'Plugins',
-    '/users': 'Users', '/profile': 'Profile',
+    '/settings': 'app.pageSettings', '/system': 'app.pageSystem', '/wanted': 'app.pageWanted', '/queue': 'app.pageQueue', '/releases': 'app.pageReleases',
+    '/history': 'app.pageHistory', '/lists': 'app.pageLists', '/import': 'app.pageImport', '/stats': 'app.pageStats', '/plugins': 'app.pagePlugins',
+    '/users': 'app.pageUsers', '/profile': 'app.pageProfile',
   };
   $effect(() => {
-    let name = PAGE_TITLES[route.path] || '';
-    if (volumeId) name = detail.series?.title && detail.series.title !== 'Comic' ? detail.series.title : 'Series';
-    else if (unknown) name = 'Page not found';
-    else if (route.path === '/' && route.search.includes('collections=1')) name = 'Collections';
-    document.title = name ? `${name} · BackIssue` : 'BackIssue';
+    let name = PAGE_TITLES[route.path] ? t(PAGE_TITLES[route.path]) : '';
+    if (volumeId) name = detail.series?.title && detail.series.title !== PLACEHOLDER_TITLE ? detail.series.title : t('app.pageSeries');
+    else if (unknown) name = t('app.notFoundTitle');
+    else if (route.path === '/' && route.search.includes('collections=1')) name = t('app.pageCollections');
+    document.title = name ? `${name} · ${t('common.appName')}` : t('common.appName');
   });
 
   // Queue/Releases were drawers (?drawer=) for a while — keep old links working.
@@ -207,10 +210,10 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
         <div class="nopage" id="nopage">
           <div class="nopage__card">
             <div class="nopage__art"><Icon name={denied ? 'shield' : 'search'} size={24} /></div>
-            <div class="nopage__title">{denied ? 'You don’t have access to this page' : 'Page not found'}</div>
-            <div class="nopage__text">{denied ? 'Your account isn’t allowed to open it. Ask an admin if you think it should be.' : 'There is nothing at this address. It may have moved, or the link is wrong.'}</div>
+            <div class="nopage__title">{denied ? t('app.noAccessTitle') : t('app.notFoundTitle')}</div>
+            <div class="nopage__text">{denied ? t('app.noAccessText') : t('app.notFoundText')}</div>
             <div class="nopage__code">{route.path}</div>
-            <div class="nopage__actions"><button class="btn" onclick={() => navigate('/')}><Icon name="home" size={14} /> Go to Home</button></div>
+            <div class="nopage__actions"><button class="btn" onclick={() => navigate('/')}><Icon name="home" size={14} /> {t('app.goHome')}</button></div>
           </div>
         </div>
       {/if}

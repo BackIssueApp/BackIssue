@@ -10,40 +10,7 @@ import path from 'node:path';
 import { scanFile, allFiles, SRC } from '../scripts/i18n-scan.mjs';
 
 // Components not yet moved to the catalog. Remove a file here when it is done.
-export const PENDING = new Set([
-  'App.svelte',
-  'components/AccountModal.svelte',
-  'components/AddModal.svelte',
-  'components/Badge.svelte',
-  'components/CvPickerModal.svelte',
-  'components/DialogModal.svelte',
-  'components/EditMetadataModal.svelte',
-  'components/FeaturingModal.svelte',
-  'components/FiltersModal.svelte',
-  'components/HelpModal.svelte',
-  'components/HistoryPage.svelte',
-  'components/ImportPage.svelte',
-  'components/IndexerModal.svelte',
-  'components/IssueModal.svelte',
-  'components/LibraryPage.svelte',
-  'components/ListsPage.svelte',
-  'components/NotificationBell.svelte',
-  'components/Onboarding.svelte',
-  'components/PackSearchModal.svelte',
-  'components/PluginsPage.svelte',
-  'components/QueuePage.svelte',
-  'components/ReleasesDrawer.svelte',
-  'components/SeriesDetail.svelte',
-  'components/SettingsPage.svelte',
-  'components/Sidebar.svelte',
-  'components/SourceSearchModal.svelte',
-  'components/StatsPage.svelte',
-  'components/SystemPage.svelte',
-  'components/UsersPage.svelte',
-  'components/WantedPage.svelte',
-  'lib/lists.js',
-  'lib/store.svelte.js',
-]);
+export const PENDING = new Set([]);
 
 describe('UI text comes from the catalog', () => {
   const files = allFiles();

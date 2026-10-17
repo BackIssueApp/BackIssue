@@ -1,0 +1,21 @@
+{
+  "pageSettings": "Settings",
+  "pageSystem": "System",
+  "pageWanted": "Wanted",
+  "pageQueue": "Queue",
+  "pageReleases": "Releases",
+  "pageHistory": "History",
+  "pageLists": "Reading lists",
+  "pageImport": "Import",
+  "pageStats": "Stats",
+  "pagePlugins": "Plugins",
+  "pageUsers": "Users",
+  "pageProfile": "Profile",
+  "pageSeries": "Series",
+  "pageCollections": "Collections",
+  "notFoundTitle": "Page not found",
+  "notFoundText": "There is nothing at this address. It may have moved, or the link is wrong.",
+  "noAccessTitle": "You don’t have access to this page",
+  "noAccessText": "Your account isn’t allowed to open it. Ask an admin if you think it should be.",
+  "goHome": "Go to Home"
+}
