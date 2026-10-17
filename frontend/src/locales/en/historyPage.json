@@ -1,0 +1,22 @@
+{
+  "title": "History",
+  "nFailures": { "one": "{count} failure", "other": "{count} failures" },
+  "nBlocked": { "one": "{count} blocked release", "other": "{count} blocked releases" },
+  "nImports": { "one": "{count} import", "other": "{count} imports" },
+  "statFailures": "Failures",
+  "statBlocked": "Blocked",
+  "statImports": "Imports",
+  "emptyFailedTitle": "No failed downloads",
+  "emptyFailedBody": "Downloads that error out are recorded here — the record persists even after the queue clears.",
+  "emptyBlockedTitle": "Nothing blocked",
+  "emptyBlockedBody": "Failed usenet releases land here so future searches skip them. Remove one to make it eligible again.",
+  "emptyImportsTitle": "Nothing imported yet",
+  "emptyImportsBody": "This fills in as downloads land. Imports handled by the background monitor are tracked here.",
+  "filterPlaceholder": "Filter…",
+  "clearAll": "Clear all",
+  "chipAll": "All",
+  "chipFailed": "Failed",
+  "chipBlocklist": "Blocklist",
+  "removeFromBlocklist": "Remove from blocklist — allow auto-grab again",
+  "loadMore": "Load more"
+}
