@@ -1,10 +1,12 @@
 <script module>
   import { openModal, closeModal, modals } from '../lib/modals.svelte.js';
   import { apiGet } from '../lib/api.js';
+  import { t, th } from '../lib/i18n.svelte.js';
 
   const m = $state({ kind: '', name: '', issues: null, loading: false, failed: false });
 
-  const LABEL = { creator: 'Credited on', character: 'Appears in', team: 'Appears in' };
+  // Catalog keys per subject kind, resolved with t() at render time.
+  const LABEL = { creator: 'featuringModal.creditedOn', character: 'featuringModal.appearsIn', team: 'featuringModal.appearsIn' };
 
   /** Every issue in the collection crediting this person, or featuring this
    *  character or team. Opened from a chip in the issue modal. */
@@ -64,10 +66,10 @@
 
   const ownedCount = $derived(shownIssues.filter((i) => i.owned).length);
   const stats = $derived([
-    { label: 'Issues', value: fmt(shownIssues.length) },
-    { label: 'Series', value: fmt(groups.length) },
-    { label: 'Owned', value: fmt(ownedCount), tone: ownedCount ? 'ok' : '' },
-    { label: 'Years', value: yearSpan(shownIssues) || '—' },
+    { key: 'issues', label: t('featuringModal.statIssues'), value: fmt(shownIssues.length) },
+    { key: 'series', label: t('featuringModal.statSeries'), value: fmt(groups.length) },
+    { key: 'owned', label: t('featuringModal.statOwned'), value: fmt(ownedCount), tone: ownedCount ? 'ok' : '' },
+    { key: 'years', label: t('featuringModal.statYears'), value: yearSpan(shownIssues) || '—' },
   ]);
 
   const denseCols = $derived(Math.max(1, Math.floor((bodyW - INDENT) / (CELL_W + CELL_GAP))));
@@ -142,9 +144,10 @@
   const ownTone = (g) => (g.owned >= g.total ? 'is-all' : g.owned ? 'is-some' : 'is-none');
   const cellTitle = (i) => [
     `#${i.issue_number ?? '?'}`, i.title, i.cover_date,
-    i.owned ? 'owned' : 'not owned', ui.role ? '' : i.role,
+    i.owned ? t('featuringModal.ownedLower') : t('featuringModal.notOwnedLower'), ui.role ? '' : i.role,
   ].filter(Boolean).join(' · ');
-  const modeLabel = (u) => (u.body === 'dense' ? (ui.view === 'grid' ? 'Show as covers' : 'Show as rows') : 'Show as number grid');
+  const modeLabel = (u) => t(u.body === 'dense' ? (ui.view === 'grid' ? 'featuringModal.showAsCovers' : 'featuringModal.showAsRows') : 'featuringModal.showAsGrid');
+  const kindLabel = $derived(LABEL[m.kind] ? t(LABEL[m.kind]) : t('featuringModal.in'));
 
   const hasResults = $derived(!m.loading && !m.failed && !!all.length);
   // True even when results do come back, so a short list isn't read as the
@@ -154,20 +157,20 @@
 
 {#if open}
   <div id="featuring-modal" class="modal" onclick={(e) => { if (e.target === e.currentTarget) close(); }}>
-    <div class="modal__panel fx" use:trapFocus role="dialog" aria-label="{LABEL[m.kind]} {m.name}">
+    <div class="modal__panel fx" use:trapFocus role="dialog" aria-label="{kindLabel} {m.name}">
       <div class="fx__head">
         <div class="fx__top">
           <span class="fx__icon fx__icon--{m.kind}"><Icon name={KIND_ICON[m.kind] || 'tag'} size={20} /></span>
           <div class="fx__who">
-            <div class="fx__kind">{LABEL[m.kind] || 'In'}</div>
+            <div class="fx__kind">{kindLabel}</div>
             <h3 class="fx__name">{m.name}</h3>
           </div>
-          <button class="modal__x" aria-label="Close" onclick={close}><Icon name="close" /></button>
+          <button class="modal__x" aria-label={t('common.close')} onclick={close}><Icon name="close" /></button>
         </div>
 
         {#if hasResults}
           <div class="fx__stats">
-            {#each stats as s (s.label)}
+            {#each stats as s (s.key)}
               <div class="fx__stat">
                 <div class="fx__statk">{s.label}</div>
                 <div class="fx__statv" class:is-ok={s.tone === 'ok'}>{s.value}</div>
@@ -178,7 +181,7 @@
           {#if roles.length > 1}
             <div class="fx__roles">
               <button class="fx__rolechip" class:is-on={!ui.role} onclick={() => { ui.role = ''; }}>
-                All roles<span class="fx__rolen">{fmt(all.length)}</span>
+                {t('featuringModal.allRoles')}<span class="fx__rolen">{fmt(all.length)}</span>
               </button>
               {#each roles as r (r.role)}
                 <button class="fx__rolechip" class:is-on={ui.role === r.role} onclick={() => pickRole(r.role)}>
@@ -191,20 +194,20 @@
           <div class="fx__bar">
             <div class="fx__find">
               <Icon name="search" size={15} />
-              <input placeholder="Filter by series or title…" spellcheck="false" bind:value={ui.q} />
+              <input placeholder={t('featuringModal.filterPlaceholder')} spellcheck="false" bind:value={ui.q} />
             </div>
             <button class="btn btn--ghost btn--sm fx__toggle" class:is-on={ui.ownedOnly}
               aria-pressed={ui.ownedOnly} onclick={() => { ui.ownedOnly = !ui.ownedOnly; }}>
-              <Icon name="check" size={14} /> Owned only
+              <Icon name="check" size={14} /> {t('featuringModal.ownedOnly')}
             </button>
             <div class="fx__seg">
-              <button class:is-on={ui.sort === 'series'} onclick={() => { ui.sort = 'series'; }}>Series</button>
-              <button class:is-on={ui.sort === 'recent'} onclick={() => { ui.sort = 'recent'; }}>Recent</button>
+              <button class:is-on={ui.sort === 'series'} onclick={() => { ui.sort = 'series'; }}>{t('featuringModal.sortSeries')}</button>
+              <button class:is-on={ui.sort === 'recent'} onclick={() => { ui.sort = 'recent'; }}>{t('featuringModal.sortRecent')}</button>
             </div>
             <div class="fx__seg">
-              <button class="fx__segi" class:is-on={ui.view === 'list'} title="List" aria-label="List"
+              <button class="fx__segi" class:is-on={ui.view === 'list'} title={t('featuringModal.viewList')} aria-label={t('featuringModal.viewList')}
                 onclick={() => { ui.view = 'list'; }}><Icon name="list" size={15} /></button>
-              <button class="fx__segi" class:is-on={ui.view === 'grid'} title="Covers" aria-label="Covers"
+              <button class="fx__segi" class:is-on={ui.view === 'grid'} title={t('featuringModal.viewCovers')} aria-label={t('featuringModal.viewCovers')}
                 onclick={() => { ui.view = 'grid'; }}><Icon name="grid" size={15} /></button>
             </div>
           </div>
@@ -214,29 +217,29 @@
       <div class="fx__body" bind:this={scroller} onscroll={onScroll}>
         <div class="fx__stream" bind:this={stream}>
           {#if m.loading}
-            <div class="loading">Searching your collection…</div>
+            <div class="loading">{t('featuringModal.searching')}</div>
           {:else if m.failed}
-            <div class="list-note">Could not search — is the app running?</div>
+            <div class="list-note">{t('featuringModal.failed')}</div>
           {:else if !all.length}
             <!-- Almost always missing data rather than a real absence: ComicVine
                  records characters for a small share of issues, so say so instead
                  of implying the collection has none. -->
             <div class="fx__empty">
               <span class="fx__emptyicon"><Icon name={KIND_ICON[m.kind] || 'tag'} size={22} /></span>
-              <div class="fx__emptyt">Nothing else in your collection lists {m.name}.</div>
+              <div class="fx__emptyt">{t('featuringModal.nothingElse', { name: m.name })}</div>
               <p class="fx__hint">
                 {#if m.kind === 'creator'}
-                  Credits only exist for issues whose metadata has been downloaded — run <b>Tools → Download issue metadata</b> to cover the rest.
+                  {@html th('featuringModal.hintCreator')}
                 {:else}
-                  Character and team listings are sparse at the source: ComicVine records them for a small share of issues, and mostly recent ones.
+                  {t('featuringModal.hintSparse')}
                 {/if}
               </p>
               {#if m.kind === 'creator'}
-                <button class="btn btn--secondary btn--sm" onclick={openTools}>Open Tools</button>
+                <button class="btn btn--secondary btn--sm" onclick={openTools}>{t('featuringModal.openTools')}</button>
               {/if}
             </div>
           {:else if !shownIssues.length}
-            <div class="fx__none">No issues match these filters.</div>
+            <div class="fx__none">{t('featuringModal.noMatch')}</div>
           {:else}
             {#if win.padTop > 0}<div style="height:{win.padTop}px"></div>{/if}
             {#each units.slice(win.start, win.end) as u (u.g.key)}
@@ -246,16 +249,16 @@
                   <span class="fx__chev" class:is-open={!u.collapsed}><Icon name="chevron-right" size={14} /></span>
                   <span class="fx__gname">{u.g.series}</span>
                   {#if u.g.years}<span class="fx__gyears">{u.g.years}</span>{/if}
-                  <span class="fx__gown {ownTone(u.g)}">{u.g.owned}/{u.g.total} owned</span>
+                  <span class="fx__gown {ownTone(u.g)}">{t('featuringModal.ownedOf', { owned: u.g.owned, total: u.g.total })}</span>
                   {#if u.g.seriesId != null}
-                    <button class="fx__glink" title="Open series" aria-label="Open series"
+                    <button class="fx__glink" title={t('featuringModal.openSeries')} aria-label={t('featuringModal.openSeries')}
                       onclick={(e) => { e.stopPropagation(); openSeries(u.g); }}><Icon name="book" size={15} /></button>
                   {/if}
                 </div>
 
                 {#if u.big}
                   <div class="fx__runs">
-                    <span class="fx__gcount">{fmt(u.g.total)} issues</span>
+                    <span class="fx__gcount">{t('common.nIssues', { count: fmt(u.g.total) })}</span>
                     <span class="fx__runstxt">{u.runs}</span>
                     {#if !u.collapsed}
                       <button class="fx__modesw" onclick={() => setMode(u)}>{modeLabel(u)}</button>
@@ -277,7 +280,7 @@
                         <span class="fx__rnum">#{i.issue_number ?? '?'}</span>
                         <span class="fx__rsub">{[i.title, i.cover_date].filter(Boolean).join(' · ')}</span>
                         {#if !ui.role && i.role}<span class="fx__role">{i.role}</span>{/if}
-                        <span class="fx__dot" class:is-own={i.owned} title={i.owned ? 'Owned' : 'Not owned'}></span>
+                        <span class="fx__dot" class:is-own={i.owned} title={i.owned ? t('featuringModal.owned') : t('featuringModal.notOwned')}></span>
                       </button>
                     {/each}
                   </div>
@@ -299,7 +302,7 @@
                 {#if u.left > 0 && u.body !== 'dense' && u.body !== 'none'}
                   <div class="fx__moreline">
                     <button class="btn btn--ghost btn--sm" onclick={() => more(u)}>
-                      Show {Math.min(PAGE, u.left)} more ({fmt(u.left)} left)
+                      {t('featuringModal.showMore', { count: Math.min(PAGE, u.left), left: fmt(u.left) })}
                     </button>
                   </div>
                 {/if}
@@ -310,7 +313,7 @@
             {#if sparse}
               <div class="fx__note">
                 <Icon name="info" size={15} />
-                <span>Character and team listings are sparse at the source — ComicVine records them for a small share of issues, mostly recent ones — so this is likely incomplete.</span>
+                <span>{t('featuringModal.sparseNote')}</span>
               </div>
             {/if}
           {/if}
