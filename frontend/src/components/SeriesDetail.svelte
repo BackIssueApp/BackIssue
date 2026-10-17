@@ -627,7 +627,7 @@
       + (isCv ? (det.unlinkedFiles || []).length : ((det.files && det.files.length) || 0)));
 
   const cvUrl = $derived(det?.cv
-    ? (det.cv.site_detail_url || ('https://comicvine.gamespot.com/volume/4050-' + det.cv.comicvine_id + '/'))
+    ? (det.cv.site_detail_url || ((det.cv.meta_source || 'comicvine') === 'comicvine' ? 'https://comicvine.gamespot.com/volume/4050-' + (det.cv.meta_ref || det.cv.comicvine_id) + '/' : null))
     : '');
 
   const corruptReason = (i) => (i.files || []).map((f) => f.error).find(Boolean);
@@ -682,7 +682,7 @@
           <div class="series-cv" id="series-cv">
             {#if det?.cv}
               <a class="cv-chip" href={cvUrl} target="_blank" rel="noreferrer" title={t('seriesDetail.openSourcePage')}><Icon name="diamond" /> {det.cv.name || t('seriesDetail.sourcePage')}
-                {#if det.cv.start_year}<span class="cv-year">({det.cv.start_year}{det.cv.metron_year_end && det.cv.metron_year_end !== det.cv.start_year ? `–${det.cv.metron_year_end}` : ''})</span>{/if} <Icon name="external-link" /></a>
+                {#if det.cv.start_year}<span class="cv-year">({det.cv.start_year}{det.cv.metron_year_end && det.cv.metron_year_end !== det.cv.start_year ? `–${det.cv.metron_year_end}` : ''})</span>{/if} {#if cvUrl}<Icon name="external-link" />{/if}</a>
               <span class="cv-total">{t('seriesDetail.issuesKnown', { n: fmt(det.cv.count_of_issues || det.cv.issue_count || 0) })}{det.series?.cv_locked ? t('seriesDetail.pinned') : ''}</span>
               {#if det.cv.metron_status && det.cv.metron_status !== 'Ongoing'}
                 <span class="tag" title={t('seriesDetail.pubStatusTitle')}>{det.cv.metron_status}</span>

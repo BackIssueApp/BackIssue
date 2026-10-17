@@ -120,7 +120,10 @@ test('cv client volume returns metadata + issue stub list', async () => {
   const v = await cv.volume(7);
   assert.equal(v.name, 'Earth X');
   assert.equal(v.issues.length, 2);
-  assert.deepEqual(v.issues[0], { id: 100, number: '1', name: 'One' });
+  // Through the routing layer every record says which catalog it is from.
+  assert.deepEqual(v.issues[0], { id: 100, number: '1', name: 'One', meta_source: 'comicvine' });
+  assert.equal(v.meta_source, 'comicvine');
+  assert.equal(v.meta_ref, '7');
 });
 
 test('scoreCvCandidate: exact name + year beats name-only', () => {

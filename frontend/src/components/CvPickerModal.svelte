@@ -97,7 +97,8 @@
     if (d <= Math.max(2, m.files * 0.1)) return 'near';
     return null;
   }
-  const cvUrl = (v) => v.site_detail_url || ('https://comicvine.gamespot.com/volume/4050-' + v.id + '/');
+  // Only a ComicVine record has a ComicVine page to fall back to.
+  const cvUrl = (v) => v.site_detail_url || ((v.meta_source || 'comicvine') === 'comicvine' ? 'https://comicvine.gamespot.com/volume/4050-' + v.id + '/' : null);
 </script>
 
 {#snippet cvpRow(v, pinned)}
@@ -114,7 +115,7 @@
       <div class="cvp-meta">{v.publisher || t('cvPickerModal.unknownPublisher')} · {t('common.nIssues', { count: fmt(v.count_of_issues || 0) })}
         {#if closeness(v) === 'exact'}<span class="cvp-fit cvp-fit--exact">{t('cvPickerModal.equalsFiles', { count: fmt(m.files) })}</span>
         {:else if closeness(v) === 'near'}<span class="cvp-fit">{t('cvPickerModal.nearFiles', { count: fmt(m.files) })}</span>{/if}
-        · <a href={cvUrl(v)} target="_blank" rel="noreferrer" class="cvp-link" onclick={(e) => e.stopPropagation()}>{t('cvPickerModal.sourceLink')} <Icon name="external-link" /></a></div>
+        {#if cvUrl(v)}· <a href={cvUrl(v)} target="_blank" rel="noreferrer" class="cvp-link" onclick={(e) => e.stopPropagation()}>{t('cvPickerModal.sourceLink')} <Icon name="external-link" /></a>{/if}</div>
       {#if stripTags(v.deck || v.description || '')}
         <div class="cvp-deck">{stripTags(v.deck || v.description || '')}</div>
       {/if}

@@ -1,4 +1,4 @@
-import { openDb, clearIssuesForRedownload, SELF_DESCRIBED_TYPES } from './db.js';
+import { openDb, clearIssuesForRedownload, SELF_DESCRIBED_TYPES, recordedCatalog, backfillCatalogs } from './db.js';
 import { runQueue, reconcileDownloading } from './downloader.js';
 import { processPack } from './pack.js';
 import { createApp } from './server.js';
@@ -23,7 +23,7 @@ import { findComicFiles, groupSeries, importMetaForFolder } from './scanner.js';
 import { extractYear } from './matcher.js';
 import { poolWithResource } from './pool.js';
 import { makeCvClient, rankSearchResults } from './cv.js';
-import { metadataProviderList, testMetadataProvider } from './metadata.js';
+import { metadataProviderList, testMetadataProvider, setCatalogLookup, classifyId } from './metadata.js';
 import { resolveBooks } from './cbl.js';
 import { tagFileFromCv, ensureCvIssueDetail, fetchAllIssueMetadata } from './metatagger.js';
 import { fetchWeeklyReleases, matchReleases, shiftWeek, currentWeek } from './releases.js';
@@ -58,6 +58,12 @@ await loadPlugins();
 loadSettings(); // merge persisted settings over config defaults before anything runs
 
 const db = openDb(config.dbPath);
+// Metadata lookups route on the catalog each record was cached under. Plugins
+// are loaded by now, so rows from a plugin catalog cached before catalogs were
+// recorded get theirs from the plugin's id block, once.
+setCatalogLookup((kind, id) => (kind === 'arc' ? null : recordedCatalog(db, kind, id)));
+try { const n = backfillCatalogs(db, classifyId); if (n) console.log(`Recorded the metadata catalog of ${n} cached records`); }
+catch (e) { console.warn('catalog backfill failed:', e?.message || e); }
 attachLogDb(db); // persist logs (and flush anything captured before the db opened)
 
 // One-time migration: libraries own the storage locations now. Existing root

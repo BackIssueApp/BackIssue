@@ -7,6 +7,7 @@ import { convertCbrToCbz, sidecarPath } from './archive.js';
 import { normalizeNumber } from './matcher.js';
 import { cvKey } from './cv.js';
 import { isMintedId } from './metron.js';
+import { BUILTIN_CATALOG_RANGES } from './db.js';
 import config from './config.js';
 
 // Native metadata tagger: builds a standard ComicInfo.xml from our cached
@@ -104,10 +105,15 @@ export function buildComicInfoXml({ series, issue }) {
 
   add('Publisher', series.publisher);
   add('Web', issue.site_detail_url || series.site_detail_url);
-  // The ComicVine id in Notes is what other taggers key on; a minted id (a
-  // provider without ComicVine ids) would only mislead them.
+  // The ComicVine id in Notes is what other taggers key on, so it is written
+  // only for a record from ComicVine. A row cached before catalogs were
+  // recorded falls back to ComicVine's own id block.
   const noteId = issue.comicvine_id ?? issue.id;
-  add('Notes', isMintedId(noteId) ? 'Tagged by BackIssue.' : `Tagged by BackIssue from ComicVine issue ${noteId}.`);
+  const source = issue.meta_source || series.meta_source || null;
+  const [, cvLo, cvHi] = BUILTIN_CATALOG_RANGES.find(([n]) => n === 'comicvine');
+  const fromCv = source ? source === 'comicvine' : (!isMintedId(noteId) && Number(noteId) >= cvLo && Number(noteId) < cvHi);
+  const cvRef = issue.meta_ref || noteId;
+  add('Notes', fromCv ? `Tagged by BackIssue from ComicVine issue ${cvRef}.` : 'Tagged by BackIssue.');
 
   return `<?xml version="1.0" encoding="utf-8"?>\n<ComicInfo xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n${tags.join('\n')}\n</ComicInfo>`;
 }

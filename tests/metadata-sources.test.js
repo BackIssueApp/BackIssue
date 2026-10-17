@@ -5,12 +5,14 @@ import assert from 'node:assert/strict';
 import {
   registerMetadataProvider, _resetMetadataProviders, selectedMetadataProvider, activeMetadataProvider,
   metadataProviderList, metadataSourceOrder, enabledMetadataProviders, mergeSearchResults,
-  makeCompositeClient, parseMetadataSources,
+  makeCompositeClient, parseMetadataSources, setCatalogLookup, classifyId, catalogOf,
 } from '../src/metadata.js';
+import { openDb, upsertCvSeries, upsertCvIssue, recordedCatalog, backfillCatalogs } from '../src/db.js';
+import { buildComicInfoXml } from '../src/metatagger.js';
 import { makeCvClient } from '../src/cv.js';
 import { validateSettings } from '../src/settings.js';
 
-afterEach(() => _resetMetadataProviders());
+afterEach(() => { _resetMetadataProviders(); setCatalogLookup(null); });
 
 const ranged = (id, lo, hi, extra = {}) => ({
   id, label: id, idRange: [lo, hi], isConfigured: () => true,
@@ -87,7 +89,7 @@ test('mergeSearchResults folds the same id or the same title and year, best sour
 
 test('with several providers enabled, lookups route by id and searches merge', async () => {
   registerMetadataProvider(ranged('alpha', 2e9, 2.1e9));
-  registerMetadataProvider(ranged('beta', 2.1e9, 2.2e9, { resolves: (id) => id < 1e9 }));
+  registerMetadataProvider(ranged('beta', 2.1e9, 2.2e9, { alsoServes: ['comicvine'] }));
   const cfg = { metadataSources: 'alpha,beta' };
   const c = makeCvClient(cfg);
   assert.equal(c.provider, undefined); // the composite, not either client
@@ -96,8 +98,12 @@ test('with several providers enabled, lookups route by id and searches merge', a
   assert.equal((await c.issue(2.1e9 + 5)).from, 'beta');
   assert.equal((await c.findIssue(2.1e9 + 5, '3')).from, 'beta');
   assert.equal((await c.storyArcIssues(2e9 + 1)).arc.from, 'alpha');
-  // A foreign id goes to the provider that says it can resolve it.
+  // A ComicVine record goes to the provider that serves ComicVine through a
+  // cross-reference, since nothing enabled serves it natively.
   assert.equal((await c.volume(42)).from, 'beta');
+  // Results say where they came from.
+  const v = await c.volume(2e9 + 5);
+  assert.equal(v.meta_source, 'alpha');
   await assert.rejects(() => c.volume(3e9), /None of the enabled metadata sources/);
   const found = await c.search('q');
   assert.deepEqual(found.map((v) => [v.id, v.name]), [[2e9 + 1, 'q alpha'], [2e9 + 2, 'Shared Title'], [2.1e9 + 1, 'q beta']]);
@@ -123,15 +129,100 @@ test('a provider that fails a search is left out; all failing rethrows', async (
   } finally { console.warn = warn; }
 });
 
-test('Metron answers for ComicVine ids only when no ComicVine-backed source is enabled', () => {
-  registerMetadataProvider(ranged('alpha', 2e9, 2.1e9));
+test('built-in providers declare the catalogs they serve', () => {
   const creds = { metronUser: 'u', metronPass: 'p' };
-  assert.equal(makeCvClient({ metadataSources: 'metron,alpha', ...creds }).provider, undefined);
-  const owner = (cfg, id) => enabledMetadataProviders(cfg).find((p) => p.owns(id)) || enabledMetadataProviders(cfg).find((p) => p.resolves(id));
-  assert.equal(owner({ metadataSources: 'metron,alpha', ...creds }, 12345).id, 'metron');
-  assert.equal(owner({ metadataSources: 'metron,hosted', ...creds }, 12345).id, 'hosted');
-  assert.equal(owner({ metadataSources: 'metron,hosted', ...creds }, 1e9 + 7).id, 'metron');
-  assert.equal(owner({ metadataSources: 'hosted,alpha' }, 1e9 + 7), undefined);
+  const byId = Object.fromEntries(enabledMetadataProviders({ metadataSources: 'hosted,metron', ...creds }).map((p) => [p.id, p]));
+  assert.deepEqual(byId.hosted.serves, ['comicvine', 'mangadex']);
+  assert.deepEqual(byId.metron.serves, ['metron']);
+  assert.deepEqual(byId.metron.alsoServes, ['comicvine']);
+  assert.equal(classifyId(12345), 'comicvine');
+  assert.equal(classifyId(10_000_152), 'mangadex');
+  assert.equal(classifyId(1e9 + 7), 'metron');
+  assert.equal(classifyId(0), null);
+});
+
+// Fake providers standing in for the built-ins, so routing is observable.
+const fake = (id, serves, extra = {}) => ({
+  id, label: id, serves, isConfigured: () => true,
+  makeClient: () => ({
+    async volume(v, hint) { return { id: v, from: id, hint, issues: [{ id: v + 1, number: '1' }] }; },
+    async issue(v) { return { id: v, from: id }; },
+    async issuesByIds(ids) { return ids.map((x) => ({ id: x, from: id })); },
+    async search() { return []; },
+  }),
+  ...extra,
+});
+
+test('a native provider beats a cross-reference; the hint names the catalog', async () => {
+  registerMetadataProvider(fake('cvd', ['comicvine']));
+  registerMetadataProvider(fake('xref', ['xrefcat'], { alsoServes: ['comicvine'] }));
+  let c = makeCompositeClient({ metadataSources: 'xref,cvd' });
+  const v = await c.volume(42);
+  assert.equal(v.from, 'cvd'); // native wins even though xref is first in the list
+  assert.deepEqual(v.hint, { catalog: 'comicvine' });
+  c = makeCompositeClient({ metadataSources: 'xref' });
+  assert.equal((await c.volume(42)).from, 'xref');
+});
+
+test('manga is never handed to a provider that cannot read it', async () => {
+  registerMetadataProvider(fake('cvd', ['comicvine']));
+  registerMetadataProvider(fake('xref', ['xrefcat'], { alsoServes: ['comicvine'] }));
+  const c = makeCompositeClient({ metadataSources: 'cvd,xref' });
+  await assert.rejects(() => c.volume(10_000_152), /manga catalogue.*built-in metadata service/s);
+  // issuesByIds leaves unreachable records out instead of failing the batch.
+  assert.deepEqual((await c.issuesByIds([42, 10_000_200])).map((r) => r.id), [42]);
+});
+
+test('the recorded catalog decides, not the number', async () => {
+  registerMetadataProvider(fake('cvd', ['comicvine']));
+  registerMetadataProvider(fake('mx', ['mangadex']));
+  const recorded = new Map([['volume:5', 'mangadex']]);
+  setCatalogLookup((kind, id) => recorded.get(`${kind}:${id}`) || null);
+  assert.equal(catalogOf('volume', 5), 'mangadex');
+  assert.equal(catalogOf('volume', 6), 'comicvine');
+  const c = makeCompositeClient({ metadataSources: 'cvd,mx' });
+  assert.equal((await c.volume(5)).from, 'mx');
+  assert.equal((await c.volume(6)).from, 'cvd');
+});
+
+test('a single provider is still wrapped: extras kept, routing and stamping applied', async () => {
+  registerMetadataProvider(fake('cvd', ['comicvine']));
+  const c = makeCompositeClient({ metadataSources: 'cvd' });
+  assert.equal(typeof c.search, 'function');
+  const v = await c.volume(42);
+  assert.equal(v.meta_source, 'comicvine');
+  assert.equal(v.issues[0].meta_source, 'comicvine');
+  await assert.rejects(() => c.volume(10_000_152), /manga catalogue/);
+});
+
+test('the cache records each row\'s catalog; old rows are backfilled once', () => {
+  const db = openDb(':memory:');
+  upsertCvSeries(db, { id: 7, name: 'CV', meta_source: 'comicvine', meta_ref: '7' });
+  upsertCvIssue(db, { id: 70, cv_series_id: 7, number: '1' }); // inherits its series' catalog
+  assert.equal(recordedCatalog(db, 'volume', 7), 'comicvine');
+  assert.equal(recordedCatalog(db, 'issue', 70), 'comicvine');
+  // The first record wins: a later answer through a cross-reference keeps it.
+  upsertCvSeries(db, { id: 7, name: 'CV', meta_source: 'metron' });
+  assert.equal(recordedCatalog(db, 'volume', 7), 'comicvine');
+  // Rows from before the column: built-ins by block at open, plugins after load.
+  db.exec("INSERT INTO cv_series (comicvine_id, name) VALUES (10000152, 'Manga'), (1000000042, 'Metron'), (2000000003, 'Plugin')");
+  db.exec('UPDATE cv_series SET meta_source=NULL, meta_ref=NULL WHERE comicvine_id > 7');
+  registerMetadataProvider(fake('plug', ['plug'], { idRange: [2e9, 2.1e9] }));
+  const n = backfillCatalogs(db, classifyId);
+  assert.equal(n, 3);
+  assert.equal(recordedCatalog(db, 'volume', 10000152), 'mangadex');
+  assert.equal(recordedCatalog(db, 'volume', 1000000042), 'metron');
+  assert.equal(recordedCatalog(db, 'volume', 2000000003), 'plug');
+});
+
+test('tags name a ComicVine issue only for a ComicVine record', () => {
+  const series = { name: 'S', publisher: 'P' };
+  const notes = (issue, s = series) => buildComicInfoXml({ series: s, issue }).match(/<Notes>(.*?)<\/Notes>/)?.[1];
+  assert.match(notes({ comicvine_id: 70, issue_number: '1', meta_source: 'comicvine', meta_ref: '70' }), /ComicVine issue 70/);
+  assert.equal(notes({ comicvine_id: 10000200, issue_number: '1', meta_source: 'mangadex' }), 'Tagged by BackIssue.');
+  // A row from before catalogs were recorded: the manga block is not ComicVine.
+  assert.equal(notes({ comicvine_id: 10000200, issue_number: '1' }), 'Tagged by BackIssue.');
+  assert.match(notes({ comicvine_id: 70, issue_number: '1' }), /ComicVine issue 70/);
 });
 
 test('a provider that declares no id range answers for ids nobody else claims', async () => {

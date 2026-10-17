@@ -58,6 +58,16 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **Each series remembers where its data comes from.** Every cached series and
+  issue now records its catalog (ComicVine, MangaDex, Metron or a plugin's) and
+  that catalog's own id, and lookups go by that record instead of guessing from
+  the number. Manga is no longer sent to ComicVine or Metron when the built-in
+  service is off; it now says it needs the built-in service. Tags written into
+  manga files no longer claim a ComicVine issue number, and a series page only
+  links to ComicVine for a ComicVine record. Existing libraries are filled in
+  automatically on the first start. Plugin metadata sources can declare
+  `catalog`, `serves`, `alsoServes` and `refOf`; one that declares only
+  `idRange` keeps working unchanged.
 - **A cover price in another currency is shown as sent.** The issue panel used
   to put a dollar sign in front of every price; a source that prices in euros
   or francs now has its own sign or code kept.

@@ -1,9 +1,9 @@
 import { normalizeTitle, extractYear, normalizeNumber } from './matcher.js';
 import config from './config.js';
 import { upsertCvSeries, upsertCvIssue, setSeriesCv, seriesNeedingCvMatch, listCvIssues, linkFileCvIssue, getSeriesByCvId, createCvSeries, setFollowed, setMonitor, MONITOR_STATES, defaultLibrary, assignSeriesLibrary, getSeriesById, getCvSeries, setSeriesPath, mergeSeriesRows, fileIssueOverridesForSeries } from './db.js';
+import { classifyId } from './metadata.js';
 import { parseIssueFromFilename } from './scanner.js';
 import { normVolume } from './cv.js';
-import { isMintedId } from './metron.js';
 import { poolWithResource } from './pool.js';
 
 // A file's issue number: prefer the embedded ComicInfo number, else parse the filename.
@@ -109,6 +109,8 @@ export function rankCandidates(series, candidates) {
 export async function cacheCvVolume(db, client, cvId) {
   const v = await client.volume(cvId);
   upsertCvSeries(db, v);
+  // The catalog the library holds this series under (the first record wins).
+  const seriesCatalog = getCvSeries(db, v.id)?.meta_source || v.meta_source || classifyId(v.id);
   // A provider refreshing a volume first cached under another one hands back
   // stubs in its own id space. The rows already here keep their ids (files,
   // wanted rows and reading lists point at them): a foreign stub is matched to
@@ -119,12 +121,13 @@ export async function cacheCvVolume(db, client, cvId) {
   for (const ci of existing) { const k = normalizeNumber(ci.issue_number); if (k && !byNum.has(k)) byNum.set(k, ci.comicvine_id); }
   for (const iss of v.issues || []) {
     let id = iss.id;
-    if (!known.has(id) && isMintedId(id) !== isMintedId(v.id)) {
+    const stubCatalog = iss.meta_source || classifyId(iss.id);
+    if (!known.has(id) && stubCatalog && seriesCatalog && stubCatalog !== seriesCatalog) {
       const k = normalizeNumber(iss.number);
       const prior = k ? byNum.get(k) : null;
       if (prior) id = prior;
     }
-    upsertCvIssue(db, { id, cv_series_id: v.id, number: iss.number, name: iss.name });
+    upsertCvIssue(db, { id, cv_series_id: v.id, number: iss.number, name: iss.name, meta_source: id === iss.id ? stubCatalog : null });
   }
   return v;
 }

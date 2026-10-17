@@ -8,13 +8,24 @@
 // api.registerMetadataProvider.
 //
 // `metadataSources` in settings is an ordered list of the providers in use,
-// like `sourcePriority` for downloads. With several enabled, lookups go
-// through a composite client: a series or issue id is answered by the provider
-// that owns its id range (each provider mints ids into its own range), a
-// search asks every enabled provider and merges the answers in priority order,
-// and Discover uses the first provider that offers it. A provider in the list
-// that is not configured (no key, no account) is skipped rather than failing
-// every lookup; with nothing usable the hosted service answers.
+// like `sourcePriority` for downloads. A provider in the list that is not
+// configured (no key, no account) is skipped rather than failing every lookup;
+// with nothing usable the hosted service answers.
+//
+// CATALOGS vs PROVIDERS. A catalog is where a record lives (ComicVine,
+// MangaDex, Metron, the BnF catalogue, …); a provider is something that can
+// fetch from one or more catalogs. The hosted service serves ComicVine and
+// MangaDex; ComicVine-direct serves ComicVine; Metron serves Metron and can
+// also answer for ComicVine records through its cross-reference. Every cached
+// series and issue records its catalog (cv_series/cv_issues.meta_source) and
+// the catalog's own id (meta_ref). A lookup reads the recorded catalog and
+// goes to the first enabled provider, in the user's order, that serves it
+// natively, then to one that serves it through a cross-reference. The integer
+// id is only a key: each catalog still mints its new records into its own
+// block of numbers so keys never collide, and that block is what classifies a
+// brand-new id the library has not recorded yet (classifyId) — never a
+// recorded one. Searches ask every enabled provider and merge the answers in
+// priority order; Discover uses the first provider that offers a feed.
 //
 // Every caller still builds its client through makeCvClient (plugins import
 // it), so the switch lives in a dispatcher installed into cv.js: makeCvClient
@@ -23,13 +34,38 @@
 import { makeCvClient, installMetadataDispatcher, cvKey } from './cv.js';
 import { makeMetronClient, MINTED_BASE as METRON_BASE } from './metron.js';
 import { normalizeTitle } from './matcher.js';
+import { BUILTIN_CATALOG_RANGES } from './db.js';
 
 const SLUG = /^[a-z0-9][a-z0-9_-]{0,31}$/;
-// ComicVine's own ids (and the hosted service's, which mirrors them) all sit
-// below one billion; other providers mint above it, each in its own range.
-const CV_LIMIT = METRON_BASE;
-const METRON_LIMIT = METRON_BASE + 100_000_000;
-const isCvId = (id) => Number(id) > 0 && Number(id) < CV_LIMIT;
+
+// Catalog id blocks, for classifying ids the library has not recorded yet.
+// [name, test(id)] — first match wins. Built-ins first, then plugins'.
+const catalogBlocks = BUILTIN_CATALOG_RANGES.map(([name, lo, hi]) => [name, (id) => id >= lo && id < hi, true]);
+const CATALOG_LABELS = { comicvine: 'ComicVine', mangadex: 'the manga catalogue', metron: 'Metron' };
+
+/** The catalog a fresh id was minted in, from the id blocks; null if none. */
+export function classifyId(id) {
+  const n = Number(id);
+  if (!(n > 0)) return null;
+  for (const [name, test] of catalogBlocks) if (test(n)) return name;
+  return null;
+}
+
+// Recorded catalogs come from the database; index.js installs the reader.
+let catalogLookup = null;
+/** Install fn(kind: 'volume'|'issue', id) → recorded catalog | null. */
+export function setCatalogLookup(fn) { catalogLookup = typeof fn === 'function' ? fn : null; }
+
+/** A record's catalog: what the library recorded, else its id block. */
+export function catalogOf(kind, id) {
+  let rec = null;
+  try { rec = catalogLookup ? catalogLookup(kind, id) : null; } catch { rec = null; }
+  return rec || classifyId(id);
+}
+
+// The id a catalog itself uses for a record (meta_ref), when the answering
+// provider can say.
+const mangadexRef = (rec) => String(rec?.site_detail_url || '').match(/mangadex\.org\/(?:title|chapter)\/([0-9a-f-]{36})/i)?.[1] || null;
 
 const providers = [
   {
@@ -38,8 +74,9 @@ const providers = [
     builtin: true,
     fields: [],
     isConfigured: () => true,
-    owns: isCvId,
-    resolves: () => false,
+    serves: ['comicvine', 'mangadex'],
+    alsoServes: [],
+    refOf: (catalog, id, rec) => (catalog === 'comicvine' ? String(id) : catalog === 'mangadex' ? mangadexRef(rec) : null),
     makeClient: (cfg, opts) => makeCvClient(cfg, { ...opts, noDispatch: true, source: 'hosted' }),
   },
   {
@@ -49,8 +86,9 @@ const providers = [
     note: "ComicVine's API is rate-limited (about 200 requests per resource per hour, with velocity checks on top). Big imports, library scans and release matching will pause when the limit is hit and can take much longer.",
     fields: [{ key: 'comicvineKeys', label: 'ComicVine API key', type: 'text', placeholder: 'Free at comicvine.gamespot.com' }],
     isConfigured: (cfg) => !!cvKey(cfg?.comicvineKeys),
-    owns: isCvId,
-    resolves: () => false,
+    serves: ['comicvine'],
+    alsoServes: [],
+    refOf: (catalog, id) => (catalog === 'comicvine' ? String(id) : null),
     makeClient: (cfg, opts) => makeCvClient(cfg, { ...opts, noDispatch: true, source: 'comicvine' }),
     async test(cfg) {
       const key = cvKey(cfg?.comicvineKeys);
@@ -70,30 +108,41 @@ const providers = [
       { key: 'metronPass', label: 'Metron password', type: 'password', placeholder: '' },
     ],
     isConfigured: (cfg) => !!(String(cfg?.metronUser || '').trim() && cfg?.metronPass),
-    owns: (id) => Number(id) >= METRON_BASE && Number(id) < METRON_LIMIT,
+    serves: ['metron'],
     // Metron records ComicVine's ids on its own rows, so it can answer for a
-    // ComicVine-keyed series when no ComicVine-backed source is enabled.
-    resolves: isCvId,
+    // ComicVine record when no provider serving ComicVine is enabled.
+    alsoServes: ['comicvine'],
+    refOf: (catalog, id) => (catalog === 'metron' ? String(Number(id) - METRON_BASE) : null),
     makeClient: (cfg, opts) => makeMetronClient(cfg, opts),
     test: (cfg) => makeMetronClient(cfg, { politeMs: 0 }).test(),
   },
 ];
 
 /**
- * Add a provider: { id, label, fields?, note?, isConfigured?(config), makeClient(config, opts), test?(config), owns?(id) | idRange?, resolves?(id) }.
+ * Add a provider: { id, label, fields?, note?, isConfigured?(config), makeClient(config, opts), test?(config),
+ *                   catalog?, idRange? | owns?(id), serves?, alsoServes?, refOf?(catalog, id, record) }.
  *   id        a slug; this is what `metadataSources` holds when the provider is enabled
  *   fields    the settings the provider needs, rendered on Settings → Metadata:
  *             [{ key, label, type: 'text' | 'password', placeholder? }]. The keys
  *             must also be registered through api.registerSettings so they persist.
  *   makeClient(config, { fetchImpl?, politeMs? }) → the client (see cv.js makeCvClient
  *             for the method contract; `list` is optional and ComicVine-specific).
+ *             volume/issue/findIssue receive a last argument { catalog } naming
+ *             the catalog the record belongs to.
  *   isConfigured(config) → false means "skip this provider" (default: true).
  *   test(config) → { ok, message } for the Settings Test button (default: a search).
- *   owns(id) → true for the ids this provider minted; or idRange: [low, high)
- *             (default: nothing). With several providers enabled, a series or
- *             issue is looked up through the provider that owns its id.
- *   resolves(id) → true when the provider can also answer for a foreign id it
- *             knows about (default: nothing); tried after every owner.
+ *   catalog   the name of the catalog this provider mints records into
+ *             (default: the provider id). With idRange: [low, high) or owns(id),
+ *             ids in that block are classified as this catalog before the
+ *             library has recorded them; keep the block clear of every other.
+ *   serves    catalogs answered natively (default: [catalog]).
+ *   alsoServes catalogs answered through a cross-reference, tried only after
+ *             every enabled provider that serves them natively (default: none).
+ *   refOf(catalog, id, record) → the catalog's own id for a record, stored as
+ *             meta_ref (default: none).
+ *   A provider that declares no id block also answers for records whose
+ *   catalog nothing enabled serves, so a plugin written before catalogs
+ *   existed keeps answering for its own series.
  * Idempotent per id; a built-in id cannot be replaced.
  */
 export function registerMetadataProvider(p, plugin = null) {
@@ -103,20 +152,23 @@ export function registerMetadataProvider(p, plugin = null) {
   const fields = (Array.isArray(p.fields) ? p.fields : [])
     .filter((f) => f?.key && /^[A-Za-z][A-Za-z0-9_]*$/.test(String(f.key)))
     .map((f) => ({ key: String(f.key), label: String(f.label || f.key), type: f.type === 'password' ? 'password' : 'text', placeholder: f.placeholder ? String(f.placeholder) : '' }));
-  // A provider that declares no range is assumed to own whatever id no
-  // declared provider claims, so a plugin written before ranges existed still
-  // answers for its own series when enabled alongside others.
-  let owns = null;
-  if (typeof p.owns === 'function') owns = (id) => !!p.owns(Number(id));
+  const catalog = SLUG.test(String(p.catalog || '').toLowerCase()) ? String(p.catalog).toLowerCase() : id;
+  let block = null;
+  if (typeof p.owns === 'function') block = (n) => !!p.owns(n);
   else if (Array.isArray(p.idRange) && p.idRange.length === 2) {
     const [lo, hi] = p.idRange.map(Number);
-    owns = (id) => Number(id) >= lo && Number(id) < hi;
+    block = (n) => n >= lo && n < hi;
   }
+  // Plugin blocks go after the built-ins, so they can never claim a built-in id.
+  if (block) catalogBlocks.push([catalog, block, false]);
+  const list = (v, dflt) => (Array.isArray(v) ? v.map((x) => String(x).toLowerCase()).filter((x) => SLUG.test(x)) : dflt);
   providers.push({
     id, label: String(p.label), note: p.note ? String(p.note) : '', fields, plugin, builtin: false,
     isConfigured: typeof p.isConfigured === 'function' ? p.isConfigured : () => true,
-    owns,
-    resolves: typeof p.resolves === 'function' ? (id) => !!p.resolves(Number(id)) : () => false,
+    serves: list(p.serves, [catalog]),
+    alsoServes: list(p.alsoServes, []),
+    fallback: !block && !Array.isArray(p.serves),
+    refOf: typeof p.refOf === 'function' ? (c, i, r) => { try { const v = p.refOf(c, i, r); return v == null ? null : String(v); } catch { return null; } } : () => null,
     makeClient: p.makeClient,
     test: typeof p.test === 'function' ? p.test : null,
   });
@@ -126,6 +178,7 @@ export function registerMetadataProvider(p, plugin = null) {
 // Test seam: drop everything a test registered.
 export function _resetMetadataProviders() {
   for (let i = providers.length - 1; i >= 0; i--) if (!providers[i].builtin) providers.splice(i, 1);
+  for (let i = catalogBlocks.length - 1; i >= 0; i--) if (!catalogBlocks[i][2]) catalogBlocks.splice(i, 1);
 }
 
 export const metadataSourceIds = () => providers.map((p) => p.id);
@@ -205,21 +258,44 @@ export function mergeSearchResults(lists) {
   return out;
 }
 
-/** One client over every enabled provider. A single enabled provider gets
- *  everything, as it always did; several are routed per call. */
+const catalogLabel = (c) => CATALOG_LABELS[c] || providers.find((p) => p.serves.includes(c) && !p.builtin)?.label || c;
+
+/** One client over the enabled providers: each lookup goes to the provider
+ *  that serves the record's catalog; searches ask everyone and merge. */
 export function makeCompositeClient(config, opts = {}) {
   const enabled = enabledMetadataProviders(config);
-  if (enabled.length === 1) return enabled[0].makeClient(config, opts);
   const clients = enabled.map((p) => ({ p, c: p.makeClient(config, opts) }));
-  const ownerOf = (id) => clients.find((x) => x.p.owns && x.p.owns(id))
-    || clients.find((x) => x.p.resolves(id))
-    || clients.find((x) => !x.p.owns)
-    || null;
-  const route = (id) => {
-    const hit = ownerOf(id);
-    if (!hit) throw new Error('None of the enabled metadata sources knows this id');
-    return hit.c;
+
+  // Native first, in the user's order; then a cross-reference; then a
+  // provider from before catalogs existed (see registerMetadataProvider).
+  const providerFor = (catalog) => (catalog && clients.find((x) => x.p.serves.includes(catalog)))
+    || (catalog && clients.find((x) => x.p.alsoServes.includes(catalog)))
+    || clients.find((x) => x.p.fallback)
+    || (!catalog && clients.length === 1 ? clients[0] : null);
+  const route = (kind, id) => {
+    const catalog = catalogOf(kind, id);
+    const hit = providerFor(catalog);
+    if (!hit) {
+      const where = catalog ? ` (it comes from ${catalogLabel(catalog)})` : '';
+      const hint = catalog === 'mangadex' ? ' Manga comes through the built-in metadata service; turn it on under Settings → Metadata.' : '';
+      throw new Error(`None of the enabled metadata sources can look this up${where}.${hint}`);
+    }
+    return { ...hit, catalog };
   };
+  // Results carry where they came from, so the cache records it.
+  const stamp = (rec, hit, id) => {
+    if (!rec || typeof rec !== 'object') return rec;
+    const out = { ...rec, meta_source: rec.meta_source ?? hit.catalog };
+    if (out.meta_ref == null && hit.p.serves.includes(hit.catalog)) out.meta_ref = hit.p.refOf(hit.catalog, id, rec) ?? null;
+    if (Array.isArray(rec.issues)) {
+      // Stubs are fresh records minted by whoever answered: their own block
+      // says which catalog they belong to (a provider answering through a
+      // cross-reference hands back stubs from its own catalog).
+      out.issues = rec.issues.map((iss) => (iss && typeof iss === 'object' ? { ...iss, meta_source: iss.meta_source ?? classifyId(iss.id) ?? hit.catalog } : iss));
+    }
+    return out;
+  };
+  const nativeCatalog = (x) => x.p.serves[0] || null;
   // Ask everyone; a source that fails is left out unless they all fail.
   async function fanOut(method, ...args) {
     const able = clients.filter((x) => typeof x.c[method] === 'function');
@@ -227,29 +303,34 @@ export function makeCompositeClient(config, opts = {}) {
     const lists = [];
     let firstErr = null;
     settled.forEach((r, i) => {
-      if (r.status === 'fulfilled') lists.push(r.value);
-      else { firstErr ??= r.reason; console.warn(`metadata ${method} failed on ${able[i].p.id}:`, r.reason?.message || r.reason); }
+      if (r.status === 'fulfilled') {
+        const x = able[i];
+        lists.push((Array.isArray(r.value) ? r.value : []).map((v) => (v && typeof v === 'object' ? { ...v, meta_source: v.meta_source ?? classifyId(v.id) ?? nativeCatalog(x) } : v)));
+      } else { firstErr ??= r.reason; console.warn(`metadata ${method} failed on ${able[i].p.id}:`, r.reason?.message || r.reason); }
     });
     if (!lists.length && firstErr) throw firstErr;
     return mergeSearchResults(lists);
   }
   const composite = {
     search: (q, o) => fanOut('search', q, o),
-    volume: async (id) => route(id).volume(id),
-    issue: async (id) => route(id).issue(id),
-    findIssue: async (volumeId, number) => route(volumeId).findIssue(volumeId, number),
-    storyArcIssues: async (arcId) => route(arcId).storyArcIssues(arcId),
+    async volume(id) { const h = route('volume', id); return stamp(await h.c.volume(id, { catalog: h.catalog }), h, id); },
+    async issue(id) { const h = route('issue', id); return stamp(await h.c.issue(id, { catalog: h.catalog }), h, id); },
+    async findIssue(volumeId, number) { const h = route('volume', volumeId); return stamp(await h.c.findIssue(volumeId, number, { catalog: h.catalog }), h, null); },
+    async storyArcIssues(arcId) { const h = route('arc', arcId); return h.c.storyArcIssues(arcId, { catalog: h.catalog }); },
     searchArcs: (q) => fanOut('searchArcs', q),
     async issuesByIds(ids) {
       const groups = new Map();
       for (const id of ids || []) {
-        const hit = ownerOf(id);
-        if (!hit) continue; // an id nobody enabled can answer for is simply absent
-        if (!groups.has(hit)) groups.set(hit, []);
-        groups.get(hit).push(id);
+        let h;
+        try { h = route('issue', id); } catch { continue; } // nobody enabled can answer: simply absent
+        const key = h.p.id + '|' + h.catalog;
+        if (!groups.has(key)) groups.set(key, { h, ids: [] });
+        groups.get(key).ids.push(id);
       }
       const out = [];
-      for (const [hit, group] of groups) out.push(...(await hit.c.issuesByIds(group)));
+      for (const { h, ids: group } of groups.values()) {
+        for (const r of await h.c.issuesByIds(group)) out.push(stamp(r, h, r?.id));
+      }
       return out;
     },
   };
@@ -257,6 +338,9 @@ export function makeCompositeClient(config, opts = {}) {
   // the first enabled provider that has one serves it.
   const lister = clients.find((x) => typeof x.c.list === 'function');
   if (lister) composite.list = (...args) => lister.c.list(...args);
+  // One provider: keep whatever else its client offers (its name, extras),
+  // with the routed methods on top.
+  if (clients.length === 1) return { ...clients[0].c, ...composite };
   return composite;
 }
 

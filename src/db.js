@@ -277,6 +277,17 @@ function migrate(db) {
   // those columns — an edit survives any number of refreshes until reset.
   if (cvcols.length && !cvcols.includes('user_fields')) db.exec('ALTER TABLE cv_series ADD COLUMN user_fields TEXT');
   if (cvi.length && !cvi.includes('user_fields')) db.exec('ALTER TABLE cv_issues ADD COLUMN user_fields TEXT');
+  // Where a cached record comes from: meta_source names its catalog
+  // ('comicvine', 'mangadex', 'metron', or a plugin's), meta_ref the id that
+  // catalog itself uses (text: MangaDex and BnF ids are not numbers). The
+  // integer comicvine_id stays the row's key everywhere else; it no longer
+  // carries meaning. Metadata lookups route on meta_source (src/metadata.js).
+  for (const [table, have] of [['cv_series', cvcols], ['cv_issues', cvi]]) {
+    if (!have.length) continue;
+    if (!have.includes('meta_source')) db.exec(`ALTER TABLE ${table} ADD COLUMN meta_source TEXT`);
+    if (!have.includes('meta_ref')) db.exec(`ALTER TABLE ${table} ADD COLUMN meta_ref TEXT`);
+  }
+  backfillBuiltinCatalogs(db);
   // Pack grabs (per-series or 0-day) carry a series_id (null = whole-collection
   // 0-day pack) and kind='pack'; individual-issue grabs stay kind='issue'.
   const grabCols = db.prepare('PRAGMA table_info(grabs)').all().map((c) => c.name);
@@ -350,6 +361,57 @@ function migrate(db) {
   db.exec('DROP TABLE IF EXISTS mylar_series_map');
   // The dedicated tag log was folded into the Logs page (category 'tag').
   db.exec('DROP TABLE IF EXISTS tag_log');
+}
+
+// The id blocks the built-in catalogs mint into. Used ONCE per row, to give
+// records cached before meta_source existed their catalog (and, where the
+// number is the catalog's own id, their meta_ref). Plugin catalogs are filled
+// the same way after plugins load (metadata.js backfillPluginCatalogs).
+export const BUILTIN_CATALOG_RANGES = [
+  ['comicvine', 1, 10_000_000],
+  ['mangadex', 10_000_000, 1_000_000_000],
+  ['metron', 1_000_000_000, 1_100_000_000],
+];
+function backfillBuiltinCatalogs(db) {
+  for (const table of ['cv_series', 'cv_issues']) {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+    if (!cols.includes('meta_source')) continue;
+    const pending = db.prepare(`SELECT 1 FROM ${table} WHERE meta_source IS NULL LIMIT 1`).get();
+    if (!pending) continue;
+    db.transaction(() => {
+      for (const [name, lo, hi] of BUILTIN_CATALOG_RANGES) {
+        db.prepare(`UPDATE ${table} SET meta_source=? WHERE meta_source IS NULL AND comicvine_id>=? AND comicvine_id<?`).run(name, lo, hi);
+      }
+      db.prepare(`UPDATE ${table} SET meta_ref=CAST(comicvine_id AS TEXT) WHERE meta_ref IS NULL AND meta_source='comicvine'`).run();
+      db.prepare(`UPDATE ${table} SET meta_ref=CAST(comicvine_id - 1000000000 AS TEXT) WHERE meta_ref IS NULL AND meta_source='metron'`).run();
+      // MangaDex's own id is the UUID in the record's page URL, when cached.
+      for (const r of db.prepare(`SELECT comicvine_id id, site_detail_url u FROM ${table} WHERE meta_ref IS NULL AND meta_source='mangadex' AND site_detail_url LIKE '%mangadex.org/%'`).all()) {
+        const m = String(r.u).match(/mangadex\.org\/(?:title|chapter)\/([0-9a-f-]{36})/i);
+        if (m) db.prepare(`UPDATE ${table} SET meta_ref=? WHERE comicvine_id=?`).run(m[1], r.id);
+      }
+    })();
+  }
+}
+
+/** The catalog a cached series or issue was recorded under, or null when the
+ *  row is unknown or predates any way to tell. kind: 'volume' | 'issue'. */
+export function recordedCatalog(db, kind, id) {
+  const table = kind === 'issue' ? 'cv_issues' : 'cv_series';
+  try { return db.prepare(`SELECT meta_source FROM ${table} WHERE comicvine_id=?`).get(Number(id))?.meta_source || null; }
+  catch { return null; }
+}
+
+/** Fill meta_source for rows still blank, using a classifier that knows every
+ *  registered catalog's id block (plugins included). Returns rows updated. */
+export function backfillCatalogs(db, classify) {
+  let n = 0;
+  for (const table of ['cv_series', 'cv_issues']) {
+    const rows = db.prepare(`SELECT comicvine_id id FROM ${table} WHERE meta_source IS NULL`).all();
+    if (!rows.length) continue;
+    const upd = db.prepare(`UPDATE ${table} SET meta_source=? WHERE comicvine_id=? AND meta_source IS NULL`);
+    db.transaction(() => { for (const r of rows) { const c = classify(r.id); if (c) n += upd.run(c, r.id).changes; } })();
+  }
+  return n;
 }
 
 export function openDb(dbPath) {
@@ -1702,15 +1764,19 @@ export function upsertCvSeries(db, v) {
     }
   }
   db.prepare(
-    `INSERT INTO cv_series (comicvine_id, name, publisher, start_year, count_of_issues, description, deck, image_url, site_detail_url, aliases, cached_at)
-     VALUES (@id, @name, @publisher, @start_year, @count_of_issues, @description, @deck, @image_url, @site_detail_url, @aliases, datetime('now'))
+    `INSERT INTO cv_series (comicvine_id, name, publisher, start_year, count_of_issues, description, deck, image_url, site_detail_url, aliases, meta_source, meta_ref, cached_at)
+     VALUES (@id, @name, @publisher, @start_year, @count_of_issues, @description, @deck, @image_url, @site_detail_url, @aliases, @meta_source, @meta_ref, datetime('now'))
      ON CONFLICT(comicvine_id) DO UPDATE SET
        name=excluded.name, publisher=excluded.publisher, start_year=excluded.start_year,
        count_of_issues=excluded.count_of_issues, description=excluded.description,
        deck=COALESCE(excluded.deck, cv_series.deck),
        image_url=excluded.image_url, site_detail_url=COALESCE(excluded.site_detail_url, cv_series.site_detail_url),
-       aliases=COALESCE(excluded.aliases, cv_series.aliases), cached_at=excluded.cached_at`
+       aliases=COALESCE(excluded.aliases, cv_series.aliases),
+       meta_source=COALESCE(cv_series.meta_source, excluded.meta_source),
+       meta_ref=COALESCE(cv_series.meta_ref, excluded.meta_ref),
+       cached_at=excluded.cached_at`
   ).run({
+    meta_source: v.meta_source ?? null, meta_ref: v.meta_ref != null ? String(v.meta_ref) : null,
     id: v.id, name: v.name ?? null, publisher: v.publisher ?? null,
     start_year: v.start_year != null ? String(v.start_year) : null,
     count_of_issues: v.count_of_issues ?? null, description: v.description ?? null, deck: v.deck ?? null,
@@ -1773,10 +1839,13 @@ export function upsertCvIssue(db, i) {
   const prev = db.prepare('SELECT issue_number, name, user_fields FROM cv_issues WHERE comicvine_id=?').get(i.id);
   const locked = userLockedFields(prev);
   db.prepare(
-    `INSERT INTO cv_issues (comicvine_id, cv_series_id, issue_number, name, cover_date, store_date, has_detail, cached_at)
-     VALUES (@id, @cv_series_id, @issue_number, @name, @cover_date, @store_date, @has_detail, datetime('now'))
+    `INSERT INTO cv_issues (comicvine_id, cv_series_id, issue_number, name, cover_date, store_date, has_detail, meta_source, meta_ref, cached_at)
+     VALUES (@id, @cv_series_id, @issue_number, @name, @cover_date, @store_date, @has_detail,
+             COALESCE(@meta_source, (SELECT meta_source FROM cv_series WHERE comicvine_id=@cv_series_id)), @meta_ref, datetime('now'))
      ON CONFLICT(comicvine_id) DO UPDATE SET
        cv_series_id=excluded.cv_series_id, issue_number=excluded.issue_number, name=excluded.name,
+       meta_source=COALESCE(cv_issues.meta_source, excluded.meta_source),
+       meta_ref=COALESCE(cv_issues.meta_ref, excluded.meta_ref),
        cover_date=COALESCE(cv_issues.cover_date, excluded.cover_date),
        store_date=COALESCE(cv_issues.store_date, excluded.store_date)`
   ).run({
@@ -1785,6 +1854,7 @@ export function upsertCvIssue(db, i) {
     name: locked.has('name') ? prev.name : (i.name ?? null),
     cover_date: i.cover_date ?? null, store_date: i.store_date ?? null,
     has_detail: i.has_detail ? 1 : 0,
+    meta_source: i.meta_source ?? null, meta_ref: i.meta_ref != null ? String(i.meta_ref) : null,
   });
   return i.id;
 }
