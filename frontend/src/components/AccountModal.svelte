@@ -11,6 +11,7 @@
   import { auth } from '../lib/auth.svelte.js';
   import { notify } from '../lib/toasts.svelte.js';
   import { trapFocus } from '../lib/dom.js';
+  import { t } from '../lib/i18n.svelte.js';
 
   let open = $state(false);
   let current = $state('');
@@ -21,30 +22,30 @@
 
   async function submit() {
     error = '';
-    if (next !== confirm) { error = 'new passwords do not match'; return; }
+    if (next !== confirm) { error = t('accountModal.mismatch'); return; }
     const r = await apiPost('/api/auth/password', { current, next });
     if (r.error) { error = r.error; return; }
     open = false;
-    notify('Password changed.', 'ok');
+    notify(t('accountModal.changed'), 'ok');
   }
 </script>
 
 {#if open}
   <div class="modal" onclick={(e) => { if (e.target === e.currentTarget) open = false; }} role="presentation">
-    <div class="modal__panel" use:trapFocus role="dialog" aria-label="Account">
-      <div class="modal__head"><h3>Account — {auth.user?.username}</h3>
-        <button class="modal__x" aria-label="Close" onclick={() => { open = false; }}><Icon name="close" /></button></div>
+    <div class="modal__panel" use:trapFocus role="dialog" aria-label={t('accountModal.dialogLabel')}>
+      <div class="modal__head"><h3>{t('accountModal.title', { username: auth.user?.username })}</h3>
+        <button class="modal__x" aria-label={t('common.close')} onclick={() => { open = false; }}><Icon name="close" /></button></div>
       <form class="modal__body" onsubmit={(e) => { e.preventDefault(); submit(); }}>
-        <label class="field field--col">Current password
+        <label class="field field--col">{t('accountModal.currentPassword')}
           <input type="password" class="dialog-input" autocomplete="current-password" bind:value={current} required /></label>
-        <label class="field field--col">New password (8+ characters)
+        <label class="field field--col">{t('accountModal.newPassword')}
           <input type="password" class="dialog-input" autocomplete="new-password" bind:value={next} required minlength="8" /></label>
-        <label class="field field--col">Confirm new password
+        <label class="field field--col">{t('accountModal.confirmNewPassword')}
           <input type="password" class="dialog-input" autocomplete="new-password" bind:value={confirm} required /></label>
         {#if error}<div class="authgate__error">{error}</div>{/if}
         <div class="modal__foot" style="padding: 0; border: none;">
-          <button type="button" class="btn btn--ghost" onclick={() => { open = false; }}>Cancel</button>
-          <button class="btn btn--primary">Change password</button>
+          <button type="button" class="btn btn--ghost" onclick={() => { open = false; }}>{t('common.cancel')}</button>
+          <button class="btn btn--primary">{t('accountModal.changePassword')}</button>
         </div>
       </form>
     </div>
