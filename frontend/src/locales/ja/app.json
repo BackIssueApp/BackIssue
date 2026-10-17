@@ -1,0 +1,21 @@
+{
+  "pageSettings": "設定",
+  "pageSystem": "システム",
+  "pageWanted": "未入手",
+  "pageQueue": "キュー",
+  "pageReleases": "新刊",
+  "pageHistory": "履歴",
+  "pageLists": "リーディングリスト",
+  "pageImport": "インポート",
+  "pageStats": "統計",
+  "pagePlugins": "プラグイン",
+  "pageUsers": "ユーザー",
+  "pageProfile": "プロフィール",
+  "pageSeries": "シリーズ",
+  "pageCollections": "コレクション",
+  "notFoundTitle": "ページが見つかりません",
+  "notFoundText": "このアドレスには何もありません。移動したか、リンクが間違っている可能性があります。",
+  "noAccessTitle": "このページへのアクセス権がありません",
+  "noAccessText": "お使いのアカウントではこのページを開けません。必要な場合は管理者に相談してください。",
+  "goHome": "ホームへ"
+}

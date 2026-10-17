@@ -1,0 +1,23 @@
+{
+  "title": "シリーズのメタデータを照合",
+  "lookingUp": "シリーズを調べています…",
+  "searching": "メタデータソースを検索中…",
+  "noVolumeWithId": "その ID のシリーズはありません。",
+  "searchFailed": "検索に失敗しました。",
+  "noVolumes": "シリーズが見つかりません。",
+  "linkFailed": "リンクに失敗しました",
+  "linkFailedWith": "リンクに失敗しました：{error}",
+  "matchedTo": "{name} に照合しました。",
+  "matchedToYear": "{name}（{year}）に照合しました。",
+  "unknownPublisher": "不明な出版社",
+  "idBadge": "ID {id}",
+  "equalsFiles": "= 手持ちの {count} ファイル",
+  "nearFiles": "≈ 手持ちの {count} ファイル",
+  "sourceLink": "ソースページ",
+  "linking": "リンク中…",
+  "use": "使用",
+  "filesNote": {
+    "other": "ディスク上に {count} 個のファイルがあります。号数が最も近いシリーズから順に表示しています。"
+  },
+  "searchPlaceholder": "名前で検索、またはシリーズの URL／ID を貼り付け…"
+}

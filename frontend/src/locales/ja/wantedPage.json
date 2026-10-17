@@ -1,0 +1,82 @@
+{
+  "title": "未入手",
+  "sortSeries": "シリーズ名順",
+  "sortNewest": "発売が新しい順",
+  "sortOldest": "発売が古い順",
+  "sortMost": "未入手が多い順",
+  "sortFewest": "未入手が少ない順",
+  "nothingToDownload": "ダウンロードするものはありません。",
+  "confirmQueueTitle": {
+    "other": "{count} 号をダウンロードキューに追加しますか？"
+  },
+  "confirmQueueMessage": "現在のフィルターに一致するものがすべてキューに追加されます。",
+  "confirmQueueGaps": " 未入手に指定していなかった欠号も未入手になります。",
+  "confirmQueueCapped": " 1 回につき 500 件までです。残りはもう一度実行してください。",
+  "queueDownloads": "ダウンロードをキューに追加",
+  "queuedN": {
+    "other": "{count} 号をキューに追加しました。"
+  },
+  "couldNotUpdate": "更新できませんでした。アプリに接続できますか？",
+  "wantingN": {
+    "other": "{count} 号を未入手に指定しました。"
+  },
+  "noLongerWantedN": {
+    "other": "{count} 号を未入手から外しました。"
+  },
+  "alreadyOnWay": "選択したものはすべてすでに取得中です。",
+  "monitorNewFrom": "#{number} 以降の新刊",
+  "notMonitored": "監視なし",
+  "monitored": "監視中",
+  "pickedByHand": "手動で選択",
+  "pickedByHandReason": "手動で選択（{reason}）",
+  "wantedBecauseMonitored": "シリーズを監視しているため未入手です",
+  "notWantedGap": "対象外 — 監視方針で触れない欠号です",
+  "statMissing": "不足",
+  "statWanted": "未入手",
+  "statInFlight": "取得中",
+  "statFailed": "失敗",
+  "statSeries": "シリーズ",
+  "summaryMissing": {
+    "other": "不足している号 {count} 件"
+  },
+  "summaryWanted": {
+    "other": "未入手の号 {count} 件"
+  },
+  "filterSeries": "シリーズを絞り込み…",
+  "downloadShown": "表示中のものをダウンロード",
+  "chipWanted": "未入手",
+  "chipWantedTitle": "ダウンロードの自動化が狙うもの。各シリーズの監視方針と手動で選んだ号です",
+  "chipGaps": "すべての欠号",
+  "chipGapsTitle": "ライブラリ内のすべてのシリーズで不足しているすべての号（未入手指定の有無を問わず）",
+  "chipFollowing": "フォロー中",
+  "chipFollowingTitle": "フォローしているシリーズ（シリーズページの ☆）",
+  "chipHideUnreleased": "未発売を隠す",
+  "chipHideUnreleasedTitle": "判明している表紙日付が未来の号を隠します（キャッシュ済みの号の多くは日付がないため、隠れるのは日付が分かっているものだけです）",
+  "sortOrder": "並び順",
+  "want": "未入手にする",
+  "wantSelectedTitle": "選択した号を未入手にします。自動化がそれらを検索します",
+  "dontWant": "対象外にする",
+  "dontWantSelectedTitle": "選択した号を未入手から外します",
+  "downloadSelected": "選択したものをダウンロード",
+  "emptyNothingTracked": "まだ何もフォローしていません",
+  "emptyAddSeries": "{library}からシリーズを追加すると、不足している号がここに表示されます。",
+  "emptyNoMatch": "フィルターに一致するシリーズはありません",
+  "emptyTryDifferent": "検索語を変えるか、フィルターをクリアしてください。",
+  "emptyNothingMissing": "不足しているものはありません",
+  "emptyAllOnDisk": "ライブラリ内のすべてのシリーズの、すべての号がディスク上にあります。",
+  "emptyNothingWanted": "未入手のものはありません",
+  "emptyPoliciesSatisfied": "監視方針が求める号はすべてライブラリにあります。「すべての欠号」に切り替えるとほかに不足しているものが見られ、欲しいものを手動で選べます。",
+  "selectSeriesIssues": "このシリーズのすべての号を選択",
+  "following": "フォロー中",
+  "monitoringPolicyTitle": "監視方針 — シリーズページで変更できます",
+  "nMissing": "不足 {count}",
+  "nWanted": "未入手 {count}",
+  "picked": "選択済み",
+  "notWanted": "対象外",
+  "queuing": "キューに追加中…",
+  "download": "ダウンロード",
+  "stopWantingIssue": "この号を未入手から外す",
+  "skipIssue": "この号をスキップします。今後は監視方針の対象外になります",
+  "wantJustThis": "この号だけ未入手にする",
+  "loadMore": "さらに読み込む"
+}

@@ -1,0 +1,9 @@
+{
+  "unknownSeries": "不明なシリーズ",
+  "moreRuns": {
+    "other": "ほか {count} 範囲"
+  },
+  "others": {
+    "other": "その他 {count} 件"
+  }
+}

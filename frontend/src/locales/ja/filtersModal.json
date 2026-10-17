@@ -1,0 +1,6 @@
+{
+  "title": "フィルター",
+  "noFilters": "このライブラリで使えるフィルターはありません。",
+  "searchGroup": "{group}を検索…",
+  "clearCount": "クリア（{count}）"
+}

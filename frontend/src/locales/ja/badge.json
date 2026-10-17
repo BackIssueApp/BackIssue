@@ -1,0 +1,11 @@
+{
+  "new": "新規",
+  "queued": "待機中",
+  "sent": "送信済み",
+  "saving": "保存中",
+  "tagging": "タグ付け中",
+  "saved": "保存済み",
+  "noTags": "タグなし",
+  "corrupt": "破損",
+  "failed": "失敗"
+}

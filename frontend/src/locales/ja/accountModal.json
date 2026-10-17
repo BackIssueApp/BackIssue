@@ -1,0 +1,10 @@
+{
+  "dialogLabel": "アカウント",
+  "title": "アカウント — {username}",
+  "currentPassword": "現在のパスワード",
+  "newPassword": "新しいパスワード（8 文字以上）",
+  "confirmNewPassword": "新しいパスワード（確認）",
+  "mismatch": "新しいパスワードが一致しません",
+  "changePassword": "パスワードを変更",
+  "changed": "パスワードを変更しました。"
+}

@@ -1,0 +1,6 @@
+{
+  "siteUrl": "サイト URL",
+  "downloadProxy": "ダウンロード用プロキシ",
+  "downloadProxyNote": "ファイルのダウンロードだけに使う任意の HTTP プロキシです。データセンターの IP をブロックするホスト向けです。",
+  "browserRequired": "このソースにはブラウザー版のアプリ（-browser タグのイメージ）が必要です。この版ではオフのままになります。"
+}

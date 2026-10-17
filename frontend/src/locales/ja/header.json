@@ -1,0 +1,11 @@
+{
+  "openNav": "ナビゲーションを開く",
+  "searchPlaceholder": "コレクションを検索…",
+  "reconnecting": "再接続中…",
+  "reconnectingTitle": "サーバーとのライブ接続が切れました。再接続しています。データが古い可能性があります。",
+  "helpForPage": "このページのヘルプ",
+  "pillSaved": "保存済み",
+  "pillQueued": "待機中",
+  "pillFailed": "失敗",
+  "pillDownloading": "ダウンロード中"
+}

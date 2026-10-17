@@ -1,0 +1,74 @@
+{
+  "title": "ダウンロードキュー",
+  "phase": {
+    "searching": "検索中",
+    "starting": "開始中",
+    "connecting": "接続中",
+    "solving": "チャレンジを解決中",
+    "grabbed": "送信済み",
+    "queued": "待機中",
+    "downloading": "ダウンロード中",
+    "done": "整理中",
+    "tagging": "タグ付け中",
+    "saving": "保存中"
+  },
+  "lookingForMatch": "一致するものを探しています…",
+  "lookingForSource": "ソースを探しています…",
+  "gettingPastProtection": "{host} の保護を通過しています…",
+  "theHost": "ホスト",
+  "contacting": "{host} に接続しています…",
+  "perSecond": "{rate}/秒",
+  "via": " · {name} 経由",
+  "pageOf": "{page} / {pages} ページ",
+  "seeders": {
+    "other": " · シーダー {count}"
+  },
+  "filterAll": "すべて",
+  "filterActive": "実行中",
+  "filterQueued": "待機中",
+  "filterFailed": "失敗",
+  "emptyAllTitle": "キューは空です",
+  "emptyAllBody": "シリーズや号を追加すると、新しいダウンロードがここに表示されます。一時停止中の項目が待っている間も、実行中のダウンロードは続きます。",
+  "emptyActiveTitle": "ダウンロード中のものはありません",
+  "emptyActiveBody": "現在実行中のダウンロードはありません。枠が空くと待機中の項目が自動で始まります。",
+  "emptyQueuedTitle": "待機中のものはありません",
+  "emptyQueuedBody": "待機中だったものはすべて開始または完了しました。",
+  "emptyFailedTitle": "失敗はありません",
+  "emptyFailedBody": "失敗したものはありません。すべてのダウンロードが完了したか、進行中です。",
+  "confirmClearTitle": {
+    "other": "待機中のダウンロード {count} 件を消去しますか？"
+  },
+  "confirmClearMessage": "キューで待っているものはすべて削除されます。実行中のダウンロードは続きます。",
+  "clearQueue": "キューを消去",
+  "clearedQueued": {
+    "other": "待機中のダウンロード {count} 件を消去しました。"
+  },
+  "retryingFailed": {
+    "other": "失敗したダウンロード {count} 件を再試行しています。"
+  },
+  "clearedFailed": {
+    "other": "失敗した項目 {count} 件を消去しました。"
+  },
+  "confirmCancelTitle": "このダウンロードを取り消しますか？",
+  "confirmCancelMessage": "ダウンロードクライアントからも削除されます。",
+  "cancelDownload": "ダウンロードを取り消す",
+  "downloadCancelled": "ダウンロードを取り消しました。クライアントからも削除しました。",
+  "paused": "一時停止中",
+  "resume": "再開",
+  "pause": "一時停止",
+  "retryFailed": "失敗を再試行",
+  "clearQueued": "待機中を消去",
+  "statActive": "実行中",
+  "statQueued": "待機中",
+  "statFailed": "失敗",
+  "statDownSpeed": "受信速度",
+  "clearFailed": "失敗を消去",
+  "pack": "パック",
+  "collectionPack": "コレクションパック",
+  "audiobook": "オーディオブック",
+  "book": "書籍",
+  "untitled": "無題",
+  "cancelRemovesFromClient": "取り消します。クライアントからもダウンロードを削除します",
+  "removeFromQueue": "キューから削除",
+  "retryThisDownload": "このダウンロードを再試行"
+}

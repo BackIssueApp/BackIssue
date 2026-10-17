@@ -1,0 +1,8 @@
+{
+  "requestFailed": "リクエストに失敗しました",
+  "noResponse": "応答がありません",
+  "downloadFailed": "ダウンロードをキューに追加できませんでした：{error}",
+  "downloadFailedUnreachable": "ダウンロードをキューに追加できませんでした。アプリに接続できますか？",
+  "redownloadFailed": "再ダウンロードに失敗しました：{error}",
+  "redownloadFailedUnreachable": "再ダウンロードに失敗しました。アプリに接続できますか？"
+}

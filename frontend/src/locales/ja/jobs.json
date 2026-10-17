@@ -1,0 +1,21 @@
+{
+  "reorganize": "ライブラリを再整理",
+  "cvMatch": "シリーズのメタデータを照合",
+  "cvMatchSchedule": "シリーズのメタデータを照合（所有＋フォロー中）",
+  "scanFolder": "フォルダーをスキャン · {detail}",
+  "tagFiles": "ファイルをタグ付け · {detail}",
+  "importScanFull": "インポート用にライブラリをスキャン（完全）",
+  "importScanNew": "新しい巻を探してライブラリをスキャン",
+  "importRun": "ライブラリをインポート",
+  "releases": "今週の新刊を確認",
+  "refreshDetails": "号の詳細を更新 · {detail}",
+  "wantedSearch": "未入手の号を検索",
+  "wantedSearchSchedule": "未入手の号を検索（バックフィル）",
+  "recentSearch": "新刊を検索",
+  "rssWatch": "インデクサーの RSS を監視",
+  "rssWatchSchedule": "インデクサーの RSS で新刊を監視",
+  "packImport": "パックをインポート · {detail}",
+  "zeroDay": "週刊 0-Day パックを取得",
+  "zeroDaySchedule": "週刊 0-Day パックを取得（トレント）",
+  "dbBackup": "データベースをバックアップ"
+}

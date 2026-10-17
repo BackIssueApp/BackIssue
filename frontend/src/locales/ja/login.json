@@ -1,0 +1,14 @@
+{
+  "intro": "BackIssue へようこそ。まずアカウントを作成してください。このアカウントが<b>管理者</b>になり、以降はサインインが必要になります。",
+  "signIn": "サインイン",
+  "createAccount": "アカウントを作成",
+  "createAdmin": "管理者アカウントを作成",
+  "username": "ユーザー名",
+  "password": "パスワード",
+  "confirmPassword": "パスワード（確認）",
+  "passwordsMismatch": "パスワードが一致しません",
+  "or": "または",
+  "signInWith": "{provider} でサインイン",
+  "noMethod": "使用できるサインイン方法がありません。管理者が SSO を設定するか、パスワードでのサインインを再度有効にする必要があります。",
+  "registrationDisabled": "登録は無効になっています。アカウントは管理者に依頼してください。"
+}

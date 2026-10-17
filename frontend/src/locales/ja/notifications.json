@@ -1,0 +1,41 @@
+{
+  "releaseWeek": {
+    "title": "今週の新刊",
+    "body": {
+      "other": "フォロー中のシリーズから今週 {count} 号が発売されます。"
+    },
+    "bodyNamed": {
+      "other": "フォロー中のシリーズから今週 {count} 号が発売されます：{named}。"
+    },
+    "bodyNamedMore": {
+      "other": "フォロー中のシリーズから今週 {count} 号が発売されます：{named} ほか {more} 号。"
+    }
+  },
+  "pickArrived": {
+    "title": "リクエストした号が届きました",
+    "body": "{series} #{number}",
+    "bodyNamed": "{series} #{number} — {name}"
+  },
+  "packDone": {
+    "title": "パックをインポートしました",
+    "body": {
+      "other": "{title} — 新しい号 {count} 件"
+    },
+    "bodyFailed": {
+      "other": "{title} — 新しい号 {count} 件、失敗 {failed} 件"
+    }
+  },
+  "packFailed": {
+    "title": "パックに失敗しました",
+    "body": "{title} — {error}"
+  },
+  "importDone": {
+    "title": "ダウンロード完了",
+    "body": "{title}",
+    "bodySource": "{title} · {source}"
+  },
+  "importFailed": {
+    "title": "ダウンロードに失敗しました",
+    "body": "{title} — {error}"
+  }
+}

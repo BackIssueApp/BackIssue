@@ -1,0 +1,28 @@
+{
+  "title": "履歴",
+  "nFailures": {
+    "other": "{count} 件の失敗"
+  },
+  "nBlocked": {
+    "other": "{count} 件のブロック済みリリース"
+  },
+  "nImports": {
+    "other": "{count} 件のインポート"
+  },
+  "statFailures": "失敗",
+  "statBlocked": "ブロック済み",
+  "statImports": "インポート",
+  "emptyFailedTitle": "失敗したダウンロードはありません",
+  "emptyFailedBody": "エラーになったダウンロードはここに記録されます。キューが空になっても記録は残ります。",
+  "emptyBlockedTitle": "ブロックしているものはありません",
+  "emptyBlockedBody": "失敗した Usenet のリリースはここに入り、以後の検索で除外されます。削除すると再び対象になります。",
+  "emptyImportsTitle": "まだ何もインポートされていません",
+  "emptyImportsBody": "ダウンロードが届くとここに表示されます。バックグラウンドの監視が処理したインポートを記録します。",
+  "filterPlaceholder": "絞り込み…",
+  "clearAll": "すべてクリア",
+  "chipAll": "すべて",
+  "chipFailed": "失敗",
+  "chipBlocklist": "ブロックリスト",
+  "removeFromBlocklist": "ブロックリストから削除して、自動取得を再び許可する",
+  "loadMore": "さらに読み込む"
+}

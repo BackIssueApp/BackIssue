@@ -1,0 +1,14 @@
+{
+  "dialogLabel": "インデクサー",
+  "kindIndexer": "インデクサー",
+  "kindTorrentIndexer": "トレントインデクサー",
+  "addTitle": "{kind}を追加",
+  "editTitle": "{kind}を編集",
+  "name": "名前",
+  "url": "URL",
+  "apiKey": "API キー",
+  "enterUrlFirst": "先に URL を入力してください。",
+  "urlRequired": "URL は必須です。",
+  "testing": "テスト中…",
+  "test": "テスト"
+}
