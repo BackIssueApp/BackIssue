@@ -13,6 +13,7 @@
   import { confirmDialog } from './DialogModal.svelte';
   import { can } from '../lib/auth.svelte.js';
   import { fmt, fmtAgo, fmtIn, escapeHtml } from '../lib/util.js';
+  import { t, th, currentLang } from '../lib/i18n.svelte.js';
   import Icon from '../lib/Icon.svelte';
 
   let { active = false } = $props();
@@ -20,8 +21,8 @@
   const canJobs = $derived(can('system.jobs'));
   const canLogs = $derived(can('system.logs'));
   const TAB_DEFS = $derived([
-    ...(canJobs ? [{ id: 'jobs', label: 'Jobs', icon: 'clock' }, { id: 'tools', label: 'Tools', icon: 'tools' }] : []),
-    ...(canLogs ? [{ id: 'logs', label: 'Logs', icon: 'file-text' }] : []),
+    ...(canJobs ? [{ id: 'jobs', label: t('systemPage.tabJobs'), icon: 'clock' }, { id: 'tools', label: t('systemPage.tabTools'), icon: 'tools' }] : []),
+    ...(canLogs ? [{ id: 'logs', label: t('systemPage.tabLogs'), icon: 'file-text' }] : []),
   ]);
 
   let page = $state('jobs');
@@ -30,7 +31,7 @@
   $effect(() => {
     if (!active) return;
     const want = new URLSearchParams(route.search).get('tab');
-    const ids = untrack(() => TAB_DEFS).map((t) => t.id);
+    const ids = untrack(() => TAB_DEFS).map((tab) => tab.id);
     untrack(() => {
       page = ids.includes(want) ? want : (ids[0] || 'jobs');
     });
@@ -38,17 +39,19 @@
   function selectTab(id) { page = id; setQuery({ tab: id }); }
 
   // ================= JOBS =================
+  // Job type → catalog key under systemPage.job (resolved at render time).
   const JOB_LABELS = {
-    crawl: 'Catalog', 'cv-match': 'ComicVine', 'scan-folder': 'Scan', 'tag-files': 'Tag',
-    releases: 'Releases', updates: 'Updates', tool: 'Tool', 'zero-day': '0-Day', 'wanted-search': 'Wanted',
-    'pack-import': 'Pack', 'import-scan': 'Import', 'import-run': 'Import',
+    crawl: 'catalog', 'cv-match': 'metadata', 'scan-folder': 'scan', 'tag-files': 'tag',
+    releases: 'releases', updates: 'updates', tool: 'tool', 'zero-day': 'zeroDay', 'wanted-search': 'wanted',
+    'pack-import': 'pack', 'import-scan': 'import', 'import-run': 'import',
   };
   const JOB_TONE = {
-    Catalog: 'var(--cyan)', ComicVine: 'var(--green)', Scan: 'var(--cyan)', Tag: 'var(--amber)',
-    Releases: 'var(--accent)', Updates: 'var(--green)', 'Tool': 'var(--muted)', '0-Day': 'var(--accent)',
-    Wanted: 'var(--accent)', Pack: 'var(--amber)', Import: 'var(--cyan)',
+    catalog: 'var(--cyan)', metadata: 'var(--green)', scan: 'var(--cyan)', tag: 'var(--amber)',
+    releases: 'var(--accent)', updates: 'var(--green)', tool: 'var(--muted)', zeroDay: 'var(--accent)',
+    wanted: 'var(--accent)', pack: 'var(--amber)', import: 'var(--cyan)',
   };
-  const jobTone = (type) => JOB_TONE[JOB_LABELS[type] || type] || 'var(--muted)';
+  const jobLabel = (type) => (JOB_LABELS[type] ? t('systemPage.job.' + JOB_LABELS[type]) : type);
+  const jobTone = (type) => JOB_TONE[JOB_LABELS[type]] || 'var(--muted)';
 
   let jobs = $state([]);
   let scheds = $state([]);
@@ -72,22 +75,22 @@
   const runningJobs = $derived(jobs.filter((j) => j.status === 'running').length);
 
   function jobSummary(j) {
-    if (j.status === 'failed') return j.error || 'failed';
-    if (j.status === 'running') return j.message || (j.total ? fmt(j.done) + '/' + fmt(j.total) : 'working…');
-    if (!j.result) return 'done';
-    return Object.entries(j.result).filter(([, val]) => val != null).map(([k, val]) => fmt(val) + ' ' + k.replace(/([A-Z])/g, ' $1').toLowerCase()).join(' · ') || 'done';
+    if (j.status === 'failed') return j.error || t('systemPage.status.failed');
+    if (j.status === 'running') return j.message || (j.total ? fmt(j.done) + '/' + fmt(j.total) : t('systemPage.status.working'));
+    if (!j.result) return t('systemPage.status.done');
+    return Object.entries(j.result).filter(([, val]) => val != null).map(([k, val]) => fmt(val) + ' ' + k.replace(/([A-Z])/g, ' $1').toLowerCase()).join(' · ') || t('systemPage.status.done');
   }
   const jobPct = (j) => j.status === 'running' && j.total ? Math.min(100, Math.round((j.done / j.total) * 100)) : (j.status === 'running' ? null : 100);
 
   async function saveSchedule(key, body) {
     const r = await apiPost('/api/schedules/' + key, body);
-    if (r.error) notify(r.error, 'error'); else notify('Schedule saved.', 'ok');
+    if (r.error) notify(r.error, 'error'); else notify(t('systemPage.scheduleSaved'), 'ok');
     renderSchedules();
   }
   async function runNow(s) {
     s._starting = true;
     const r = await apiPost('/api/schedules/' + s.key + '/run');
-    if (r?.error) notify(r.error, 'error'); else notify(`Started "${s.label || s.key}".`, 'ok');
+    if (r?.error) notify(r.error, 'error'); else notify(t('systemPage.started', { name: s.label || s.key }), 'ok');
     renderSchedules(); renderJobs();
   }
   async function clearFinished() {
@@ -143,7 +146,7 @@
   async function previewRefile() {
     refileBusy = true;
     try { refilePlan = await apiGet('/api/library/refile-plan'); }
-    catch (e) { notify('Preview failed: ' + (e?.message || e), 'error'); }
+    catch (e) { notify(t('systemPage.previewFailed', { error: e?.message || e }), 'error'); }
     refileBusy = false;
   }
   let refileStatus = $state(null);
@@ -158,9 +161,9 @@
         refileBusy = false;
         if (refileStatus?.result) {
           const r = refileStatus.result;
-          notify(`Reorganized ${fmt(r.moved)} file${r.moved === 1 ? '' : 's'}${r.skipped ? `, ${fmt(r.skipped)} skipped` : ''}.`, 'ok');
+          notify(t('systemPage.reorganizedResult', { count: r.moved, skipped: r.skipped ? t('systemPage.reorganizedSkipped', { count: fmt(r.skipped) }) : '' }), 'ok');
           refilePlan = null;
-        } else if (refileStatus?.error) notify('Reorganize failed: ' + refileStatus.error, 'error');
+        } else if (refileStatus?.error) notify(t('systemPage.reorganizeFailed', { error: refileStatus.error }), 'error');
       }
     }, 1200);
   }
@@ -169,9 +172,9 @@
     const n = refilePlan?.counts?.move || 0;
     if (!n) return;
     if (!(await confirmDialog({
-      title: `Reorganize ${fmt(n)} file${n === 1 ? '' : 's'}?`,
-      message: 'Every ComicVine-matched series is moved/renamed to match your folder and file patterns. This changes files on disk and runs in the background — progress shows here and on the Jobs tab.',
-      confirmLabel: 'Reorganize',
+      title: t('systemPage.confirmReorganizeTitle', { count: n }),
+      message: t('systemPage.confirmReorganizeMessage'),
+      confirmLabel: t('systemPage.reorganize'),
     }))) return;
     refileBusy = true;
     let r;
@@ -182,12 +185,12 @@
   }
 
   let startingId = $state(null);
-  async function runTool(t) {
-    startingId = t.id;
-    const body = t.id === 'verify' && verifyCorruptOnly ? { corruptOnly: true }
-      : t.id === 'remove-ghosts' && ghostsRemove ? { remove: true }
-      : t.id === 'remove-duplicates' && dupesRemove ? { remove: true } : {};
-    const r = await apiPost('/api/tools/' + t.id, body);
+  async function runTool(tool) {
+    startingId = tool.id;
+    const body = tool.id === 'verify' && verifyCorruptOnly ? { corruptOnly: true }
+      : tool.id === 'remove-ghosts' && ghostsRemove ? { remove: true }
+      : tool.id === 'remove-duplicates' && dupesRemove ? { remove: true } : {};
+    const r = await apiPost('/api/tools/' + tool.id, body);
     if (r.error) notify(r.error, 'error');
     startingId = null;
     renderTools();
@@ -229,7 +232,7 @@
   $effect(() => { if (page === 'logs' && category !== 'all' && cats.length && !cats.includes(category)) setQuery({ cat: null }); });
   const counts = $derived(logData?.counts || {});
 
-  const LEVELS = [['all', 'All', ''], ['error', 'Errors', 'var(--red)'], ['warn', 'Warnings', 'var(--amber)'], ['info', 'Info', 'var(--cyan)']];
+  const LEVELS = $derived([['all', t('systemPage.levelAll'), ''], ['error', t('systemPage.levelErrors'), 'var(--red)'], ['warn', t('systemPage.levelWarnings'), 'var(--amber)'], ['info', t('systemPage.levelInfo'), 'var(--cyan)']]);
   const levelCount = (id) => id === 'all' ? (logData?.logs?.length || 0) : (counts[id] || 0);
 
   function highlight(text, q) {
@@ -263,7 +266,7 @@
     try {
       const r = await fetch('/api/support/package');
       if (!r.ok) {
-        let msg = `Server error (HTTP ${r.status})`;
+        let msg = t('common.serverError', { status: r.status });
         try { msg = (await r.json()).error || msg; } catch { /* keep */ }
         supportError = msg;
         return;
@@ -289,33 +292,33 @@
   async function clearLogs() {
     const r = await apiPost('/api/logs/clear');
     if (r?.error) return notify(r.error, 'error');
-    notify('Logs cleared.', 'ok');
+    notify(t('systemPage.logsCleared'), 'ok');
     renderLogs();
   }
 
   const headerSummary = $derived(
-    page === 'jobs' ? (jobs.length ? `${fmt(jobs.length)} recent · ${fmt(runningJobs)} running` : '')
-    : page === 'logs' ? `${fmt(counts.error || 0)} errors · ${fmt(counts.warn || 0)} warnings · ${fmt(counts.info || 0)} info`
-    : 'Library-wide maintenance');
+    page === 'jobs' ? (jobs.length ? t('systemPage.summaryJobs', { recent: fmt(jobs.length), running: fmt(runningJobs) }) : '')
+    : page === 'logs' ? t('systemPage.summaryLogs', { errors: fmt(counts.error || 0), warnings: fmt(counts.warn || 0), info: fmt(counts.info || 0) })
+    : t('systemPage.summaryTools'));
 </script>
 
 <main id="system-page" class="scan-page system-page sysx">
   <!-- header -->
   <div class="sysx__head">
-    <h2 class="sysx__title">System</h2>
+    <h2 class="sysx__title">{t('systemPage.title')}</h2>
     <span class="sysx__summary">{headerSummary}</span>
     <div class="sysx__head-actions">
-      {#if page === 'jobs'}<button class="sysx__ghost" onclick={clearFinished}>Clear finished</button>{/if}
-      {#if page === 'logs'}<button class="sysx__ghost" onclick={clearLogs}>Clear logs</button>{/if}
+      {#if page === 'jobs'}<button class="sysx__ghost" onclick={clearFinished}>{t('systemPage.clearFinished')}</button>{/if}
+      {#if page === 'logs'}<button class="sysx__ghost" onclick={clearLogs}>{t('systemPage.clearLogs')}</button>{/if}
     </div>
   </div>
 
   <!-- tab rail -->
   <div class="sysx__tabs">
-    {#each TAB_DEFS as t (t.id)}
-      <button class="sysx__tab" class:is-active={page === t.id} onclick={() => selectTab(t.id)}>
-        <Icon name={t.icon} size={15} />{t.label}
-        {#if t.id === 'jobs' && runningJobs}<span class="sysx__tab-count">{runningJobs}</span>{/if}
+    {#each TAB_DEFS as tab (tab.id)}
+      <button class="sysx__tab" class:is-active={page === tab.id} onclick={() => selectTab(tab.id)}>
+        <Icon name={tab.icon} size={15} />{tab.label}
+        {#if tab.id === 'jobs' && runningJobs}<span class="sysx__tab-count">{runningJobs}</span>{/if}
       </button>
     {/each}
   </div>
@@ -324,49 +327,49 @@
   {#if canJobs}
     <div class="sysx__body" class:is-active={page === 'jobs'}>
       <div class="sysx__scroll"><div class="sysx__inner">
-        <div class="sysx__h">Scheduled tasks</div>
-        <p class="sysx__note">Toggle a task on and set when it runs with a cron pattern — <code>min hour day month weekday</code>. Examples: <code>0 9 * * 3</code> = Wednesdays 9am · <code>0 */12 * * *</code> = every 12 hours. A run missed while the app was off catches up once at the next start.</p>
+        <div class="sysx__h">{t('systemPage.scheduledTasks')}</div>
+        <p class="sysx__note">{@html th('systemPage.cronNote')}</p>
         <div class="sysx__sched-table">
           {#each scheds as s (s.key)}
             <div class="sysx__sched" class:is-running={s.running} class:is-off={!s.enabled}>
               <label class="switch switch--sm"><input type="checkbox" checked={s.enabled} onchange={(e) => saveSchedule(s.key, { enabled: e.currentTarget.checked })} /><span class="switch__track"></span></label>
               <div class="sysx__sched-id">
                 <div class="sysx__sched-label">{s.label}</div>
-                <div class="sysx__sched-last">{s.lastRun ? `last run ${fmtAgo(now - s.lastRun)} ago` : 'never run'}</div>
+                <div class="sysx__sched-last">{s.lastRun ? t('systemPage.lastRunAgo', { time: fmtAgo(now - s.lastRun) }) : t('systemPage.neverRun')}</div>
               </div>
-              <input class="sched__cron sysx__cron" type="text" spellcheck="false" value={s.cron} title="min hour day month weekday — e.g. 0 9 * * 3 = Wednesdays 9am"
+              <input class="sched__cron sysx__cron" type="text" spellcheck="false" value={s.cron} title={t('systemPage.cronTitle')}
                 onchange={(e) => saveSchedule(s.key, { cron: e.currentTarget.value })} />
               {#if s.running}
-                <span class="sysx__next sysx__next--run">running{s.runningSince ? ' ' + fmtAgo(now - s.runningSince) : ''}</span>
+                <span class="sysx__next sysx__next--run">{s.runningSince ? t('systemPage.runningFor', { time: fmtAgo(now - s.runningSince) }) : t('systemPage.running')}</span>
               {:else if !s.enabled}
-                <span class="sysx__next sysx__next--off">off</span>
+                <span class="sysx__next sysx__next--off">{t('systemPage.off')}</span>
               {:else if s.invalid}
-                <span class="sysx__next sysx__next--bad" title={s.invalid}>invalid</span>
+                <span class="sysx__next sysx__next--bad" title={s.invalid}>{t('systemPage.invalid')}</span>
               {:else if s.nextRun}
-                <span class="sysx__next" title={new Date(s.nextRun).toLocaleString()}>{fmtIn(s.nextRun - now)}</span>
+                <span class="sysx__next" title={new Date(s.nextRun).toLocaleString(currentLang())}>{fmtIn(s.nextRun - now)}</span>
               {:else}
-                <span class="sysx__next sysx__next--off">never</span>
+                <span class="sysx__next sysx__next--off">{t('systemPage.never')}</span>
               {/if}
               <button class="sysx__ghost sysx__ghost--sm" disabled={s.running || s._starting} onclick={() => runNow(s)}>
-                {s.running ? 'Running…' : s._starting ? 'Starting…' : 'Run now'}</button>
+                {s.running ? t('systemPage.runningEllipsis') : s._starting ? t('systemPage.startingEllipsis') : t('systemPage.runNow')}</button>
             </div>
           {/each}
         </div>
 
-        <div class="sysx__h sysx__h--gap">Recent runs <span class="sysx__h-count">{jobs.length ? `${fmt(jobs.length)} shown` : ''}</span></div>
+        <div class="sysx__h sysx__h--gap">{t('systemPage.recentRuns')} <span class="sysx__h-count">{jobs.length ? t('systemPage.nShown', { count: fmt(jobs.length) }) : ''}</span></div>
         {#if jobsLoaded && !jobs.length}
-          <div class="sysx__empty-line">No jobs yet. Background tasks (crawl, ComicVine match, scans, tagging, release checks) show up here.</div>
+          <div class="sysx__empty-line">{t('systemPage.noJobs')}</div>
         {/if}
         {#each jobs as j (j.id ?? j.startedAt + j.type)}
           {@const pct = jobPct(j)}
           <div class="sysx__job" class:is-failed={j.status === 'failed'}>
             <div class="sysx__job-head">
-              <span class="sysx__chip" style="color:{jobTone(j.type)}; background:color-mix(in srgb, {jobTone(j.type)} 15%, transparent);">{JOB_LABELS[j.type] || j.type}</span>
+              <span class="sysx__chip" style="color:{jobTone(j.type)}; background:color-mix(in srgb, {jobTone(j.type)} 15%, transparent);">{jobLabel(j.type)}</span>
               <span class="sysx__job-label">{j.label}</span>
               <span class="sysx__badge sysx__badge--{j.status}"><span class="sysx__bdot"></span>{j.status}</span>
               <span class="sysx__job-time">{j.status === 'running'
-                ? `running ${fmtAgo(now - j.startedAt)}`
-                : `${fmtAgo(now - (j.finishedAt || j.startedAt))} ago · took ${fmtAgo((j.finishedAt || now) - j.startedAt)}`}</span>
+                ? t('systemPage.runningFor', { time: fmtAgo(now - j.startedAt) })
+                : t('systemPage.agoTook', { ago: fmtAgo(now - (j.finishedAt || j.startedAt)), took: fmtAgo((j.finishedAt || now) - j.startedAt) })}</span>
             </div>
             {#if j.status === 'running'}
               <div class="sysx__track">
@@ -383,33 +386,33 @@
     <!-- ============ TOOLS ============ -->
     <div class="sysx__body" class:is-active={page === 'tools'}>
       <div class="sysx__scroll"><div class="sysx__inner">
-        <p class="sysx__note sysx__note--lead">Library-wide maintenance. Each runs in the background — you can leave this page and watch progress on the Jobs tab.</p>
+        <p class="sysx__note sysx__note--lead">{t('systemPage.toolsLead')}</p>
 
         <!-- Featured: reorganize -->
         <div class="sysx__refile">
           <div class="sysx__refile-head">
             <div class="sysx__refile-ico"><Icon name="folder" size={20} /></div>
             <div>
-              <div class="sysx__refile-title">Reorganize library</div>
-              <p class="sysx__refile-desc">Move &amp; rename every matched series' files to your folder and file patterns (Settings → Library → File organization). Preview first — nothing changes until you reorganize.</p>
+              <div class="sysx__refile-title">{t('systemPage.reorganizeTitle')}</div>
+              <p class="sysx__refile-desc">{t('systemPage.reorganizeDesc')}</p>
             </div>
           </div>
           {#if refileStatus?.running}
             <div class="sysx__track sysx__track--lg"><div class="sysx__bar" style="width:{refileStatus.total ? Math.round(((refileStatus.done || 0) / refileStatus.total) * 100) : 0}%"></div></div>
-            <div class="sysx__refile-meta">{refileStatus.message || 'Starting…'} · {fmt(refileStatus.done || 0)}/{fmt(refileStatus.total || 0)} series{refileStatus.moved != null ? ` · ${fmt(refileStatus.moved)} moved` : ''}</div>
+            <div class="sysx__refile-meta">{t('systemPage.refileProgress', { message: refileStatus.message || t('systemPage.startingEllipsis'), done: fmt(refileStatus.done || 0), total: fmt(refileStatus.total || 0) })}{refileStatus.moved != null ? t('systemPage.refileMoved', { count: fmt(refileStatus.moved) }) : ''}</div>
           {/if}
           {#if refilePlan}
             <div class="sysx__refile-stats">
-              <span class="sysx__stat"><b>{fmt(refilePlan.counts.move)}</b> to move</span>
-              <span class="sysx__stat"><b>{fmt(refilePlan.counts.unchanged)}</b> already match</span>
-              {#if refilePlan.counts.skip}<span class="sysx__stat"><b>{fmt(refilePlan.counts.skip)}</b> skipped</span>{/if}
-              {#if refilePlan.counts.collision}<span class="sysx__stat sysx__stat--warn"><b>{fmt(refilePlan.counts.collision)}</b> name collisions</span>{/if}
+              <span class="sysx__stat"><b>{fmt(refilePlan.counts.move)}</b> {t('systemPage.toMove')}</span>
+              <span class="sysx__stat"><b>{fmt(refilePlan.counts.unchanged)}</b> {t('systemPage.alreadyMatch')}</span>
+              {#if refilePlan.counts.skip}<span class="sysx__stat"><b>{fmt(refilePlan.counts.skip)}</b> {t('systemPage.skipped')}</span>{/if}
+              {#if refilePlan.counts.collision}<span class="sysx__stat sysx__stat--warn"><b>{fmt(refilePlan.counts.collision)}</b> {t('systemPage.nameCollisions')}</span>{/if}
             </div>
             {#if refileGroups.length}
               <div class="sysx__diff">
                 {#each refileGroups as g (g.dir)}
                   <div class="sysx__diff-group">
-                    <div class="sysx__diff-dir" title={g.dir}><Icon name="folder" size={14} /><span>{g.label}</span><span class="sysx__diff-count">{g.items.length} file{g.items.length === 1 ? '' : 's'}</span></div>
+                    <div class="sysx__diff-dir" title={g.dir}><Icon name="folder" size={14} /><span>{g.label}</span><span class="sysx__diff-count">{t('systemPage.nFiles', { count: g.items.length })}</span></div>
                     {#each g.items as it (it.fullFrom)}
                       <div class="sysx__diff-item" title={it.fullFrom + '\n→ ' + it.fullTo}>
                         <span class="sysx__diff-from">{it.from}</span>
@@ -419,30 +422,30 @@
                   </div>
                 {/each}
                 {#if refilePlan.truncated}
-                  <div class="sysx__diff-more">Showing the first {fmt(refilePlan.moves.length)} of {fmt(refilePlan.counts.move)} moves — the rest follow the same patterns.</div>
+                  <div class="sysx__diff-more">{t('systemPage.showingFirstMoves', { shown: fmt(refilePlan.moves.length), total: fmt(refilePlan.counts.move) })}</div>
                 {/if}
               </div>
             {:else}
-              <div class="sysx__note">Nothing to move — files already match your patterns.</div>
+              <div class="sysx__note">{t('systemPage.nothingToMove')}</div>
             {/if}
           {/if}
           <div class="sysx__refile-actions">
-            <button class="sysx__ghost" disabled={refileBusy} onclick={previewRefile}>{refileBusy && !refilePlan ? 'Previewing…' : refilePlan ? 'Re-preview' : 'Preview'}</button>
+            <button class="sysx__ghost" disabled={refileBusy} onclick={previewRefile}>{refileBusy && !refilePlan ? t('systemPage.previewing') : refilePlan ? t('systemPage.repreview') : t('systemPage.preview')}</button>
             {#if refilePlan && refilePlan.counts.move}
-              <button class="sysx__primary" disabled={refileBusy} onclick={runRefile}>{refileBusy ? 'Reorganizing…' : `Reorganize ${fmt(refilePlan.counts.move)}`}</button>
+              <button class="sysx__primary" disabled={refileBusy} onclick={runRefile}>{refileBusy ? t('systemPage.reorganizing') : t('systemPage.reorganizeN', { count: fmt(refilePlan.counts.move) })}</button>
             {/if}
           </div>
         </div>
 
         <!-- support package -->
-        <div class="sysx__h">Getting help</div>
+        <div class="sysx__h">{t('systemPage.gettingHelp')}</div>
         <div class="sysx__tools-grid">
           <div class="sysx__tool">
             <div class="sysx__tool-head">
               <div class="sysx__tool-ico"><Icon name="download" size={18} /></div>
               <div class="sysx__tool-id">
-                <div class="sysx__tool-name">Support package</div>
-                <p class="sysx__tool-desc">One zip to attach to a bug report: version and build, runtime, settings, plugins, libraries, jobs, recent downloads and the log. API keys, passwords and tokens are redacted; no comics, user names or e-mail addresses are included.</p>
+                <div class="sysx__tool-name">{t('systemPage.supportPackage')}</div>
+                <p class="sysx__tool-desc">{t('systemPage.supportDesc')}</p>
               </div>
             </div>
             {#if supportError}
@@ -451,54 +454,54 @@
             {#if sendResult?.code}
               <div class="sysx__tool-result sysx__support-code">
                 <Icon name="check" size={14} />
-                <span>Sent. Quote this code in your report:</span>
+                <span>{t('systemPage.sentQuoteCode')}</span>
                 <code class="sysx__code">{sendResult.code}</code>
-                <button class="sysx__ghost" onclick={copyCode}>{codeCopied ? 'Copied' : 'Copy'}</button>
-                {#if sendResult.expiresInDays}<span class="sysx__muted">kept for {sendResult.expiresInDays} days</span>{/if}
+                <button class="sysx__ghost" onclick={copyCode}>{codeCopied ? t('common.copied') : t('common.copy')}</button>
+                {#if sendResult.expiresInDays}<span class="sysx__muted">{t('systemPage.keptForDays', { count: sendResult.expiresInDays })}</span>{/if}
               </div>
             {/if}
             <div class="sysx__tool-actions">
-              <button class="sysx__primary" disabled={supportBusy || sendBusy} onclick={downloadSupport}>{supportBusy ? 'Building…' : 'Download support package'}</button>
-              <input class="sysx__support-note" placeholder="What's wrong? (optional, goes with the package)" maxlength="200" bind:value={sendNote} disabled={sendBusy} />
-              <button class="sysx__ghost" disabled={supportBusy || sendBusy} onclick={sendSupport}>{sendBusy ? 'Sending…' : 'Send to BackIssue support'}</button>
+              <button class="sysx__primary" disabled={supportBusy || sendBusy} onclick={downloadSupport}>{supportBusy ? t('systemPage.building') : t('systemPage.downloadSupport')}</button>
+              <input class="sysx__support-note" placeholder={t('systemPage.supportNotePlaceholder')} maxlength="200" bind:value={sendNote} disabled={sendBusy} />
+              <button class="sysx__ghost" disabled={supportBusy || sendBusy} onclick={sendSupport}>{sendBusy ? t('systemPage.sending') : t('systemPage.sendToSupport')}</button>
             </div>
           </div>
         </div>
 
         <!-- tool grid -->
-        <div class="sysx__h">Maintenance</div>
+        <div class="sysx__h">{t('systemPage.maintenance')}</div>
         <div class="sysx__tools-grid">
-          {#each st?.catalog || [] as t (t.id)}
-            <div class="sysx__tool" class:is-running={runningTool === t.id}>
+          {#each st?.catalog || [] as tool (tool.id)}
+            <div class="sysx__tool" class:is-running={runningTool === tool.id}>
               <div class="sysx__tool-head">
-                <div class="sysx__tool-ico"><Icon name={toolIcon(t.id)} size={18} /></div>
+                <div class="sysx__tool-ico"><Icon name={toolIcon(tool.id)} size={18} /></div>
                 <div class="sysx__tool-id">
-                  <div class="sysx__tool-name">{t.label}</div>
-                  <p class="sysx__tool-desc">{t.desc}</p>
+                  <div class="sysx__tool-name">{tool.label}</div>
+                  <p class="sysx__tool-desc">{tool.desc}</p>
                 </div>
               </div>
-              {#if runningTool === t.id && st.total}
+              {#if runningTool === tool.id && st.total}
                 <div class="sysx__track"><div class="sysx__bar" style="width:{Math.round(((st.done || 0) / st.total) * 100)}%"></div></div>
                 <div class="sysx__tool-meta">{st.message || ''} · {fmt(st.done || 0)}/{fmt(st.total)}</div>
               {/if}
-              {#if runningTool !== t.id && st?.ranAt && st.tool === t.id && st.result}
+              {#if runningTool !== tool.id && st?.ranAt && st.tool === tool.id && st.result}
                 <div class="sysx__tool-result"><Icon name="check" size={14} /> {summarizeToolResult(st)}</div>
               {/if}
-              {#if runningTool !== t.id && st?.tool === t.id && st.error}
+              {#if runningTool !== tool.id && st?.tool === tool.id && st.error}
                 <div class="sysx__tool-result sysx__tool-result--err"><Icon name="close" size={14} /> {st.error}</div>
               {/if}
-              {#if t.id === 'verify'}
-                <label class="sysx__tool-opt"><input type="checkbox" bind:checked={verifyCorruptOnly} disabled={busy} /> Only re-check corrupt files{st?.corruptCount ? ` (${fmt(st.corruptCount)})` : ''}</label>
+              {#if tool.id === 'verify'}
+                <label class="sysx__tool-opt"><input type="checkbox" bind:checked={verifyCorruptOnly} disabled={busy} /> {st?.corruptCount ? t('systemPage.onlyCorruptCount', { count: fmt(st.corruptCount) }) : t('systemPage.onlyCorrupt')}</label>
               {/if}
-              {#if t.id === 'remove-ghosts'}
-                <label class="sysx__tool-opt"><input type="checkbox" bind:checked={ghostsRemove} disabled={busy} /> Actually delete (unticked = preview to Logs)</label>
+              {#if tool.id === 'remove-ghosts'}
+                <label class="sysx__tool-opt"><input type="checkbox" bind:checked={ghostsRemove} disabled={busy} /> {t('systemPage.ghostsDelete')}</label>
               {/if}
-              {#if t.id === 'remove-duplicates'}
-                <label class="sysx__tool-opt"><input type="checkbox" bind:checked={dupesRemove} disabled={busy} /> Also delete extra good copies (unticked = preview them to Logs)</label>
+              {#if tool.id === 'remove-duplicates'}
+                <label class="sysx__tool-opt"><input type="checkbox" bind:checked={dupesRemove} disabled={busy} /> {t('systemPage.dupesDelete')}</label>
               {/if}
               <div class="sysx__tool-foot">
-                <button class="sysx__primary sysx__primary--sm" disabled={busy || startingId === t.id} onclick={() => runTool(t)}>
-                  {runningTool === t.id ? 'Running…' : startingId === t.id ? 'Starting…' : 'Run'}</button>
+                <button class="sysx__primary sysx__primary--sm" disabled={busy || startingId === tool.id} onclick={() => runTool(tool)}>
+                  {runningTool === tool.id ? t('systemPage.runningEllipsis') : startingId === tool.id ? t('systemPage.startingEllipsis') : t('systemPage.run')}</button>
               </div>
             </div>
           {/each}
@@ -521,28 +524,28 @@
           </button>
         {/each}
         <select class="sysx__catsel" value={category} onchange={(e) => setQuery({ cat: e.currentTarget.value === 'all' ? null : e.currentTarget.value })}>
-          <option value="all">All categories</option>
+          <option value="all">{t('systemPage.allCategories')}</option>
           {#each cats as c (c)}<option value={c}>{c}</option>{/each}
         </select>
         <div class="sysx__logfind">
           <Icon name="search" size={15} />
-          <input placeholder="filter messages…" bind:value={findText} spellcheck="false" />
+          <input placeholder={t('systemPage.filterMessages')} bind:value={findText} spellcheck="false" />
         </div>
         <label class="sysx__tail">
           <span class="switch switch--sm"><input type="checkbox" bind:checked={tail_} /><span class="switch__track"></span></span>
-          <span class="sysx__tail-label">Live tail</span>
+          <span class="sysx__tail-label">{t('systemPage.liveTail')}</span>
         </label>
-        <button class="sysx__iconbtn" title="Download logs" onclick={exportLogs}><Icon name="download" size={14} /></button>
+        <button class="sysx__iconbtn" title={t('systemPage.downloadLogs')} onclick={exportLogs}><Icon name="download" size={14} /></button>
       </div>
       <div class="sysx__logscroll" bind:this={logScrollEl}>
         {#if logData && !logData.logs.length}
-          <div class="sysx__log-empty">Nothing logged yet. Warnings and errors show up here as they happen.</div>
+          <div class="sysx__log-empty">{t('systemPage.nothingLogged')}</div>
         {:else if logData && !shownLogs.length}
-          <div class="sysx__log-empty">Nothing matches “{findText}”.</div>
+          <div class="sysx__log-empty">{t('systemPage.nothingMatches', { query: findText })}</div>
         {/if}
         {#each shownLogs as e, i (i)}
           {#if i === 0 || dayOf(e.ts) !== dayOf(shownLogs[i - 1].ts)}
-            <div class="sysx__logday">{new Date(e.ts).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+            <div class="sysx__logday">{new Date(e.ts).toLocaleDateString(currentLang(), { weekday: 'short', month: 'short', day: 'numeric' })}</div>
           {/if}
           {@const lid = 'log' + i}
           {@const exp = !!expanded[lid]}
@@ -550,12 +553,12 @@
           <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
           <div class="sysx__logrow sysx__logrow--{e.level}" class:has-detail={!!e.detail} onclick={() => { if (e.detail) toggleRow(lid); }} role={e.detail ? 'button' : undefined} tabindex={e.detail ? 0 : undefined} onkeydown={(ev) => { if (e.detail && ev.key === 'Enter') toggleRow(lid); }}>
             {#if e.detail}<span class="sysx__chev" class:is-open={exp}><Icon name="chevron-right" size={13} /></span>{:else}<span class="sysx__chev-sp"></span>{/if}
-            <span class="sysx__logtime">{new Date(e.ts).toLocaleTimeString()}</span>
+            <span class="sysx__logtime">{new Date(e.ts).toLocaleTimeString(currentLang())}</span>
             <span class="sysx__loglevel">{e.level}</span>
             {#if e.category}<span class="sysx__logcat">{e.category}</span>{/if}
             <span class="sysx__logmsg">{@html highlight(e.message, findText.trim().toLowerCase())}</span>
-            {#if copiedId === lid}<span class="sysx__copied">copied</span>{/if}
-            <button class="sysx__copybtn" title="Copy line" onclick={(ev) => { ev.stopPropagation(); copyRow(lid, `[${e.level}] ${e.category || ''} — ${e.message}` + (e.detail ? '\n' + e.detail : '')); }}><Icon name="copy" size={13} /></button>
+            {#if copiedId === lid}<span class="sysx__copied">{t('systemPage.copied')}</span>{/if}
+            <button class="sysx__copybtn" title={t('systemPage.copyLine')} onclick={(ev) => { ev.stopPropagation(); copyRow(lid, `[${e.level}] ${e.category || ''} — ${e.message}` + (e.detail ? '\n' + e.detail : '')); }}><Icon name="copy" size={13} /></button>
           </div>
           {#if e.detail && exp}
             <pre class="sysx__detail">{e.detail}</pre>
@@ -599,7 +602,7 @@
   .sysx__h-count { font-family: var(--font-body); font-size: 12px; color: var(--faint); font-weight: 400; }
   .sysx__note { font-size: 12.5px; color: var(--faint); margin: 0 0 14px; line-height: 1.55; max-width: 640px; }
   .sysx__note--lead { margin-bottom: 18px; }
-  .sysx__note code { font-family: var(--font-mono); color: var(--muted); }
+  .sysx__note :global(code) { font-family: var(--font-mono); color: var(--muted); }
 
   /* schedules */
   .sysx__sched-table { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,.015); margin-bottom: 4px; }
