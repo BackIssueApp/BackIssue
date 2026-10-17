@@ -1,0 +1,26 @@
+{
+  "hosted": {
+    "label": "BackIssue 元数据服务（内置，无需设置）"
+  },
+  "comicvine": {
+    "label": "直连 ComicVine（使用自己的 API 密钥）",
+    "fields": {
+      "comicvineKeys": {
+        "label": "ComicVine API 密钥",
+        "placeholder": "可在 comicvine.gamespot.com 免费获取"
+      }
+    }
+  },
+  "metron": {
+    "label": "直连 Metron（使用自己的账户）",
+    "fields": {
+      "metronUser": {
+        "label": "Metron 用户名",
+        "placeholder": "你的 metron.cloud 用户名"
+      },
+      "metronPass": {
+        "label": "Metron 密码"
+      }
+    }
+  }
+}

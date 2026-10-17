@@ -173,7 +173,14 @@
   // fields each needs; every row is rendered generically and its fields stay
   // mounted (their set-* ids are collected on save) whether or not it is on.
   let metaOrder = $state([]);
-  const providerName = (p) => String(p?.label || p?.id || '').split(' (')[0];
+  // Provider names and their field labels by id: core's built-ins and any
+  // plugin that ships _shared.metadataProviders.<id> in its catalog.
+  const provLabel = (p) => (p?.id && hasMessage('metadataProviders.' + p.id + '.label') ? t('metadataProviders.' + p.id + '.label') : (p?.label || p?.id || ''));
+  const provField = (p, f, what) => {
+    const k = 'metadataProviders.' + p?.id + '.fields.' + f?.key + '.' + what;
+    return hasMessage(k) ? t(k) : (what === 'label' ? lbl(f?.label) : f?.placeholder || '');
+  };
+  const providerName = (p) => String(provLabel(p)).split(/ ?[(（]/)[0];
   function touchMeta() {
     dirty = true;
     if (!dirtySections.has('metadata')) dirtySections = new Set(dirtySections).add('metadata');
@@ -1003,7 +1010,7 @@
               <div class="srcpri-row">
                 <span class="srcpri-rank">{i + 1}</span>
                 <label class="switch"><input type="checkbox" checked={p.enabled} aria-label={t('settingsPage.useProvider', { name: providerName(p) })} onchange={(e) => toggleMeta(p, e.currentTarget.checked)} /><span class="switch__track"></span></label>
-                <span class="srcpri-name">{p.label}{#if p.enabled && !p.configured}<span class="metasrc__warn">{t('settingsPage.notSetUp')}</span>{/if}</span>
+                <span class="srcpri-name">{provLabel(p)}{#if p.enabled && !p.configured}<span class="metasrc__warn">{t('settingsPage.notSetUp')}</span>{/if}</span>
                 <button class="srcpri-btn" type="button" disabled={i === 0} onclick={() => moveMeta(i, -1)} aria-label={t('settingsPage.moveUp')}><Icon name="arrow-up" /></button>
                 <button class="srcpri-btn" type="button" disabled={i === metaOrder.length - 1} onclick={() => moveMeta(i, 1)} aria-label={t('settingsPage.moveDown')}><Icon name="arrow-down" /></button>
               </div>
@@ -1021,9 +1028,9 @@
                   <div class="client-test"><button class="btn btn--ghost" type="button" onclick={testMeta}>{t('settingsPage.testService')}</button>
                     {#if tests.meta}<span class="client-status {tests.meta.cls}">{#if tests.meta.icon}<Icon name={tests.meta.icon} /> {/if}{tests.meta.text}</span>{/if}</div>
                 {:else}
-                  {#if p.note}<p class="modal__note list-note--warn"><Icon name="info" /> {p.note}</p>{/if}
+                  {#if p.note}<p class="modal__note list-note--warn"><Icon name="info" /> {hasMessage('metadataProviders.' + p.id + '.note') ? t('metadataProviders.' + p.id + '.note') : p.note}</p>{/if}
                   {#each p.fields as f (f.key)}
-                    <label class="field"><span>{lbl(f.label)}</span><input id="set-{f.key}" class="mono" type={f.type === 'password' ? 'password' : 'text'} spellcheck="false" autocomplete="off" placeholder={f.placeholder || ''} /></label>
+                    <label class="field"><span>{provField(p, f, 'label')}</span><input id="set-{f.key}" class="mono" type={f.type === 'password' ? 'password' : 'text'} spellcheck="false" autocomplete="off" placeholder={provField(p, f, 'placeholder')} /></label>
                   {/each}
                   <div class="client-test"><button class="btn btn--ghost" type="button" onclick={() => testProvider(p)}>{providerTestLabel(p)}</button>
                     {#if tests['prov-' + p.id]}<span class="client-status {tests['prov-' + p.id].cls}">{#if tests['prov-' + p.id].icon}<Icon name={tests['prov-' + p.id].icon} /> {/if}{tests['prov-' + p.id].text}</span>{/if}</div>

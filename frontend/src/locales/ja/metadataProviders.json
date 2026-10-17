@@ -1,0 +1,26 @@
+{
+  "hosted": {
+    "label": "BackIssue メタデータサービス（内蔵・設定不要）"
+  },
+  "comicvine": {
+    "label": "ComicVine に直接接続（自分の API キー）",
+    "fields": {
+      "comicvineKeys": {
+        "label": "ComicVine API キー",
+        "placeholder": "comicvine.gamespot.com で無料で取得できます"
+      }
+    }
+  },
+  "metron": {
+    "label": "Metron に直接接続（自分のアカウント）",
+    "fields": {
+      "metronUser": {
+        "label": "Metron のユーザー名",
+        "placeholder": "metron.cloud のユーザー名"
+      },
+      "metronPass": {
+        "label": "Metron のパスワード"
+      }
+    }
+  }
+}

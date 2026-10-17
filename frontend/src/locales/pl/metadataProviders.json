@@ -1,0 +1,26 @@
+{
+  "hosted": {
+    "label": "Usługa metadanych BackIssue (wbudowana, bez konfiguracji)"
+  },
+  "comicvine": {
+    "label": "ComicVine bezpośrednio (własny klucz API)",
+    "fields": {
+      "comicvineKeys": {
+        "label": "Klucz API ComicVine",
+        "placeholder": "Bezpłatny na comicvine.gamespot.com"
+      }
+    }
+  },
+  "metron": {
+    "label": "Metron bezpośrednio (własne konto)",
+    "fields": {
+      "metronUser": {
+        "label": "Nazwa użytkownika Metron",
+        "placeholder": "Twoja nazwa użytkownika metron.cloud"
+      },
+      "metronPass": {
+        "label": "Hasło Metron"
+      }
+    }
+  }
+}
