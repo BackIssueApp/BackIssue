@@ -1,0 +1,6 @@
+{
+  "siteUrl": "站点 URL",
+  "downloadProxy": "下载代理",
+  "downloadProxyNote": "可选的 HTTP 代理，仅用于文件下载，适用于屏蔽数据中心 IP 的主机。",
+  "browserRequired": "此来源需要应用的浏览器版本（标记为 -browser 的镜像）。在当前版本中保持关闭。"
+}

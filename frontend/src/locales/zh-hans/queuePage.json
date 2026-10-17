@@ -1,0 +1,74 @@
+{
+  "title": "下载队列",
+  "phase": {
+    "searching": "搜索中",
+    "starting": "启动中",
+    "connecting": "连接中",
+    "solving": "正在通过验证",
+    "grabbed": "已发送",
+    "queued": "排队中",
+    "downloading": "下载中",
+    "done": "归档中",
+    "tagging": "标记中",
+    "saving": "保存中"
+  },
+  "lookingForMatch": "正在寻找匹配…",
+  "lookingForSource": "正在寻找来源…",
+  "gettingPastProtection": "正在通过 {host} 的防护…",
+  "theHost": "主机",
+  "contacting": "正在连接 {host}…",
+  "perSecond": "{rate}/秒",
+  "via": " · 通过 {name}",
+  "pageOf": "第 {page} / {pages} 页",
+  "seeders": {
+    "other": " · {count} 个做种者"
+  },
+  "filterAll": "全部",
+  "filterActive": "进行中",
+  "filterQueued": "排队中",
+  "filterFailed": "失败",
+  "emptyAllTitle": "队列为空",
+  "emptyAllBody": "添加系列或期刊后，新的下载会出现在这里。即使有暂停的项目在等待，进行中的下载也会继续。",
+  "emptyActiveTitle": "没有正在下载的内容",
+  "emptyActiveBody": "当前没有进行中的下载。有空闲名额时，排队的项目会自动开始。",
+  "emptyQueuedTitle": "没有排队的内容",
+  "emptyQueuedBody": "所有排队的项目都已开始或完成。",
+  "emptyFailedTitle": "没有失败",
+  "emptyFailedBody": "没有任何失败——所有下载都已完成或仍在进行中。",
+  "confirmClearTitle": {
+    "other": "清除 {count} 个排队中的下载？"
+  },
+  "confirmClearMessage": "队列中所有等待的项目都会被移除。进行中的下载会继续。",
+  "clearQueue": "清空队列",
+  "clearedQueued": {
+    "other": "已清除 {count} 个排队中的下载。"
+  },
+  "retryingFailed": {
+    "other": "正在重试 {count} 个失败的下载。"
+  },
+  "clearedFailed": {
+    "other": "已清除 {count} 个失败项。"
+  },
+  "confirmCancelTitle": "取消此下载？",
+  "confirmCancelMessage": "它也会从下载客户端中移除。",
+  "cancelDownload": "取消下载",
+  "downloadCancelled": "下载已取消——已从客户端中移除。",
+  "paused": "已暂停",
+  "resume": "继续",
+  "pause": "暂停",
+  "retryFailed": "重试失败项",
+  "clearQueued": "清除排队项",
+  "statActive": "进行中",
+  "statQueued": "排队中",
+  "statFailed": "失败",
+  "statDownSpeed": "下载速度",
+  "clearFailed": "清除失败项",
+  "pack": "合集包",
+  "collectionPack": "合订本合集包",
+  "audiobook": "有声书",
+  "book": "图书",
+  "untitled": "无标题",
+  "cancelRemovesFromClient": "取消——从客户端中移除该下载",
+  "removeFromQueue": "从队列中移除",
+  "retryThisDownload": "重试此下载"
+}

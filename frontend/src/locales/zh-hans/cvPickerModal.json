@@ -1,0 +1,23 @@
+{
+  "title": "匹配系列元数据",
+  "lookingUp": "正在查找系列…",
+  "searching": "正在搜索元数据源…",
+  "noVolumeWithId": "没有该 id 对应的系列。",
+  "searchFailed": "搜索失败。",
+  "noVolumes": "未找到系列。",
+  "linkFailed": "关联失败",
+  "linkFailedWith": "关联失败：{error}",
+  "matchedTo": "已匹配到 {name}。",
+  "matchedToYear": "已匹配到 {name}（{year}）。",
+  "unknownPublisher": "未知出版商",
+  "idBadge": "ID {id}",
+  "equalsFiles": "= 你的 {count} 个文件",
+  "nearFiles": "≈ 你的 {count} 个文件",
+  "sourceLink": "来源页面",
+  "linking": "关联中…",
+  "use": "使用",
+  "filesNote": {
+    "other": "磁盘上有 {count} 个文件——期数最接近的系列排在前面。"
+  },
+  "searchPlaceholder": "按名称搜索——或粘贴系列 URL / id…"
+}

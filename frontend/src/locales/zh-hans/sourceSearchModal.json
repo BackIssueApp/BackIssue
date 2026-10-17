@@ -1,0 +1,17 @@
+{
+  "fallbackSeries": "期刊",
+  "title": "搜索来源",
+  "searchFailed": "搜索失败——应用是否正在运行？",
+  "noSources": "未启用任何下载源（设置 → 下载源）。",
+  "noneFound": "在你的来源中未找到任何发布。试试更宽泛的搜索词，或为该系列添加别名。",
+  "queryPlaceholder": "系列和期号，或任意搜索词…",
+  "searched": "已搜索",
+  "searching": "正在搜索已启用的来源…",
+  "pack": "合集包",
+  "packQueued": "合集包已通过 {source} 加入队列——缺失的期数会自动导入（请关注队列）。",
+  "queued": "下载已通过 {source} 加入队列——请关注队列。",
+  "failed": "下载失败：{error}",
+  "unknownError": "未知错误",
+  "sending": "发送中…",
+  "download": "下载"
+}

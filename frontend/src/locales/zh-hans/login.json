@@ -1,0 +1,14 @@
+{
+  "intro": "欢迎使用 BackIssue。创建账户即可开始——该账户将成为<b>管理员</b>，此后需要登录才能使用。",
+  "signIn": "登录",
+  "createAccount": "创建账户",
+  "createAdmin": "创建管理员账户",
+  "username": "用户名",
+  "password": "密码",
+  "confirmPassword": "确认密码",
+  "passwordsMismatch": "两次输入的密码不一致",
+  "or": "或",
+  "signInWith": "使用 {provider} 登录",
+  "noMethod": "没有可用的登录方式——需要管理员配置 SSO 或重新启用密码登录。",
+  "registrationDisabled": "注册已关闭——请向管理员申请账户。"
+}

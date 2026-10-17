@@ -1,0 +1,14 @@
+{
+  "dialogLabel": "索引器",
+  "kindIndexer": "索引器",
+  "kindTorrentIndexer": "种子索引器",
+  "addTitle": "添加{kind}",
+  "editTitle": "编辑{kind}",
+  "name": "名称",
+  "url": "URL",
+  "apiKey": "API 密钥",
+  "enterUrlFirst": "请先输入 URL。",
+  "urlRequired": "URL 为必填项。",
+  "testing": "测试中…",
+  "test": "测试"
+}

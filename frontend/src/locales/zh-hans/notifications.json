@@ -1,0 +1,41 @@
+{
+  "releaseWeek": {
+    "title": "本周新刊",
+    "body": {
+      "other": "你关注的系列本周有 {count} 期发售。"
+    },
+    "bodyNamed": {
+      "other": "你关注的系列本周有 {count} 期发售：{named}。"
+    },
+    "bodyNamedMore": {
+      "other": "你关注的系列本周有 {count} 期发售：{named} 等另外 {more} 期。"
+    }
+  },
+  "pickArrived": {
+    "title": "你想要的那一期已到",
+    "body": "{series} #{number}",
+    "bodyNamed": "{series} #{number}——{name}"
+  },
+  "packDone": {
+    "title": "合集包已导入",
+    "body": {
+      "other": "{title}——{count} 期新内容"
+    },
+    "bodyFailed": {
+      "other": "{title}——{count} 期新内容，{failed} 期失败"
+    }
+  },
+  "packFailed": {
+    "title": "合集包失败",
+    "body": "{title}——{error}"
+  },
+  "importDone": {
+    "title": "已下载",
+    "body": "{title}",
+    "bodySource": "{title} · {source}"
+  },
+  "importFailed": {
+    "title": "下载失败",
+    "body": "{title}——{error}"
+  }
+}

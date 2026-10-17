@@ -1,0 +1,11 @@
+{
+  "openNav": "打开导航",
+  "searchPlaceholder": "搜索你的收藏…",
+  "reconnecting": "正在重新连接…",
+  "reconnectingTitle": "与服务器的实时连接已断开，正在重新连接。数据可能不是最新的。",
+  "helpForPage": "本页帮助",
+  "pillSaved": "已保存",
+  "pillQueued": "排队中",
+  "pillFailed": "失败",
+  "pillDownloading": "下载中"
+}

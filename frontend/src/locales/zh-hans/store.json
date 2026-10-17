@@ -1,0 +1,8 @@
+{
+  "requestFailed": "请求失败",
+  "noResponse": "无响应",
+  "downloadFailed": "下载加入队列失败：{error}",
+  "downloadFailedUnreachable": "下载加入队列失败——应用是否可以访问？",
+  "redownloadFailed": "重新下载失败：{error}",
+  "redownloadFailedUnreachable": "重新下载失败——应用是否可以访问？"
+}

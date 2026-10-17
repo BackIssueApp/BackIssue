@@ -1,0 +1,11 @@
+{
+  "new": "新",
+  "queued": "排队中",
+  "sent": "已发送",
+  "saving": "保存中",
+  "tagging": "标记中",
+  "saved": "已保存",
+  "noTags": "无标签",
+  "corrupt": "已损坏",
+  "failed": "失败"
+}

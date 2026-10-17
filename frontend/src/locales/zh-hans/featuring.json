@@ -1,0 +1,9 @@
+{
+  "unknownSeries": "未知系列",
+  "moreRuns": {
+    "other": "另有 {count} 段"
+  },
+  "others": {
+    "other": "其他 {count} 期"
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "title": "缺失",
+  "sortSeries": "系列 A–Z",
+  "sortNewest": "最新发布",
+  "sortOldest": "最早发布",
+  "sortMost": "缺失最多优先",
+  "sortFewest": "缺失最少优先",
+  "nothingToDownload": "没有可下载的内容。",
+  "confirmQueueTitle": {
+    "other": "将 {count} 期加入下载队列？"
+  },
+  "confirmQueueMessage": "所有符合当前筛选条件的内容都会加入队列。",
+  "confirmQueueGaps": "原本不需要的缺口会变为需要。",
+  "confirmQueueCapped": "每次最多 500 项——剩余部分请再次运行。",
+  "queueDownloads": "加入下载队列",
+  "queuedN": {
+    "other": "已将 {count} 期加入队列。"
+  },
+  "couldNotUpdate": "无法更新——应用是否可以访问？",
+  "wantingN": {
+    "other": "已标记需要 {count} 期。"
+  },
+  "noLongerWantedN": {
+    "other": "{count} 期不再需要。"
+  },
+  "alreadyOnWay": "所选内容都已在下载途中。",
+  "monitorNewFrom": "从 #{number} 起的新刊",
+  "notMonitored": "未监控",
+  "monitored": "已监控",
+  "pickedByHand": "手动选择",
+  "pickedByHandReason": "手动选择（{reason}）",
+  "wantedBecauseMonitored": "因系列已监控而需要",
+  "notWantedGap": "不需要——监控策略不处理的缺口",
+  "statMissing": "缺失",
+  "statWanted": "需要",
+  "statInFlight": "进行中",
+  "statFailed": "失败",
+  "statSeries": "系列",
+  "summaryMissing": {
+    "other": "缺失 {count} 期"
+  },
+  "summaryWanted": {
+    "other": "需要 {count} 期"
+  },
+  "filterSeries": "筛选系列…",
+  "downloadShown": "下载所显示的",
+  "chipWanted": "需要",
+  "chipWantedTitle": "自动下载会去获取的内容——每个系列的监控策略加上你的手动选择",
+  "chipGaps": "所有缺口",
+  "chipGapsTitle": "书库中每个系列的所有缺失期数，无论是否需要",
+  "chipFollowing": "已关注",
+  "chipFollowingTitle": "你关注的系列（系列页面上的 ☆）",
+  "chipHideUnreleased": "隐藏未发售",
+  "chipHideUnreleasedTitle": "隐藏已知封面日期在未来的期刊（大多数缓存的期刊没有日期——这只会隐藏已知的）",
+  "sortOrder": "排序方式",
+  "want": "需要",
+  "wantSelectedTitle": "需要所选期刊——自动化会去搜索它们",
+  "dontWant": "不需要",
+  "dontWantSelectedTitle": "不再需要所选期刊",
+  "downloadSelected": "下载所选",
+  "emptyNothingTracked": "尚未追踪任何内容",
+  "emptyAddSeries": "从{library}添加系列后，其缺失的期数会显示在这里。",
+  "emptyNoMatch": "没有符合筛选条件的系列",
+  "emptyTryDifferent": "试试其他搜索，或清除筛选条件。",
+  "emptyNothingMissing": "没有缺失",
+  "emptyAllOnDisk": "书库中每个系列的每一期都已在磁盘上。",
+  "emptyNothingWanted": "没有需要的内容",
+  "emptyPoliciesSatisfied": "监控策略要求的每一期都已在书库中。切换到“所有缺口”可查看还缺少什么，并手动选择你想要的内容。",
+  "selectSeriesIssues": "选择此系列的所有期数",
+  "following": "已关注",
+  "monitoringPolicyTitle": "监控策略——请在系列页面上更改",
+  "nMissing": "缺失 {count} 期",
+  "nWanted": "需要 {count} 期",
+  "picked": "已选择",
+  "notWanted": "不需要",
+  "queuing": "加入队列中…",
+  "download": "下载",
+  "stopWantingIssue": "不再需要这一期",
+  "skipIssue": "跳过这一期——此后监控策略不再处理它",
+  "wantJustThis": "只需要这一期",
+  "loadMore": "加载更多"
+}

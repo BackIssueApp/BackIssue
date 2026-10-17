@@ -1,0 +1,21 @@
+{
+  "reorganize": "整理书库",
+  "cvMatch": "匹配系列元数据",
+  "cvMatchSchedule": "匹配系列元数据（已拥有 + 已关注）",
+  "scanFolder": "扫描文件夹 · {detail}",
+  "tagFiles": "标记文件 · {detail}",
+  "importScanFull": "扫描书库以导入（完整）",
+  "importScanNew": "扫描书库中的新卷",
+  "importRun": "导入书库",
+  "releases": "检查本周新刊",
+  "refreshDetails": "刷新期刊详情 · {detail}",
+  "wantedSearch": "搜索缺失的期数",
+  "wantedSearchSchedule": "搜索缺失的期数（补全）",
+  "recentSearch": "搜索新刊",
+  "rssWatch": "监视索引器 RSS",
+  "rssWatchSchedule": "监视索引器 RSS 中的新刊",
+  "packImport": "导入合集包 · {detail}",
+  "zeroDay": "获取每周 0-Day 合集包",
+  "zeroDaySchedule": "获取每周 0-Day 合集包（种子）",
+  "dbBackup": "备份数据库"
+}

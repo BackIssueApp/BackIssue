@@ -1,0 +1,60 @@
+{
+  "categories": {
+    "library": "书库",
+    "system": "系统"
+  },
+  "library": {
+    "view": {
+      "label": "浏览书库",
+      "description": "查看系列、期刊、新刊和队列"
+    },
+    "manage": {
+      "label": "管理书库",
+      "description": "添加/删除卷和期刊、扫描、标记、导入、修正匹配"
+    },
+    "restricted": {
+      "label": "查看成人内容",
+      "description": "查看和阅读标记为成人/受限的系列（没有此权限的角色看不到）"
+    }
+  },
+  "downloads": {
+    "grab": {
+      "label": "搜索和下载",
+      "description": "搜索来源、将下载加入队列、取消排队项"
+    }
+  },
+  "lists": {
+    "share": {
+      "label": "分享阅读列表",
+      "description": "发布你的阅读列表和故事线，让所有用户都能看到"
+    }
+  },
+  "settings": {
+    "manage": {
+      "label": "设置和索引器",
+      "description": "更改应用设置、索引器，并运行连接测试"
+    }
+  },
+  "users": {
+    "manage": {
+      "label": "用户和角色",
+      "description": "创建和管理账户、角色及权限"
+    }
+  },
+  "plugins": {
+    "manage": {
+      "label": "插件和重启",
+      "description": "启用/禁用插件并重启应用"
+    }
+  },
+  "system": {
+    "jobs": {
+      "label": "任务和工具",
+      "description": "运行任务、计划任务和书库维护工具"
+    },
+    "logs": {
+      "label": "日志",
+      "description": "查看和清除应用日志"
+    }
+  }
+}

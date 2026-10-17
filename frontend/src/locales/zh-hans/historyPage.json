@@ -1,0 +1,28 @@
+{
+  "title": "历史",
+  "nFailures": {
+    "other": "{count} 次失败"
+  },
+  "nBlocked": {
+    "other": "{count} 个已屏蔽的发布"
+  },
+  "nImports": {
+    "other": "{count} 次导入"
+  },
+  "statFailures": "失败",
+  "statBlocked": "已屏蔽",
+  "statImports": "导入",
+  "emptyFailedTitle": "没有失败的下载",
+  "emptyFailedBody": "出错的下载会记录在这里——即使队列已清空，记录依然保留。",
+  "emptyBlockedTitle": "没有屏蔽项",
+  "emptyBlockedBody": "失败的 usenet 发布会进入这里，以后的搜索会跳过它们。移除某一项即可让它重新可用。",
+  "emptyImportsTitle": "尚未导入任何内容",
+  "emptyImportsBody": "下载完成后这里会逐步填充。后台监视器处理的导入会记录在这里。",
+  "filterPlaceholder": "筛选…",
+  "clearAll": "全部清除",
+  "chipAll": "全部",
+  "chipFailed": "失败",
+  "chipBlocklist": "屏蔽列表",
+  "removeFromBlocklist": "从屏蔽列表移除——允许再次自动获取",
+  "loadMore": "加载更多"
+}

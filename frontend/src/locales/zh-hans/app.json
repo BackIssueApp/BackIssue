@@ -1,0 +1,21 @@
+{
+  "pageSettings": "设置",
+  "pageSystem": "系统",
+  "pageWanted": "缺失",
+  "pageQueue": "队列",
+  "pageReleases": "新刊",
+  "pageHistory": "历史",
+  "pageLists": "阅读列表",
+  "pageImport": "导入",
+  "pageStats": "统计",
+  "pagePlugins": "插件",
+  "pageUsers": "用户",
+  "pageProfile": "个人资料",
+  "pageSeries": "系列",
+  "pageCollections": "收藏集",
+  "notFoundTitle": "页面不存在",
+  "notFoundText": "此地址没有内容。它可能已被移动，或者链接有误。",
+  "noAccessTitle": "你无权访问此页面",
+  "noAccessText": "你的账户不允许打开此页面。如果你认为应该允许，请联系管理员。",
+  "goHome": "返回首页"
+}

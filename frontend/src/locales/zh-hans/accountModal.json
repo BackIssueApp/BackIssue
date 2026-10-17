@@ -1,0 +1,10 @@
+{
+  "dialogLabel": "账户",
+  "title": "账户——{username}",
+  "currentPassword": "当前密码",
+  "newPassword": "新密码（至少 8 个字符）",
+  "confirmNewPassword": "确认新密码",
+  "mismatch": "两次输入的新密码不一致",
+  "changePassword": "修改密码",
+  "changed": "密码已修改。"
+}
