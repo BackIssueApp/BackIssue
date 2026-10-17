@@ -1,0 +1,5 @@
+{
+  "unknownSeries": "Onbekende reeks",
+  "moreRuns": { "one": "+{count} reeks meer", "other": "+{count} reeksen meer" },
+  "others": { "one": "{count} andere", "other": "{count} andere" }
+}

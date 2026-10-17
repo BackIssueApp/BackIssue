@@ -1,0 +1,6 @@
+{
+  "siteUrl": "Site-URL",
+  "downloadProxy": "Downloadproxy",
+  "downloadProxyNote": "Optionele HTTP-proxy, alleen voor het downloaden van het bestand, voor hosts die datacenter-IP's blokkeren.",
+  "browserRequired": "Deze bron heeft de browserversie van de app nodig (de image met tag -browser). Op deze versie blijft hij uit."
+}

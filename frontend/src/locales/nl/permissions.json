@@ -1,0 +1,30 @@
+{
+  "categories": {
+    "library": "Bibliotheek",
+    "system": "Systeem"
+  },
+  "library": {
+    "view": { "label": "Door de bibliotheek bladeren", "description": "Reeksen, nummers, uitgaven en de wachtrij bekijken" },
+    "manage": { "label": "De bibliotheek beheren", "description": "Delen en nummers toevoegen/verwijderen, scannen, taggen, importeren, koppelingen herstellen" },
+    "restricted": { "label": "Inhoud voor volwassenen bekijken", "description": "Reeksen bekijken en lezen die als 18+/beperkt zijn gemarkeerd (verborgen voor rollen zonder dit recht)" }
+  },
+  "downloads": {
+    "grab": { "label": "Zoeken en downloaden", "description": "Bronnen doorzoeken, downloads in de wachtrij zetten, wachtende items annuleren" }
+  },
+  "lists": {
+    "share": { "label": "Leeslijsten delen", "description": "Je leeslijsten en verhaallijnen publiceren zodat elke gebruiker ze kan zien" }
+  },
+  "settings": {
+    "manage": { "label": "Instellingen en indexers", "description": "App-instellingen en indexers wijzigen en verbindingstests uitvoeren" }
+  },
+  "users": {
+    "manage": { "label": "Gebruikers en rollen", "description": "Accounts, rollen en rechten aanmaken en beheren" }
+  },
+  "plugins": {
+    "manage": { "label": "Plugins en herstart", "description": "Plugins in- of uitschakelen en de app herstarten" }
+  },
+  "system": {
+    "jobs": { "label": "Taken en hulpmiddelen", "description": "Taken, schema's en onderhoudshulpmiddelen voor de bibliotheek uitvoeren" },
+    "logs": { "label": "Logboek", "description": "Het logboek van de app bekijken en wissen" }
+  }
+}

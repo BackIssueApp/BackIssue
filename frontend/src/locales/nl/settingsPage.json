@@ -35,7 +35,10 @@
   "ovDirect": "Directe opzoekingen met je eigen sleutel of account",
   "ovCached": "Gecachet en verrijkt, geen instelling nodig",
   "ovLibraries": "Bibliotheken",
-  "ovLibrariesCount": { "one": "{count} bibliotheek", "other": "{count} bibliotheken" },
+  "ovLibrariesCount": {
+    "one": "{count} bibliotheek",
+    "other": "{count} bibliotheken"
+  },
   "ovSeriesCount": "{count} reeksen in de verzameling",
   "ovStorage": "Opslag",
   "ovWithFolders": "{count} met mappen",
@@ -47,7 +50,10 @@
   "ovFormat": "Formaat: {format}",
   "ovDownloadsOnAdd": " · downloadt bij toevoegen",
   "ovNotifications": "Meldingen",
-  "ovChannels": { "one": "{count} kanaal", "other": "{count} kanalen" },
+  "ovChannels": {
+    "one": "{count} kanaal",
+    "other": "{count} kanalen"
+  },
   "ovNoneInstalled": "Geen geïnstalleerd",
   "ovOutbound": "Uitgaande meldingen ingesteld",
   "ovBellOnly": "Alleen de bel in de app",
@@ -199,6 +205,8 @@
   "metaSources": "Metadatabronnen",
   "metaSourcesNote": "Schakel elke bron in waarvan je gegevens over reeksen en nummers wilt. Zoekopdrachten vragen ze allemaal en tonen de antwoorden samen, beste eerst, dus de volgorde bepaalt wie wint als twee bronnen dezelfde reeks kennen. Een reeks blijft komen van de bron die haar vond. De ingebouwde dienst werkt meteen; de andere bevragen een database rechtstreeks met je eigen sleutel of account, binnen de limieten daarvan.",
   "useProvider": "{name} gebruiken",
+  "pluginFallbackLabel": "Plugin",
+  "pluginFallbackNote": "Plugininstellingen",
   "notSetUp": "niet ingesteld",
   "moveUp": "Omhoog",
   "moveDown": "Omlaag",

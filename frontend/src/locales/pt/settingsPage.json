@@ -35,7 +35,10 @@
   "ovDirect": "Consultas diretas com a sua própria chave ou conta",
   "ovCached": "Em cache e enriquecido, sem configuração",
   "ovLibraries": "Bibliotecas",
-  "ovLibrariesCount": { "one": "{count} biblioteca", "other": "{count} bibliotecas" },
+  "ovLibrariesCount": {
+    "one": "{count} biblioteca",
+    "other": "{count} bibliotecas"
+  },
   "ovSeriesCount": "{count} séries na coleção",
   "ovStorage": "Armazenamento",
   "ovWithFolders": "{count} com pastas",
@@ -47,7 +50,10 @@
   "ovFormat": "Formato: {format}",
   "ovDownloadsOnAdd": " · descarrega ao adicionar",
   "ovNotifications": "Notificações",
-  "ovChannels": { "one": "{count} canal", "other": "{count} canais" },
+  "ovChannels": {
+    "one": "{count} canal",
+    "other": "{count} canais"
+  },
   "ovNoneInstalled": "Nenhum instalado",
   "ovOutbound": "Alertas de saída configurados",
   "ovBellOnly": "Só o sino na aplicação",
@@ -199,6 +205,8 @@
   "metaSources": "Fontes de metadados",
   "metaSourcesNote": "Ligue todas as fontes de que quer dados de séries e edições. As pesquisas perguntam a todas e mostram as respostas em conjunto, as melhores primeiro, por isso a ordem decide qual ganha quando duas conhecem a mesma série. Uma série continua a vir da fonte que a encontrou. O serviço incorporado funciona sem configuração; as outras consultam uma base de dados diretamente com a sua própria chave ou conta, dentro dos limites dela.",
   "useProvider": "Usar {name}",
+  "pluginFallbackLabel": "Plugin",
+  "pluginFallbackNote": "Definições do plugin",
   "notSetUp": "não configurado",
   "moveUp": "Mover para cima",
   "moveDown": "Mover para baixo",

@@ -35,7 +35,10 @@
   "ovDirect": "Ricerche dirette con la tua chiave o il tuo account",
   "ovCached": "In cache e arricchito, nessuna configurazione necessaria",
   "ovLibraries": "Biblioteche",
-  "ovLibrariesCount": { "one": "{count} biblioteca", "other": "{count} biblioteche" },
+  "ovLibrariesCount": {
+    "one": "{count} biblioteca",
+    "other": "{count} biblioteche"
+  },
   "ovSeriesCount": "{count} serie nella collezione",
   "ovStorage": "Archiviazione",
   "ovWithFolders": "{count} con cartelle",
@@ -47,7 +50,10 @@
   "ovFormat": "Formato: {format}",
   "ovDownloadsOnAdd": " · scarica all'aggiunta",
   "ovNotifications": "Notifiche",
-  "ovChannels": { "one": "{count} canale", "other": "{count} canali" },
+  "ovChannels": {
+    "one": "{count} canale",
+    "other": "{count} canali"
+  },
   "ovNoneInstalled": "Nessuno installato",
   "ovOutbound": "Avvisi in uscita configurati",
   "ovBellOnly": "Solo campanella nell'app",
@@ -199,6 +205,8 @@
   "metaSources": "Fonti di metadati",
   "metaSourcesNote": "Attiva ogni fonte da cui vuoi i dati di serie e albi. Le ricerche le interrogano tutte e mostrano le risposte insieme, le migliori per prime, quindi l'ordine decide quale vince quando due conoscono la stessa serie. Una serie continua ad arrivare dalla fonte che l'ha trovata. Il servizio integrato funziona subito; le altre interrogano direttamente un database con la tua chiave o il tuo account, entro i suoi limiti.",
   "useProvider": "Usa {name}",
+  "pluginFallbackLabel": "Plugin",
+  "pluginFallbackNote": "Impostazioni del plugin",
   "notSetUp": "non configurata",
   "moveUp": "Sposta su",
   "moveDown": "Sposta giù",
