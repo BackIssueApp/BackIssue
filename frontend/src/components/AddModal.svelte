@@ -20,6 +20,7 @@
   import { fmt, parseCvVolumeRef, isExactCvRef } from '../lib/util.js';
   import { trapFocus } from '../lib/dom.js';
   import { status } from '../lib/status.svelte.js';
+  import { t, th } from '../lib/i18n.svelte.js';
   import Cover from './Cover.svelte';
 
   // Which catalog the search talks to: ComicVine for comics; the metadata
@@ -34,9 +35,14 @@
   const mangaLib = $derived(libOf('manga'));
   const bookLib = $derived(libOf('ebook'));
   const audioLib = $derived(libOf('audiobook'));
-  const sourceLabel = $derived(mode === 'manga' ? 'the manga catalog' : mode === 'ebook' ? 'the books catalog' : mode === 'audiobook' ? 'the audiobooks catalog' : 'ComicVine');
+  const sourceLabel = $derived(t(mode === 'manga' ? 'addModal.sourceManga' : mode === 'ebook' ? 'addModal.sourceBooks' : mode === 'audiobook' ? 'addModal.sourceAudiobooks' : 'addModal.sourceComics'));
   const thing = $derived(mode === 'ebook' ? 'book' : mode === 'audiobook' ? 'audiobook' : 'series');
+  const thingLabel = $derived(t(mode === 'ebook' ? 'addModal.thingBook' : 'addModal.thingAudiobook'));
+  const title = $derived(t(mode === 'ebook' ? 'addModal.titleBook' : mode === 'audiobook' ? 'addModal.titleAudiobook' : 'addModal.titleSeries'));
   const plugin = $derived(mode === 'ebook' ? 'ebooks' : 'audiobooks');
+  // Row button state → label. Rows carry a state code (and a count for the
+  // queued outcome) so the text follows the UI language.
+  const labelOf = (v) => (v._label === 'addedQueued' ? t('addModal.addedQueued', { count: v._n }) : v._label === 'add' ? t('common.add') : t('addModal.' + v._label));
 
   const open = $derived(modals.stack.includes('add'));
 
@@ -65,14 +71,14 @@
     if (bookMode) {
       let r;
       try { r = await apiGet(`/api/${plugin}/catalog/search?q=` + encodeURIComponent(q)); }
-      catch { if (seq === searchSeq) { m.error = 'Search failed — is the app reachable?'; searching = false; } return; }
+      catch { if (seq === searchSeq) { m.error = t('addModal.searchFailed'); searching = false; } return; }
       if (seq !== searchSeq) return;
       searching = false;
       if (r.error) { m.error = r.error; m.results = null; return; }
       m.results = (r.results || []).map((b) => ({
         id: b.id, name: b.title, start_year: b.year, image_url: b.cover, inLibrary: b.inLibrary, seriesId: b.seriesId,
-        _meta: [b.author, b.publisher, b.pages ? fmt(b.pages) + ' pages' : null, b.minutes ? Math.round(b.minutes / 60) + 'h' : null, b.narrators?.length ? 'read by ' + b.narrators.join(', ') : null].filter(Boolean).join(' · '),
-        _label: b.wanted ? 'Wanted' : 'Add', _busy: false, _done: !!b.wanted,
+        _meta: [b.author, b.publisher, b.pages ? t('addModal.nPages', { count: fmt(b.pages) }) : null, b.minutes ? Math.round(b.minutes / 60) + 'h' : null, b.narrators?.length ? t('addModal.readBy', { names: b.narrators.join(', ') }) : null].filter(Boolean).join(' · '),
+        _label: b.wanted ? 'wanted' : 'add', _busy: false, _done: !!b.wanted,
       }));
       return;
     }
@@ -87,20 +93,20 @@
     if (refId) {
       try {
         const v = await apiGet('/api/cv/volume/' + refId);
-        if (v && !v.error) pinned = { ...v, count_of_issues: v.count_of_issues ?? v.issue_count, _label: 'Add', _busy: false };
+        if (v && !v.error) pinned = { ...v, count_of_issues: v.count_of_issues ?? v.issue_count, _label: 'add', _busy: false };
       } catch { /* fall through to the name search */ }
       if (seq !== searchSeq) return;
       if (isExactCvRef(q)) {
         searching = false;
         m.results = pinned ? [pinned] : [];
-        m.error = pinned ? '' : 'No ComicVine volume with that id.';
+        m.error = pinned ? '' : t('addModal.noVolumeWithId');
         return;
       }
     }
 
     let list;
     try { list = await apiGet('/api/cv/search?q=' + encodeURIComponent(q) + (mangaMode ? '&manga=1' : '')); }
-    catch { if (seq === searchSeq) { m.error = 'Search failed — is the app reachable?'; searching = false; } return; }
+    catch { if (seq === searchSeq) { m.error = t('addModal.searchFailed'); searching = false; } return; }
     if (seq !== searchSeq) return; // superseded by a newer search — drop this response
     searching = false;
     if (list.error) {
@@ -112,7 +118,7 @@
     // volumes oldest-first, so a cap hides exactly the newest series (the ones
     // people most often add). The list scrolls; covers load lazily.
     const rows = (Array.isArray(list) ? list : []).filter((v) => v.id !== refId)
-      .map((v) => ({ ...v, _label: 'Add', _busy: false }));
+      .map((v) => ({ ...v, _label: 'add', _busy: false }));
     m.results = pinned ? [pinned, ...rows] : rows;
   }
 
@@ -125,40 +131,41 @@
   }
 
   async function add(v) {
-    v._busy = true; v._label = 'Adding…';
+    v._busy = true; v._label = 'adding';
     // A book or audiobook: it goes on the wanted list and the download
     // sources are asked for it now; the button says what happened.
     if (bookMode) {
       try {
         const r = await apiPost(`/api/${plugin}/catalog/add`, { id: v.id });
-        if (r.error) { notify('Add failed: ' + r.error, 'error'); v._busy = false; v._label = 'Add'; return; }
+        if (r.error) { notify(t('addModal.addFailedWith', { error: r.error }), 'error'); v._busy = false; v._label = 'add'; return; }
         const s = r.status;
         const inLib = s === 'imported' || s === 'on-shelf';
-        v._label = inLib ? 'In library' : ['grabbed', 'downloading', 'active'].includes(s) ? 'Downloading' : 'Wanted';
+        v._label = inLib ? 'inLibrary' : ['grabbed', 'downloading', 'active'].includes(s) ? 'downloading' : 'wanted';
         v._done = true;
         // Only a book already on the shelf has a series to open; one that was
         // merely wanted has nothing to point at yet.
         if (r.seriesId) v.seriesId = r.seriesId;
         if (r.note) notify(r.note, s === 'error' ? 'error' : inLib || s === 'grabbed' || s === 'downloading' ? 'success' : 'info');
         if (inLib) loadCollection();
-      } catch { notify('Add failed', 'error'); v._busy = false; v._label = 'Add'; }
+      } catch { notify(t('addModal.addFailed'), 'error'); v._busy = false; v._label = 'add'; }
       return;
     }
     try {
       const r = await apiPost('/api/collection/add-cv', { comicvineId: v.id, manga: mangaMode });
-      if (r.error) { notify('Add failed: ' + r.error, 'error'); v._busy = false; v._label = 'Add'; return; }
+      if (r.error) { notify(t('addModal.addFailedWith', { error: r.error }), 'error'); v._busy = false; v._label = 'add'; return; }
       // Say what actually happened: how many issues were queued, or why none.
-      v._label = r.queued ? `Added — ${r.queued} queued` :
-        r.noSources ? 'Added (no sources enabled)' :
-        r.outcome === 'created' ? 'Added' : 'Already in library';
+      v._n = r.queued || 0;
+      v._label = r.queued ? 'addedQueued' :
+        r.noSources ? 'addedNoSources' :
+        r.outcome === 'created' ? 'added' : 'alreadyInLibrary';
       v._done = true;
       if (r.seriesId) v.seriesId = r.seriesId;   // so the row can open it
-      if (r.noSources) notify('Added. Nothing was queued — no download sources are enabled (Settings → Download sources).', 'info');
+      if (r.noSources) notify(t('addModal.nothingQueuedNoSources'), 'info');
       // The first manga add materializes the Manga library — without a folder
       // its downloads file into the comics root, so point at the fix.
-      if (r.createdLibrary) notify(`Created the ${r.createdLibrary} library — give it a folder in Settings → Library so its downloads file separately.`, 'info');
+      if (r.createdLibrary) notify(t('addModal.createdLibrary', { name: r.createdLibrary }), 'info');
       loadCollection();
-    } catch { notify('Add failed', 'error'); v._busy = false; v._label = 'Add'; }
+    } catch { notify(t('addModal.addFailed'), 'error'); v._busy = false; v._label = 'add'; }
   }
 
   const ql = $derived(m.query.trim());
@@ -168,32 +175,32 @@
 
 {#if open}
   <div id="add-modal" class="modal addx-overlay" onclick={(e) => { if (e.target === e.currentTarget) closeModal('add'); }}>
-    <div class="addx" use:trapFocus role="dialog" aria-label="Add {thing}">
+    <div class="addx" use:trapFocus role="dialog" aria-label={title}>
       <div class="addx__head">
         <div class="addx__icon"><Icon name="plus" size={18} /></div>
         <div class="addx__titles">
-          <div class="addx__title">Add {thing === 'audiobook' ? 'an' : 'a'} {thing}</div>
-          <div class="addx__sub">Search {sourceLabel} and {bookMode ? 'get it from your download sources' : 'start tracking it'}</div>
+          <div class="addx__title">{title}</div>
+          <div class="addx__sub">{t(bookMode ? 'addModal.subtitleFetch' : 'addModal.subtitleTrack', { source: sourceLabel })}</div>
         </div>
-        <button id="add-modal-x" class="addx__x" aria-label="Close" onclick={() => closeModal('add')}><Icon name="close" size={16} /></button>
+        <button id="add-modal-x" class="addx__x" aria-label={t('common.close')} onclick={() => closeModal('add')}><Icon name="close" size={16} /></button>
       </div>
 
       <div class="addx__switch-row">
         <div class="addx__switch" role="tablist">
-          <button class="addx__seg" class:is-on={mode === 'comic'} role="tab" aria-selected={mode === 'comic'} onclick={() => setMode('comic')}><Icon name="book" size={14} /> Comics</button>
-          <button class="addx__seg" class:is-on={mode === 'manga'} role="tab" aria-selected={mode === 'manga'} title={mangaLib ? `Added series join the ${mangaLib.name} library` : 'Your Manga library is created on the first add'} onclick={() => setMode('manga')}><Icon name="book" size={14} /> Manga</button>
+          <button class="addx__seg" class:is-on={mode === 'comic'} role="tab" aria-selected={mode === 'comic'} onclick={() => setMode('comic')}><Icon name="book" size={14} /> {t('addModal.tabComics')}</button>
+          <button class="addx__seg" class:is-on={mode === 'manga'} role="tab" aria-selected={mode === 'manga'} title={mangaLib ? t('addModal.mangaJoins', { name: mangaLib.name }) : t('addModal.mangaCreated')} onclick={() => setMode('manga')}><Icon name="book" size={14} /> {t('addModal.tabManga')}</button>
           {#if bookLib}
-            <button class="addx__seg" class:is-on={mode === 'ebook'} role="tab" aria-selected={mode === 'ebook'} title={`Added books are fetched by your download sources into ${bookLib.name}`} onclick={() => setMode('ebook')}><Icon name="book" size={14} /> Books</button>
+            <button class="addx__seg" class:is-on={mode === 'ebook'} role="tab" aria-selected={mode === 'ebook'} title={t('addModal.booksFetched', { name: bookLib.name })} onclick={() => setMode('ebook')}><Icon name="book" size={14} /> {t('addModal.tabBooks')}</button>
           {/if}
           {#if audioLib}
-            <button class="addx__seg" class:is-on={mode === 'audiobook'} role="tab" aria-selected={mode === 'audiobook'} title={`Added audiobooks are fetched by your download sources into ${audioLib.name}`} onclick={() => setMode('audiobook')}><Icon name="book" size={14} /> Audiobooks</button>
+            <button class="addx__seg" class:is-on={mode === 'audiobook'} role="tab" aria-selected={mode === 'audiobook'} title={t('addModal.audiobooksFetched', { name: audioLib.name })} onclick={() => setMode('audiobook')}><Icon name="book" size={14} /> {t('addModal.tabAudiobooks')}</button>
           {/if}
         </div>
       </div>
 
       <div class="addx__search">
         <Icon name="search" size={16} />
-        <input id="add-search" type="search" spellcheck="false" placeholder={`Search ${sourceLabel}…`} bind:this={searchEl} bind:value={m.query} oninput={onInput} />
+        <input id="add-search" type="search" spellcheck="false" placeholder={t('addModal.searchPlaceholder', { source: sourceLabel })} bind:this={searchEl} bind:value={m.query} oninput={onInput} />
         {#if searching}<span class="addx__spin"><Icon name="refresh" size={16} /></span>{/if}
       </div>
 
@@ -201,44 +208,44 @@
         {#if needsKey}
           <div class="addx__keycard">
             <div class="addx__keyicon"><Icon name="shield" size={22} /></div>
-            <div class="addx__keytitle">A ComicVine API key is required</div>
-            <p class="addx__keybody">Searching identifies every series and issue via ComicVine. Add a free key to start.</p>
-            <button class="addx__keycta" onclick={() => { closeModal('add'); navigate('/settings?tab=metadata'); }}>Open Settings → Metadata</button>
+            <div class="addx__keytitle">{t('addModal.setupTitle')}</div>
+            <p class="addx__keybody">{t('addModal.setupBody')}</p>
+            <button class="addx__keycta" onclick={() => { closeModal('add'); navigate('/settings?tab=metadata'); }}>{t('addModal.openMetadataSettings')}</button>
           </div>
         {:else if m.error}
           <div class="addx__empty">{m.error}</div>
         {:else if prompt}
           <div class="addx__prompt">
             <div class="addx__prompt-art"><Icon name="search" size={20} /></div>
-            <div>Type at least 2 characters to search {sourceLabel}.</div>
-            {#if mode === 'comic'}<div class="addx__tip">Can’t find a series? Paste its ComicVine URL or id (e.g. <code>cv:166619</code>) to jump straight to it.</div>{/if}
-            {#if bookMode}<div class="addx__tip">Search by title, author or ISBN. An added {thing} is fetched by your download sources and filed into the library.</div>{/if}
+            <div>{t('addModal.typeToSearch', { source: sourceLabel })}</div>
+            {#if mode === 'comic'}<div class="addx__tip">{@html th('addModal.tipPasteRef')}</div>{/if}
+            {#if bookMode}<div class="addx__tip">{t('addModal.tipBooks', { thing: thingLabel })}</div>{/if}
           </div>
         {:else if noResults}
-          <div class="addx__empty">No {thing === 'series' ? 'series' : thing + 's'} found for “{ql}”.</div>
+          <div class="addx__empty">{t(thing === 'series' ? 'addModal.noResultsSeries' : thing === 'book' ? 'addModal.noResultsBooks' : 'addModal.noResultsAudiobooks', { query: ql })}</div>
         {:else if m.results}
           {#each m.results as v (v.id)}
             <div class="addx__row" class:is-dim={v.inLibrary}>
               <Cover coverUrl={v.image_url} title={v.name || '?'} />
               <div class="addx__info">
                 <div class="addx__name">
-                  {#if v.site_detail_url}<a class="addx__link" href={v.site_detail_url} target="_blank" rel="noreferrer" title="View details">{v.name || '?'}</a>{:else}{v.name || '?'}{/if}
+                  {#if v.site_detail_url}<a class="addx__link" href={v.site_detail_url} target="_blank" rel="noreferrer" title={t('addModal.viewDetails')}>{v.name || '?'}</a>{:else}{v.name || '?'}{/if}
                   {#if v.start_year}<span class="addx__year">({v.start_year})</span>{/if}
                 </div>
-                <div class="addx__meta">{#if v._meta !== undefined}{v._meta}{:else}{v.publisher || ''}{v.publisher ? ' · ' : ''}{fmt(v.count_of_issues || 0)} issues{/if}</div>
+                <div class="addx__meta">{#if v._meta !== undefined}{v._meta}{:else}{v.publisher || ''}{v.publisher ? ' · ' : ''}{t('common.nIssues', { count: fmt(v.count_of_issues || 0) })}{/if}</div>
               </div>
               {#if v.inLibrary}
-                <button class="addx__btn addx__btn--ghost" title="Already in your library — open it" onclick={() => openSeries(v.seriesId)}>In library</button>
+                <button class="addx__btn addx__btn--ghost" title={t('addModal.inLibraryTitle')} onclick={() => openSeries(v.seriesId)}>{t('addModal.inLibrary')}</button>
               {:else if v._done}
                 <!-- Just added. Keep the outcome as the label (how many issues
                      queued is the useful part) and make it open the series,
                      the same as the In library row. A book that is only wanted
                      has no series yet, so that one stays a plain label. -->
                 <button class="addx__btn addx__btn--done" class:is-open={!!v.seriesId}
-                  disabled={!v.seriesId} title={v.seriesId ? 'Open the series' : undefined}
-                  onclick={() => v.seriesId && openSeries(v.seriesId)}>{v._label}</button>
+                  disabled={!v.seriesId} title={v.seriesId ? t('addModal.openSeries') : undefined}
+                  onclick={() => v.seriesId && openSeries(v.seriesId)}>{labelOf(v)}</button>
               {:else}
-                <button class="addx__btn {v._label === 'Add' ? 'addx__btn--add' : 'addx__btn--ghost'}" disabled={v._busy || v._label !== 'Add'} onclick={() => add(v)}>{v._label}</button>
+                <button class="addx__btn {v._label === 'add' ? 'addx__btn--add' : 'addx__btn--ghost'}" disabled={v._busy || v._label !== 'add'} onclick={() => add(v)}>{labelOf(v)}</button>
               {/if}
             </div>
           {/each}
@@ -300,7 +307,7 @@
   .addx__prompt { padding: 44px 20px; text-align: center; color: var(--faint); font-size: 13px; }
   .addx__prompt-art { width: 46px; height: 46px; margin: 0 auto 12px; border-radius: 12px; background: var(--panel-2); display: grid; place-items: center; color: #6f6885; }
   .addx__tip { margin-top: 10px; font-size: 12px; color: var(--faint); }
-  .addx__tip code { font-size: 11px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+  .addx__tip :global(code) { font-size: 11px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
   .addx__empty { padding: 40px; text-align: center; color: var(--faint); font-size: 13px; }
 
   .addx__keycard { margin: 8px; padding: 18px; border: 1px solid rgba(255,194,75,.3); background: rgba(255,194,75,.06); border-radius: 12px; text-align: center; }
