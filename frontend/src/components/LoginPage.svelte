@@ -4,6 +4,7 @@
   // open mode to create the first admin account.
   import { auth, login, register } from '../lib/auth.svelte.js';
   import { apiGet } from '../lib/api.js';
+  import { t, th } from '../lib/i18n.svelte.js';
 
   let { mode = 'login', oncancel = null } = $props(); // 'login' | 'secure'
   let tab = $state(mode === 'secure' ? 'register' : 'login');
@@ -31,7 +32,7 @@
   async function submit() {
     error = '';
     if (tab === 'register') {
-      if (password !== confirm) { error = 'passwords do not match'; return; }
+      if (password !== confirm) { error = t('login.passwordsMismatch'); return; }
     }
     busy = true;
     try {
@@ -50,49 +51,49 @@
   <div class="authgate__card">
     <div class="brand"><span class="brand__logo">BACKISSUE</span></div>
     {#if securing}
-      <p class="authgate__intro">Welcome to BackIssue. Create your account to get started — it becomes the <b>admin</b>, and signing in will be required from then on.</p>
+      <p class="authgate__intro">{@html th('login.intro')}</p>
     {:else if canRegister && showPasswordForm}
       <div class="authgate__tabs">
-        <button class="authgate__tab" class:is-active={tab === 'login'} onclick={() => { tab = 'login'; error = ''; }}>Sign in</button>
-        <button class="authgate__tab" class:is-active={tab === 'register'} onclick={() => { tab = 'register'; error = ''; }}>Create account</button>
+        <button class="authgate__tab" class:is-active={tab === 'login'} onclick={() => { tab = 'login'; error = ''; }}>{t('login.signIn')}</button>
+        <button class="authgate__tab" class:is-active={tab === 'register'} onclick={() => { tab = 'register'; error = ''; }}>{t('login.createAccount')}</button>
       </div>
     {/if}
 
     {#if showPasswordForm}
       <form class="authgate__form" onsubmit={(e) => { e.preventDefault(); submit(); }}>
-        <label>Username
+        <label>{t('login.username')}
           <input type="text" autocomplete="username" bind:value={username} required minlength="2" maxlength="32" />
         </label>
-        <label>Password
+        <label>{t('login.password')}
           <input type="password" autocomplete={tab === 'register' ? 'new-password' : 'current-password'} bind:value={password} required minlength={tab === 'register' ? 8 : 1} />
         </label>
         {#if tab === 'register'}
-          <label>Confirm password
+          <label>{t('login.confirmPassword')}
             <input type="password" autocomplete="new-password" bind:value={confirm} required />
           </label>
         {/if}
         {#if error}<div class="authgate__error">{error}</div>{/if}
         <button class="btn btn--primary authgate__submit" disabled={busy}>
-          {busy ? '…' : securing ? 'Create admin account' : tab === 'register' ? 'Create account' : 'Sign in'}</button>
+          {busy ? '…' : securing ? t('login.createAdmin') : tab === 'register' ? t('login.createAccount') : t('login.signIn')}</button>
         {#if securing && oncancel}
-          <button type="button" class="btn btn--ghost" onclick={oncancel}>Cancel</button>
+          <button type="button" class="btn btn--ghost" onclick={oncancel}>{t('common.cancel')}</button>
         {/if}
       </form>
     {/if}
 
     {#if !securing && providers.length}
-      {#if showPasswordForm}<div class="authgate__or"><span>or</span></div>{/if}
+      {#if showPasswordForm}<div class="authgate__or"><span>{t('login.or')}</span></div>{/if}
       <div class="authgate__sso">
         {#each providers as p (p.id)}
-          <a class="btn btn--ghost authgate__sso-btn" href={p.loginPath}>Sign in with {p.label}</a>
+          <a class="btn btn--ghost authgate__sso-btn" href={p.loginPath}>{t('login.signInWith', { provider: p.label })}</a>
         {/each}
       </div>
     {/if}
 
     {#if !securing && !passwordLogin && !providers.length}
-      <p class="authgate__note">No sign-in method is available — an admin must configure SSO or re-enable password login.</p>
+      <p class="authgate__note">{t('login.noMethod')}</p>
     {:else if !securing && !canRegister && showPasswordForm}
-      <p class="authgate__note">Registration is disabled — ask an admin for an account.</p>
+      <p class="authgate__note">{t('login.registrationDisabled')}</p>
     {/if}
   </div>
 </div>

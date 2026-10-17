@@ -1,4 +1,6 @@
-export const fmt = (n) => (n ?? 0).toLocaleString('en-US');
+import { currentLang, t } from './i18n.js';
+
+export const fmt = (n) => (n ?? 0).toLocaleString(currentLang());
 
 export const pad3 = (n) => (/^\d+$/.test(String(n)) ? String(n).padStart(3, '0') : String(n ?? ''));
 
@@ -86,11 +88,11 @@ export function fmtAgo(ms) {
 }
 
 export function fmtIn(ms) {
-  if (ms <= 0) return 'due now';
+  if (ms <= 0) return t('common.dueNow');
   const m = Math.round(ms / 60000);
-  if (m < 60) return 'in ' + m + 'm';
+  if (m < 60) return t('common.inTime', { time: m + 'm' });
   const h = Math.floor(m / 60);
-  return 'in ' + h + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : '');
+  return t('common.inTime', { time: h + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : '') });
 }
 
 // Strip HTML tags to plain text (ComicVine deck/description can contain markup).

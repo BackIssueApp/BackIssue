@@ -1,3 +1,5 @@
+// Boots the English catalog the helpers format with.
+import '../src/lib/i18n.svelte.js';
 import { describe, test, expect, beforeEach } from 'vitest';
 import { librarySort, setLibrarySort } from '../src/lib/store.svelte.js';
 import {

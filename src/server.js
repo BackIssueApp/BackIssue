@@ -425,7 +425,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // returned here ('*' = everything). UI hiding is courtesy; the middleware
   // above is the enforcement.
   const publicUser = (u) => u
-    ? { id: u.id, username: u.username, role: u.role, permissions: users.rolePermissions(db, u.role, permCatalog), hideMature: !!u.hide_mature }
+    ? { id: u.id, username: u.username, role: u.role, permissions: users.rolePermissions(db, u.role, permCatalog), hideMature: !!u.hide_mature, lang: u.lang || null }
     : null;
   app.get('/api/auth/me', (req, res) => {
     if (!anyUsers.get().e) {
@@ -560,6 +560,17 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     const on = users.setHideMature(db, req.user.id, !!(req.body || {}).hide);
     users.clearBasicCache();
     res.json({ hideMature: on });
+  });
+  // Personal UI language (self-service). null/'' = follow the browser. The
+  // web shell inlines it so the first paint is already translated; the mobile
+  // apps read it from /api/auth/me.
+  app.post('/api/auth/lang', (req, res) => {
+    if (!req.user || req.user.id === 0) return res.status(403).json({ error: 'sign in with a real account first' });
+    try {
+      const lang = users.setLang(db, req.user.id, (req.body || {}).lang);
+      users.clearBasicCache();
+      res.json({ lang });
+    } catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
   });
   app.post('/api/auth/logout-others', (req, res) => {
     if (!req.user || req.user.id === 0) return res.status(403).json({ error: 'sign in with a real account first' });
@@ -846,9 +857,16 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     const file = path.join(publicDir, 'index.html');
     if (!fssync.existsSync(file)) return null;
     let html = fssync.readFileSync(file, 'utf8');
-    const authed = !anyUsers.get().e || !!resolveUser(req);
+    const u = anyUsers.get().e ? resolveUser(req) : null;
+    const authed = !anyUsers.get().e || !!u;
     if (authed) {
       const tags = ['<script>window.BackIssue={_q:[],registerClient(fn){this._q.push(fn)}};window.__BI_PLUGINS_INLINE__=1;</script>'];
+      // The account's saved UI language, so the bundle picks it before the
+      // first render (validated against LANG_RE on write; safe to inline).
+      if (u?.lang && users.LANG_RE.test(u.lang)) {
+        tags.unshift(`<script>window.__BI_LANG__=${JSON.stringify(u.lang)};</script>`);
+        html = html.replace('<html lang="en">', `<html lang="${u.lang}">`);
+      }
       for (const a of stampedAssets()) {
         const v = a.v ? `?v=${a.v}` : '';
         if (a.css) tags.push(`<link rel="stylesheet" href="/plugins/${a.name}/${a.css}${v}">`);

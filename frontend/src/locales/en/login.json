@@ -1,0 +1,14 @@
+{
+  "intro": "Welcome to BackIssue. Create your account to get started — it becomes the <b>admin</b>, and signing in will be required from then on.",
+  "signIn": "Sign in",
+  "createAccount": "Create account",
+  "createAdmin": "Create admin account",
+  "username": "Username",
+  "password": "Password",
+  "confirmPassword": "Confirm password",
+  "passwordsMismatch": "passwords do not match",
+  "or": "or",
+  "signInWith": "Sign in with {provider}",
+  "noMethod": "No sign-in method is available — an admin must configure SSO or re-enable password login.",
+  "registrationDisabled": "Registration is disabled — ask an admin for an account."
+}

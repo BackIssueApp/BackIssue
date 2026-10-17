@@ -9,6 +9,7 @@
   import { can } from '../lib/auth.svelte.js';
   import { live } from '../lib/events.svelte.js';
   import { fmt } from '../lib/util.js';
+  import { t } from '../lib/i18n.svelte.js';
   import { openHelp } from './HelpModal.svelte';
   import NotificationBell from './NotificationBell.svelte';
   import Icon from '../lib/Icon.svelte';
@@ -63,31 +64,31 @@
 </script>
 
 <header class="topbar">
-  <button class="btn btn--ghost topbar__burger" title="Menu" aria-label="Open navigation" onclick={() => { ui.sidebarOpen = !ui.sidebarOpen; }}><Icon name="menu" /></button>
+  <button class="btn btn--ghost topbar__burger" title={t('common.menu')} aria-label={t('header.openNav')} onclick={() => { ui.sidebarOpen = !ui.sidebarOpen; }}><Icon name="menu" /></button>
 
   <div class="search">
-    <input id="search" type="search" autocomplete="off" placeholder="Search your collection…" bind:value={searchValue} oninput={onSearchInput} />
+    <input id="search" type="search" autocomplete="off" placeholder={t('header.searchPlaceholder')} bind:value={searchValue} oninput={onSearchInput} />
   </div>
 
   <div class="topbar__right">
     {#if disconnected}
-      <span class="topbar__offline" title="Lost the live connection to the server — reconnecting. Data may be stale.">reconnecting…</span>
+      <span class="topbar__offline" title={t('header.reconnectingTitle')}>{t('header.reconnecting')}</span>
     {/if}
     <!-- Plugin header widgets inject here (plain DOM — must stay mounted). -->
     <div id="header-plugin-slot"></div>
     <NotificationBell />
-    <button class="topbar__help" title="Help for this page" aria-label="Help for this page" onclick={openHelp}>?</button>
+    <button class="topbar__help" title={t('header.helpForPage')} aria-label={t('header.helpForPage')} onclick={openHelp}>?</button>
     {#if can('downloads.grab')}
       <!-- Download-pipeline stats: meaningless to a read-only viewer, so hidden
            unless the user can actually queue downloads. -->
       <div class="pills" id="pills">
-        <span class="pill pill--done"><span class="dot"></span>saved <b>{fmt(status.counts.done || 0)}</b></span>
-        <span class="pill pill--queued"><span class="dot"></span>queued <b>{fmt(status.counts.queued || 0)}</b></span>
+        <span class="pill pill--done"><span class="dot"></span>{t('header.pillSaved')} <b>{fmt(status.counts.done || 0)}</b></span>
+        <span class="pill pill--queued"><span class="dot"></span>{t('header.pillQueued')} <b>{fmt(status.counts.queued || 0)}</b></span>
         {#if status.counts.failed}
-          <span class="pill pill--failed"><span class="dot"></span>failed <b>{fmt(status.counts.failed)}</b></span>
+          <span class="pill pill--failed"><span class="dot"></span>{t('header.pillFailed')} <b>{fmt(status.counts.failed)}</b></span>
         {/if}
         {#if status.downloading || inFlight}
-          <span class="pill pill--busy"><span class="dot"></span>downloading <b>{fmt(inFlight)}</b></span>
+          <span class="pill pill--busy"><span class="dot"></span>{t('header.pillDownloading')} <b>{fmt(inFlight)}</b></span>
         {/if}
       </div>
     {/if}

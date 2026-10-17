@@ -9,6 +9,7 @@
   import { notify } from '../lib/toasts.svelte.js';
   import { confirmDialog } from './DialogModal.svelte';
   import { loadCollection } from '../lib/store.svelte.js';
+  import { t, th, LANGUAGES, languageName, matchLanguage, storedLanguage, rememberLanguage, currentLang } from '../lib/i18n.svelte.js';
   import Icon from '../lib/Icon.svelte';
 
   let { active = false } = $props();
@@ -22,18 +23,23 @@
   let freshKey = $state('');      // the raw key, shown once after generation
   let qrDataUrl = $state('');     // QR of the connection payload for the mobile app
   let copied = $state(false);
+  // '' = follow the browser; otherwise a catalog code. Signed-in accounts keep
+  // it on the server (every device), open mode keeps it in this browser.
+  let langChoice = $state('');
+  const browserLang = matchLanguage(typeof navigator !== 'undefined' ? navigator.languages || [navigator.language] : []) || 'en';
 
   const PROVIDER_LABELS = { whmcs: 'WHMCS', oidc: 'SSO' };
   const providerLabel = (id) => PROVIDER_LABELS[id] || String(id || '').toUpperCase();
   // Accounts that sign in through an external service (SSO/OIDC, billing, …)
   // don't have a local password — it's managed by that provider.
   const isExternal = $derived((profile?.providers || []).length > 0);
-  const fmtDate = (s) => (s ? new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—');
+  const fmtDate = (s) => (s ? new Date(s).toLocaleDateString(currentLang(), { year: 'numeric', month: 'short', day: 'numeric' }) : '—');
 
   async function load() {
     try { const r = await apiGet('/api/auth/profile'); profile = r.user; email = profile?.email || ''; hideMature = !!profile?.hide_mature; }
     catch { profile = null; }
     try { apiKey = (await apiGet('/api/auth/apikey')).key; } catch { apiKey = null; }
+    langChoice = (!auth.openMode && profile?.lang) || storedLanguage() || '';
   }
 
   // Toggle the personal "hide mature content" preference. Optimistic; reverts on
@@ -54,11 +60,24 @@
   }
   $effect(() => { if (active) load(); });
 
+  // Pick a UI language. Saved for the account when there is one, remembered in
+  // this browser either way, then a full reload: plugin UIs are plain DOM and
+  // only re-render from scratch.
+  async function changeLanguage(code) {
+    langChoice = code;
+    if (!auth.openMode && auth.user?.id) {
+      const r = await apiPost('/api/auth/lang', { lang: code || null });
+      if (r.error) return notify(r.error, 'error');
+    }
+    rememberLanguage(code);
+    location.reload();
+  }
+
   async function generateKey() {
     if (apiKey && !(await confirmDialog({
-      title: 'Replace your API key?',
-      message: 'A new key is generated and the current one stops working immediately. Anything using the old key must be updated.',
-      confirmLabel: 'Replace key', danger: true,
+      title: t('profile.replaceKeyTitle'),
+      message: t('profile.replaceKeyMessage'),
+      confirmLabel: t('profile.replaceKey'), danger: true,
     }))) return;
     const r = await apiPost('/api/auth/apikey', {});
     if (r.error) return notify(r.error, 'error');
@@ -76,45 +95,45 @@
   }
   async function revokeKey() {
     if (!(await confirmDialog({
-      title: 'Revoke your API key?',
-      message: 'The key stops working immediately. Anything using it loses access.',
-      confirmLabel: 'Revoke key', danger: true,
+      title: t('profile.revokeKeyTitle'),
+      message: t('profile.revokeKeyMessage'),
+      confirmLabel: t('profile.revokeKey'), danger: true,
     }))) return;
-    const r = await fetch('/api/auth/apikey', { method: 'DELETE' }).then((x) => x.json()).catch(() => ({ error: 'request failed' }));
+    const r = await fetch('/api/auth/apikey', { method: 'DELETE' }).then((x) => x.json()).catch(() => ({ error: t('common.requestFailed') }));
     if (r.error) return notify(r.error, 'error');
     freshKey = '';
-    notify('API key revoked.', 'ok');
+    notify(t('profile.keyRevoked'), 'ok');
     load();
   }
   async function copyKey() {
     try {
       await navigator.clipboard.writeText(freshKey);
       copied = true; clearTimeout(copyKey._t); copyKey._t = setTimeout(() => { copied = false; }, 1400);
-    } catch { notify('Copy failed — select and copy it manually.', 'error'); }
+    } catch { notify(t('profile.copyFailed'), 'error'); }
   }
 
   async function saveEmail() {
     const r = await apiPost('/api/auth/email', { email });
     if (r.error) return notify(r.error, 'error');
-    notify('Email saved.', 'ok');
+    notify(t('profile.emailSaved'), 'ok');
     load();
   }
   async function signOutOthers() {
     if (!(await confirmDialog({
-      title: 'Sign out other devices?',
-      message: 'Every other signed-in session is ended. This device stays signed in.',
-      confirmLabel: 'Sign out others',
+      title: t('profile.signOutOthersTitle'),
+      message: t('profile.signOutOthersMessage'),
+      confirmLabel: t('profile.signOutOthersConfirm'),
     }))) return;
     const r = await apiPost('/api/auth/logout-others', {});
     if (r.error) return notify(r.error, 'error');
-    notify(r.cleared ? `Signed out ${r.cleared} other session${r.cleared === 1 ? '' : 's'}.` : 'No other sessions were active.', 'ok');
+    notify(r.cleared ? t('profile.signedOutOthers', { count: r.cleared }) : t('profile.noOtherSessions'), 'ok');
   }
 </script>
 
 <main id="profile-page" class="scan-page profile-page pfx">
   <div class="pfx__head">
-    <button class="pfx__iconbtn" aria-label="Back" onclick={goBack}><Icon name="arrow-left" size={16} /></button>
-    <h2 class="pfx__title">Profile</h2>
+    <button class="pfx__iconbtn" aria-label={t('common.back')} onclick={goBack}><Icon name="arrow-left" size={16} /></button>
+    <h2 class="pfx__title">{t('profile.title')}</h2>
   </div>
   <div class="pfx__scroll">
     <div class="pfx__inner">
@@ -126,12 +145,12 @@
           <div class="pfx__hero-top">
             <span class="pfx__name">{auth.user?.username}</span>
             <span class="pfx__roletag">{auth.user?.role}</span>
-            {#each profile?.providers || [] as p (p)}<span class="pfx__provider" title="Linked to {providerLabel(p)}">{providerLabel(p)}</span>{/each}
+            {#each profile?.providers || [] as p (p)}<span class="pfx__provider" title={t('profile.linkedTo', { provider: providerLabel(p) })}>{providerLabel(p)}</span>{/each}
           </div>
           {#if profile}
             <div class="pfx__hero-meta">
-              <span>Member since <b>{fmtDate(profile.created_at)}</b></span>
-              <span>Last signed in <b>{fmtDate(profile.last_seen)}</b></span>
+              <span>{@html th('profile.memberSince', { date: fmtDate(profile.created_at) })}</span>
+              <span>{@html th('profile.lastSignedIn', { date: fmtDate(profile.last_seen) })}</span>
             </div>
           {/if}
         </div>
@@ -140,33 +159,46 @@
       <div class="pfx__cards">
         <!-- account -->
         <div class="pfx__card">
-          <div class="pfx__cardhead">Account</div>
+          <div class="pfx__cardhead">{t('profile.account')}</div>
           <div class="pfx__field">
-            <span class="pfx__label">Email</span>
+            <span class="pfx__label">{t('profile.email')}</span>
             <div class="pfx__email">
-              <input type="email" spellcheck="false" bind:value={email} placeholder="you@example.com" />
-              <button class="pfx__ghost" onclick={saveEmail}>Save</button>
+              <input type="email" spellcheck="false" bind:value={email} placeholder={t('profile.emailPlaceholder')} />
+              <button class="pfx__ghost" onclick={saveEmail}>{t('common.save')}</button>
             </div>
           </div>
           <div class="pfx__rule"></div>
           <div class="pfx__actions">
-            {#if !isExternal}<button class="pfx__ghost" onclick={openAccountModal}>Change password</button>{/if}
-            <button class="pfx__ghost" onclick={signOutOthers}>Sign out other devices</button>
-            <button class="pfx__ghost pfx__ghost--danger" onclick={logout}>Sign out</button>
+            {#if !isExternal}<button class="pfx__ghost" onclick={openAccountModal}>{t('profile.changePassword')}</button>{/if}
+            <button class="pfx__ghost" onclick={signOutOthers}>{t('profile.signOutOthers')}</button>
+            <button class="pfx__ghost pfx__ghost--danger" onclick={logout}>{t('profile.signOut')}</button>
           </div>
           {#if isExternal}
-            <p class="pfx__note">You sign in through {profile.providers.map(providerLabel).join(', ')}, so your password is managed there — not here.</p>
+            <p class="pfx__note">{t('profile.externalNote', { providers: profile.providers.map(providerLabel).join(', ') })}</p>
           {/if}
+        </div>
+
+        <!-- language -->
+        <div class="pfx__card">
+          <div class="pfx__cardhead">{t('profile.language')}</div>
+          <div class="pfx__field">
+            <span class="pfx__label">{t('profile.languageLabel')}</span>
+            <select class="pfx__select" value={langChoice} onchange={(e) => changeLanguage(e.currentTarget.value)}>
+              <option value="">{t('profile.languageAuto', { name: languageName(browserLang) })}</option>
+              {#each LANGUAGES as code (code)}<option value={code}>{languageName(code)}</option>{/each}
+            </select>
+          </div>
+          <p class="pfx__note">{t('profile.languageNote')}</p>
         </div>
 
         <!-- content preferences -->
         {#if canSeeMature}
           <div class="pfx__card">
-            <div class="pfx__cardhead">Content</div>
+            <div class="pfx__cardhead">{t('profile.content')}</div>
             <label class="pfx__toggle">
               <span class="pfx__toggle-main">
-                <b>Hide mature content</b>
-                <span class="pfx__note">Hide series marked mature from your Library, search, and reader — even though your role is allowed to see them. Nothing is deleted; turn this off any time to show it again.</span>
+                <b>{t('profile.hideMature')}</b>
+                <span class="pfx__note">{t('profile.hideMatureNote')}</span>
               </span>
               <span class="switch"><input type="checkbox" checked={hideMature} onchange={toggleMature}><span class="switch__track"></span></span>
             </label>
@@ -175,34 +207,34 @@
 
         <!-- api key -->
         <div class="pfx__card">
-          <div class="pfx__cardhead">API key</div>
-          <p class="pfx__note pfx__note--top">A personal key for apps and scripts that talk to this BackIssue install — sent as an <code>X-Api-Key</code> header (or <code>Authorization: Bearer</code>). It can do exactly what your account can, nothing more.</p>
+          <div class="pfx__cardhead">{t('profile.apiKey')}</div>
+          <p class="pfx__note pfx__note--top">{@html th('profile.apiKeyNote')}</p>
 
           {#if freshKey}
             <div class="pfx__freshkey">
               <code>{freshKey}</code>
-              <button class="pfx__ghost pfx__ghost--sm" onclick={copyKey}><Icon name="copy" size={14} /> {copied ? 'Copied' : 'Copy'}</button>
+              <button class="pfx__ghost pfx__ghost--sm" onclick={copyKey}><Icon name="copy" size={14} /> {copied ? t('common.copied') : t('common.copy')}</button>
             </div>
-            <p class="pfx__warn">Copy it now — it won't be shown again.</p>
+            <p class="pfx__warn">{t('profile.copyNow')}</p>
             {#if qrDataUrl}
               <div class="pfx__qr">
-                <div class="pfx__qr-img"><img src={qrDataUrl} alt="Pairing QR code" width="110" height="110" /></div>
-                <p class="pfx__note">Scan in the <b>BackIssue</b> mobile app (Connect → Scan QR) to pair without typing.</p>
+                <div class="pfx__qr-img"><img src={qrDataUrl} alt={t('profile.pairingQrAlt')} width="110" height="110" /></div>
+                <p class="pfx__note">{@html th('profile.scanNote')}</p>
               </div>
             {/if}
           {:else if apiKey}
             <div class="pfx__keyrows">
-              <div class="pfx__keyrow"><span>Key</span><code>{apiKey.prefix}…</code></div>
-              <div class="pfx__keyrow"><span>Created</span><span>{fmtDate(apiKey.created_at)}</span></div>
-              <div class="pfx__keyrow"><span>Last used</span><span>{fmtDate(apiKey.last_used)}</span></div>
+              <div class="pfx__keyrow"><span>{t('profile.key')}</span><code>{apiKey.prefix}…</code></div>
+              <div class="pfx__keyrow"><span>{t('profile.created')}</span><span>{fmtDate(apiKey.created_at)}</span></div>
+              <div class="pfx__keyrow"><span>{t('profile.lastUsed')}</span><span>{fmtDate(apiKey.last_used)}</span></div>
             </div>
           {:else}
-            <div class="pfx__nokey">No API key yet. Generate one to connect the mobile app or scripts.</div>
+            <div class="pfx__nokey">{t('profile.noKey')}</div>
           {/if}
 
           <div class="pfx__actions pfx__actions--key">
-            <button class="pfx__primary" onclick={generateKey}>{apiKey ? 'Replace key' : 'Generate key'}</button>
-            {#if apiKey}<button class="pfx__ghost pfx__ghost--danger" onclick={revokeKey}>Revoke</button>{/if}
+            <button class="pfx__primary" onclick={generateKey}>{apiKey ? t('profile.replaceKey') : t('profile.generateKey')}</button>
+            {#if apiKey}<button class="pfx__ghost pfx__ghost--danger" onclick={revokeKey}>{t('profile.revoke')}</button>{/if}
           </div>
         </div>
       </div>
@@ -233,7 +265,7 @@
   .pfx__roletag { font: 600 10px var(--font-body); text-transform: uppercase; letter-spacing: .05em; color: var(--accent); border: 1px solid rgba(255,45,111,.4); border-radius: 5px; padding: 2px 8px; }
   .pfx__provider { font: 600 10px var(--font-body); text-transform: uppercase; letter-spacing: .04em; color: var(--cyan); border: 1px solid rgba(43,212,217,.4); border-radius: 5px; padding: 2px 8px; }
   .pfx__hero-meta { display: flex; gap: 20px; margin-top: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--faint); }
-  .pfx__hero-meta b { color: var(--text); }
+  .pfx__hero-meta :global(b) { color: var(--text); }
 
   .pfx__cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
   .pfx__card { border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.012); padding: 18px 20px; }
@@ -243,6 +275,8 @@
   .pfx__email { display: flex; gap: 8px; }
   .pfx__email input { flex: 1; height: 38px; padding: 0 11px; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; color: var(--text); font: 13px var(--font-body); }
   .pfx__email input:focus { outline: none; border-color: var(--accent); }
+  .pfx__select { height: 38px; padding: 0 11px; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; color: var(--text); font: 13px var(--font-body); }
+  .pfx__select:focus { outline: none; border-color: var(--accent); }
   .pfx__rule { height: 1px; background: #2a2536; margin: 16px 0; }
   .pfx__actions { display: flex; flex-wrap: wrap; gap: 9px; }
   .pfx__actions--key { margin-top: 14px; }
@@ -258,8 +292,8 @@
   .pfx__toggle .switch { flex: none; margin-top: 2px; }
   .pfx__note { font-size: 12px; color: var(--faint); margin: 12px 0 0; line-height: 1.55; }
   .pfx__note--top { margin: 0 0 14px; }
-  .pfx__note code, .pfx__note--top code { font-family: var(--font-mono); color: var(--muted); }
-  .pfx__note b { color: var(--text); }
+  .pfx__note :global(code), .pfx__note--top :global(code) { font-family: var(--font-mono); color: var(--muted); }
+  .pfx__note :global(b) { color: var(--text); }
 
   .pfx__freshkey { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--ink); border: 1px solid rgba(95,211,138,.35); border-radius: 9px; }
   .pfx__freshkey code { flex: 1; min-width: 0; font: 12.5px var(--font-mono); color: var(--green); overflow: hidden; text-overflow: ellipsis; }

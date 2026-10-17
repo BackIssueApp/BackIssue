@@ -1,0 +1,11 @@
+{
+  "openNav": "Open navigation",
+  "searchPlaceholder": "Search your collection…",
+  "reconnecting": "reconnecting…",
+  "reconnectingTitle": "Lost the live connection to the server — reconnecting. Data may be stale.",
+  "helpForPage": "Help for this page",
+  "pillSaved": "saved",
+  "pillQueued": "queued",
+  "pillFailed": "failed",
+  "pillDownloading": "downloading"
+}

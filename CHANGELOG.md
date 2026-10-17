@@ -10,6 +10,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Translations.** BackIssue can now show its interface in other languages.
+  Pick one under Profile → Language, or leave it on "match the browser"; a
+  signed-in account keeps the choice on every device, and the page arrives
+  already translated rather than flashing English first. English is the
+  source of truth, every string a person reads comes from a catalog under
+  frontend/src/locales, and a test fails the build when a converted screen
+  still carries hardcoded text. Plugins get api.t / api.th / api.lang and
+  api.registerMessages for their own strings. Series and issue data stay in
+  the language the metadata source provides.
 - **Several metadata sources at once.** Settings → Metadata is now an ordered
   list, like download sources: turn on every source you want data from and
   move the one you trust most to the top. A search asks all of them and shows

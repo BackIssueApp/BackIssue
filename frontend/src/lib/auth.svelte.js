@@ -6,6 +6,7 @@
 // components use can()/isTrusted/isAdmin to hide affordances the server
 // would 403 anyway — the middleware is the real enforcement.
 import { apiGet, apiPost } from './api.js';
+import { currentLang, setLanguage, matchLanguage } from './i18n.svelte.js';
 
 export const auth = $state({
   ready: false,
@@ -29,6 +30,10 @@ export async function loadMe() {
     auth.openMode = !!r.openMode;
     auth.user = r.user || null;
     auth.registration = !!r.registration;
+    // Signing in without a reload: switch to the account's language now (a
+    // fresh page load gets it from the server shell before anything renders).
+    const want = matchLanguage(r.user?.lang);
+    if (want && want !== currentLang()) await setLanguage(want);
   } catch {
     auth.openMode = false;
     auth.user = null;

@@ -12,6 +12,7 @@ import { auth } from './auth.svelte.js';
 import { detailSelected } from './store.svelte.js';
 import { navigate } from './router.svelte.js';
 import { status } from './status.svelte.js';
+import { t, th, currentLang, addMessages } from './i18n.svelte.js';
 
 // Flips when plugin assets have loaded — the Settings page watches it so
 // plugin-injected fields get populated even if Settings was opened first.
@@ -93,6 +94,15 @@ const bi = {
     // MUST route it through here.
     safeUrl: (u) => safeUrl(u),
     slot: (id) => document.getElementById(id),
+    // Translations. t('ns.key', params) looks up core's catalogs plus any the
+    // plugin registered; th() is the same for innerHTML (params escaped, only
+    // <b>/<i>/<code>/<br> allowed through); lang() is the active code.
+    // registerMessages({ en: { myplugin: { key: 'text' } }, fr: { … } }) adds a
+    // plugin's own strings — call it before rendering anything.
+    t: (key, params) => t(key, params),
+    th: (key, params) => th(key, params),
+    lang: () => currentLang(),
+    registerMessages(catalogs) { addMessages(catalogs); },
     // The already-resolved session ({ openMode, user } with permissions) —
     // spares plugin clients an /api/auth/me roundtrip on boot. May be
     // pre-resolution (user null, openMode false): fall back to fetching.

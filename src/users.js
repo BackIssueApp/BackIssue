@@ -107,6 +107,9 @@ export function initUserTables(db) {
   // for this user EVEN IF their role could see them (library.restricted). A
   // personal preference on top of the role gate — see canRestricted in server.js.
   if (!userCols.includes('hide_mature')) db.exec('ALTER TABLE users ADD COLUMN hide_mature INTEGER NOT NULL DEFAULT 0');
+  // Per-user UI language (a BCP 47 tag such as 'fr' or 'pt-BR'); NULL means
+  // follow the browser. Read by the web shell, the API and the mobile apps.
+  if (!userCols.includes('lang')) db.exec('ALTER TABLE users ADD COLUMN lang TEXT');
   db.exec(`
     CREATE TABLE IF NOT EXISTS external_identities (
       provider TEXT NOT NULL,
@@ -319,7 +322,7 @@ export function listUsers(db) {
  *  last activity, and any external-login providers. */
 export function userProfile(db, id) {
   const u = db.prepare(`
-    SELECT u.id, u.username, u.email, u.role, u.created_at, u.hide_mature,
+    SELECT u.id, u.username, u.email, u.role, u.created_at, u.hide_mature, u.lang,
            (SELECT MAX(last_seen) FROM sessions s WHERE s.user_id = u.id) AS last_seen,
            (SELECT GROUP_CONCAT(DISTINCT provider) FROM external_identities e WHERE e.user_id = u.id) AS providers
       FROM users u WHERE u.id = ?`).get(id);
@@ -331,6 +334,18 @@ export function userProfile(db, id) {
 export function setHideMature(db, id, on) {
   db.prepare('UPDATE users SET hide_mature=? WHERE id=?').run(on ? 1 : 0, id);
   return !!on;
+}
+
+// A language tag: 'fr', 'pt-BR', 'zh-Hant'. Kept strict because the value is
+// echoed into the HTML shell.
+export const LANG_RE = /^[a-z]{2,3}(-[a-z0-9]{2,8}){0,2}$/i;
+
+/** Set (or clear, with null/'') a user's UI language. Returns the stored value. */
+export function setLang(db, id, lang) {
+  const v = lang == null || lang === '' ? null : String(lang).trim();
+  if (v !== null && !LANG_RE.test(v)) throw new Error('unsupported language');
+  db.prepare('UPDATE users SET lang=? WHERE id=?').run(v, id);
+  return v;
 }
 
 /** Set a user's email (self-service). Blank clears it. Validates format and
@@ -417,7 +432,7 @@ export function createApiKey(db, userId) {
 export function apiKeyUser(db, key) {
   if (!key || !String(key).startsWith('bi_')) return null;
   const row = db.prepare(`
-    SELECT u.id, u.username, u.role, u.disabled, u.hide_mature FROM api_keys k
+    SELECT u.id, u.username, u.role, u.disabled, u.hide_mature, u.lang FROM api_keys k
       JOIN users u ON u.id = k.user_id
      WHERE k.key_hash = ?`).get(tokenHash(key));
   if (!row || row.disabled) return null;
@@ -451,7 +466,7 @@ export function createSession(db, userId) {
 export function sessionUser(db, token) {
   if (!token) return null;
   const row = db.prepare(`
-    SELECT u.id, u.username, u.role, u.disabled, u.hide_mature FROM sessions s
+    SELECT u.id, u.username, u.role, u.disabled, u.hide_mature, u.lang FROM sessions s
       JOIN users u ON u.id = s.user_id
      WHERE s.token_hash=? AND s.expires_at > strftime('%Y-%m-%dT%H:%M:%SZ','now')`)
     .get(tokenHash(token));
