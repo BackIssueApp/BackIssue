@@ -7,6 +7,7 @@
   import { loadCollection } from '../lib/store.svelte.js';
   import { notify } from '../lib/toasts.svelte.js';
   import { fmt, weekOfYear, shiftWeek, fmtAgo, fmtDay } from '../lib/util.js';
+  import { t } from '../lib/i18n.svelte.js';
   import Badge from './Badge.svelte';
   import { can, isTrusted } from '../lib/auth.svelte.js';
   import Icon from '../lib/Icon.svelte';
@@ -78,8 +79,7 @@
   const onThisWeek = $derived(!st.week || (st.week === nowWeek.week && st.year === nowWeek.year));
   function step(delta) {
     if (!st.week || st.running) return;
-    const t = shiftWeek(st.week, st.year, delta);
-    checkWeek(t);
+    checkWeek(shiftWeek(st.week, st.year, delta));
   }
 
   const all = $derived(st.releases || []);
@@ -96,10 +96,10 @@
     const mine = items.filter((r) => r.tracked);
     const rest = items.filter((r) => !r.tracked);
     const out = [];
-    if (mine.length) out.push({ name: 'In your collection', mine: true, items: mine });
+    if (mine.length) out.push({ name: t('releasesDrawer.inYourCollection'), mine: true, items: mine });
     let cur = null;
     for (const r of rest) {
-      const pub = r.publisher || 'Other';
+      const pub = r.publisher || t('releasesDrawer.otherPublisher');
       if (!cur || cur.name !== pub) { cur = { name: pub, mine: false, items: [] }; out.push(cur); }
       cur.items.push(r);
     }
@@ -134,18 +134,18 @@
   });
   const coverOf = (m) => m.cover || (m.issueId && covers[m.issueId]) || null;
   const statusText = $derived.by(() => {
-    if (st.running) return onThisWeek ? 'Checking this week…' : 'Checking…';
-    if (st.error) return 'Error: ' + st.error;
+    if (st.running) return onThisWeek ? t('releasesDrawer.checkingThisWeek') : t('releasesDrawer.checking');
+    if (st.error) return t('releasesDrawer.error', { error: st.error });
     const age = st.checkedAt ? Date.now() - new Date(st.checkedAt).getTime() : null;
-    const when = age == null ? '' : ' · checked ' + (age < 60000 ? 'just now' : fmtAgo(age) + ' ago');
-    return st.week ? `Week ${st.week}, ${st.year} · ${fmt(all.length)} releases · ${fmt(mineCount)} in your collection${when}` : '';
+    const when = age == null ? '' : (age < 60000 ? t('releasesDrawer.checkedJustNow') : t('releasesDrawer.checkedAgo', { time: fmtAgo(age) }));
+    return st.week ? t('releasesDrawer.statusLine', { week: st.week, year: st.year, releases: fmt(all.length), mine: fmt(mineCount), checked: when }) : '';
   });
 
   async function downloadRelease(m) {
     const r = await apiPost('/api/releases/download', { seriesId: m.seriesId, number: m.number });
     if (r.error) { notify(r.error, 'error'); return false; }
     queued.add(relKey(m));
-    notify(`Queued ${m.series} #${m.number}`, 'ok');
+    notify(t('releasesDrawer.queuedIssue', { series: m.series, number: m.number }), 'ok');
     return true;
   }
 
@@ -167,7 +167,7 @@
       } catch { failed++; }
     }
     bulkBusy = false;
-    notify(failed ? `Queued ${ok} — ${failed} failed (see Queue/Logs)` : `Queued ${ok} release${ok === 1 ? '' : 's'}`, failed ? 'error' : 'ok');
+    notify(failed ? t('releasesDrawer.queuedWithFailures', { ok, failed }) : t('releasesDrawer.queuedN', { count: ok }), failed ? 'error' : 'ok');
   }
 
   async function addRelease(m) {
@@ -176,10 +176,10 @@
       // The release IS the issue the user wants — pass it so "only the issues
       // that were asked for" can scope the download to it.
       const r = await apiPost('/api/collection/add-cv', { comicvineId: m.cvId, cvIssueIds: m.issueId ? [m.issueId] : [], reason: 'release' });
-      if (r?.error) { notify('Add failed: ' + r.error, 'error'); m._adding = false; return; }
+      if (r?.error) { notify(t('releasesDrawer.addFailed', { error: r.error }), 'error'); m._adding = false; return; }
       m._added = true;
       loadCollection();
-    } catch { notify('Add failed — is the app reachable?', 'error'); m._adding = false; }
+    } catch { notify(t('releasesDrawer.addFailedUnreachable'), 'error'); m._adding = false; }
   }
 </script>
 
@@ -187,36 +187,36 @@
   <section id="releases-drawer" class="page">
     <div class="page__inner">
       <div class="page__head">
-        <h3>{onThisWeek ? "This week's releases" : st.week ? `Releases — week ${st.week}, ${st.year}` : 'Releases'}</h3>
+        <h3>{onThisWeek ? t('releasesDrawer.titleThisWeek') : st.week ? t('releasesDrawer.titleWeek', { week: st.week, year: st.year }) : t('releasesDrawer.title')}</h3>
       </div>
       <div class="drawer__controls">
-        <button class="btn btn--ghost btn--sm" title="Previous week" disabled={!st.week || st.running} onclick={() => step(-1)}><Icon name="chevron-left" /></button>
-        <button class="btn btn--ghost btn--sm" title="Next week" disabled={!st.week || st.running} onclick={() => step(1)}><Icon name="chevron-right" /></button>
+        <button class="btn btn--ghost btn--sm" title={t('releasesDrawer.previousWeek')} disabled={!st.week || st.running} onclick={() => step(-1)}><Icon name="chevron-left" /></button>
+        <button class="btn btn--ghost btn--sm" title={t('releasesDrawer.nextWeek')} disabled={!st.week || st.running} onclick={() => step(1)}><Icon name="chevron-right" /></button>
         {#if !onThisWeek}
-          <button class="btn btn--ghost btn--sm" disabled={st.running} onclick={() => checkWeek(null)}>This week</button>
+          <button class="btn btn--ghost btn--sm" disabled={st.running} onclick={() => checkWeek(null)}>{t('releasesDrawer.thisWeek')}</button>
         {/if}
         <span id="releases-status" class="muted">{statusText}</span>
-        <button id="releases-refresh" class="btn btn--ghost" onclick={refresh}>Refresh</button>
+        <button id="releases-refresh" class="btn btn--ghost" onclick={refresh}>{t('common.refresh')}</button>
       </div>
       <div class="releases-filters" id="releases-filters" use:hscroll>
-        <button class="filter__btn" class:is-active={filter === 'all'} onclick={() => { filter = 'all'; }}>All</button>
-        <button class="filter__btn" class:is-active={filter === 'mine'} onclick={() => { filter = 'mine'; }}>In collection</button>
+        <button class="filter__btn" class:is-active={filter === 'all'} onclick={() => { filter = 'all'; }}>{t('releasesDrawer.filterAll')}</button>
+        <button class="filter__btn" class:is-active={filter === 'mine'} onclick={() => { filter = 'mine'; }}>{t('releasesDrawer.filterInCollection')}</button>
         {#if collectedCount}
-          <button class="filter__btn" class:is-active={!singles} title={singles ? `${collectedCount} collected edition${collectedCount === 1 ? '' : 's'} (trades, hardcovers, omnibuses) hidden — click to show` : 'Showing collected editions — click to hide'}
-            onclick={() => { singles = !singles; }}>Collections ({collectedCount})</button>
+          <button class="filter__btn" class:is-active={!singles} title={singles ? t('releasesDrawer.collectedHidden', { count: collectedCount }) : t('releasesDrawer.collectedShown')}
+            onclick={() => { singles = !singles; }}>{t('releasesDrawer.collectionsN', { count: collectedCount })}</button>
         {/if}
         {#if bulkEligible.length}
-          <button class="btn btn--ghost btn--sm" disabled={bulkBusy} title="Queue every tracked, unowned release shown (skips ones already queued)" onclick={downloadAllMissing}>
-            <Icon name="download" /> {bulkBusy ? 'Queueing…' : `Download all (${bulkEligible.length})`}</button>
+          <button class="btn btn--ghost btn--sm" disabled={bulkBusy} title={t('releasesDrawer.downloadAllTitle')} onclick={downloadAllMissing}>
+            <Icon name="download" /> {bulkBusy ? t('releasesDrawer.queueing') : t('releasesDrawer.downloadAllN', { count: bulkEligible.length })}</button>
         {/if}
       </div>
       <div id="releases-list" class="queue-list">
         {#if st.running}
           <!-- checking… -->
         {:else if st.error}
-          <div class="queue-empty">Could not reach the release provider.</div>
+          <div class="queue-empty">{t('releasesDrawer.providerUnreachable')}</div>
         {:else if !items.length}
-          <div class="queue-empty">{filter === 'mine' ? 'Nothing from your tracked series ships this week.' : 'No releases found for this week.'}</div>
+          <div class="queue-empty">{filter === 'mine' ? t('releasesDrawer.nothingTrackedShips') : t('releasesDrawer.noReleases')}</div>
         {:else}
           {#each groups as g (g.name)}
             <div class="rel-group__head" class:rel-group__head--mine={g.mine}>
@@ -233,29 +233,29 @@
                   {:else}<span class="rel-thumb__ph">#{m.number ?? '?'}</span>{/if}
                 </div>
                 <div class="queue-item__main">
-                  <div class="queue-item__series">{m.series}{#if m.seriesYear} <span class="rel-year">({m.seriesYear})</span>{/if}{#if m.volume && m.volume !== '1'} <span class="rel-year">Vol. {m.volume}</span>{/if} <span class="rel-num">#{m.number ?? '?'}</span>
-                    {#if m.isNew}<span class="coll-badge coll-badge--cv">new</span>{/if}
-                    {#if m.collected}<span class="coll-badge" title="A collected edition, not a single issue">{m.type}</span>{/if}</div>
+                  <div class="queue-item__series">{m.series}{#if m.seriesYear} <span class="rel-year">({m.seriesYear})</span>{/if}{#if m.volume && m.volume !== '1'} <span class="rel-year">{t('releasesDrawer.vol', { volume: m.volume })}</span>{/if} <span class="rel-num">#{m.number ?? '?'}</span>
+                    {#if m.isNew}<span class="coll-badge coll-badge--cv">{t('releasesDrawer.new')}</span>{/if}
+                    {#if m.collected}<span class="coll-badge" title={t('releasesDrawer.collectedEdition')}>{m.type}</span>{/if}</div>
                   {#if m.title}<div class="rel-story">{m.title}</div>{/if}
-                  <div class="queue-item__title">{g.mine && m.publisher ? m.publisher + ' · ' : ''}{m.shipdate ? 'ships ' + fmtDay(m.shipdate) : ''}{m.coverdate ? ' · cover ' + fmtDay(m.coverdate) : ''}</div>
+                  <div class="queue-item__title">{g.mine && m.publisher ? m.publisher + ' · ' : ''}{m.shipdate ? t('releasesDrawer.ships', { date: fmtDay(m.shipdate) }) : ''}{m.coverdate ? t('releasesDrawer.coverDate', { date: fmtDay(m.coverdate) }) : ''}</div>
                 </div>
                 {#if m.tracked}
                   <span>
-                    {#if m.owned}<span class="badge badge--done"><span class="dot"></span>owned</span>
+                    {#if m.owned}<span class="badge badge--done"><span class="dot"></span>{t('releasesDrawer.owned')}</span>
                     {:else if queued.has(relKey(m))}<Badge status="queued" />
-                    {:else}<span class="badge badge--queued"><span class="dot"></span>missing</span>{/if}
+                    {:else}<span class="badge badge--queued"><span class="dot"></span>{t('releasesDrawer.missing')}</span>{/if}
                   </span>
                   {#if !m.owned && !queued.has(relKey(m)) && can('downloads.grab')}
                     <!-- Close the loop: download the missing release right here. -->
-                    <button class="btn btn--ghost btn--icon" title="Download this issue" disabled={m._busy}
+                    <button class="btn btn--ghost btn--icon" title={t('releasesDrawer.downloadThisIssue')} disabled={m._busy}
                       onclick={async (e) => { e.stopPropagation(); m._busy = true; if (!(await downloadRelease(m))) m._busy = false; }}><Icon name="download" /></button>
                   {/if}
                 {:else if m.cvId && isTrusted()}
                   <button class="btn btn--ghost btn--sm" disabled={m._adding}
-                    onclick={(e) => { e.stopPropagation(); addRelease(m); }}>{#if m._added}Added{:else if m._adding}Adding…{:else}<Icon name="plus" /> Add{/if}</button>
+                    onclick={(e) => { e.stopPropagation(); addRelease(m); }}>{#if m._added}{t('releasesDrawer.added')}{:else if m._adding}{t('releasesDrawer.adding')}{:else}<Icon name="plus" /> {t('common.add')}{/if}</button>
                 {:else if !m.cvId && isTrusted()}
-                  <!-- Not on ComicVine yet as far as the feed knows: search by name + year. -->
-                  <button class="btn btn--ghost btn--sm" title="Search ComicVine for this series and add it" onclick={(e) => { e.stopPropagation(); findSeries(m); }}><Icon name="search" /> Find</button>
+                  <!-- Not in the metadata source yet as far as the feed knows: search by name + year. -->
+                  <button class="btn btn--ghost btn--sm" title={t('releasesDrawer.findTitle')} onclick={(e) => { e.stopPropagation(); findSeries(m); }}><Icon name="search" /> {t('releasesDrawer.find')}</button>
                 {/if}
               </div>
             {/each}
