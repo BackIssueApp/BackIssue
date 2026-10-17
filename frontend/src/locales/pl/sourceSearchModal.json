@@ -1,0 +1,17 @@
+{
+  "fallbackSeries": "Zeszyt",
+  "title": "Szukaj w źródłach",
+  "searchFailed": "Wyszukiwanie nie powiodło się — czy aplikacja działa?",
+  "noSources": "Żadne źródło pobierania nie jest włączone (Ustawienia → Źródła pobierania).",
+  "noneFound": "Nie znaleziono wydań w żadnym źródle. Spróbuj ogólniejszego zapytania albo dodaj serii alternatywną nazwę.",
+  "queryPlaceholder": "Seria i numer albo dowolne zapytanie…",
+  "searched": "Przeszukano",
+  "searching": "Przeszukiwanie włączonych źródeł…",
+  "pack": "Paczka",
+  "packQueued": "Paczka dodana do kolejki przez {source} — brakujące zeszyty zaimportują się automatycznie (obserwuj kolejkę).",
+  "queued": "Pobieranie dodane do kolejki przez {source} — obserwuj kolejkę.",
+  "failed": "Pobieranie nie powiodło się: {error}",
+  "unknownError": "nieznany błąd",
+  "sending": "Wysyłanie…",
+  "download": "Pobierz"
+}

@@ -1,0 +1,14 @@
+{
+  "intro": "Witaj w BackIssue. Utwórz konto, aby zacząć — zostanie ono <b>administratorem</b>, a od tej chwili logowanie będzie wymagane.",
+  "signIn": "Zaloguj się",
+  "createAccount": "Utwórz konto",
+  "createAdmin": "Utwórz konto administratora",
+  "username": "Nazwa użytkownika",
+  "password": "Hasło",
+  "confirmPassword": "Potwierdź hasło",
+  "passwordsMismatch": "hasła się nie zgadzają",
+  "or": "lub",
+  "signInWith": "Zaloguj się przez {provider}",
+  "noMethod": "Brak dostępnej metody logowania — administrator musi skonfigurować SSO lub ponownie włączyć logowanie hasłem.",
+  "registrationDisabled": "Rejestracja jest wyłączona — poproś administratora o konto."
+}

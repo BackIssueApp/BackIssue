@@ -1,0 +1,6 @@
+{
+  "siteUrl": "Adres URL strony",
+  "downloadProxy": "Proxy pobierania",
+  "downloadProxyNote": "Opcjonalne proxy HTTP tylko do pobierania plików, dla serwerów blokujących adresy IP centrów danych.",
+  "browserRequired": "To źródło wymaga wersji aplikacji z przeglądarką (obraz z tagiem -browser). W tej wersji pozostaje wyłączone."
+}

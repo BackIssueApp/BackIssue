@@ -1,0 +1,8 @@
+{
+  "requestFailed": "żądanie nie powiodło się",
+  "noResponse": "brak odpowiedzi",
+  "downloadFailed": "Nie udało się dodać pobierania do kolejki: {error}",
+  "downloadFailedUnreachable": "Nie udało się dodać pobierania do kolejki — czy aplikacja jest dostępna?",
+  "redownloadFailed": "Ponowne pobieranie nie powiodło się: {error}",
+  "redownloadFailedUnreachable": "Ponowne pobieranie nie powiodło się — czy aplikacja jest dostępna?"
+}

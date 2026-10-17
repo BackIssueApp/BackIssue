@@ -1,0 +1,37 @@
+{
+  "title": "Historia",
+  "nFailures": {
+    "one": "{count} błąd",
+    "few": "{count} błędy",
+    "many": "{count} błędów",
+    "other": "{count} błędu"
+  },
+  "nBlocked": {
+    "one": "{count} zablokowane wydanie",
+    "few": "{count} zablokowane wydania",
+    "many": "{count} zablokowanych wydań",
+    "other": "{count} zablokowanego wydania"
+  },
+  "nImports": {
+    "one": "{count} import",
+    "few": "{count} importy",
+    "many": "{count} importów",
+    "other": "{count} importu"
+  },
+  "statFailures": "Błędy",
+  "statBlocked": "Zablokowane",
+  "statImports": "Importy",
+  "emptyFailedTitle": "Brak nieudanych pobrań",
+  "emptyFailedBody": "Pobrania zakończone błędem są tu zapisywane — wpis zostaje nawet po wyczyszczeniu kolejki.",
+  "emptyBlockedTitle": "Nic nie zablokowano",
+  "emptyBlockedBody": "Nieudane wydania z usenetu trafiają tutaj, aby przyszłe wyszukiwania je pomijały. Usuń wpis, aby wydanie znów mogło zostać pobrane.",
+  "emptyImportsTitle": "Jeszcze nic nie zaimportowano",
+  "emptyImportsBody": "Lista wypełnia się w miarę pojawiania się pobrań. Śledzone są tu też importy obsłużone przez monitor w tle.",
+  "filterPlaceholder": "Filtruj…",
+  "clearAll": "Wyczyść wszystko",
+  "chipAll": "Wszystkie",
+  "chipFailed": "Nieudane",
+  "chipBlocklist": "Czarna lista",
+  "removeFromBlocklist": "Usuń z czarnej listy — pozwól znów pobierać automatycznie",
+  "loadMore": "Wczytaj więcej"
+}

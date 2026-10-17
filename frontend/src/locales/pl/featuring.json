@@ -1,0 +1,15 @@
+{
+  "unknownSeries": "Nieznana seria",
+  "moreRuns": {
+    "one": "+{count} kolejny zakres",
+    "few": "+{count} kolejne zakresy",
+    "many": "+{count} kolejnych zakresów",
+    "other": "+{count} kolejnego zakresu"
+  },
+  "others": {
+    "one": "{count} inny",
+    "few": "{count} inne",
+    "many": "{count} innych",
+    "other": "{count} innego"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "pageSettings": "Ustawienia",
+  "pageSystem": "System",
+  "pageWanted": "Brakujące",
+  "pageQueue": "Kolejka",
+  "pageReleases": "Premiery",
+  "pageHistory": "Historia",
+  "pageLists": "Listy lektur",
+  "pageImport": "Import",
+  "pageStats": "Statystyki",
+  "pagePlugins": "Wtyczki",
+  "pageUsers": "Użytkownicy",
+  "pageProfile": "Profil",
+  "pageSeries": "Seria",
+  "pageCollections": "Kolekcje",
+  "notFoundTitle": "Nie znaleziono strony",
+  "notFoundText": "Pod tym adresem nic nie ma. Strona mogła zostać przeniesiona albo link jest błędny.",
+  "noAccessTitle": "Nie masz dostępu do tej strony",
+  "noAccessText": "Twoje konto nie może jej otworzyć. Jeśli uważasz, że powinno, zapytaj administratora.",
+  "goHome": "Przejdź do strony startowej"
+}

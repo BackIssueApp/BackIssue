@@ -1,0 +1,14 @@
+{
+  "title": "Szukaj paczek · {series}",
+  "dialogLabel": "Szukaj paczek",
+  "searching": "Szukanie paczek we włączonych źródłach…",
+  "noSources": "Żadne źródło obsługujące paczki nie jest włączone.",
+  "noneFound": "Nie znaleziono paczek w żadnym źródle. Spróbuj ogólniejszego zapytania (tylko nazwa serii).",
+  "intro": "Paczki wielu zeszytów (całe serie, wydania zbiorcze, zakresy numerów) ze wszystkich włączonych źródeł. Pobierz jedną — każdy zeszyt, którego <b>brakuje</b> w tej serii, zostanie z niej zaimportowany; posiadane zeszyty są pomijane. Torrenty/usenet pobierają się przez Twojego klienta; inne źródła pobierają się w aplikacji.",
+  "queryPlaceholder": "Nazwa serii…",
+  "queued": "Paczka dodana do kolejki przez {source} — brakujące zeszyty tej serii zaimportują się automatycznie (obserwuj kolejkę / zadania).",
+  "failed": "Pobieranie nie powiodło się: {error}",
+  "unknownError": "nieznany błąd",
+  "sending": "Wysyłanie…",
+  "download": "Pobierz"
+}

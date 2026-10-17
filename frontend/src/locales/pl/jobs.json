@@ -1,0 +1,21 @@
+{
+  "reorganize": "Reorganizuj bibliotekę",
+  "cvMatch": "Dopasuj metadane serii",
+  "cvMatchSchedule": "Dopasuj metadane serii (posiadane + obserwowane)",
+  "scanFolder": "Skanuj folder · {detail}",
+  "tagFiles": "Taguj pliki · {detail}",
+  "importScanFull": "Skanuj bibliotekę do importu (pełne)",
+  "importScanNew": "Skanuj bibliotekę w poszukiwaniu nowych tomów",
+  "importRun": "Importuj bibliotekę",
+  "releases": "Sprawdź premiery z tego tygodnia",
+  "refreshDetails": "Odśwież szczegóły zeszytów · {detail}",
+  "wantedSearch": "Szukaj brakujących zeszytów",
+  "wantedSearchSchedule": "Szukaj brakujących zeszytów (uzupełnianie)",
+  "recentSearch": "Szukaj nowych wydań",
+  "rssWatch": "Obserwuj RSS indekserów",
+  "rssWatchSchedule": "Obserwuj RSS indekserów w poszukiwaniu wydań",
+  "packImport": "Importuj paczkę · {detail}",
+  "zeroDay": "Pobierz tygodniową paczkę 0-Day",
+  "zeroDaySchedule": "Pobierz tygodniową paczkę 0-Day (torrent)",
+  "dbBackup": "Utwórz kopię zapasową bazy danych"
+}

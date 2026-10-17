@@ -1,0 +1,113 @@
+{
+  "title": "Pomoc · {page}",
+  "footer": "Wskazówka: naciśnij <kbd>Esc</kbd>, aby zamknąć. Przyciski, których nie widzisz, mogą wymagać wyższych uprawnień.",
+  "whatThisIs": "Co to jest",
+  "fallback": {
+    "title": "BackIssue",
+    "s1h": "Ta strona",
+    "s1p": "Brak pomocy dla tej strony — wybierz sekcję z menu po lewej."
+  },
+  "series": {
+    "title": "Seria",
+    "s1h": "Co to jest",
+    "s1p": "Każdy zeszyt tej serii znany źródłu metadanych. Posiadane zeszyty mają okładkę i zielony znacznik; brakujące możesz pobrać.",
+    "s2h": "Czytanie i pobieranie",
+    "s2p": "Użyj przycisku pobierania w wierszu (albo zaznacz kilka i wybierz „Pobierz zaznaczone”), aby pobrać brakujące zeszyty. Przy posiadanych zeszytach są akcje czytnika (czytaj, oznacz jako przeczytane), jeśli wtyczka czytnika jest włączona.",
+    "s3h": "Lista czy siatka",
+    "s3p": "Przełączaj siatkę i listę u góry. Widok listy pokazuje datę na okładce, liczbę stron, rozmiar i format pliku każdego zeszytu; siatka pokazuje okładki.",
+    "s4h": "Zarządzanie",
+    "s4p": "Z uprawnieniami do zarządzania biblioteką możesz odświeżyć metadane, poprawić dopasowanie, przeskanować folder, otagować pliki, ustawić położenie, dodać alternatywne nazwy wyszukiwania lub usunąć serię. „Dodaj do listy” umieszcza zaznaczenie (albo całą serię) na liście lektur."
+  },
+  "library": {
+    "title": "Biblioteka",
+    "s1h": "Co to jest",
+    "s1p": "Każda śledzona seria. Przy każdej widać, ile zeszytów masz, a ile istnieje, z paskiem postępu.",
+    "s2h": "Wyszukiwanie",
+    "s2p": "Pole wyszukiwania u góry filtruje kolekcję. Przyciski filtrów zawężają do niekompletnych, nieobserwowanych, problematycznych lub niedopasowanych (jeszcze bez dopasowania metadanych); menu sortowania układa A–Z, wg ostatnio dodanych lub największych braków.",
+    "s3h": "Widoki",
+    "s3p": "Siatka to ściana okładek; lista to gęsta tabela z wydawcą, rokiem, aktywnością pobierania, datą ostatniego zeszytu i rozmiarem na dysku.",
+    "s4h": "Dodawanie i akcje zbiorcze",
+    "s4p": "„+ Dodaj” przeszukuje źródło metadanych i dodaje serię (która domyślnie od razu dodaje swoje zeszyty do kolejki pobierania). „Zaznacz” włącza zbiorcze obserwowanie, pobieranie brakujących i usuwanie."
+  },
+  "wanted": {
+    "title": "Brakujące",
+    "s1h": "Co to jest",
+    "s1p": "Każdy brakujący zeszyt w całej kolekcji, pogrupowany według serii — Twoja lista rzeczy do pobrania.",
+    "s2h": "Jak używać",
+    "s2p": "Pobierz pojedynczy zeszyt albo użyj „Pobierz widoczne”, aby dodać do kolejki wszystko pasujące do bieżących filtrów (z limitem na przebieg). Filtruj tylko obserwowane lub ukryj niewydane zeszyty."
+  },
+  "queue": {
+    "title": "Kolejka pobierania",
+    "s1h": "Co to jest",
+    "s1p": "Co się teraz pobiera, a co czeka. Aktywna pozycja ma pasek postępu z szybkością i źródłem.",
+    "s2h": "Sterowanie",
+    "s2p": "Wstrzymuj i wznawiaj kolejkę, czyść pozycje w kolejce albo ponawiaj/czyść nieudane (uprawnienia do zarządzania biblioteką). × w wierszu anuluje pobieranie i usuwa je z klienta.",
+    "s3h": "Po ponownym uruchomieniu",
+    "s3p": "Kolejka przerwana w trakcie pobierania wznawia się automatycznie przy starcie aplikacji."
+  },
+  "releases": {
+    "title": "Premiery",
+    "s1h": "Co to jest",
+    "s1p": "Nowe komiksy wydawane w tym tygodniu (inne tygodnie przeglądasz strzałkami). Zeszyty śledzonych serii są oznaczone i można je od razu dodać lub pobrać."
+  },
+  "lists": {
+    "title": "Listy lektur",
+    "s1h": "Co to jest",
+    "s1p": "Osobiste, uporządkowane listy zeszytów — tworzone ręcznie lub importowane z cyklu fabularnego. Listy są prywatne dla Twojego konta.",
+    "s2h": "Tworzenie listy",
+    "s2p": "Utwórz listę, a potem dodawaj zeszyty z dowolnej strony serii („Dodaj do listy”). Kolejność zmieniasz strzałkami w górę i w dół. Przy nieposiadanych pozycjach jest przycisk pobierania albo „+ Dodaj serię”, jeśli całej serii nie ma jeszcze w bibliotece.",
+    "s3h": "Cykle fabularne",
+    "s3p": "„Importuj cykl fabularny” przeszukuje źródło metadanych i dodaje zeszyty cyklu w kolejności czytania według dat na okładkach — świetne przy crossoverach obejmujących kilka serii."
+  },
+  "history": {
+    "title": "Historia",
+    "s1h": "Co to jest",
+    "s1p": "Dziennik zeszytów zaimportowanych do biblioteki — co przyszło, kiedy i z jakiego źródła. Filtruj według źródła u góry."
+  },
+  "stats": {
+    "title": "Statystyki",
+    "s1h": "Co to jest",
+    "s1p": "Migawka kolekcji — sumy według wydawców, kompletność, liczba i rozmiar plików."
+  },
+  "users": {
+    "title": "Użytkownicy i role",
+    "s1h": "Konta",
+    "s1p": "Twórz konta, przypisuj role, wyłączaj je lub usuwaj. Włączaj samodzielną rejestrację (nowe konta zaczynają jako widzowie). Zawsze musi zostać co najmniej jeden administrator.",
+    "s2h": "Role i uprawnienia",
+    "s2p": "Role wbudowane (Widz, Zaufany, Administrator) dają coraz szersze uprawnienia. Utwórz własną rolę i zaznacz dokładnie te uprawnienia, które ma mieć — także uprawnienia rejestrowane przez wtyczki (czytanie, OPDS, prośby itd.)."
+  },
+  "plugins": {
+    "title": "Wtyczki",
+    "s1h": "Co to jest",
+    "s1p": "Wszystko, co zainstalowano w folderze wtyczek, wraz z tym, co każda zarejestrowała (trasy, źródła, zadania, UI). Włączaj lub wyłączaj każdą; zmiany działają po ponownym uruchomieniu.",
+    "s2h": "Ponowne uruchomienie",
+    "s2p": "Przycisk „Uruchom ponownie teraz” restartuje aplikację, aby zmiany wtyczek zaczęły działać."
+  },
+  "jobs": {
+    "title": "Zadania",
+    "s1h": "Co to jest",
+    "s1p": "Zadania w tle (sprawdzanie premier, dopasowywanie metadanych, indeksowanie, uzupełnianie) i ich harmonogramy. Edytuj harmonogram cron zadania, włączaj je lub uruchamiaj od razu."
+  },
+  "tools": {
+    "title": "Narzędzia",
+    "s1h": "Co to jest",
+    "s1p": "Jednorazowa konserwacja biblioteki: przeskanuj wszystko, otaguj pliki bez tagów, konwertuj CBR→CBZ, usuń duplikaty i sprawdź archiwa pod kątem uszkodzeń."
+  },
+  "logs": {
+    "title": "Dzienniki",
+    "s1h": "Co to jest",
+    "s1p": "Ostatnie komunikaty aplikacji — przydatne, gdy pobieranie lub tagowanie się nie powiedzie. Filtruj według poziomu i kategorii albo wyczyść bufor."
+  },
+  "settings": {
+    "title": "Ustawienia",
+    "s1h": "Co to jest",
+    "s1p": "Konfiguracja aplikacji: foldery główne biblioteki, format i działanie pobierania, źródła metadanych, indeksery i klienty pobierania, powiadomienia oraz ustawienia wtyczek.",
+    "s2h": "Pobieranie po dodaniu",
+    "s2p": "W sekcji Pobieranie opcja „Pobieraj po dodaniu” decyduje, czy dodanie serii od razu dodaje jej zeszyty do kolejki (domyślnie włączone)."
+  },
+  "import": {
+    "title": "Import",
+    "s1h": "Co to jest",
+    "s1p": "Wczytaj istniejącą bibliotekę komiksów z dysku do BackIssue: przeskanuj foldery, przejrzyj dopasowanych kandydatów i potwierdź, aby przypisać je do pasujących serii."
+  }
+}

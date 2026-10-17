@@ -1,0 +1,62 @@
+{
+  "scan-library": {
+    "label": "Skanuj całą bibliotekę",
+    "desc": "Przejdź przez foldery główne i zaindeksuj każdy plik komiksu — znajduje pliki, których nie ma jeszcze w bibliotece, i usuwa te skasowane z dysku."
+  },
+  "reindex-series": {
+    "label": "Ponownie zaindeksuj foldery serii",
+    "desc": "Dla każdej dopasowanej serii ponownie indeksuje jej WŁASNY folder i przypisuje znajdujące się tam pliki — jednoznacznie, bez dopasowania przybliżonego. Naprawia pliki przypięte do niewłaściwej serii o tej samej nazwie. (Nowe komiksy nadal znajduje „Skanuj całą bibliotekę”)."
+  },
+  "tag-untagged": {
+    "label": "Otaguj wszystkie pliki bez tagów",
+    "desc": "Zapisz metadane w każdym posiadanym pliku, który ich nie ma (w razie potrzeby konwertuje .cbr)."
+  },
+  "convert-cbr": {
+    "label": "Konwertuj wszystkie CBR → CBZ",
+    "desc": "Przepakuj każdy plik .cbr do .cbz, aby dało się go tagować i czytać w jednolity sposób."
+  },
+  "unwrap-nested": {
+    "label": "Rozpakuj zagnieżdżone archiwa",
+    "desc": "Niektóre wydania zawierają plik .cbz, w którym zamiast stron jest plik .cbr — otwiera się, taguje i wygląda dobrze, ale nie ma czego czytać. To narzędzie przenosi strony wewnętrznego archiwum na najwyższy poziom, w miejscu, zachowując ComicInfo. Wszystko, czego nie da się potwierdzić, zostaje nietknięte."
+  },
+  "remove-duplicates": {
+    "label": "Usuń zduplikowane pliki",
+    "desc": "Usuń zduplikowane kopie tego samego zeszytu we wszystkich komiksach. Uszkodzone kopie, które dobra już zastąpiła, są usuwane od razu. Gdy istnieją dwie DOBRE kopie, zostaje najlepsza — najpierw otagowana, potem z największą liczbą stron, potem największa — a druga jest usuwana; ta część działa jako podgląd (lista w Dzienniki → narzędzia), chyba że zaznaczysz pole."
+  },
+  "verify": {
+    "label": "Sprawdź archiwa",
+    "desc": "Dokładnie sprawdź każdy plik komiksu pod kątem uszkodzeń i usuń wpisy plików, których nie ma na dysku."
+  },
+  "relink-cv": {
+    "label": "Ponownie powiąż pliki z metadanymi",
+    "desc": "Ponownie przypisz posiadane pliki do zeszytów ze źródła metadanych dla każdego dopasowanego komiksu (naprawia liczniki posiadanych/brakujących)."
+  },
+  "merge-duplicate-series": {
+    "label": "Scal zduplikowane serie",
+    "desc": "Połącz wiersze serii wskazujące ten sam tom (kopia dodana prosto ze źródła metadanych, podczas gdy wiersz z folderu dopasowano gdzie indziej). Wiersz powiązany z folderem zostaje; pliki, poszukiwane zeszyty i obserwacje drugiego są przenoszone. Ewentualne duplikaty, które się ujawnią, usuwa potem „Usuń zduplikowane pliki”."
+  },
+  "rematch-mismatched": {
+    "label": "Sprawdź ponownie niedopasowane tomy",
+    "desc": "Znajdź serie, których pliki wychodzą poza ostatni zeszyt dopasowanego tomu — znak, że zamiast właściwej serii dopasowano miniserię lub one-shot o tej samej nazwie — i dopasuj je ponownie. Wyraźny zwycięzca jest stosowany, a jego pliki ponownie powiązane; wszystko niejasne zostaje do poprawienia przez „Popraw dopasowanie” na stronie serii."
+  },
+  "refresh-series": {
+    "label": "Odśwież metadane serii",
+    "desc": "Pobierz ponownie szczegóły tomu i listę zeszytów każdej dopasowanej serii z usługi metadanych — uwzględnia stan wydawania (Wydawana / Zakończona), wzbogacenia dla serii zapisanych przed ich włączeniem i zeszyty wydane od tego czasu. Jedno żądanie na sekundę, więc duża biblioteka chwilę potrwa; jeśli usługa ograniczy liczbę żądań, zadanie zatrzyma się czysto i wystarczy uruchomić je ponownie."
+  },
+  "fetch-metadata": {
+    "label": "Pobierz metadane zeszytów",
+    "desc": "Pobierz szczegóły (opisy, twórców, daty, okładki) dla każdego zeszytu w kolekcji, któremu ich brakuje. Zeszyty już zapisane są pomijane; jeśli źródło metadanych ograniczy liczbę żądań, zadanie zatrzyma się czysto — wystarczy uruchomić je ponownie, aby dokończyć."
+  },
+  "rename-files": {
+    "label": "Zmień nazwy plików według wzorca",
+    "desc": "Zmień nazwę każdego dopasowanego pliku według wzorca nazw (ten sam folder — bez przenoszenia), aby importowane pliki z nazwami w stylu scenowym pasowały do pobranych. Kolizje są pomijane."
+  },
+  "backup-db": {
+    "label": "Utwórz kopię zapasową bazy danych",
+    "desc": "Zapisz migawkę bazy katalogu w folderze backups/ obok niej (przechowuje 5 najnowszych). Bezpieczne podczas używania aplikacji. Przywracanie: zatrzymaj aplikację i skopiuj migawkę na miejsce catalog.db."
+  },
+  "remove-ghosts": {
+    "label": "Usuń serie widma",
+    "desc": "Znajdź pozostałości serii sprzed dopasowywania metadanych — bez dopasowania i bez plików na dysku — których „poszukiwane” zeszyty zaśmiecają kartę Brakujące, a nigdy się nie pobiorą. Działa jako podgląd (lista w Dzienniki → narzędzia); zaznacz pole, aby naprawdę je usunąć."
+  }
+}

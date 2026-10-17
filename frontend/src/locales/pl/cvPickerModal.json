@@ -1,0 +1,26 @@
+{
+  "title": "Dopasuj metadane serii",
+  "lookingUp": "Wyszukiwanie serii…",
+  "searching": "Przeszukiwanie źródła metadanych…",
+  "noVolumeWithId": "Brak serii o tym identyfikatorze.",
+  "searchFailed": "Wyszukiwanie nie powiodło się.",
+  "noVolumes": "Nie znaleziono serii.",
+  "linkFailed": "Powiązanie nie powiodło się",
+  "linkFailedWith": "Powiązanie nie powiodło się: {error}",
+  "matchedTo": "Dopasowano do: {name}.",
+  "matchedToYear": "Dopasowano do: {name} ({year}).",
+  "unknownPublisher": "Nieznany wydawca",
+  "idBadge": "ID {id}",
+  "equalsFiles": "= Twoje pliki: {count}",
+  "nearFiles": "≈ Twoje pliki: {count}",
+  "sourceLink": "Strona źródła",
+  "linking": "Wiązanie…",
+  "use": "Użyj",
+  "filesNote": {
+    "one": "Masz na dysku {count} plik — serie o najbliższej liczbie zeszytów są na początku listy.",
+    "few": "Masz na dysku {count} pliki — serie o najbliższej liczbie zeszytów są na początku listy.",
+    "many": "Masz na dysku {count} plików — serie o najbliższej liczbie zeszytów są na początku listy.",
+    "other": "Masz na dysku {count} pliku — serie o najbliższej liczbie zeszytów są na początku listy."
+  },
+  "searchPlaceholder": "Szukaj po nazwie — lub wklej URL / identyfikator serii…"
+}

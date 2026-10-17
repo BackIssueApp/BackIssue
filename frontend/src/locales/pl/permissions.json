@@ -1,0 +1,60 @@
+{
+  "categories": {
+    "library": "Biblioteka",
+    "system": "System"
+  },
+  "library": {
+    "view": {
+      "label": "Przeglądanie biblioteki",
+      "description": "Wyświetlanie serii, zeszytów, premier i kolejki"
+    },
+    "manage": {
+      "label": "Zarządzanie biblioteką",
+      "description": "Dodawanie i usuwanie tomów oraz zeszytów, skanowanie, tagowanie, import, poprawianie dopasowań"
+    },
+    "restricted": {
+      "label": "Treści dla dorosłych",
+      "description": "Wyświetlanie i czytanie serii oznaczonych jako dla dorosłych/ograniczone (ukryte przed rolami bez tego uprawnienia)"
+    }
+  },
+  "downloads": {
+    "grab": {
+      "label": "Wyszukiwanie i pobieranie",
+      "description": "Przeszukiwanie źródeł, dodawanie pobrań do kolejki, anulowanie pozycji w kolejce"
+    }
+  },
+  "lists": {
+    "share": {
+      "label": "Udostępnianie list lektur",
+      "description": "Publikowanie list lektur i cykli fabularnych, aby widzieli je wszyscy użytkownicy"
+    }
+  },
+  "settings": {
+    "manage": {
+      "label": "Ustawienia i indeksery",
+      "description": "Zmiana ustawień aplikacji i indekserów oraz testowanie połączeń"
+    }
+  },
+  "users": {
+    "manage": {
+      "label": "Użytkownicy i role",
+      "description": "Tworzenie kont, ról i uprawnień oraz zarządzanie nimi"
+    }
+  },
+  "plugins": {
+    "manage": {
+      "label": "Wtyczki i restart",
+      "description": "Włączanie i wyłączanie wtyczek oraz ponowne uruchamianie aplikacji"
+    }
+  },
+  "system": {
+    "jobs": {
+      "label": "Zadania i narzędzia",
+      "description": "Uruchamianie zadań, harmonogramów i narzędzi konserwacji biblioteki"
+    },
+    "logs": {
+      "label": "Dzienniki",
+      "description": "Przeglądanie i czyszczenie dzienników aplikacji"
+    }
+  }
+}

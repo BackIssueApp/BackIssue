@@ -1,0 +1,56 @@
+{
+  "releaseWeek": {
+    "title": "Premiery w tym tygodniu",
+    "body": {
+      "one": "{count} zeszyt z obserwowanych serii ukazuje się w tym tygodniu.",
+      "few": "{count} zeszyty z obserwowanych serii ukazują się w tym tygodniu.",
+      "many": "{count} zeszytów z obserwowanych serii ukazuje się w tym tygodniu.",
+      "other": "{count} zeszytu z obserwowanych serii ukazuje się w tym tygodniu."
+    },
+    "bodyNamed": {
+      "one": "{count} zeszyt z obserwowanych serii ukazuje się w tym tygodniu: {named}.",
+      "few": "{count} zeszyty z obserwowanych serii ukazują się w tym tygodniu: {named}.",
+      "many": "{count} zeszytów z obserwowanych serii ukazuje się w tym tygodniu: {named}.",
+      "other": "{count} zeszytu z obserwowanych serii ukazuje się w tym tygodniu: {named}."
+    },
+    "bodyNamedMore": {
+      "one": "{count} zeszyt z obserwowanych serii ukazuje się w tym tygodniu: {named} i {more} więcej.",
+      "few": "{count} zeszyty z obserwowanych serii ukazują się w tym tygodniu: {named} i {more} więcej.",
+      "many": "{count} zeszytów z obserwowanych serii ukazuje się w tym tygodniu: {named} i {more} więcej.",
+      "other": "{count} zeszytu z obserwowanych serii ukazuje się w tym tygodniu: {named} i {more} więcej."
+    }
+  },
+  "pickArrived": {
+    "title": "Zeszyt, o który prosiłeś, już jest",
+    "body": "{series} #{number}",
+    "bodyNamed": "{series} #{number} — {name}"
+  },
+  "packDone": {
+    "title": "Paczka zaimportowana",
+    "body": {
+      "one": "{title} — {count} nowy zeszyt",
+      "few": "{title} — {count} nowe zeszyty",
+      "many": "{title} — {count} nowych zeszytów",
+      "other": "{title} — {count} nowego zeszytu"
+    },
+    "bodyFailed": {
+      "one": "{title} — {count} nowy zeszyt, błędy: {failed}",
+      "few": "{title} — {count} nowe zeszyty, błędy: {failed}",
+      "many": "{title} — {count} nowych zeszytów, błędy: {failed}",
+      "other": "{title} — {count} nowego zeszytu, błędy: {failed}"
+    }
+  },
+  "packFailed": {
+    "title": "Paczka nie powiodła się",
+    "body": "{title} — {error}"
+  },
+  "importDone": {
+    "title": "Pobrano",
+    "body": "{title}",
+    "bodySource": "{title} · {source}"
+  },
+  "importFailed": {
+    "title": "Pobieranie nie powiodło się",
+    "body": "{title} — {error}"
+  }
+}

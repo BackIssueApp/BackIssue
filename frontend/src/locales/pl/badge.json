@@ -1,0 +1,11 @@
+{
+  "new": "nowy",
+  "queued": "w kolejce",
+  "sent": "wysłany",
+  "saving": "zapisywanie",
+  "tagging": "tagowanie",
+  "saved": "zapisany",
+  "noTags": "bez tagów",
+  "corrupt": "uszkodzony",
+  "failed": "błąd"
+}
