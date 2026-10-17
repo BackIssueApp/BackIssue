@@ -1,0 +1,46 @@
+{
+  "releaseWeek": {
+    "title": "Novos lançamentos esta semana",
+    "body": {
+      "one": "{count} edição de séries que segue sai esta semana.",
+      "other": "{count} edições de séries que segue saem esta semana."
+    },
+    "bodyNamed": {
+      "one": "{count} edição de séries que segue sai esta semana: {named}.",
+      "other": "{count} edições de séries que segue saem esta semana: {named}."
+    },
+    "bodyNamedMore": {
+      "one": "{count} edição de séries que segue sai esta semana: {named} e mais {more}.",
+      "other": "{count} edições de séries que segue saem esta semana: {named} e mais {more}."
+    }
+  },
+  "pickArrived": {
+    "title": "Chegou uma edição que pediu",
+    "body": "{series} #{number}",
+    "bodyNamed": "{series} #{number} — {name}"
+  },
+  "packDone": {
+    "title": "Pacote importado",
+    "body": {
+      "one": "{title} — {count} edição nova",
+      "other": "{title} — {count} edições novas"
+    },
+    "bodyFailed": {
+      "one": "{title} — {count} edição nova, {failed} falhou",
+      "other": "{title} — {count} edições novas, {failed} falharam"
+    }
+  },
+  "packFailed": {
+    "title": "O pacote falhou",
+    "body": "{title} — {error}"
+  },
+  "importDone": {
+    "title": "Baixado",
+    "body": "{title}",
+    "bodySource": "{title} · {source}"
+  },
+  "importFailed": {
+    "title": "O download falhou",
+    "body": "{title} — {error}"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "pageSettings": "Configurações",
+  "pageSystem": "Sistema",
+  "pageWanted": "Em falta",
+  "pageQueue": "Fila",
+  "pageReleases": "Lançamentos",
+  "pageHistory": "Histórico",
+  "pageLists": "Listas de leitura",
+  "pageImport": "Importar",
+  "pageStats": "Estatísticas",
+  "pagePlugins": "Plugins",
+  "pageUsers": "Usuários",
+  "pageProfile": "Perfil",
+  "pageSeries": "Série",
+  "pageCollections": "Coleções",
+  "notFoundTitle": "Página não encontrada",
+  "notFoundText": "Não há nada neste endereço. Pode ter sido movido, ou a conexão está errada.",
+  "noAccessTitle": "Não tem acesso a esta página",
+  "noAccessText": "A sua conta não está autorizada a abri-la. Fale com um administrador se achar que devia estar.",
+  "goHome": "Ir para o Início"
+}

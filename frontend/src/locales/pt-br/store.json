@@ -1,0 +1,8 @@
+{
+  "requestFailed": "o pedido falhou",
+  "noResponse": "sem resposta",
+  "downloadFailed": "Não foi possível pôr o download na fila: {error}",
+  "downloadFailedUnreachable": "Não foi possível pôr o download na fila — o aplicativo está acessível?",
+  "redownloadFailed": "O novo download falhou: {error}",
+  "redownloadFailedUnreachable": "O novo download falhou — o aplicativo está acessível?"
+}

@@ -1,0 +1,17 @@
+{
+  "fallbackSeries": "Edição",
+  "title": "Pesquisar nas fontes",
+  "searchFailed": "A pesquisa falhou — o aplicativo está em execução?",
+  "noSources": "Nenhuma fonte de download está ativa (Configurações → Fontes de download).",
+  "noneFound": "Nenhum lançamento encontrado nas suas fontes. Tente uma pesquisa mais ampla ou adicione um nome alternativo à série.",
+  "queryPlaceholder": "Série e edição, ou qualquer pesquisa…",
+  "searched": "Pesquisado",
+  "searching": "Pesquisando nas fontes ativas…",
+  "pack": "Pacote",
+  "packQueued": "Pacote na fila via {source} — as edições em falta importam automaticamente (acompanhe a fila).",
+  "queued": "Download na fila via {source} — acompanhe a fila.",
+  "failed": "O download falhou: {error}",
+  "unknownError": "erro desconhecido",
+  "sending": "Enviando…",
+  "download": "Download"
+}

@@ -1,0 +1,60 @@
+{
+  "categories": {
+    "library": "Biblioteca",
+    "system": "Sistema"
+  },
+  "library": {
+    "view": {
+      "label": "Navegar na biblioteca",
+      "description": "Ver séries, edições, lançamentos e a fila"
+    },
+    "manage": {
+      "label": "Gerir a biblioteca",
+      "description": "Adicionar/remover volumes e edições, analisar, etiquetar, importar, corrigir associações"
+    },
+    "restricted": {
+      "label": "Ver conteúdo para adultos",
+      "description": "Ver e ler séries marcadas como para adultos/restritas (ocultas às funções sem esta permissão)"
+    }
+  },
+  "downloads": {
+    "grab": {
+      "label": "Procurar e baixar",
+      "description": "Procurar nas fontes, pôr downloads na fila, cancelar itens em fila"
+    }
+  },
+  "lists": {
+    "share": {
+      "label": "Compartilhar listas de leitura",
+      "description": "Publicar as suas listas de leitura e arcos narrativos para que todos os usuários os vejam"
+    }
+  },
+  "settings": {
+    "manage": {
+      "label": "Configurações e indexadores",
+      "description": "Alterar configurações do aplicativo e indexadores, executar testes de conexão"
+    }
+  },
+  "users": {
+    "manage": {
+      "label": "Usuários e funções",
+      "description": "Criar e gerir contas, funções e permissões"
+    }
+  },
+  "plugins": {
+    "manage": {
+      "label": "Plugins e reinício",
+      "description": "Ativar/desativar plugins e reiniciar o aplicativo"
+    }
+  },
+  "system": {
+    "jobs": {
+      "label": "Tarefas e ferramentas",
+      "description": "Executar tarefas, agendamentos e ferramentas de manutenção da biblioteca"
+    },
+    "logs": {
+      "label": "Registros",
+      "description": "Ver e limpar os registros do aplicativo"
+    }
+  }
+}
