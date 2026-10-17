@@ -184,7 +184,7 @@ export function autoLinkCvSeries() { return 0; }
 // published issues), then re-link owned files. Returns the fresh issue count.
 export async function refreshCvVolume(db, client, seriesId) {
   const s = getSeriesById(db, seriesId);
-  if (!s || !s.cv_id) return { ok: false, reason: 'not matched to ComicVine' };
+  if (!s || !s.cv_id) return { ok: false, reason: 'not matched to a metadata record' };
   const v = await cacheCvVolume(db, client, s.cv_id);
   linkFilesToCv(db, seriesId, v.id);
   return { ok: true, issues: (v.issues || []).length };

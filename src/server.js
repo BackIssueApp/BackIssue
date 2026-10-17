@@ -775,7 +775,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   app.post('/api/lists/import-arc', async (req, res) => {
     try {
       const { arc, issues } = await arcIssues(Number((req.body || {}).arcId));
-      if (!issues.length) return res.status(400).json({ error: 'that arc has no issues on ComicVine' });
+      if (!issues.length) return res.status(400).json({ error: 'that arc has no issues at the metadata source' });
       res.json({ id: lists.importArcAsList(db, req.user.id, arc, issues), issues: issues.length });
     } catch (e) { listErr(res, e); }
   });
@@ -788,7 +788,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     const parsed = cbl.parseCbl(xml);
     if (!parsed.books.length) return res.status(400).json({ error: 'that list has no books in it' });
     const { issues, unmatched, truncated } = await cblResolve(parsed.books);
-    if (!issues.length) return res.status(400).json({ error: 'none of the books could be matched on ComicVine' });
+    if (!issues.length) return res.status(400).json({ error: 'none of the books could be matched at the metadata source' });
     const name = cbl.prettyCblName(parsed.name || source || 'Reading list');
     const id = lists.importCblAsList(db, req.user.id, name, issues, source);
     res.json({
@@ -1458,7 +1458,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     const seriesId = Number(req.body?.seriesId);
     const number = String(req.body?.number ?? '');
     const s = getSeriesById(db, seriesId);
-    if (!s?.cv_id) return res.status(400).json({ error: 'series not matched to ComicVine' });
+    if (!s?.cv_id) return res.status(400).json({ error: 'series not matched to a metadata record' });
     const want = normalizeNumber(number);
     const find = () => listCvIssues(db, s.cv_id).find((x) => normalizeNumber(x.issue_number) === want);
     let ci = find();
@@ -1754,7 +1754,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // drops the locks so the next refresh restores source values.
   app.post('/api/collection/:id/metadata', (req, res) => {
     const series = getSeriesById(db, Number(req.params.id));
-    if (!series?.cv_id) return res.status(400).json({ error: 'not matched to ComicVine' });
+    if (!series?.cv_id) return res.status(400).json({ error: 'not matched to a metadata record' });
     if (req.body?.reset) { resetCvSeriesUser(db, series.cv_id); return res.json({ reset: true }); }
     res.json(updateCvSeriesUser(db, series.cv_id, req.body?.fields || {}));
   });
@@ -1822,7 +1822,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   app.post('/api/collection/:id/refile', (req, res) => {
     const row = getSeriesById(db, Number(req.params.id));
     if (!row) return res.status(404).json({ error: 'no such series' });
-    if (!canRefile(row)) return res.status(400).json({ error: 'match this series to ComicVine first — its files can’t be organized without publisher/title/year' });
+    if (!canRefile(row)) return res.status(400).json({ error: 'match this series to a metadata record first — its files can’t be organized without publisher/title/year' });
     try {
       if ((req.body || {}).dryRun) return res.json({ plan: planSeries(db, row) });
       res.json(refileSeries(db, row));

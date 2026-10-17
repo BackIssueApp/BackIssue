@@ -1,0 +1,31 @@
+{
+  "releaseWeek": {
+    "title": "New releases this week",
+    "body": { "one": "{count} issue from series you follow ships this week.", "other": "{count} issues from series you follow ship this week." },
+    "bodyNamed": { "one": "{count} issue from series you follow ships this week: {named}.", "other": "{count} issues from series you follow ship this week: {named}." },
+    "bodyNamedMore": { "one": "{count} issue from series you follow ships this week: {named} and {more} more.", "other": "{count} issues from series you follow ship this week: {named} and {more} more." }
+  },
+  "pickArrived": {
+    "title": "An issue you asked for is here",
+    "body": "{series} #{number}",
+    "bodyNamed": "{series} #{number} — {name}"
+  },
+  "packDone": {
+    "title": "Pack imported",
+    "body": { "one": "{title} — {count} new issue", "other": "{title} — {count} new issues" },
+    "bodyFailed": { "one": "{title} — {count} new issue, {failed} failed", "other": "{title} — {count} new issues, {failed} failed" }
+  },
+  "packFailed": {
+    "title": "Pack failed",
+    "body": "{title} — {error}"
+  },
+  "importDone": {
+    "title": "Downloaded",
+    "body": "{title}",
+    "bodySource": "{title} · {source}"
+  },
+  "importFailed": {
+    "title": "Download failed",
+    "body": "{title} — {error}"
+  }
+}

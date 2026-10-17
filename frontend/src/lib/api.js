@@ -7,16 +7,20 @@
 // already check r.error, so 5xx / proxy HTML / crashed-server responses light
 // up the existing error paths instead of throwing parse errors that dozens of
 // `catch { /* keep last */ }` blocks silently swallow.
+import { t, translateServerMessage } from './i18n.js';
+
 async function handle(res) {
   if (res.status === 401) {
     import('./auth.svelte.js').then((m) => m.sessionLost()).catch(() => {});
   }
   let data = null;
   try { data = await res.json(); }
-  catch { return { error: res.ok ? 'Bad response from the server' : `Server error (HTTP ${res.status})` }; }
+  catch { return { error: res.ok ? t('errors.badResponse') : t('errors.serverError', { status: res.status }) }; }
   if (!res.ok && data && typeof data === 'object' && !Array.isArray(data) && !data.error) {
-    data.error = `Server error (HTTP ${res.status})`;
+    data.error = t('errors.serverError', { status: res.status });
   }
+  // Server messages are English; show the reader's language when we know the text.
+  if (data && typeof data === 'object' && typeof data.error === 'string') data.error = translateServerMessage(data.error);
   return data;
 }
 

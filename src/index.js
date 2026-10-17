@@ -647,6 +647,7 @@ async function checkReleases({ week, year } = {}) {
         notifyRaw(db, { type: 'release.week', category: 'release', level: 'info',
           title: 'New releases this week',
           body: `${n} issue${n === 1 ? '' : 's'} from series you follow ship${n === 1 ? 's' : ''} this week${named.length ? ': ' + named.join(', ') + (more > 0 ? ` and ${more} more` : '') : ''}.`,
+          params: { count: n, named: named.join(', '), more: Math.max(0, more) },
           url: weekUrl });
       }
       job.finish({ releases: r.total, inCollection: r.hits, newIssues: r.added });
@@ -717,7 +718,7 @@ function setScheduleCron(key, { cron, enabled } = {}) {
 async function refreshVolume(seriesId) {
   const series = getSeriesById(db, seriesId);
   if (!series) return { error: 'not found' };
-  if (!series.cv_id) return { error: 'not matched to ComicVine' };
+  if (!series.cv_id) return { error: 'not matched to a metadata record' };
   try {
     const r = await refreshCvVolume(db, cvClient(), seriesId);
     // Deep half: every issue's full detail (summary, credits, enrichment),
@@ -830,6 +831,7 @@ function settlePicks(seriesId = null) {
       type: 'pick.arrived', category: 'import', level: 'success',
       title: 'An issue you asked for is here',
       body: `${p.series_title || 'Series'} #${p.issue_number ?? '?'}${p.name ? ' — ' + p.name : ''}`,
+      params: { series: p.series_title || '', number: p.issue_number ?? '?', name: p.name || '' },
       url: `/volume/${p.series_id}`, userId: p.by_user, seriesId: p.series_id,
     });
   }
@@ -1125,13 +1127,13 @@ function grabSourcePack({ source, seriesId, result } = {}) {
       job.finish({ imported: summary.imported, skipped: summary.skipped, unmatched: summary.unmatched, failed: summary.failed });
       setGrabStatus(db, grabId, 'imported', { importedAt: new Date().toISOString() });
       logInfo(`${source} pack imported: ${summary.imported} new · ${summary.skipped} already owned · ${summary.unmatched} unmatched · ${summary.failed} failed — ${result.title}`, source);
-      notifyRaw(db, { type: 'pack.done', category: 'import', level: summary.failed ? 'warn' : 'success', title: 'Pack imported', body: `${result.title} — ${summary.imported} new issue(s)`, seriesId: sid ?? null });
+      notifyRaw(db, { type: 'pack.done', category: 'import', level: summary.failed ? 'warn' : 'success', title: 'Pack imported', body: `${result.title} — ${summary.imported} new issue(s)`, params: { title: result.title, count: summary.imported, failed: summary.failed || 0 }, seriesId: sid ?? null });
       settlePicks(sid ?? null);
     } catch (e) {
       setGrabStatus(db, grabId, 'failed', { error: String(e?.message || e) });
       job.fail(e);
       logError(`${source} pack failed: ${result.title} — ${String(e?.message || e)}`, source);
-      notifyRaw(db, { type: 'pack.failed', category: 'failure', level: 'error', title: 'Pack failed', body: `${result.title} — ${String(e?.message || e)}`, seriesId: sid ?? null });
+      notifyRaw(db, { type: 'pack.failed', category: 'failure', level: 'error', title: 'Pack failed', body: `${result.title} — ${String(e?.message || e)}`, params: { title: result.title, error: String(e?.message || e) }, seriesId: sid ?? null });
     } finally {
       inAppPackProgress.delete(grabId);
       // processPack copies each imported file into the library, so a temp dir the
@@ -1512,10 +1514,10 @@ const downloadMonitor = createDownloadMonitor({
   db,
   onProgress: (p) => {
     if (p.event === 'tag-result') recordProgressTagLog(p);
-    if (p.event === 'done') { logInfo(`Imported from ${p.source || 'download'}: ${p.issue?.title || 'issue ' + p.issue?.id}`, p.source || 'usenet'); notifyRaw(db, { type: 'import.done', category: 'import', level: 'success', title: 'Downloaded', body: `${p.issue?.title || 'issue'}${p.source ? ' · ' + p.source : ''}`, seriesId: p.issue?.series_id ?? null }); settlePicks(p.issue?.series_id ?? null); }
-    if (p.event === 'failed') { logError(`${p.source || 'download'} import failed: ${p.issue?.title || 'issue ' + p.issue?.id} — ${p.error}`, p.source || 'usenet'); notifyRaw(db, { type: 'import.failed', category: 'failure', level: 'error', title: 'Download failed', body: `${p.issue?.title || 'issue'} — ${p.error}`, seriesId: p.issue?.series_id ?? null }); }
-    if (p.event === 'media-done') notifyRaw(db, { type: 'import.done', category: 'import', level: 'success', title: 'Downloaded', body: `${p.title || p.type}${p.source ? ' · ' + p.source : ''}`, seriesId: p.seriesId ?? null });
-    if (p.event === 'media-failed') { logError(`${p.source || 'download'}: ${p.title || p.type || 'media'} — ${p.error}`, p.source || 'download'); notifyRaw(db, { type: 'import.failed', category: 'failure', level: 'error', title: 'Download failed', body: `${p.title || p.type || 'media'} — ${p.error}` }); }
+    if (p.event === 'done') { logInfo(`Imported from ${p.source || 'download'}: ${p.issue?.title || 'issue ' + p.issue?.id}`, p.source || 'usenet'); notifyRaw(db, { type: 'import.done', category: 'import', level: 'success', title: 'Downloaded', body: `${p.issue?.title || 'issue'}${p.source ? ' · ' + p.source : ''}`, params: { title: p.issue?.title || '', source: p.source || '' }, seriesId: p.issue?.series_id ?? null }); settlePicks(p.issue?.series_id ?? null); }
+    if (p.event === 'failed') { logError(`${p.source || 'download'} import failed: ${p.issue?.title || 'issue ' + p.issue?.id} — ${p.error}`, p.source || 'usenet'); notifyRaw(db, { type: 'import.failed', category: 'failure', level: 'error', title: 'Download failed', body: `${p.issue?.title || 'issue'} — ${p.error}`, params: { title: p.issue?.title || '', error: String(p.error || '') }, seriesId: p.issue?.series_id ?? null }); }
+    if (p.event === 'media-done') notifyRaw(db, { type: 'import.done', category: 'import', level: 'success', title: 'Downloaded', body: `${p.title || p.type}${p.source ? ' · ' + p.source : ''}`, params: { title: p.title || p.type || '', source: p.source || '' }, seriesId: p.seriesId ?? null });
+    if (p.event === 'media-failed') { logError(`${p.source || 'download'}: ${p.title || p.type || 'media'} — ${p.error}`, p.source || 'download'); notifyRaw(db, { type: 'import.failed', category: 'failure', level: 'error', title: 'Download failed', body: `${p.title || p.type || 'media'} — ${p.error}`, params: { title: p.title || p.type || '', error: String(p.error || '') } }); }
     if (p.event === 'pack-start') logInfo(`Post-processing pack — ${p.title}…`, p.source || 'torrent');
     if (p.event === 'pack-import') {
       if (p.outcome === 'imported') logInfo(`[${p.done}/${p.total}] imported ${p.reason}`, p.source || 'torrent');
@@ -1525,7 +1527,7 @@ const downloadMonitor = createDownloadMonitor({
       const s = p.summary;
       logInfo(`Pack done — ${p.title}: ${s.imported} imported, ${s.skipped} already owned, ${s.unmatched} not in collection, ${s.failed} failed`, p.source || 'torrent');
       if (!s.total) logWarn(`Pack "${p.title}" contained no comic files at all — wrong path mapping, or a bogus release?`, p.source || 'torrent');
-      notifyRaw(db, { type: 'pack.done', category: 'import', level: s.failed ? 'warn' : 'success', title: 'Pack imported', body: `${p.title}: ${s.imported} new issue(s)${s.failed ? ', ' + s.failed + ' failed' : ''}`, seriesId: p.seriesId ?? null });
+      notifyRaw(db, { type: 'pack.done', category: 'import', level: s.failed ? 'warn' : 'success', title: 'Pack imported', body: `${p.title}: ${s.imported} new issue(s)${s.failed ? ', ' + s.failed + ' failed' : ''}`, params: { title: p.title, count: s.imported, failed: s.failed || 0 }, seriesId: p.seriesId ?? null });
     }
     if (p.event === 'pack-failed') { logError(`Pack failed — ${p.title}: ${p.error}`, p.source || 'torrent'); notifyRaw(db, { type: 'pack.failed', category: 'failure', level: 'error', title: 'Pack failed', body: `${p.title}: ${p.error}`, seriesId: p.seriesId ?? null }); }
   },

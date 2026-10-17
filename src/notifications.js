@@ -58,16 +58,22 @@ export function initNotificationTables(db) {
   // series_id arrived after first ship; CREATE TABLE IF NOT EXISTS won't alter
   // an existing table (errors if the column already exists; ignored).
   try { db.exec('ALTER TABLE notifications ADD COLUMN series_id INTEGER'); } catch { /* exists */ }
+  // params: the facts behind title/body as JSON ({ title, count, source, … }),
+  // so a client can render the event in the reader's language from its type
+  // while title/body stay the English fallback (older clients, outbound
+  // channels, rows from before this column).
+  try { db.exec('ALTER TABLE notifications ADD COLUMN params TEXT'); } catch { /* exists */ }
 }
 
 /** Record + dispatch a notification. Never throws (a bad channel or a closed
  *  DB must not break the thing that triggered it). Returns the row id or 0. */
-export function notify(db, { type, category = 'system', level = 'info', title, body = null, url = null, userId = null, seriesId = null }, { fetchImpl = fetch } = {}) {
+export function notify(db, { type, category = 'system', level = 'info', title, body = null, url = null, userId = null, seriesId = null, params = null }, { fetchImpl = fetch } = {}) {
   let id = 0;
+  const paramsJson = params && typeof params === 'object' ? JSON.stringify(params) : null;
   try {
     const r = db.prepare(
-      'INSERT INTO notifications (ts, type, category, level, title, body, url, user_id, series_id) VALUES (?,?,?,?,?,?,?,?,?)',
-    ).run(Date.now(), String(type || 'event'), category, level, String(title || ''), body, url, userId ?? null, seriesId ?? null);
+      'INSERT INTO notifications (ts, type, category, level, title, body, url, user_id, series_id, params) VALUES (?,?,?,?,?,?,?,?,?,?)',
+    ).run(Date.now(), String(type || 'event'), category, level, String(title || ''), body, url, userId ?? null, seriesId ?? null, paramsJson);
     id = r.lastInsertRowid;
     // Prune oldest beyond KEEP (and their read receipts).
     db.prepare(`DELETE FROM notifications WHERE id <= (
@@ -79,7 +85,8 @@ export function notify(db, { type, category = 'system', level = 'info', title, b
   }
   // Outbound channels (plugins): fire-and-forget, each does its own filtering
   // and transport. A channel's failure never breaks the caller or the others.
-  const event = { type, category, level, title, body, url, userId, seriesId };
+  // params only when given, so channels written against the old shape see no new key.
+  const event = { type, category, level, title, body, url, userId, seriesId, ...(paramsJson ? { params } : {}) };
   for (const fn of registeredNotifiers()) {
     Promise.resolve()
       .then(() => fn(event, { fetchImpl }))
@@ -112,12 +119,13 @@ function visClause(categories, includeRestricted = true) {
 export function listNotifications(db, userId, { limit = 30, categories = null, includeRestricted = true } = {}) {
   const v = visClause(categories, includeRestricted);
   const items = db.prepare(`
-    SELECT n.id, n.ts, n.type, n.category, n.level, n.title, n.body, n.url,
+    SELECT n.id, n.ts, n.type, n.category, n.level, n.title, n.body, n.url, n.params,
            EXISTS(SELECT 1 FROM notification_reads r WHERE r.notification_id = n.id AND r.user_id = ?) AS read
       FROM notifications n
      WHERE ${v.sql}
      ORDER BY n.ts DESC LIMIT ?`).all(userId, userId, ...v.extra, Math.min(200, Math.max(1, limit)));
-  return { items: items.map((i) => ({ ...i, read: !!i.read })), unread: unreadCount(db, userId, { categories, includeRestricted }) };
+  const parse = (s) => { if (!s) return null; try { return JSON.parse(s); } catch { return null; } };
+  return { items: items.map((i) => ({ ...i, read: !!i.read, params: parse(i.params) })), unread: unreadCount(db, userId, { categories, includeRestricted }) };
 }
 
 export function unreadCount(db, userId, { categories = null, includeRestricted = true } = {}) {

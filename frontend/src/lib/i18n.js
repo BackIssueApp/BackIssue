@@ -123,7 +123,7 @@ const TOKEN = (name) => `\u0000${name}\u0000`;
  *  escaped. Lets a sentence keep its emphasis without trusting the catalog. */
 export function th(key, params) {
   const tokens = params ? Object.fromEntries(Object.keys(params).map((k) => [k, TOKEN(k)])) : undefined;
-  let html = esc(t(key, tokens)).replace(/&lt;(\/?)(b|i|em|strong|code|br)&gt;/g, '<$1$2>');
+  let html = esc(t(key, tokens)).replace(/&lt;(\/?)(b|i|em|strong|code|br|kbd)&gt;/g, '<$1$2>');
   if (params) for (const [k, v] of Object.entries(params)) html = html.split(TOKEN(k)).join(esc(v ?? ''));
   return html;
 }
@@ -152,6 +152,34 @@ export function addMessages(catalogs) {
   }
   if (changed) onChange();
   return changed;
+}
+
+// ---- server messages -------------------------------------------------------
+// The API answers with English text in { error }. Rather than teach every
+// route a code, the client recognises the English of the messages listed in
+// the errors namespace and shows the translation; anything unknown (plugin
+// errors, upstream detail) passes through unchanged. A message ending in
+// {detail} matches by prefix and carries the rest as the param.
+let reverse = null, reverseFor = null;
+function reverseMap() {
+  const errors = enCatalog.errors || {};
+  if (reverse && reverseFor === errors && reverse.size === Object.keys(errors).length) return reverse;
+  reverse = new Map();
+  reverseFor = errors;
+  for (const [key, text] of Object.entries(errors)) if (typeof text === 'string') reverse.set(text, key);
+  return reverse;
+}
+export function translateServerMessage(msg) {
+  if (typeof msg !== 'string' || !msg) return msg;
+  const map = reverseMap();
+  const exact = map.get(msg);
+  if (exact) return t('errors.' + exact);
+  for (const [text, key] of map) {
+    if (!text.endsWith('{detail}')) continue;
+    const prefix = text.slice(0, -'{detail}'.length);
+    if (msg.startsWith(prefix)) return t('errors.' + key, { detail: msg.slice(prefix.length) });
+  }
+  return msg;
 }
 
 /** Testing hook: swap the active catalog without touching any loader. */

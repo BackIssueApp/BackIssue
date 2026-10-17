@@ -1,5 +1,6 @@
 import { describe, test, expect, afterEach } from 'vitest';
 import { t, th, matchLanguage, addMessages, hasMessage, languageName, _setCatalogForTests, LANGUAGES } from '../src/lib/i18n.svelte.js';
+import { translateServerMessage } from '../src/lib/i18n.js';
 import en from '../src/locales/en/common.json';
 
 afterEach(() => _setCatalogForTests('en', { common: en }));
@@ -58,6 +59,16 @@ describe('language matching', () => {
   test('English is always first in the catalog list and names itself', () => {
     expect(LANGUAGES[0]).toBe('en');
     expect(languageName('en')).toBe('English');
+  });
+});
+
+describe('translateServerMessage()', () => {
+  test('recognises the English of a known server message, with a trailing detail', () => {
+    _setCatalogForTests('fr', { errors: { signInFirst: 'Connectez-vous d’abord', installFailed: 'Échec de l’installation : {detail}' } });
+    expect(translateServerMessage('sign in with a real account first')).toBe('Connectez-vous d’abord');
+    expect(translateServerMessage('install failed: disk full')).toBe('Échec de l’installation : disk full');
+    expect(translateServerMessage('something a plugin said')).toBe('something a plugin said');
+    expect(translateServerMessage(null)).toBe(null);
   });
 });
 
