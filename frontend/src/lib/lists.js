@@ -4,6 +4,7 @@
 import { apiGet, apiPost } from './api.js';
 import { choiceDialog, inputDialog } from '../components/DialogModal.svelte';
 import { notify } from './toasts.svelte.js';
+import { t } from './i18n.svelte.js';
 
 /**
  * @param {string} message   what is being added, in the user's terms
@@ -13,13 +14,13 @@ import { notify } from './toasts.svelte.js';
 export async function pickList({ message, newName = '' }) {
   const r = await apiGet('/api/lists');
   if (r.error) { notify(r.error, 'error'); return null; }
-  const buttons = (r.lists || []).map((l) => ({ label: `${l.name} (${l.items})`, value: l.id }));
-  buttons.push({ label: '+ New list…', value: 'new' });
-  const choice = await choiceDialog({ title: 'Add to reading list', message, buttons });
+  const buttons = (r.lists || []).map((l) => ({ label: t('lists.listChoice', { name: l.name, count: l.items }), value: l.id }));
+  buttons.push({ label: t('lists.newList'), value: 'new' });
+  const choice = await choiceDialog({ title: t('lists.addToList'), message, buttons });
   if (!choice) return null;
   if (choice !== 'new') return choice;
 
-  const name = await inputDialog({ title: 'New reading list', value: newName, confirmLabel: 'Create' });
+  const name = await inputDialog({ title: t('lists.newListTitle'), value: newName, confirmLabel: t('lists.create') });
   if (!name) return null;
   const c = await apiPost('/api/lists', { name });
   if (c.error) { notify(c.error, 'error'); return null; }
