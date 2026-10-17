@@ -7,6 +7,7 @@
   import { fmt } from '../lib/util.js';
   import { auth, logout, can, isTrusted } from '../lib/auth.svelte.js';
   import Icon from '../lib/Icon.svelte';
+  import { t } from '../lib/i18n.svelte.js';
 
   let userMenuOpen = $state(false);
 
@@ -32,8 +33,9 @@
   // single type (or a fresh, empty install) a single "everything" entry keeps
   // the grid — and its Add button — reachable. Home ('/') is separate: it shows
   // the account's reading rails, not the whole collection.
-  const TYPE_LABELS = { comic: 'Comics', manga: 'Manga', magazine: 'Magazines', ebook: 'Books' };
+  const TYPE_KEYS = { comic: 'sidebar.typeComics', manga: 'sidebar.typeManga', magazine: 'sidebar.typeMagazines', ebook: 'sidebar.typeBooks' };
   const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const typeLabel = (type) => (TYPE_KEYS[type] ? t(TYPE_KEYS[type]) : cap(type));
   const libraryEntries = $derived.by(() => {
     const libs = status.libraries || [];
     if (libs.length) return libs.map((l) => ({ key: 'lib:' + l.id, q: '/?library=' + l.id, label: l.name }));
@@ -42,9 +44,9 @@
       return types.map((t) => ({
         key: t.type === 'comic' ? 'comics' : t.type,
         q: '/?filter=' + (t.type === 'comic' ? 'comics' : t.type),
-        label: TYPE_LABELS[t.type] || cap(t.type),
+        label: typeLabel(t.type),
       }));
-    return [{ key: 'all', q: '/?all=1', label: types[0] ? (TYPE_LABELS[types[0].type] || cap(types[0].type)) : 'Library' }];
+    return [{ key: 'all', q: '/?all=1', label: types[0] ? typeLabel(types[0].type) : t('common.library') }];
   });
   const activeLane = $derived.by(() => {
     const p = new URLSearchParams(route.search);
@@ -58,66 +60,66 @@
   const collectionsActive = $derived(new URLSearchParams(route.search).get('collections') === '1');
 </script>
 
-<aside class="sidebar" class:is-open={ui.sidebarOpen} aria-label="App sections">
+<aside class="sidebar" class:is-open={ui.sidebarOpen} aria-label={t('sidebar.appSections')}>
   <div class="brand" onclick={() => go('/')} role="button" tabindex="0" onkeydown={(e) => { if (e.key === 'Enter') go('/'); }}>
     <span class="brand__logo">BACKISSUE</span>
   </div>
 
   <nav class="sidenav">
-    <div class="sidenav__head">Library</div>
+    <div class="sidenav__head">{t('common.library')}</div>
     <button class="sidenav__item" class:is-active={isActive('/') && !activeLane && !collectionsActive} onclick={() => go('/')}>
-      <span class="sidenav__icon"><Icon name="home" /></span> Home</button>
+      <span class="sidenav__icon"><Icon name="home" /></span> {t('sidebar.home')}</button>
     <button id="collections-btn" class="sidenav__item" class:is-active={collectionsActive} onclick={() => go('/?collections=1')}>
-      <span class="sidenav__icon"><Icon name="layers" /></span> Collections</button>
+      <span class="sidenav__icon"><Icon name="layers" /></span> {t('sidebar.collections')}</button>
     <button id="lists-btn" class="sidenav__item" class:is-active={isActive('/lists')} onclick={() => go('/lists')}>
-      <span class="sidenav__icon"><Icon name="list" /></span> Lists</button>
+      <span class="sidenav__icon"><Icon name="list" /></span> {t('sidebar.lists')}</button>
     {#if isTrusted()}
       <button id="import-btn" class="sidenav__item" class:is-active={isActive('/import')} onclick={() => go('/import')}>
-        <span class="sidenav__icon"><Icon name="import" /></span> Import</button>
+        <span class="sidenav__icon"><Icon name="import" /></span> {t('sidebar.import')}</button>
     {/if}
     <button id="stats-btn" class="sidenav__item" class:is-active={isActive('/stats')} onclick={() => go('/stats')}>
-      <span class="sidenav__icon"><Icon name="bar-chart" /></span> Stats</button>
+      <span class="sidenav__icon"><Icon name="bar-chart" /></span> {t('sidebar.stats')}</button>
 
-    <div class="sidenav__head">Libraries</div>
+    <div class="sidenav__head">{t('sidebar.libraries')}</div>
     {#each libraryEntries as lane (lane.key)}
       <button class="sidenav__item" class:is-active={laneActive(lane.key)} onclick={() => go(lane.q)}>
         <span class="sidenav__icon"><Icon name="book" /></span> {lane.label}</button>
     {/each}
 
     {#if can('downloads.grab')}
-      <div class="sidenav__head">Downloads</div>
+      <div class="sidenav__head">{t('sidebar.downloads')}</div>
       <button id="wanted-btn" class="sidenav__item" class:is-active={isActive('/wanted')} onclick={() => go('/wanted')}>
-        <span class="sidenav__icon"><Icon name="target" /></span> Wanted</button>
+        <span class="sidenav__icon"><Icon name="target" /></span> {t('sidebar.wanted')}</button>
       <button id="queue-btn" class="sidenav__item" class:is-active={isActive('/queue')} onclick={() => go('/queue')}>
-        <span class="sidenav__icon"><Icon name="queue" /></span> Queue
+        <span class="sidenav__icon"><Icon name="queue" /></span> {t('sidebar.queue')}
         {#if queueActive}<span class="sidenav__count">{fmt(queueActive)}</span>{/if}
         {#if failed}<span class="sidenav__count sidenav__count--bad">{fmt(failed)}</span>{/if}</button>
       <button id="releases-btn" class="sidenav__item" class:is-active={isActive('/releases')} onclick={() => go('/releases')}>
-        <span class="sidenav__icon"><Icon name="calendar" /></span> Releases</button>
+        <span class="sidenav__icon"><Icon name="calendar" /></span> {t('sidebar.releases')}</button>
       <button id="history-btn" class="sidenav__item" class:is-active={isActive('/history')} onclick={() => go('/history')}>
-        <span class="sidenav__icon"><Icon name="history" /></span> History</button>
+        <span class="sidenav__icon"><Icon name="history" /></span> {t('sidebar.history')}</button>
     {/if}
 
     <!-- Plugin menu actions inject here (plain DOM — must stay mounted). -->
     <div id="menu-plugin-actions" class="sidenav__plugins" onclick={() => { ui.sidebarOpen = false; }}></div>
 
     {#if can('users.manage') || can('plugins.manage') || can('system.jobs') || can('system.logs') || can('settings.manage')}
-      <div class="sidenav__head">System</div>
+      <div class="sidenav__head">{t('sidebar.system')}</div>
       {#if can('users.manage')}
         <button id="users-btn" class="sidenav__item" class:is-active={isActive('/users')} onclick={() => go('/users')}>
-          <span class="sidenav__icon"><Icon name="users" /></span> Users</button>
+          <span class="sidenav__icon"><Icon name="users" /></span> {t('sidebar.users')}</button>
       {/if}
       {#if can('plugins.manage')}
         <button id="plugins-btn" class="sidenav__item" class:is-active={isActive('/plugins')} onclick={() => go('/plugins')}>
-          <span class="sidenav__icon"><Icon name="puzzle" /></span> Plugins</button>
+          <span class="sidenav__icon"><Icon name="puzzle" /></span> {t('sidebar.plugins')}</button>
       {/if}
       {#if can('system.jobs') || can('system.logs')}
         <button id="system-btn" class="sidenav__item" class:is-active={isActive('/system')} onclick={() => go('/system')}>
-          <span class="sidenav__icon"><Icon name="tools" /></span> System</button>
+          <span class="sidenav__icon"><Icon name="tools" /></span> {t('sidebar.system')}</button>
       {/if}
       {#if can('settings.manage')}
         <button id="settings-btn" class="sidenav__item" class:is-active={isActive('/settings')} onclick={() => go('/settings')}>
-          <span class="sidenav__icon"><Icon name="settings" /></span> Settings</button>
+          <span class="sidenav__icon"><Icon name="settings" /></span> {t('common.settings')}</button>
       {/if}
     {/if}
     <!-- Plugin items that belong under the System header (addMenuAction with
@@ -138,14 +140,14 @@
       </button>
       {#if userMenuOpen}
         <div class="sideuser__menu">
-          <button class="menu__item" onclick={() => { userMenuOpen = false; go('/profile'); }}>Profile</button>
-          <button class="menu__item" onclick={() => { userMenuOpen = false; logout(); }}>Sign out</button>
+          <button class="menu__item" onclick={() => { userMenuOpen = false; go('/profile'); }}>{t('sidebar.profile')}</button>
+          <button class="menu__item" onclick={() => { userMenuOpen = false; logout(); }}>{t('sidebar.signOut')}</button>
         </div>
       {/if}
     {/if}
   </div>
 
-  <div class="sidenav__version" id="app-version">{status.version ? `BackIssue v${status.version}` : ''}</div>
+  <div class="sidenav__version" id="app-version">{status.version ? t('sidebar.version', { version: status.version }) : ''}</div>
 </aside>
 
 {#if ui.sidebarOpen}
