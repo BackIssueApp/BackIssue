@@ -1,0 +1,8 @@
+{
+  "requestFailed": "request failed",
+  "noResponse": "no response",
+  "downloadFailed": "Download failed to queue: {error}",
+  "downloadFailedUnreachable": "Download failed to queue — is the app reachable?",
+  "redownloadFailed": "Re-download failed: {error}",
+  "redownloadFailedUnreachable": "Re-download failed — is the app reachable?"
+}

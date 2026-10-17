@@ -5,6 +5,7 @@ import { SvelteSet } from 'svelte/reactivity';
 import { apiGet, apiPost } from './api.js';
 import { subscribe } from './events.svelte.js';
 import { notify } from './toasts.svelte.js';
+import { t } from './i18n.svelte.js';
 
 // rows holds the LOADED prefix of the collection (an infinite-scroll window that
 // grows as the user scrolls). total is the full count for the active filter — the
@@ -36,6 +37,10 @@ export const ui = $state({ sidebarOpen: false });
 export const railSelect = new SvelteSet();
 
 export const detail = $state({ series: null, det: null, failed: false });
+// Placeholder title while a series has no name yet (unmatched row, failed
+// load). A sentinel, not display copy: App.svelte checks for it when naming
+// the browser tab, and the pages render their own wording.
+export const PLACEHOLDER_TITLE = 'Comic';
 // CV issue ids checked in the open series' issue list.
 export const detailSelected = new SvelteSet();
 
@@ -193,7 +198,7 @@ export async function openVolume(id) {
     detail.failed = false;
     detail.series = {
       id: Number(id),
-      title: row ? (row.title || row.folder || 'Comic') : '',
+      title: row ? (row.title || row.folder || PLACEHOLDER_TITLE) : '',
       cover_url: row?.cover_url || null,
       publisher: row?.publisher || null,
       issue_count: row?.total || 0,
@@ -205,10 +210,10 @@ export async function openVolume(id) {
     detailSelected.clear();
   }
   let det = null;
-  try { det = await apiGet('/api/collection/' + id); } catch (e) { det = { error: String(e?.message || e || 'request failed') }; }
+  try { det = await apiGet('/api/collection/' + id); } catch (e) { det = { error: String(e?.message || e || t('store.requestFailed')) }; }
   if (!det || det.error) {
-    const reason = String(det?.error || 'no response');
-    detail.series = { id: Number(id), title: 'Comic' }; detail.det = null; detail.failed = true;
+    const reason = String(det?.error || t('store.noResponse'));
+    detail.series = { id: Number(id), title: PLACEHOLDER_TITLE }; detail.det = null; detail.failed = true;
     detail.notFound = /not found|404/i.test(reason); // a missing series reads differently from a dead server
     detail.failReason = reason;
     return;
@@ -217,7 +222,7 @@ export async function openVolume(id) {
   const cv = det.cv, sr = det.series || {};
   detail.series = {
     id: Number(id),
-    title: sr.title || (cv && cv.name) || 'Comic',
+    title: sr.title || (cv && cv.name) || PLACEHOLDER_TITLE,
     cover_url: sr.cover_url,
     publisher: sr.publisher,
     issue_count: cv ? cv.issue_count : (det.issues ? det.issues.length : 0),
@@ -312,8 +317,8 @@ export async function downloadCvIssues(cvIssueIds) {
   if (!ids.length || !detail.series) return;
   try {
     const r = await apiPost(`/api/collection/${detail.series.id}/download`, { cvIssueIds: ids });
-    if (r?.error) return notify('Download failed to queue: ' + r.error, 'error');
-  } catch { return notify('Download failed to queue — is the app reachable?', 'error'); }
+    if (r?.error) return notify(t('store.downloadFailed', { error: r.error }), 'error');
+  } catch { return notify(t('store.downloadFailedUnreachable'), 'error'); }
   refreshIssueStatuses();
 }
 
@@ -324,8 +329,8 @@ export async function redownloadCvIssues(cvIssueIds) {
   if (!ids.length || !detail.series) return;
   try {
     const r = await apiPost(`/api/collection/${detail.series.id}/redownload`, { cvIssueIds: ids });
-    if (r?.error) return notify('Re-download failed: ' + r.error, 'error');
-  } catch { return notify('Re-download failed — is the app reachable?', 'error'); }
+    if (r?.error) return notify(t('store.redownloadFailed', { error: r.error }), 'error');
+  } catch { return notify(t('store.redownloadFailedUnreachable'), 'error'); }
   reloadDetail(); // full re-render (owned→queued transition)
 }
 
@@ -335,7 +340,7 @@ export async function redownloadIssues(issueIds) {
   if (!issueIds.length) return;
   try {
     const r = await apiPost('/api/redownload', { issueIds });
-    if (r?.error) return notify('Re-download failed: ' + r.error, 'error');
-  } catch { return notify('Re-download failed — is the app reachable?', 'error'); }
+    if (r?.error) return notify(t('store.redownloadFailed', { error: r.error }), 'error');
+  } catch { return notify(t('store.redownloadFailedUnreachable'), 'error'); }
   refreshIssueStatuses();
 }
