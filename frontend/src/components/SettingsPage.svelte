@@ -8,9 +8,13 @@
   import { openIndexerModal, testIndexer } from './IndexerModal.svelte';
   import { confirmDialog } from './DialogModal.svelte';
   import { notify } from '../lib/toasts.svelte.js';
+  import { t, th, hasMessage } from '../lib/i18n.svelte.js';
   import Icon from '../lib/Icon.svelte';
   import { hscroll } from '../lib/hscroll.js';
 
+  // A label a plugin or source card sends may be a catalog key ('myplugin.apiKey')
+  // or a plain string; show the translation when there is one.
+  const lbl = (x) => (typeof x === 'string' && hasMessage(x) ? t(x) : x);
   let { active = false } = $props();
 
   const DEFAULT_PORTS = { sabnzbd: '8080', nzbget: '6789' };
@@ -19,16 +23,16 @@
   // "Split detail" settings: a top tab rail shows ONE page at a time. Every
   // page stays MOUNTED (CSS-hidden, never {#if}-removed) — the generic set-*
   // form scan reads hidden fields fine, and plugin-injected DOM must survive
-  // tab switches.
+  // tab switches. `label` is a catalog key, resolved where rendered.
   const TABS = [
-    { id: 'overview', label: 'Overview', icon: 'bar-chart' },
-    { id: 'library', label: 'Library', icon: 'library' },
-    { id: 'downloading', label: 'Downloading', icon: 'download' },
-    { id: 'sources', label: 'Sources', icon: 'target' },
-    { id: 'metadata', label: 'Metadata', icon: 'tag' },
-    { id: 'plugins', label: 'Plugins', icon: 'puzzle' }, // hidden until a plugin mounts a panel
-    { id: 'signin', label: 'Sign-in', icon: 'shield' },
-    { id: 'notifications', label: 'Notifications', icon: 'bell' },
+    { id: 'overview', label: 'settingsPage.tabOverview', icon: 'bar-chart' },
+    { id: 'library', label: 'settingsPage.tabLibrary', icon: 'library' },
+    { id: 'downloading', label: 'settingsPage.tabDownloading', icon: 'download' },
+    { id: 'sources', label: 'settingsPage.tabSources', icon: 'target' },
+    { id: 'metadata', label: 'settingsPage.tabMetadata', icon: 'tag' },
+    { id: 'plugins', label: 'settingsPage.tabPlugins', icon: 'puzzle' }, // hidden until a plugin mounts a panel
+    { id: 'signin', label: 'settingsPage.tabSignin', icon: 'shield' },
+    { id: 'notifications', label: 'settingsPage.tabNotifications', icon: 'bell' },
   ];
   let activeTab = $state('overview');
   let libPanel = $state('libraries');   // libraries | org | maint
@@ -48,12 +52,12 @@
   let kitOn = $state({});
   let kitTests = $state({});
   const kitNote = (text) => {
-    const t = String(text || '').replace(/\s+/g, ' ').trim();
-    const one = (t.match(/^[^.!?]*[.!?]/)?.[0] || t).trim();
-    return one.length > 90 ? one.slice(0, 89).replace(/\s+\S*$/, '') + '…' : (one || 'Download source');
+    const s = String(text || '').replace(/\s+/g, ' ').trim();
+    const one = (s.match(/^[^.!?]*[.!?]/)?.[0] || s).trim();
+    return one.length > 90 ? one.slice(0, 89).replace(/\s+\S*$/, '') + '…' : (one || t('settingsPage.downloadSource'));
   };
   async function testKitSource(c) {
-    kitTests[c.id] = { cls: 'is-testing', text: 'Testing…' };
+    kitTests[c.id] = { cls: 'is-testing', text: t('settingsPage.testing') };
     const body = { [c.id + 'Enabled']: !!root.querySelector('#set-' + c.id + 'Enabled')?.checked };
     for (const f of c.fields) {
       const el = root.querySelector('#set-' + f.key);
@@ -85,42 +89,42 @@
   // sidebar). CRUD applies immediately — not part of the settings Save cycle.
   let libs = $state([]);
   let newLib = $state({ name: '', type: 'comic', rootFolder: '' });
-  let LIB_TYPES = $state([['comic', 'Comics'], ['manga', 'Manga']]);
+  let LIB_TYPES = $state([['comic', t('settingsPage.libTypeComics')], ['manga', t('settingsPage.libTypeManga')]]);
   const parseRoots = (text) => String(text || '').split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
   const withFolders = (l) => ({ ...l, folders: parseRoots(l.root_folder).length ? parseRoots(l.root_folder) : [''] });
   async function loadLibs() {
     try {
       const r = await apiGet('/api/libraries');
       libs = (r.libraries || []).map(withFolders);
-      if (Array.isArray(r.types) && r.types.length) LIB_TYPES = r.types.map((t) => [t.id, t.label]);
-    } catch { notify('Could not load your libraries — the list below may be out of date.', 'error'); }
+      if (Array.isArray(r.types) && r.types.length) LIB_TYPES = r.types.map((x) => [x.id, x.label]);
+    } catch { notify(t('settingsPage.librariesLoadFailed'), 'error'); }
   }
   $effect(() => { if (active) loadLibs(); });
   async function addLib() {
-    if (!newLib.name.trim()) return notify('Give the library a name.', 'error');
+    if (!newLib.name.trim()) return notify(t('settingsPage.libraryNeedsName'), 'error');
     const r = await apiPost('/api/libraries', { name: newLib.name.trim(), type: newLib.type, rootFolder: newLib.rootFolder.trim() || null });
     if (r.error) return notify(r.error, 'error');
     libs = r.libraries.map(withFolders); newLib = { name: '', type: 'comic', rootFolder: '' };
-    notify('Library created — it now shows in the sidebar.', 'ok');
+    notify(t('settingsPage.libraryCreated'), 'ok');
   }
   async function saveLib(l) {
     const rootFolder = (l.folders || []).map((s) => s.trim()).filter(Boolean).join('\n');
     const r = await apiPost('/api/libraries/' + l.id, { name: l.name, type: l.type, rootFolder: rootFolder || null, folderPattern: l.folder_pattern || null, restricted: !!l.restricted, tagPlacement: l.tag_placement || null });
     if (r.error) return notify(r.error, 'error');
-    libs = r.libraries.map(withFolders); notify('Library updated.', 'ok');
+    libs = r.libraries.map(withFolders); notify(t('settingsPage.libraryUpdated'), 'ok');
   }
   const libAddFolder = (l) => { l.folders = [...l.folders, '']; };
   const libRemoveFolder = (l, i) => { l.folders = l.folders.filter((_, k) => k !== i); if (!l.folders.length) l.folders = ['']; saveLib(l); };
   const libMakeDefault = (l, i) => { if (i <= 0) return; const next = [...l.folders]; const [f] = next.splice(i, 1); l.folders = [f, ...next]; saveLib(l); };
   async function removeLib(l) {
     if (!(await confirmDialog({
-      title: `Delete “${l.name}”?`,
-      message: `Its ${l.series_count} series stay in your collection (moved to another library) — nothing is deleted from disk.`,
-      confirmLabel: 'Delete library', danger: true,
+      title: t('settingsPage.deleteLibraryTitle', { name: l.name }),
+      message: t('settingsPage.deleteLibraryMessage', { count: l.series_count }),
+      confirmLabel: t('settingsPage.deleteLibraryConfirm'), danger: true,
     }))) return;
     const r = await apiDelete('/api/libraries/' + l.id);
     if (r.error) return notify(r.error, 'error');
-    libs = r.libraries.map(withFolders); notify('Library deleted — series kept.', 'ok');
+    libs = r.libraries.map(withFolders); notify(t('settingsPage.libraryDeleted'), 'ok');
   }
 
   // Source priority (order enabled sources are tried), from /api/sources.
@@ -182,6 +186,7 @@
   function toggleMeta(p, on) { p.enabled = on; touchMeta(); refreshOverview(); }
   const testProvider = (p) => runTest(`prov-${p.id}`, '/api/metadata/providers/test',
     () => ({ provider: p.id, values: Object.fromEntries(p.fields.map((f) => [f.key, v('#set-' + f.key)])) }));
+  const providerTestLabel = (p) => !p.fields.length ? t('settingsPage.testSource') : p.fields.length === 1 ? t('settingsPage.testKey') : t('settingsPage.testSignIn');
 
   function syncSourceUI() {
     if (!root) return;
@@ -228,8 +233,8 @@
     // The rail note is the description's first sentence — whole words, never a
     // hard cut mid-word (a 48-character slice used to end in "hubs via t").
     const firstSentence = (text) => {
-      const t = String(text || '').replace(/\s+/g, ' ').trim();
-      const one = (t.match(/^[^.!?]*[.!?]/)?.[0] || t).trim();
+      const s = String(text || '').replace(/\s+/g, ' ').trim();
+      const one = (s.match(/^[^.!?]*[.!?]/)?.[0] || s).trim();
       return one.length > 90 ? one.slice(0, 89).replace(/\s+\S*$/, '') + '…' : one;
     };
     [...mount.querySelectorAll(':scope > .src-block')].forEach((block, i) => {
@@ -312,41 +317,45 @@
     const metaBad = metaOn.filter((p) => !p.configured);
     const libFolders = libs.filter((l) => (l.folders || []).some((f) => f.trim())).length;
     const totalSeries = libs.reduce((n, l) => n + (l.series_count || 0), 0);
-    const tone = (t) => t; // green | amber | red
+    const tone = (x) => x; // green | amber | red
     overview.cards = [
-      { id: 'sources', tab: 'sources', icon: 'target', label: 'Sources',
-        value: `${enabledSourceCount} enabled`, note: enabledSourceCount >= 2 ? 'Fallback order applies' : enabledSourceCount === 1 ? 'No fallback if it misses' : 'Nothing can download',
+      { id: 'sources', tab: 'sources', icon: 'target', label: t('settingsPage.ovSources'),
+        value: t('settingsPage.ovEnabledCount', { count: enabledSourceCount }),
+        note: enabledSourceCount >= 2 ? t('settingsPage.ovFallbackApplies') : enabledSourceCount === 1 ? t('settingsPage.ovNoFallback') : t('settingsPage.ovNothingDownloads'),
         tone: tone(enabledSourceCount >= 2 ? 'green' : enabledSourceCount === 1 ? 'amber' : 'red') },
-      { id: 'comicvine', tab: 'metadata', icon: 'tag', label: 'Metadata',
-        value: metaOn.length >= 2 ? `${metaOn.length} sources` : metaOn[0] && metaOn[0].id !== 'hosted' ? providerName(metaOn[0]) : 'Built-in service',
-        note: metaBad.length ? `${providerName(metaBad[0])} is not set up`
-          : metaOn.length >= 2 ? 'Searches merge, best first'
-          : metaOn[0] && metaOn[0].id !== 'hosted' ? 'Direct lookups with your own key or account'
-          : 'Cached + enriched, no setup needed',
+      { id: 'comicvine', tab: 'metadata', icon: 'tag', label: t('settingsPage.ovMetadata'),
+        value: metaOn.length >= 2 ? t('settingsPage.ovSourcesCount', { count: metaOn.length }) : metaOn[0] && metaOn[0].id !== 'hosted' ? providerName(metaOn[0]) : t('settingsPage.ovBuiltIn'),
+        note: metaBad.length ? t('settingsPage.ovNotSetUp', { name: providerName(metaBad[0]) })
+          : metaOn.length >= 2 ? t('settingsPage.ovMerge')
+          : metaOn[0] && metaOn[0].id !== 'hosted' ? t('settingsPage.ovDirect')
+          : t('settingsPage.ovCached'),
         tone: tone(metaBad.length ? 'red' : 'green') },
-      { id: 'libraries', tab: 'library', icon: 'library', label: 'Libraries',
-        value: `${libs.length} librar${libs.length === 1 ? 'y' : 'ies'}`, note: `${totalSeries} series in the collection`,
+      { id: 'libraries', tab: 'library', icon: 'library', label: t('settingsPage.ovLibraries'),
+        value: t('settingsPage.ovLibrariesCount', { count: libs.length }), note: t('settingsPage.ovSeriesCount', { count: totalSeries }),
         tone: tone(libs.length ? 'green' : 'amber') },
-      { id: 'storage', tab: 'library', icon: 'book', label: 'Storage',
-        value: libFolders ? `${libFolders} with folders` : 'No folders set', note: libFolders ? 'Downloads file into library folders' : 'Set a folder on a library',
+      { id: 'storage', tab: 'library', icon: 'book', label: t('settingsPage.ovStorage'),
+        value: libFolders ? t('settingsPage.ovWithFolders', { count: libFolders }) : t('settingsPage.ovNoFolders'),
+        note: libFolders ? t('settingsPage.ovFilesInto') : t('settingsPage.ovSetFolder'),
         tone: tone(libFolders ? 'green' : 'amber') },
-      { id: 'downloading', tab: 'downloading', icon: 'download', label: 'Downloading',
-        value: `${s.downloadConcurrency || 4} at once`, note: `Format: ${(s.format || 'cbz').toUpperCase()}${s.autoDownloadOnAdd ? ' · downloads on add' : ''}`,
+      { id: 'downloading', tab: 'downloading', icon: 'download', label: t('settingsPage.ovDownloading'),
+        value: t('settingsPage.ovAtOnce', { count: s.downloadConcurrency || 4 }),
+        note: t('settingsPage.ovFormat', { format: (s.format || 'cbz').toUpperCase() }) + (s.autoDownloadOnAdd ? t('settingsPage.ovDownloadsOnAdd') : ''),
         tone: 'green' },
-      { id: 'notifications', tab: 'notifications', icon: 'bell', label: 'Notifications',
-        value: notifyChannels ? `${notifyChannels} channel${notifyChannels > 1 ? 's' : ''}` : 'None installed', note: notifyChannels ? 'Outbound alerts configured' : 'In-app bell only',
+      { id: 'notifications', tab: 'notifications', icon: 'bell', label: t('settingsPage.ovNotifications'),
+        value: notifyChannels ? t('settingsPage.ovChannels', { count: notifyChannels }) : t('settingsPage.ovNoneInstalled'),
+        note: notifyChannels ? t('settingsPage.ovOutbound') : t('settingsPage.ovBellOnly'),
         tone: tone(notifyChannels ? 'green' : 'amber') },
     ];
     const attention = [];
-    for (const p of metaBad) attention.push({ tone: 'red', title: `${providerName(p)} is not set up`, body: `It is turned on as a metadata source, but until its key or sign-in details are entered it is skipped${metaOn.length >= 2 ? ' and the other sources answer' : ' and the built-in service answers'}.`, action: 'Set up', tab: 'metadata' });
-    if (enabledSourceCount === 0) attention.push({ tone: 'red', title: 'No download sources enabled', body: 'New comics can’t be downloaded until a source is turned on.', action: 'Enable', tab: 'sources' });
-    else if (enabledSourceCount === 1) attention.push({ tone: 'amber', title: 'Only one download source enabled', body: 'A second source gives searches a fallback when the first misses.', action: 'Review', tab: 'sources' });
-    if (libs.length && !libFolders) attention.push({ tone: 'amber', title: 'No library has a folder', body: 'Downloads fall back to the downloads folder until a library gets one.', action: 'Set folder', tab: 'library' });
+    for (const p of metaBad) attention.push({ tone: 'red', title: t('settingsPage.ovNotSetUp', { name: providerName(p) }), body: t(metaOn.length >= 2 ? 'settingsPage.attnProviderBodyOthers' : 'settingsPage.attnProviderBody'), action: t('settingsPage.attnSetUp'), tab: 'metadata' });
+    if (enabledSourceCount === 0) attention.push({ tone: 'red', title: t('settingsPage.attnNoSourcesTitle'), body: t('settingsPage.attnNoSourcesBody'), action: t('settingsPage.attnEnable'), tab: 'sources' });
+    else if (enabledSourceCount === 1) attention.push({ tone: 'amber', title: t('settingsPage.attnOneSourceTitle'), body: t('settingsPage.attnOneSourceBody'), action: t('settingsPage.attnReview'), tab: 'sources' });
+    if (libs.length && !libFolders) attention.push({ tone: 'amber', title: t('settingsPage.attnNoFolderTitle'), body: t('settingsPage.attnNoFolderBody'), action: t('settingsPage.attnSetFolder'), tab: 'library' });
     // A populated library without its own folder files into another library's
     // root — worth surfacing per library (e.g. the auto-created Manga library).
     for (const l of libs) {
       if (l.series_count > 0 && !(l.folders || []).some((f) => f.trim()) && libFolders) {
-        attention.push({ tone: 'amber', title: `The ${l.name} library has no folder`, body: 'Its downloads file into the first library that has one — set a folder to keep them separate.', action: 'Set folder', tab: 'library' });
+        attention.push({ tone: 'amber', title: t('settingsPage.attnLibNoFolderTitle', { name: l.name }), body: t('settingsPage.attnLibNoFolderBody'), action: t('settingsPage.attnSetFolder'), tab: 'library' });
       }
     }
     overview.attention = attention;
@@ -392,7 +401,7 @@
   $effect(() => {
     if (!active) return;
     const want = new URLSearchParams(route.search).get('tab');
-    if (want && TABS.some((t) => t.id === want)) untrack(() => pickTab(want));
+    if (want && TABS.some((tb) => tb.id === want)) untrack(() => pickTab(want));
   });
 
   // Load when opened — and again when plugin assets finish loading. Never
@@ -410,9 +419,9 @@
     if (!dirty) return;
     (async () => {
       const discard = await confirmDialog({
-        title: 'Discard unsaved changes?',
-        message: 'You edited settings but didn’t save them.',
-        confirmLabel: 'Discard changes', danger: true,
+        title: t('settingsPage.discardTitle'),
+        message: t('settingsPage.discardMessage'),
+        confirmLabel: t('settingsPage.discardConfirm'), danger: true,
       });
       if (discard) dirty = false;
       else navigate('/settings'); // page never unmounted — edits still there
@@ -426,21 +435,21 @@
   async function save() {
     let r;
     try { r = await apiPost('/api/settings', collectSettingsFromForm()); }
-    catch { return notify('Save failed — is the app reachable?', 'error'); }
-    if (r?.error) return notify('Save failed: ' + r.error, 'error');
+    catch { return notify(t('settingsPage.saveFailedUnreachable'), 'error'); }
+    if (r?.error) return notify(t('settingsPage.saveFailed', { error: r.error }), 'error');
     flags.usenetEnabled = !!root.querySelector('#set-usenetEnabled')?.checked;
     flags.torrentEnabled = !!root.querySelector('#set-torrentEnabled')?.checked;
     loadedSettings = { ...loadedSettings, ...collectSettingsFromForm() };
     dirty = false;
     dirtySections = new Set();
     refreshOverview();
-    notify('Settings saved.', 'ok');
+    notify(t('settingsPage.saved'), 'ok');
   }
   async function discardEdits() {
     dirty = false;
     dirtySections = new Set();
     await openSettings();
-    notify('Changes discarded.', 'info');
+    notify(t('settingsPage.discarded'), 'info');
   }
 
   /* ---- Indexer rows ---- */
@@ -451,15 +460,15 @@
     dirty = true;
   }
   async function testRow(ix, mode) {
-    ix._st = { cls: 'is-testing', text: 'Testing…', title: '' };
+    ix._st = { cls: 'is-testing', text: t('settingsPage.testing'), title: '' };
     const r = await testIndexer(ix, MODE_ENDPOINTS[mode]);
-    ix._st = { cls: r.ok ? 'is-ok' : 'is-bad', icon: r.ok ? 'check' : 'close', text: r.ok ? 'OK' : 'Failed', title: r.message };
+    ix._st = { cls: r.ok ? 'is-ok' : 'is-bad', icon: r.ok ? 'check' : 'close', text: r.ok ? t('settingsPage.testOk') : t('settingsPage.testFailed'), title: r.message };
   }
 
   /* ---- Connection tests (download clients + CV keys) ---- */
   let tests = $state({ client: null, qb: null, cv: null, meta: null });
   async function runTest(key, endpoint, collect) {
-    tests[key] = { cls: 'is-testing', text: 'Testing…' };
+    tests[key] = { cls: 'is-testing', text: t('settingsPage.testing') };
     let r;
     try { r = await apiPost(endpoint, collect()); }
     catch (e) { r = { ok: false, message: String(e) }; }
@@ -520,15 +529,15 @@
 
 {#snippet indexerRows(mode, list)}
   {#if !list.length}
-    <p class="indexer-empty">No indexers yet.</p>
+    <p class="indexer-empty">{t('settingsPage.noIndexers')}</p>
   {/if}
   {#each list as ix, i (i)}
     <div class="indexer-row">
       <div class="indexer-row__info"><b>{ix.name}</b><span>{ix.url}</span></div>
       <span class="indexer-row__status {ix._st?.cls || ''}" title={ix._st?.title || ''}>{#if ix._st?.icon}<Icon name={ix._st.icon} /> {/if}{ix._st?.text || ''}</span>
-      <button class="link-btn" type="button" onclick={() => testRow(ix, mode)}>Test</button>
-      <button class="link-btn" type="button" onclick={() => openIndexerModal(i, mode, ix, saveIndexer)}>Edit</button>
-      <button class="indexer-row__x" type="button" title="Remove" onclick={() => { list.splice(i, 1); dirty = true; }}><Icon name="close" /></button>
+      <button class="link-btn" type="button" onclick={() => testRow(ix, mode)}>{t('settingsPage.test')}</button>
+      <button class="link-btn" type="button" onclick={() => openIndexerModal(i, mode, ix, saveIndexer)}>{t('common.edit')}</button>
+      <button class="indexer-row__x" type="button" title={t('common.remove')} onclick={() => { list.splice(i, 1); dirty = true; }}><Icon name="close" /></button>
     </div>
   {/each}
 {/snippet}
@@ -552,22 +561,22 @@
 <main id="settings-page" class="scan-page settings-page setx-shell" bind:this={root} oninput={markDirty} onchange={markDirty}>
   <!-- Header bar -->
   <div class="setx-head">
-    <button id="settings-back" class="btn btn--ghost btn--sm" onclick={goBack}><Icon name="arrow-left" /> Back</button>
-    <h2 class="setx-head__title">Settings</h2>
+    <button id="settings-back" class="btn btn--ghost btn--sm" onclick={goBack}><Icon name="arrow-left" /> {t('common.back')}</button>
+    <h2 class="setx-head__title">{t('common.settings')}</h2>
     <label class="setx-search">
       <Icon name="search" size={14} />
-      <input type="text" placeholder="Search settings…" autocomplete="off" spellcheck="false" bind:value={filterQuery} oninput={applyFilter} />
+      <input type="text" placeholder={t('settingsPage.searchPlaceholder')} autocomplete="off" spellcheck="false" bind:value={filterQuery} oninput={applyFilter} />
     </label>
-    <button class="btn btn--ghost btn--sm setx-head__wizard" title="Walk through the first-run setup again (keys, folders, sources)" onclick={() => navigate('/?onboarding=1')}>Setup wizard</button>
-    <button id="settings-save" class="btn btn--primary" onclick={save}>Save</button>
+    <button class="btn btn--ghost btn--sm setx-head__wizard" title={t('settingsPage.wizardTitle')} onclick={() => navigate('/?onboarding=1')}>{t('settingsPage.setupWizard')}</button>
+    <button id="settings-save" class="btn btn--primary" onclick={save}>{t('common.save')}</button>
   </div>
 
   <!-- Tab rail -->
-  <nav class="setx-tabs" aria-label="Settings pages" use:hscroll>
-    {#each TABS.filter((t) => t.id !== 'plugins' || pluginPanels.length) as t (t.id)}
-      <button type="button" class="setx-tab" class:is-active={activeTab === t.id} onclick={() => pickTab(t.id)}>
-        <Icon name={t.icon} size={14} /> {t.label}
-        {#if tabDot(t.id)}<span class="setx-tab__dot {tabDot(t.id)}"></span>{/if}
+  <nav class="setx-tabs" aria-label={t('settingsPage.tabsLabel')} use:hscroll>
+    {#each TABS.filter((tb) => tb.id !== 'plugins' || pluginPanels.length) as tb (tb.id)}
+      <button type="button" class="setx-tab" class:is-active={activeTab === tb.id} onclick={() => pickTab(tb.id)}>
+        <Icon name={tb.icon} size={14} /> {t(tb.label)}
+        {#if tabDot(tb.id)}<span class="setx-tab__dot {tabDot(tb.id)}"></span>{/if}
       </button>
     {/each}
   </nav>
@@ -575,25 +584,25 @@
   <div class="setx-body">
     <!-- OVERVIEW -->
     <div class="setx-page setx-page--narrow" data-tab="overview" class:is-active={activeTab === 'overview'}>
-      <p class="setx-intro">How BackIssue is configured at a glance — click a card to jump to its page.</p>
+      <p class="setx-intro">{t('settingsPage.ovIntro')}</p>
       <div class="setx-cards">
         {#each overview.cards as c (c.id)}
           <button type="button" class="setx-scard setx-scard--{c.tone}" onclick={() => pickTab(c.tab)}>
             <span class="setx-scard__top">
               <span class="setx-scard__chip"><Icon name={c.icon} size={15} /></span>
-              <span class="setx-scard__label">{c.label}</span>
+              <span class="setx-scard__label">{lbl(c.label)}</span>
               <span class="setx-dot setx-dot--{c.tone}"></span>
             </span>
             <span class="setx-scard__value">{c.value}</span>
-            <span class="setx-scard__note">{c.note}</span>
+            <span class="setx-scard__note">{lbl(c.note)}</span>
           </button>
         {/each}
       </div>
       <div class="setx-card setx-attention">
-        <h3 class="setx-card__head">Needs attention</h3>
+        <h3 class="setx-card__head">{t('settingsPage.needsAttention')}</h3>
         {#if !overview.attention.length}
           <div class="setx-attn"><span class="setx-attn__icon setx-attn__icon--green"><Icon name="check" size={15} /></span>
-            <span class="setx-attn__text"><b>All good</b><span>Nothing needs attention right now.</span></span></div>
+            <span class="setx-attn__text"><b>{t('settingsPage.allGood')}</b><span>{t('settingsPage.allGoodBody')}</span></span></div>
         {/if}
         {#each overview.attention as a (a.title)}
           <div class="setx-attn">
@@ -609,94 +618,94 @@
     <div class="setx-page" data-tab="library" class:is-active={activeTab === 'library'}>
       <div class="setx-split" class:is-drilled={libDrill}>
         <div class="setx-rail">
-          {@render railItem('lib', 'libraries', 'library', 'Libraries', `${libs.length} librar${libs.length === 1 ? 'y' : 'ies'}`, libs.length ? 'green' : 'amber')}
-          {@render railItem('lib', 'org', 'book', 'File organization', 'Naming patterns', 'green')}
-          {@render railItem('lib', 'maint', 'tag', 'Maintenance', 'Fallbacks & workers', 'green')}
+          {@render railItem('lib', 'libraries', 'library', t('settingsPage.railLibraries'), t('settingsPage.ovLibrariesCount', { count: libs.length }), libs.length ? 'green' : 'amber')}
+          {@render railItem('lib', 'org', 'book', t('settingsPage.railOrg'), t('settingsPage.railOrgNote'), 'green')}
+          {@render railItem('lib', 'maint', 'tag', t('settingsPage.railMaint'), t('settingsPage.railMaintNote'), 'green')}
         </div>
         <div class="setx-detail">
-          <button type="button" class="setx-backlink" onclick={() => { libDrill = false; }}><Icon name="arrow-left" size={14} /> Library</button>
+          <button type="button" class="setx-backlink" onclick={() => { libDrill = false; }}><Icon name="arrow-left" size={14} /> {t('settingsPage.backLibrary')}</button>
 
           <div class="setx-panel" class:is-active={libPanel === 'libraries'}>
-            <h3 class="setx-panel__title">Libraries</h3>
-            <p class="setx-panel__sub">Split the collection into named libraries — each shows as its own entry in the sidebar. A library's <b>type</b> sets how its series behave (manga = chapter-style search, right-to-left reading); its folders are where its comics are filed and scanned. Move series from a volume's ⋯ menu.</p>
+            <h3 class="setx-panel__title">{t('settingsPage.librariesTitle')}</h3>
+            <p class="setx-panel__sub">{@html th('settingsPage.librariesSub')}</p>
             {#each libs as l (l.id)}
               <div class="libcard">
                 <div class="libcard__head">
                   <span class="libcard__icon"><Icon name="book" /></span>
-                  <input class="libcard__name" type="text" spellcheck="false" bind:value={l.name} onchange={() => saveLib(l)} title="Library name" />
-                  <select bind:value={l.type} onchange={() => saveLib(l)} title="Library type — sets how its series behave">
+                  <input class="libcard__name" type="text" spellcheck="false" bind:value={l.name} onchange={() => saveLib(l)} title={t('settingsPage.libraryName')} />
+                  <select bind:value={l.type} onchange={() => saveLib(l)} title={t('settingsPage.libraryTypeTitle')}>
                     {#each LIB_TYPES as [tv, label] (tv)}<option value={tv}>{label}</option>{/each}
                   </select>
-                  <label class="field field--check libcard__mature" title="Hide this library (and everything in it) from roles without the “View mature content” permission">
-                    <input type="checkbox" checked={!!l.restricted} onchange={(e) => { l.restricted = e.currentTarget.checked ? 1 : 0; saveLib(l); }} /><span>Mature</span></label>
-                  <span class="scan-muted libcard__count">{l.series_count} series</span>
-                  <button class="rootrow__x" type="button" title="Delete this library (series are kept)" aria-label="Delete library" onclick={() => removeLib(l)}><Icon name="trash" size={15} /></button>
+                  <label class="field field--check libcard__mature" title={t('settingsPage.matureTitle')}>
+                    <input type="checkbox" checked={!!l.restricted} onchange={(e) => { l.restricted = e.currentTarget.checked ? 1 : 0; saveLib(l); }} /><span>{t('settingsPage.mature')}</span></label>
+                  <span class="scan-muted libcard__count">{t('settingsPage.seriesCount', { count: l.series_count })}</span>
+                  <button class="rootrow__x" type="button" title={t('settingsPage.deleteLibraryBtnTitle')} aria-label={t('settingsPage.deleteLibrary')} onclick={() => removeLib(l)}><Icon name="trash" size={15} /></button>
                 </div>
                 <div class="rootlist">
                   {#each l.folders as _f, i (i)}
                     <div class="rootrow">
                       <input class="rootrow__path" type="text" spellcheck="false" bind:value={l.folders[i]} onchange={() => saveLib(l)}
-                        placeholder={i === 0 ? 'D:\\Comics   or   \\\\NAS\\comics' : 'another folder to scan…'} />
+                        placeholder={i === 0 ? 'D:\\Comics   or   \\\\NAS\\comics' : t('settingsPage.anotherFolder')} />
                       {#if i === 0}
-                        <span class="rootrow__badge" title="New comics for this library are filed here">Default</span>
+                        <span class="rootrow__badge" title={t('settingsPage.defaultTitle')}>{t('settingsPage.defaultBadge')}</span>
                       {:else}
-                        <button class="link-btn rootrow__def" type="button" onclick={() => libMakeDefault(l, i)} title="Make this the default folder for new comics">Make default</button>
+                        <button class="link-btn rootrow__def" type="button" onclick={() => libMakeDefault(l, i)} title={t('settingsPage.makeDefaultTitle')}>{t('settingsPage.makeDefault')}</button>
                       {/if}
                       {#if l.folders.length > 1}
-                        <button class="rootrow__x" type="button" title="Remove this folder (files stay on disk)" aria-label="Remove folder" onclick={() => libRemoveFolder(l, i)}><Icon name="close" size={15} /></button>
+                        <button class="rootrow__x" type="button" title={t('settingsPage.removeFolderTitle')} aria-label={t('settingsPage.removeFolder')} onclick={() => libRemoveFolder(l, i)}><Icon name="close" size={15} /></button>
                       {/if}
                     </div>
                   {/each}
-                  <button class="link-btn rootlist__add" type="button" onclick={() => libAddFolder(l)}><Icon name="plus" size={14} /> Add folder</button>
+                  <button class="link-btn rootlist__add" type="button" onclick={() => libAddFolder(l)}><Icon name="plus" size={14} /> {t('settingsPage.addFolder')}</button>
                 </div>
                 <div class="libcard__extras">
-                  <label class="field"><span>Folder pattern</span>
-                    <input type="text" spellcheck="false" placeholder="blank = global pattern" bind:value={l.folder_pattern} onchange={() => saveLib(l)} title="Per-library folder pattern, e.g. {'{series}'} for a tree without publisher folders" /></label>
-                  <label class="field"><span>Tag placement</span>
-                    <select bind:value={l.tag_placement} onchange={() => saveLib(l)} title="Sidecar writes metadata to a .xml next to each archive and never modifies the file — keeps it byte-identical for seeding and share hashing">
-                      <option value={null}>Global setting</option>
-                      <option value="embed">Embedded (inside the archive)</option>
-                      <option value="sidecar">Sidecar (.xml next to the file)</option>
+                  <label class="field"><span>{t('settingsPage.folderPattern')}</span>
+                    <input type="text" spellcheck="false" placeholder={t('settingsPage.folderPatternPlaceholder')} bind:value={l.folder_pattern} onchange={() => saveLib(l)} title={t('settingsPage.libFolderPatternTitle')} /></label>
+                  <label class="field"><span>{t('settingsPage.tagPlacement')}</span>
+                    <select bind:value={l.tag_placement} onchange={() => saveLib(l)} title={t('settingsPage.tagPlacementTitle')}>
+                      <option value={null}>{t('settingsPage.tagGlobal')}</option>
+                      <option value="embed">{t('settingsPage.tagEmbed')}</option>
+                      <option value="sidecar">{t('settingsPage.tagSidecar')}</option>
                     </select></label>
                 </div>
               </div>
             {/each}
             <div class="rootrow libcard__new">
-              <input class="rootrow__path" style="max-width:200px" type="text" spellcheck="false" placeholder="New library name…" bind:value={newLib.name} onkeydown={(e) => { if (e.key === 'Enter') addLib(); }} />
+              <input class="rootrow__path" style="max-width:200px" type="text" spellcheck="false" placeholder={t('settingsPage.newLibraryPlaceholder')} bind:value={newLib.name} onkeydown={(e) => { if (e.key === 'Enter') addLib(); }} />
               <select bind:value={newLib.type}>
                 {#each LIB_TYPES as [tv, label] (tv)}<option value={tv}>{label}</option>{/each}
               </select>
-              <button class="btn btn--ghost btn--sm" type="button" onclick={addLib}><Icon name="plus" size={14} /> Create library</button>
+              <button class="btn btn--ghost btn--sm" type="button" onclick={addLib}><Icon name="plus" size={14} /> {t('settingsPage.createLibrary')}</button>
             </div>
             <!-- Plugin library-behavior settings inject here (plain DOM — stays mounted). -->
             <div id="settings-plugin-library"></div>
           </div>
 
           <div class="setx-panel" class:is-active={libPanel === 'org'}>
-            <h3 class="setx-panel__title">File organization</h3>
-            <p class="setx-panel__sub">How downloaded comics are named and filed.</p>
+            <h3 class="setx-panel__title">{t('settingsPage.orgTitle')}</h3>
+            <p class="setx-panel__sub">{t('settingsPage.orgSub')}</p>
             <div class="setx-card">
-              <label class="field"><span>Folder pattern</span><input id="set-folderPattern" class="mono" type="text" spellcheck="false" placeholder={'{publisher}/{series} ({year})'} oninput={previewNaming} /></label>
-              <label class="field"><span>File pattern</span><input id="set-filePattern" class="mono" type="text" spellcheck="false" placeholder={'{series} V{year} #{issue}'} oninput={previewNaming} /></label>
+              <label class="field"><span>{t('settingsPage.folderPattern')}</span><input id="set-folderPattern" class="mono" type="text" spellcheck="false" placeholder={'{publisher}/{series} ({year})'} oninput={previewNaming} /></label>
+              <label class="field"><span>{t('settingsPage.filePattern')}</span><input id="set-filePattern" class="mono" type="text" spellcheck="false" placeholder={'{series} V{year} #{issue}'} oninput={previewNaming} /></label>
               {#if namingPreview}<p class="setx-preview mono">{namingPreview}</p>{/if}
               <label class="field field--check">
                 <span class="switch"><input id="set-renameDownloads" type="checkbox" /><span class="switch__track"></span></span>
-                <span>Rename downloaded files to the file pattern (off = keep the source's original filename)</span>
+                <span>{t('settingsPage.renameDownloads')}</span>
               </label>
-              <p class="modal__note">Tokens: <code>{'{publisher}'}</code> <code>{'{series}'}</code> <code>{'{year}'}</code> <code>{'{issue}'}</code> (<code>{'{issue:2}'}</code> sets the pad width) <code>{'{issueTitle}'}</code> <code>{'{date}'}</code> <code>{'{edition}'}</code>.</p>
-              <p class="modal__note"><code>{'{date}'}</code> is the cover date — <i>November 2011</i>. For the parts on their own: <code>{'{date:m}'}</code> <i>11</i>, <code>{'{date:y}'}</code> <i>2011</i>, <code>{'{date:mon}'}</code> <i>Nov</i>. So <code>{'({date:m}-{date:y})'}</code> gives <i>(11-2011)</i>.</p>
-              <p class="modal__note">Changing these affects <b>new</b> downloads — for existing files use <b>Reorganize library</b> on the Tools page.</p>
+              <p class="modal__note">{@html th('settingsPage.tokensNote')}</p>
+              <p class="modal__note">{@html th('settingsPage.dateNote')}</p>
+              <p class="modal__note">{@html th('settingsPage.patternsNote')}</p>
             </div>
           </div>
 
           <div class="setx-panel" class:is-active={libPanel === 'maint'}>
-            <h3 class="setx-panel__title">Maintenance</h3>
-            <p class="setx-panel__sub">Fallback locations and how hard the library tools work.</p>
+            <h3 class="setx-panel__title">{t('settingsPage.maintTitle')}</h3>
+            <p class="setx-panel__sub">{t('settingsPage.maintSub')}</p>
             <div class="setx-card">
-              <label class="field"><span>Downloads folder (fallback)</span><input id="set-downloadsDir" class="mono" type="text" spellcheck="false" /></label>
-              <p class="modal__note">Only used when no library has a folder — normally every download files into its library.</p>
-              <label class="field"><span>Tool workers</span><input id="set-toolsConcurrency" type="number" min="1" max="16" /></label>
-              <p class="modal__note">How many files the library tools (convert / verify / tag) process at once — higher overlaps I/O but uses more memory per in-flight file.</p>
+              <label class="field"><span>{t('settingsPage.downloadsDir')}</span><input id="set-downloadsDir" class="mono" type="text" spellcheck="false" /></label>
+              <p class="modal__note">{t('settingsPage.downloadsDirNote')}</p>
+              <label class="field"><span>{t('settingsPage.toolWorkers')}</span><input id="set-toolsConcurrency" type="number" min="1" max="16" /></label>
+              <p class="modal__note">{t('settingsPage.toolWorkersNote')}</p>
             </div>
           </div>
         </div>
@@ -705,32 +714,32 @@
 
     <!-- DOWNLOADING -->
     <div class="setx-page setx-page--narrow" data-tab="downloading" class:is-active={activeTab === 'downloading'}>
-      <h3 class="setx-panel__title">Downloading</h3>
-      <p class="setx-panel__sub">What happens when you add a series, and how downloads run.</p>
+      <h3 class="setx-panel__title">{t('settingsPage.dlTitle')}</h3>
+      <p class="setx-panel__sub">{t('settingsPage.dlSub')}</p>
       <div class="setx-card">
         <label class="field field--check">
           <span class="switch"><input id="set-autoDownloadOnAdd" type="checkbox" /><span class="switch__track"></span></span>
-          <span>Download on add</span>
+          <span>{t('settingsPage.downloadOnAdd')}</span>
         </label>
-        <p class="modal__note">Adding a series (Library, Discover, Releases, reading lists) immediately queues what its monitoring policy wants. Off = series add empty and you press "Download missing" yourself.</p>
+        <p class="modal__note">{t('settingsPage.downloadOnAddNote')}</p>
         <label class="field">
-          <span>Monitor added series</span>
-          <select id="set-defaultMonitor"><option value="all">All issues</option><option value="new">New issues only</option><option value="none">Off</option></select>
+          <span>{t('settingsPage.monitorAdded')}</span>
+          <select id="set-defaultMonitor"><option value="all">{t('settingsPage.monitorAll')}</option><option value="new">{t('settingsPage.monitorNew')}</option><option value="none">{t('settingsPage.monitorOff')}</option></select>
         </label>
-        <p class="modal__note">The monitoring policy a series gets when it enters the library — added by hand, from Discover, Releases, reading lists, requests, or an import. <b>All issues</b> keeps the run complete; <b>New issues only</b> wants issues from the newest one onward and leaves the back catalogue alone; <b>Off</b> fetches nothing until you monitor it or pick issues yourself. Any series can be changed later from its ⋯ menu.</p>
+        <p class="modal__note">{@html th('settingsPage.monitorNote')}</p>
         <label class="field field--check">
           <span class="switch"><input id="set-addDownloadOnlyRequested" type="checkbox" /><span class="switch__track"></span></span>
-          <span>Only the issues that were asked for</span>
+          <span>{t('settingsPage.onlyRequested')}</span>
         </label>
-        <p class="modal__note">When a series is added because of specific issues — an entry on a reading list, a release, a CBL import — it arrives with monitoring off and just those issues wanted, so only they are downloaded (now and if a grab fails later). Adding from the Library or Discover still gets the policy above. Needs "Download on add".</p>
+        <p class="modal__note">{t('settingsPage.onlyRequestedNote')}</p>
         <label class="field">
-          <span>Download format</span>
-          <select id="set-format"><option value="cbz">CBZ (with metadata)</option><option value="pdf">PDF</option></select>
+          <span>{t('settingsPage.downloadFormat')}</span>
+          <select id="set-format"><option value="cbz">{t('settingsPage.formatCbz')}</option><option value="pdf">{t('settingsPage.formatPdf')}</option></select>
         </label>
-        <label class="field"><span>Simultaneous downloads</span><input id="set-downloadConcurrency" type="number" min="1" max="16" /></label>
-        <p class="modal__note">How many issues download at once. Higher is faster but more likely to trip a source's rate limits. Applies to the next download.</p>
-        <label class="field"><span>FlareSolverr URL</span><input id="set-flaresolverrUrl" type="text" spellcheck="false" placeholder="http://flaresolverr:8191/v1" /></label>
-        <p class="modal__note">Some download sites sit behind Cloudflare. <b>FlareSolverr</b> (a small companion service you run — <code>ghcr.io/flaresolverr/flaresolverr</code>) gets past the challenge; point this at its <code>/v1</code> endpoint. Every source that needs it shares this one setting. Leave blank if none of your sources are behind Cloudflare.</p>
+        <label class="field"><span>{t('settingsPage.simultaneous')}</span><input id="set-downloadConcurrency" type="number" min="1" max="16" /></label>
+        <p class="modal__note">{t('settingsPage.simultaneousNote')}</p>
+        <label class="field"><span>{t('settingsPage.flaresolverrUrl')}</span><input id="set-flaresolverrUrl" type="text" spellcheck="false" placeholder={'http://flaresolverr:8191/v1'} /></label>
+        <p class="modal__note">{@html th('settingsPage.flaresolverrNote')}</p>
       </div>
     </div>
 
@@ -738,8 +747,8 @@
     <div class="setx-page" data-tab="sources" class:is-active={activeTab === 'sources'}>
       <div class="setx-split" class:is-drilled={srcDrill}>
         <div class="setx-rail">
-          {@render railItem('src', 'usenet', 'download', 'Usenet', 'Newznab + SABnzbd/NZBGet', srcOn.usenet ? 'green' : 'muted')}
-          {@render railItem('src', 'torrent', 'download', 'Torrents', 'Torznab + torrent client', srcOn.torrent ? 'green' : 'muted')}
+          {@render railItem('src', 'usenet', 'download', t('settingsPage.usenet'), t('settingsPage.usenetRailNote'), srcOn.usenet ? 'green' : 'muted')}
+          {@render railItem('src', 'torrent', 'download', t('settingsPage.torrents'), t('settingsPage.torrentsRailNote'), srcOn.torrent ? 'green' : 'muted')}
           {#each kitCards as c (c.id)}
             {@render railItem('src', 'kit:' + c.id, 'download', c.label, kitNote(c.description), kitOn[c.id] ? 'green' : 'muted')}
           {/each}
@@ -747,74 +756,74 @@
             {@render railItem('src', pb.key, 'download', pb.label, pb.note, pb.on ? 'green' : 'muted')}
           {/each}
           {#if sourceOrder.length >= 2}
-            {@render railItem('src', 'priority', 'arrow-up-down', 'Source priority', 'Which source tries first', 'green')}
+            {@render railItem('src', 'priority', 'arrow-up-down', t('settingsPage.sourcePriority'), t('settingsPage.sourcePriorityNote'), 'green')}
           {/if}
           {#if !anySourceOn}
-            <p class="setx-railwarn"><Icon name="alert-triangle" size={14} /> No sources enabled — nothing can download.</p>
+            <p class="setx-railwarn"><Icon name="alert-triangle" size={14} /> {t('settingsPage.noSourcesWarn')}</p>
           {/if}
         </div>
         <div class="setx-detail">
-          <button type="button" class="setx-backlink" onclick={() => { srcDrill = false; }}><Icon name="arrow-left" size={14} /> Sources</button>
+          <button type="button" class="setx-backlink" onclick={() => { srcDrill = false; }}><Icon name="arrow-left" size={14} /> {t('settingsPage.backSources')}</button>
 
           <div class="setx-panel" class:is-active={srcPanel === 'usenet'}>
             <div class="setx-card setx-srchead">
               <label class="switch"><input id="set-usenetEnabled" type="checkbox" onchange={syncSourceUI} /><span class="switch__track"></span></label>
               <div class="setx-srchead__text">
-                <b>Usenet</b>
-                <span>Search Newznab indexers and download via SABnzbd or NZBGet.</span>
+                <b>{t('settingsPage.usenet')}</b>
+                <span>{t('settingsPage.usenetDesc')}</span>
               </div>
               <span class="setx-dot setx-dot--{srcOn.usenet ? 'green' : 'muted'}"></span>
             </div>
             <div id="usenet-config" class="src-config setx-srcbody">
               <div class="setx-card" class:is-managed={srcManaged}>
-                <h4 class="setx-card__head">Indexers</h4>
+                <h4 class="setx-card__head">{t('settingsPage.indexers')}</h4>
                 {#if srcManaged}
-                  <p class="modal__note indexers-managed"><Icon name="target" size={14} /> Managed by an indexer plugin — these manual indexers are ignored while it's enabled.</p>
+                  <p class="modal__note indexers-managed"><Icon name="target" size={14} /> {t('settingsPage.managedNote')}</p>
                 {/if}
                 <div id="indexer-list" class="indexer-list">
                   {@render indexerRows('newznab', indexerList)}
                 </div>
-                <button id="add-indexer" class="btn btn--ghost btn--add" type="button" disabled={srcManaged} onclick={() => openIndexerModal(-1, 'newznab', null, saveIndexer)}>+ Add indexer</button>
-                <p class="modal__note">Newznab (the standard indexer API — e.g. NZBgeek) indexers, searched in order; results are merged.</p>
+                <button id="add-indexer" class="btn btn--ghost btn--add" type="button" disabled={srcManaged} onclick={() => openIndexerModal(-1, 'newznab', null, saveIndexer)}>{t('settingsPage.addIndexer')}</button>
+                <p class="modal__note">{t('settingsPage.newznabNote')}</p>
               </div>
 
               <div class="setx-card">
-                <h4 class="setx-card__head">Download client</h4>
-                <label class="field"><span>Client</span>
-                  <select id="set-nzbClient" onchange={syncSourceUI}><option value="sabnzbd">SABnzbd</option><option value="nzbget">NZBGet</option></select>
+                <h4 class="setx-card__head">{t('settingsPage.downloadClient')}</h4>
+                <label class="field"><span>{t('settingsPage.client')}</span>
+                  <select id="set-nzbClient" onchange={syncSourceUI}><option value="sabnzbd">{'SABnzbd'}</option><option value="nzbget">{'NZBGet'}</option></select>
                 </label>
-                <label class="field"><span>Host</span><input id="set-nzbClientHost" class="mono" type="text" spellcheck="false" placeholder="nas or 192.168.1.10" /></label>
-                <label class="field"><span>Port</span><input id="set-nzbClientPort" class="mono" type="number" min="1" max="65535" placeholder="8080" /></label>
-                <label class="field"><span>URL base</span><input id="set-nzbClientUrlBase" class="mono" type="text" spellcheck="false" placeholder="blank, or e.g. /sabnzbd" /></label>
-                <label class="field field--check"><input id="set-nzbClientSsl" type="checkbox" /><span>Use HTTPS</span></label>
+                <label class="field"><span>{t('settingsPage.host')}</span><input id="set-nzbClientHost" class="mono" type="text" spellcheck="false" placeholder={t('settingsPage.hostPlaceholder')} /></label>
+                <label class="field"><span>{t('settingsPage.port')}</span><input id="set-nzbClientPort" class="mono" type="number" min="1" max="65535" placeholder="8080" /></label>
+                <label class="field"><span>{t('settingsPage.urlBase')}</span><input id="set-nzbClientUrlBase" class="mono" type="text" spellcheck="false" placeholder={t('settingsPage.urlBasePlaceholder', { example: '/sabnzbd' })} /></label>
+                <label class="field field--check"><input id="set-nzbClientSsl" type="checkbox" /><span>{t('settingsPage.useHttps')}</span></label>
                 <div class="only-sabnzbd">
-                  <label class="field"><span>API key</span><input id="set-nzbClientApiKey" class="mono" type="text" spellcheck="false" /></label>
+                  <label class="field"><span>{t('settingsPage.apiKey')}</span><input id="set-nzbClientApiKey" class="mono" type="text" spellcheck="false" /></label>
                 </div>
                 <div class="only-nzbget">
-                  <label class="field"><span>Username</span><input id="set-nzbClientUser" type="text" spellcheck="false" /></label>
-                  <label class="field"><span>Password</span><input id="set-nzbClientPass" type="password" spellcheck="false" /></label>
+                  <label class="field"><span>{t('settingsPage.username')}</span><input id="set-nzbClientUser" type="text" spellcheck="false" /></label>
+                  <label class="field"><span>{t('settingsPage.password')}</span><input id="set-nzbClientPass" type="password" spellcheck="false" /></label>
                 </div>
-                <label class="field"><span>Category</span><input id="set-nzbCategory" type="text" spellcheck="false" placeholder="backissue" /></label>
+                <label class="field"><span>{t('settingsPage.category')}</span><input id="set-nzbCategory" type="text" spellcheck="false" placeholder={'backissue'} /></label>
                 <div class="client-test">
-                  <button id="client-test" class="btn btn--ghost" type="button" onclick={testClient}>Test connection</button>
+                  <button id="client-test" class="btn btn--ghost" type="button" onclick={testClient}>{t('settingsPage.testConnection')}</button>
                   {#if tests.client}<span id="client-test-result" class="client-status {tests.client.cls}">{#if tests.client.icon}<Icon name={tests.client.icon} /> {/if}{tests.client.text}</span>{/if}
                 </div>
               </div>
 
               <div class="setx-card">
-                <h4 class="setx-card__head">Completed downloads</h4>
-                <label class="field"><span>Folder (this app's view)</span><input id="set-usenetCompleteDir" class="mono" type="text" spellcheck="false" placeholder="\\NAS\dl\complete" /></label>
-                <label class="field"><span>Folder (client's view)</span><input id="set-usenetCompleteDirRemote" class="mono" type="text" spellcheck="false" placeholder="/downloads/complete" /></label>
-                <p class="modal__note">Only needed if the client runs on another machine. Map the folder it writes finished downloads to (client's view) onto the path this app reads it at over the network. <code>.cbr</code> releases are converted to <code>.cbz</code> so they can be tagged.</p>
+                <h4 class="setx-card__head">{t('settingsPage.completedDownloads')}</h4>
+                <label class="field"><span>{t('settingsPage.folderAppView')}</span><input id="set-usenetCompleteDir" class="mono" type="text" spellcheck="false" placeholder={'\\\\NAS\\dl\\complete'} /></label>
+                <label class="field"><span>{t('settingsPage.folderClientView')}</span><input id="set-usenetCompleteDirRemote" class="mono" type="text" spellcheck="false" placeholder={'/downloads/complete'} /></label>
+                <p class="modal__note">{@html th('settingsPage.usenetCompleteNote')}</p>
               </div>
 
               <div class="setx-card">
-                <h4 class="setx-card__head">Polling</h4>
+                <h4 class="setx-card__head">{t('settingsPage.polling')}</h4>
                 <div class="fields-row">
-                  <label class="field"><span>Poll every (s)</span><input id="set-usenetPollSeconds" type="number" min="5" max="600" /></label>
-                  <label class="field"><span>Give up after (min)</span><input id="set-usenetTimeoutMinutes" type="number" min="1" max="1440" /></label>
+                  <label class="field"><span>{t('settingsPage.pollEvery')}</span><input id="set-usenetPollSeconds" type="number" min="5" max="600" /></label>
+                  <label class="field"><span>{t('settingsPage.giveUpAfter')}</span><input id="set-usenetTimeoutMinutes" type="number" min="1" max="1440" /></label>
                 </div>
-                <p class="modal__note">BackIssue hands the NZB to your client under the category you set above (default <code>backissue</code>), watches it, imports each download when it completes (tag + file), and removes it from the client. Downloads are tracked in the database, so an app restart resumes them.</p>
+                <p class="modal__note">{@html th('settingsPage.usenetPollingNote')}</p>
               </div>
             </div>
           </div>
@@ -823,80 +832,80 @@
             <div class="setx-card setx-srchead">
               <label class="switch"><input id="set-torrentEnabled" type="checkbox" onchange={syncSourceUI} /><span class="switch__track"></span></label>
               <div class="setx-srchead__text">
-                <b>Torrents</b>
-                <span>Search Torznab indexers (Jackett/Prowlarr) and download via qBittorrent, Transmission, or Deluge.</span>
+                <b>{t('settingsPage.torrents')}</b>
+                <span>{t('settingsPage.torrentDesc')}</span>
               </div>
               <span class="setx-dot setx-dot--{srcOn.torrent ? 'green' : 'muted'}"></span>
             </div>
             <div id="torrent-config" class="src-config setx-srcbody">
               <div class="setx-card" class:is-managed={srcManaged}>
-                <h4 class="setx-card__head">Indexers (Torznab)</h4>
+                <h4 class="setx-card__head">{t('settingsPage.indexersTorznab')}</h4>
                 {#if srcManaged}
-                  <p class="modal__note indexers-managed"><Icon name="target" size={14} /> Managed by an indexer plugin — these manual indexers are ignored while it's enabled.</p>
+                  <p class="modal__note indexers-managed"><Icon name="target" size={14} /> {t('settingsPage.managedNote')}</p>
                 {/if}
                 <div id="torznab-list" class="indexer-list">
                   {@render indexerRows('torznab', torznabList)}
                 </div>
-                <button id="add-torznab" class="btn btn--ghost btn--add" type="button" disabled={srcManaged} onclick={() => openIndexerModal(-1, 'torznab', null, saveIndexer)}>+ Add indexer</button>
-                <p class="modal__note">Torznab (the standard indexer API — e.g. Jackett or Prowlarr) feeds, searched in order; results are merged and ranked by seeders.</p>
+                <button id="add-torznab" class="btn btn--ghost btn--add" type="button" disabled={srcManaged} onclick={() => openIndexerModal(-1, 'torznab', null, saveIndexer)}>{t('settingsPage.addIndexer')}</button>
+                <p class="modal__note">{t('settingsPage.torznabNote')}</p>
               </div>
 
               <div class="setx-card">
-                <h4 class="setx-card__head">Download client</h4>
-                <label class="field"><span>Client</span>
-                  <select id="set-torrentClient" onchange={syncSourceUI}><option value="qbittorrent">qBittorrent</option><option value="transmission">Transmission</option><option value="deluge">Deluge</option></select>
+                <h4 class="setx-card__head">{t('settingsPage.downloadClient')}</h4>
+                <label class="field"><span>{t('settingsPage.client')}</span>
+                  <select id="set-torrentClient" onchange={syncSourceUI}><option value="qbittorrent">{'qBittorrent'}</option><option value="transmission">{'Transmission'}</option><option value="deluge">{'Deluge'}</option></select>
                 </label>
                 <div class="only-qbittorrent">
-                  <label class="field"><span>Host</span><input id="set-qbHost" class="mono" type="text" spellcheck="false" placeholder="nas or 192.168.1.10" /></label>
-                  <label class="field"><span>Port</span><input id="set-qbPort" class="mono" type="number" min="1" max="65535" placeholder="8080" /></label>
-                  <label class="field"><span>URL base</span><input id="set-qbUrlBase" class="mono" type="text" spellcheck="false" placeholder="blank, or e.g. /qbittorrent" /></label>
-                  <label class="field field--check"><input id="set-qbSsl" type="checkbox" /><span>Use HTTPS</span></label>
-                  <label class="field"><span>Username</span><input id="set-qbUser" type="text" spellcheck="false" /></label>
-                  <label class="field"><span>Password</span><input id="set-qbPass" type="password" spellcheck="false" /></label>
+                  <label class="field"><span>{t('settingsPage.host')}</span><input id="set-qbHost" class="mono" type="text" spellcheck="false" placeholder={t('settingsPage.hostPlaceholder')} /></label>
+                  <label class="field"><span>{t('settingsPage.port')}</span><input id="set-qbPort" class="mono" type="number" min="1" max="65535" placeholder="8080" /></label>
+                  <label class="field"><span>{t('settingsPage.urlBase')}</span><input id="set-qbUrlBase" class="mono" type="text" spellcheck="false" placeholder={t('settingsPage.urlBasePlaceholder', { example: '/qbittorrent' })} /></label>
+                  <label class="field field--check"><input id="set-qbSsl" type="checkbox" /><span>{t('settingsPage.useHttps')}</span></label>
+                  <label class="field"><span>{t('settingsPage.username')}</span><input id="set-qbUser" type="text" spellcheck="false" /></label>
+                  <label class="field"><span>{t('settingsPage.password')}</span><input id="set-qbPass" type="password" spellcheck="false" /></label>
                 </div>
                 <div class="only-transmission">
-                  <label class="field"><span>Host</span><input id="set-trHost" class="mono" type="text" spellcheck="false" placeholder="nas or 192.168.1.10" /></label>
-                  <label class="field"><span>Port</span><input id="set-trPort" class="mono" type="number" min="1" max="65535" placeholder="9091" /></label>
-                  <label class="field"><span>URL base</span><input id="set-trUrlBase" class="mono" type="text" spellcheck="false" placeholder="blank, or e.g. /transmission" /></label>
-                  <label class="field field--check"><input id="set-trSsl" type="checkbox" /><span>Use HTTPS</span></label>
-                  <label class="field"><span>Username</span><input id="set-trUser" type="text" spellcheck="false" /></label>
-                  <label class="field"><span>Password</span><input id="set-trPass" type="password" spellcheck="false" /></label>
+                  <label class="field"><span>{t('settingsPage.host')}</span><input id="set-trHost" class="mono" type="text" spellcheck="false" placeholder={t('settingsPage.hostPlaceholder')} /></label>
+                  <label class="field"><span>{t('settingsPage.port')}</span><input id="set-trPort" class="mono" type="number" min="1" max="65535" placeholder="9091" /></label>
+                  <label class="field"><span>{t('settingsPage.urlBase')}</span><input id="set-trUrlBase" class="mono" type="text" spellcheck="false" placeholder={t('settingsPage.urlBasePlaceholder', { example: '/transmission' })} /></label>
+                  <label class="field field--check"><input id="set-trSsl" type="checkbox" /><span>{t('settingsPage.useHttps')}</span></label>
+                  <label class="field"><span>{t('settingsPage.username')}</span><input id="set-trUser" type="text" spellcheck="false" /></label>
+                  <label class="field"><span>{t('settingsPage.password')}</span><input id="set-trPass" type="password" spellcheck="false" /></label>
                 </div>
                 <div class="only-deluge">
-                  <label class="field"><span>Host</span><input id="set-delugeHost" class="mono" type="text" spellcheck="false" placeholder="nas or 192.168.1.10" /></label>
-                  <label class="field"><span>Port</span><input id="set-delugePort" class="mono" type="number" min="1" max="65535" placeholder="8112" /></label>
-                  <label class="field"><span>URL base</span><input id="set-delugeUrlBase" class="mono" type="text" spellcheck="false" placeholder="blank, or e.g. /deluge" /></label>
-                  <label class="field field--check"><input id="set-delugeSsl" type="checkbox" /><span>Use HTTPS</span></label>
-                  <label class="field"><span>Password</span><input id="set-delugePass" type="password" spellcheck="false" /></label>
+                  <label class="field"><span>{t('settingsPage.host')}</span><input id="set-delugeHost" class="mono" type="text" spellcheck="false" placeholder={t('settingsPage.hostPlaceholder')} /></label>
+                  <label class="field"><span>{t('settingsPage.port')}</span><input id="set-delugePort" class="mono" type="number" min="1" max="65535" placeholder="8112" /></label>
+                  <label class="field"><span>{t('settingsPage.urlBase')}</span><input id="set-delugeUrlBase" class="mono" type="text" spellcheck="false" placeholder={t('settingsPage.urlBasePlaceholder', { example: '/deluge' })} /></label>
+                  <label class="field field--check"><input id="set-delugeSsl" type="checkbox" /><span>{t('settingsPage.useHttps')}</span></label>
+                  <label class="field"><span>{t('settingsPage.password')}</span><input id="set-delugePass" type="password" spellcheck="false" /></label>
                 </div>
-                <label class="field"><span>Category</span><input id="set-torrentCategory" type="text" spellcheck="false" placeholder="backissue" /></label>
+                <label class="field"><span>{t('settingsPage.category')}</span><input id="set-torrentCategory" type="text" spellcheck="false" placeholder={'backissue'} /></label>
                 <div class="client-test">
-                  <button id="qb-test" class="btn btn--ghost" type="button" onclick={testQb}>Test connection</button>
+                  <button id="qb-test" class="btn btn--ghost" type="button" onclick={testQb}>{t('settingsPage.testConnection')}</button>
                   {#if tests.qb}<span id="qb-test-result" class="client-status {tests.qb.cls}">{#if tests.qb.icon}<Icon name={tests.qb.icon} /> {/if}{tests.qb.text}</span>{/if}
                 </div>
               </div>
 
               <div class="setx-card">
-                <h4 class="setx-card__head">Completed downloads</h4>
-                <label class="field"><span>Folder (this app's view)</span><input id="set-torrentCompleteDir" class="mono" type="text" spellcheck="false" placeholder="\\NAS\dl\complete" /></label>
-                <label class="field"><span>Folder (client's view)</span><input id="set-torrentCompleteDirRemote" class="mono" type="text" spellcheck="false" placeholder="/downloads/complete" /></label>
-                <p class="modal__note">Only needed if the download client runs on another machine. Map its content path onto the path this app reads over the network.</p>
+                <h4 class="setx-card__head">{t('settingsPage.completedDownloads')}</h4>
+                <label class="field"><span>{t('settingsPage.folderAppView')}</span><input id="set-torrentCompleteDir" class="mono" type="text" spellcheck="false" placeholder={'\\\\NAS\\dl\\complete'} /></label>
+                <label class="field"><span>{t('settingsPage.folderClientView')}</span><input id="set-torrentCompleteDirRemote" class="mono" type="text" spellcheck="false" placeholder={'/downloads/complete'} /></label>
+                <p class="modal__note">{t('settingsPage.torrentCompleteNote')}</p>
               </div>
 
               <div class="setx-card">
-                <h4 class="setx-card__head">Polling</h4>
+                <h4 class="setx-card__head">{t('settingsPage.polling')}</h4>
                 <div class="fields-row">
-                  <label class="field"><span>Poll every (s)</span><input id="set-torrentPollSeconds" type="number" min="5" max="600" /></label>
-                  <label class="field"><span>Give up after (min)</span><input id="set-torrentTimeoutMinutes" type="number" min="1" max="1440" /></label>
+                  <label class="field"><span>{t('settingsPage.pollEvery')}</span><input id="set-torrentPollSeconds" type="number" min="5" max="600" /></label>
+                  <label class="field"><span>{t('settingsPage.giveUpAfter')}</span><input id="set-torrentTimeoutMinutes" type="number" min="1" max="1440" /></label>
                 </div>
-                <p class="modal__note">BackIssue hands the magnet/.torrent to your client, watches it, and imports each torrent when it completes. After import the torrent is <b>left seeding</b> — manage ratio and removal in the client.</p>
+                <p class="modal__note">{@html th('settingsPage.torrentPollingNote')}</p>
               </div>
 
               <div class="setx-card">
-                <h4 class="setx-card__head">Weekly 0-Day pack</h4>
-                <label class="field"><span>Search phrase</span><input id="set-zeroDayQuery" type="text" spellcheck="false" placeholder="0-Day Week" /></label>
-                <label class="field field--check"><input id="set-zeroDayAddNew" type="checkbox" /><span>Add new series I don't follow (confident ComicVine matches only)</span></label>
-                <p class="modal__note">A scheduled job finds the newest <b>0-Day Week of …</b> pack on your Torznab indexers, downloads it, and imports the <b>missing</b> issues of series already in your collection. Turn the schedule on from the <b>Jobs</b> page.</p>
+                <h4 class="setx-card__head">{t('settingsPage.zeroDay')}</h4>
+                <label class="field"><span>{t('settingsPage.searchPhrase')}</span><input id="set-zeroDayQuery" type="text" spellcheck="false" placeholder={'0-Day Week'} /></label>
+                <label class="field field--check"><input id="set-zeroDayAddNew" type="checkbox" /><span>{t('settingsPage.zeroDayAddNew')}</span></label>
+                <p class="modal__note">{@html th('settingsPage.zeroDayNote')}</p>
               </div>
             </div>
           </div>
@@ -906,8 +915,8 @@
               <div class="setx-card setx-srchead">
                 <label class="switch"><input id="set-{c.id}Enabled" type="checkbox" disabled={!!c.unavailable} onchange={syncSourceUI} /><span class="switch__track"></span></label>
                 <div class="setx-srchead__text">
-                  <b>{c.label}</b>
-                  <span>{c.description || 'Download source.'}</span>
+                  <b>{lbl(c.label)}</b>
+                  <span>{c.description || t('settingsPage.kitDefaultDesc')}</span>
                 </div>
                 <span class="setx-dot setx-dot--{c.unavailable ? 'muted' : kitOn[c.id] ? 'green' : 'muted'}"></span>
               </div>
@@ -916,21 +925,21 @@
                   {#if c.unavailable}
                     <p class="modal__note"><Icon name="alert-triangle" size={14} /> {c.unavailable}</p>
                   {:else if c.cloudflare}
-                    <p class="modal__note">This site is behind Cloudflare, so it uses the <b>FlareSolverr URL</b> from <b>Settings → Downloading</b>{#if c.browser === 'fallback'}; on the browser build it can also fall back to the built-in browser{/if}.</p>
+                    <p class="modal__note">{@html th(c.browser === 'fallback' ? 'settingsPage.cloudflareNoteBrowser' : 'settingsPage.cloudflareNote')}</p>
                   {/if}
                   {#each c.fields as f (f.key)}
                     {#if f.type === 'bool'}
-                      <label class="field field--check"><span class="switch"><input id="set-{f.key}" type="checkbox" /><span class="switch__track"></span></span><span>{f.label}</span></label>
+                      <label class="field field--check"><span class="switch"><input id="set-{f.key}" type="checkbox" /><span class="switch__track"></span></span><span>{lbl(f.label)}</span></label>
                     {:else if f.type === 'int'}
-                      <label class="field"><span>{f.label}</span><input id="set-{f.key}" type="number" placeholder={f.placeholder || (f.default ?? '')} /></label>
+                      <label class="field"><span>{lbl(f.label)}</span><input id="set-{f.key}" type="number" placeholder={f.placeholder || (f.default ?? '')} /></label>
                     {:else}
-                      <label class="field"><span>{f.label}</span><input id="set-{f.key}" type={f.secret ? 'password' : 'text'} spellcheck="false" autocomplete={f.secret ? 'off' : null} placeholder={f.placeholder || (f.default ?? '')} /></label>
+                      <label class="field"><span>{lbl(f.label)}</span><input id="set-{f.key}" type={f.secret ? 'password' : 'text'} spellcheck="false" autocomplete={f.secret ? 'off' : null} placeholder={f.placeholder || (f.default ?? '')} /></label>
                     {/if}
-                    {#if f.note}<p class="modal__note">{f.note}</p>{/if}
+                    {#if f.note}<p class="modal__note">{lbl(f.note)}</p>{/if}
                   {/each}
                   {#if c.testable}
                     <div class="client-test">
-                      <button class="btn btn--ghost" type="button" onclick={() => testKitSource(c)}>Test connection</button>
+                      <button class="btn btn--ghost" type="button" onclick={() => testKitSource(c)}>{t('settingsPage.testConnection')}</button>
                       {#if kitTests[c.id]}<span class="client-status {kitTests[c.id].cls}">{#if kitTests[c.id].icon}<Icon name={kitTests[c.id].icon} /> {/if}{kitTests[c.id].text}</span>{/if}
                     </div>
                   {/if}
@@ -940,8 +949,8 @@
           {/each}
 
           <div class="setx-panel" class:is-active={srcPanel === 'priority'}>
-            <h3 class="setx-panel__title">Source priority</h3>
-            <p class="setx-panel__sub">When more than one source can serve an issue, they're tried top-to-bottom — the first with a match wins.</p>
+            <h3 class="setx-panel__title">{t('settingsPage.priorityTitle')}</h3>
+            <p class="setx-panel__sub">{t('settingsPage.prioritySub')}</p>
             <div class="setx-card" id="source-priority-list">
               {#each sourceOrder as s, i (s.id)}
                 <div class="srcpri-row">
@@ -972,7 +981,7 @@
           {/each}
         </div>
         <div class="setx-detail">
-          <button type="button" class="setx-backlink" onclick={() => { plgDrill = false; }}><Icon name="arrow-left" size={14} /> Plugins</button>
+          <button type="button" class="setx-backlink" onclick={() => { plgDrill = false; }}><Icon name="arrow-left" size={14} /> {t('settingsPage.backPlugins')}</button>
           <!-- Plugin settings panels inject here (plain DOM — must stay mounted;
                same contract as settings-plugin-sources, for plugins that are
                NOT download sources: each block becomes a rail entry). -->
@@ -983,20 +992,20 @@
 
     <!-- METADATA -->
     <div class="setx-page setx-page--narrow" data-tab="metadata" class:is-active={activeTab === 'metadata'}>
-      <h3 class="setx-panel__title">Metadata</h3>
-      <p class="setx-panel__sub">Where series and issue data comes from.</p>
+      <h3 class="setx-panel__title">{t('settingsPage.metaTitle')}</h3>
+      <p class="setx-panel__sub">{t('settingsPage.metaSub')}</p>
       <div class="setx-card">
-        <h4 class="setx-card__head">Metadata sources</h4>
-        <p class="modal__note">Turn on every source you want series and issue data from. Searches ask all of them and show the answers together, best first, so the order decides which wins when two know the same series. A series keeps coming from the source that found it. The built-in service works out of the box; the others query a database directly with your own key or account, under its limits.</p>
+        <h4 class="setx-card__head">{t('settingsPage.metaSources')}</h4>
+        <p class="modal__note">{t('settingsPage.metaSourcesNote')}</p>
         <div id="metadata-source-list">
           {#each metaOrder as p, i (p.id)}
             <div class="metasrc" class:is-on={p.enabled}>
               <div class="srcpri-row">
                 <span class="srcpri-rank">{i + 1}</span>
-                <label class="switch"><input type="checkbox" checked={p.enabled} aria-label="Use {providerName(p)}" onchange={(e) => toggleMeta(p, e.currentTarget.checked)} /><span class="switch__track"></span></label>
-                <span class="srcpri-name">{p.label}{#if p.enabled && !p.configured}<span class="metasrc__warn">not set up</span>{/if}</span>
-                <button class="srcpri-btn" type="button" disabled={i === 0} onclick={() => moveMeta(i, -1)} aria-label="Move up"><Icon name="arrow-up" /></button>
-                <button class="srcpri-btn" type="button" disabled={i === metaOrder.length - 1} onclick={() => moveMeta(i, 1)} aria-label="Move down"><Icon name="arrow-down" /></button>
+                <label class="switch"><input type="checkbox" checked={p.enabled} aria-label={t('settingsPage.useProvider', { name: providerName(p) })} onchange={(e) => toggleMeta(p, e.currentTarget.checked)} /><span class="switch__track"></span></label>
+                <span class="srcpri-name">{p.label}{#if p.enabled && !p.configured}<span class="metasrc__warn">{t('settingsPage.notSetUp')}</span>{/if}</span>
+                <button class="srcpri-btn" type="button" disabled={i === 0} onclick={() => moveMeta(i, -1)} aria-label={t('settingsPage.moveUp')}><Icon name="arrow-up" /></button>
+                <button class="srcpri-btn" type="button" disabled={i === metaOrder.length - 1} onclick={() => moveMeta(i, 1)} aria-label={t('settingsPage.moveDown')}><Icon name="arrow-down" /></button>
               </div>
               <!-- Each source's details stay mounted (their set-* ids are
                    collected on save); hidden just removes them from view. -->
@@ -1004,19 +1013,19 @@
                 {#if p.id === 'hosted'}
                   <p class="modal__note">
                     {#if loadedSettings.metadataInstanceKey}
-                      <Icon name="check" /> Registered with the metadata service (instance key ends in <b class="mono">{String(loadedSettings.metadataInstanceKey).slice(-6)}</b>).
+                      <Icon name="check" /> {@html th('settingsPage.registered', { key: String(loadedSettings.metadataInstanceKey).slice(-6) })}
                     {:else}
-                      Not registered yet — this install provisions its key automatically on first use.
+                      {t('settingsPage.notRegistered')}
                     {/if}
                   </p>
-                  <div class="client-test"><button class="btn btn--ghost" type="button" onclick={testMeta}>Test service</button>
+                  <div class="client-test"><button class="btn btn--ghost" type="button" onclick={testMeta}>{t('settingsPage.testService')}</button>
                     {#if tests.meta}<span class="client-status {tests.meta.cls}">{#if tests.meta.icon}<Icon name={tests.meta.icon} /> {/if}{tests.meta.text}</span>{/if}</div>
                 {:else}
                   {#if p.note}<p class="modal__note list-note--warn"><Icon name="info" /> {p.note}</p>{/if}
                   {#each p.fields as f (f.key)}
-                    <label class="field"><span>{f.label}</span><input id="set-{f.key}" class="mono" type={f.type === 'password' ? 'password' : 'text'} spellcheck="false" autocomplete="off" placeholder={f.placeholder || ''} /></label>
+                    <label class="field"><span>{lbl(f.label)}</span><input id="set-{f.key}" class="mono" type={f.type === 'password' ? 'password' : 'text'} spellcheck="false" autocomplete="off" placeholder={f.placeholder || ''} /></label>
                   {/each}
-                  <div class="client-test"><button class="btn btn--ghost" type="button" onclick={() => testProvider(p)}>Test {p.fields.length ? (p.fields.length === 1 ? 'key' : 'sign-in') : 'source'}</button>
+                  <div class="client-test"><button class="btn btn--ghost" type="button" onclick={() => testProvider(p)}>{providerTestLabel(p)}</button>
                     {#if tests['prov-' + p.id]}<span class="client-status {tests['prov-' + p.id].cls}">{#if tests['prov-' + p.id].icon}<Icon name={tests['prov-' + p.id].icon} /> {/if}{tests['prov-' + p.id].text}</span>{/if}</div>
                 {/if}
               </div>
@@ -1027,77 +1036,77 @@
              hatch: kept mounted so a saved value persists, but not shown. It
              remains settable via the API / a previously saved value. -->
         <div hidden>
-          <label class="field"><span>Service URL (optional)</span><input id="set-cvBaseUrl" class="mono" type="text" spellcheck="false" placeholder="https://data.backissue.app/api" /></label>
+          <label class="field"><span>{t('settingsPage.serviceUrl')}</span><input id="set-cvBaseUrl" class="mono" type="text" spellcheck="false" placeholder={'https://data.backissue.app/api'} /></label>
         </div>
       </div>
       <div class="setx-card">
-        <h4 class="setx-card__head">Tagging &amp; files</h4>
+        <h4 class="setx-card__head">{t('settingsPage.taggingFiles')}</h4>
         <label class="field">
-          <span>Tag on download</span>
-          <select id="set-tagOnDownload"><option value="off">Off</option><option value="on">On</option></select>
+          <span>{t('settingsPage.tagOnDownload')}</span>
+          <select id="set-tagOnDownload"><option value="off">{t('common.off')}</option><option value="on">{t('common.on')}</option></select>
         </label>
         <label class="field">
-          <span>Tag placement</span>
-          <select id="set-tagPlacement"><option value="embed">Embedded (inside the archive)</option><option value="sidecar">Sidecar (.xml next to the file)</option></select>
+          <span>{t('settingsPage.tagPlacement')}</span>
+          <select id="set-tagPlacement"><option value="embed">{t('settingsPage.tagEmbed')}</option><option value="sidecar">{t('settingsPage.tagSidecar')}</option></select>
         </label>
-        <p class="modal__note">Embedded writes ComicInfo.xml straight into the CBZ (<code>.cbr</code> downloads are converted to <code>.cbz</code> so they can be tagged). Sidecar writes the same metadata to a <code>.xml</code> file next to the archive and never modifies it — keeping files byte-identical for seeding and file-share hashing, and letting <code>.cbr</code> files stay <code>.cbr</code>. Each library can override this in its settings.</p>
+        <p class="modal__note">{@html th('settingsPage.tagNote')}</p>
       </div>
       <div class="setx-card">
-        <h4 class="setx-card__head">Enrichment</h4>
+        <h4 class="setx-card__head">{t('settingsPage.enrichment')}</h4>
         <label class="field field--check">
           <span class="switch"><input id="set-cvEnrich" type="checkbox" /><span class="switch__track"></span></span>
-          <span>Enrich metadata (characters, story arcs, ratings, issue extras)</span>
+          <span>{t('settingsPage.enrichLabel')}</span>
         </label>
-        <p class="modal__note">When the metadata server supports it, adds Metron data on top of ComicVine: <strong>characters, teams and story arcs</strong> — which ComicVine has for only a small share of issues, and almost none published before 1980 — plus per-role credits, content ratings, series status and end year, price, UPC and story titles. Characters and arcs are written into <code>ComicInfo.xml</code>, so turning this off leaves those fields out of your files. The official ComicVine API ignores the request, so it's safe either way.</p>
+        <p class="modal__note">{@html th('settingsPage.enrichNote')}</p>
       </div>
       <div class="setx-card">
-        <h4 class="setx-card__head">Manga</h4>
+        <h4 class="setx-card__head">{t('settingsPage.manga')}</h4>
         <label class="field">
-          <span>Content rating ceiling</span>
+          <span>{t('settingsPage.ratingCeiling')}</span>
           <select id="set-mangaRating">
-            <option value="safe">Safe only</option>
-            <option value="suggestive">Up to Suggestive</option>
-            <option value="erotica">Up to Erotica (default)</option>
-            <option value="pornographic">Everything</option>
+            <option value="safe">{t('settingsPage.ratingSafe')}</option>
+            <option value="suggestive">{t('settingsPage.ratingSuggestive')}</option>
+            <option value="erotica">{t('settingsPage.ratingErotica')}</option>
+            <option value="pornographic">{t('settingsPage.ratingAll')}</option>
           </select>
         </label>
-        <p class="modal__note">How far manga search reaches into MangaDex's content ratings — each level includes the ones below it. Applies to the Add dialog's manga lane and manga-library imports.</p>
+        <p class="modal__note">{t('settingsPage.mangaNote')}</p>
       </div>
       <div class="setx-card">
-        <h4 class="setx-card__head">Releases</h4>
-        <label class="field"><span>Release provider URL</span><input id="set-releaseProviderUrl" class="mono" type="text" spellcheck="false" placeholder="https://data.backissue.app" /></label>
-        <p class="modal__note">The release provider feeds "This week's releases".</p>
+        <h4 class="setx-card__head">{t('settingsPage.releases')}</h4>
+        <label class="field"><span>{t('settingsPage.releaseProviderUrl')}</span><input id="set-releaseProviderUrl" class="mono" type="text" spellcheck="false" placeholder={'https://data.backissue.app'} /></label>
+        <p class="modal__note">{t('settingsPage.releaseNote')}</p>
       </div>
     </div>
 
     <!-- SIGN-IN -->
     <div class="setx-page setx-page--narrow" data-tab="signin" class:is-active={activeTab === 'signin'}>
-      <h3 class="setx-panel__title">Sign-in</h3>
-      <p class="setx-panel__sub">How people sign in. Password login always works for admins.</p>
+      <h3 class="setx-panel__title">{t('settingsPage.signinTitle')}</h3>
+      <p class="setx-panel__sub">{t('settingsPage.signinSub')}</p>
       <div class="setx-card">
-        <p class="modal__note">Add an SSO provider (e.g. OIDC) or another login backend from the <b>Plugins</b> page to let users sign in with an identity provider.</p>
+        <p class="modal__note">{@html th('settingsPage.signinNote')}</p>
         <!-- Auth plugin config (e.g. OIDC/SSO, WHMCS) injects here (plain DOM — stays mounted). -->
         <div id="settings-plugin-auth"></div>
         <label class="field field--check">
           <span class="switch"><input id="set-passwordLoginDisabled" type="checkbox" /><span class="switch__track"></span></span>
-          <span>Disable password login (SSO only — admins keep a password fallback)</span>
+          <span>{t('settingsPage.disablePasswordLogin')}</span>
         </label>
       </div>
     </div>
 
     <!-- NOTIFICATIONS -->
     <div class="setx-page setx-page--narrow" data-tab="notifications" class:is-active={activeTab === 'notifications'}>
-      <h3 class="setx-panel__title">Notifications</h3>
-      <p class="setx-panel__sub">Where BackIssue sends alerts. The in-app bell always records everything regardless. Open a channel to configure it.</p>
+      <h3 class="setx-panel__title">{t('settingsPage.notifTitle')}</h3>
+      <p class="setx-panel__sub">{t('settingsPage.notifSub')}</p>
       <!-- Outbound channels are provided by plugins (the notifications hub
            injects one collapsible card per channel, like the source cards). -->
       <div id="settings-plugin-notifications"></div>
       {#if !notifyChannels}
         <div class="setx-card setx-empty">
           <span class="setx-empty__icon"><Icon name="bell" size={22} /></span>
-          <b>No outbound channels installed</b>
-          <p class="modal__note">Add the <b>Notifications Hub</b> plugin to send alerts to Discord, Telegram, Pushover, ntfy, or any webhook.</p>
-          <button class="btn btn--ghost btn--sm" type="button" onclick={() => navigate('/plugins')}>Browse plugins</button>
+          <b>{t('settingsPage.noChannels')}</b>
+          <p class="modal__note">{@html th('settingsPage.noChannelsNote')}</p>
+          <button class="btn btn--ghost btn--sm" type="button" onclick={() => navigate('/plugins')}>{t('settingsPage.browsePlugins')}</button>
         </div>
       {/if}
     </div>
@@ -1107,9 +1116,9 @@
   {#if dirty}
     <div class="setx-savebar">
       <span class="setx-savebar__dot"></span>
-      <span class="setx-savebar__text">You have unsaved changes.</span>
-      <button class="btn btn--ghost btn--sm" type="button" onclick={discardEdits}>Discard</button>
-      <button class="btn btn--primary btn--sm" type="button" onclick={save}>Save changes</button>
+      <span class="setx-savebar__text">{t('settingsPage.unsaved')}</span>
+      <button class="btn btn--ghost btn--sm" type="button" onclick={discardEdits}>{t('settingsPage.discard')}</button>
+      <button class="btn btn--primary btn--sm" type="button" onclick={save}>{t('settingsPage.saveChanges')}</button>
     </div>
   {/if}
 </main>
