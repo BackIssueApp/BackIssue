@@ -1,0 +1,11 @@
+{
+  "new": "new",
+  "queued": "queued",
+  "sent": "sent",
+  "saving": "saving",
+  "tagging": "tagging",
+  "saved": "saved",
+  "noTags": "no tags",
+  "corrupt": "corrupt",
+  "failed": "failed"
+}
