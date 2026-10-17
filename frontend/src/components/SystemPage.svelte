@@ -13,7 +13,7 @@
   import { confirmDialog } from './DialogModal.svelte';
   import { can } from '../lib/auth.svelte.js';
   import { fmt, fmtAgo, fmtIn, escapeHtml } from '../lib/util.js';
-  import { t, th, currentLang } from '../lib/i18n.svelte.js';
+  import { t, th, currentLang, st as serverText } from '../lib/i18n.svelte.js';
   import Icon from '../lib/Icon.svelte';
 
   let { active = false } = $props();
@@ -334,7 +334,7 @@
             <div class="sysx__sched" class:is-running={s.running} class:is-off={!s.enabled}>
               <label class="switch switch--sm"><input type="checkbox" checked={s.enabled} onchange={(e) => saveSchedule(s.key, { enabled: e.currentTarget.checked })} /><span class="switch__track"></span></label>
               <div class="sysx__sched-id">
-                <div class="sysx__sched-label">{s.label}</div>
+                <div class="sysx__sched-label">{serverText(['jobs', 'tools'], s.label)}</div>
                 <div class="sysx__sched-last">{s.lastRun ? t('systemPage.lastRunAgo', { time: fmtAgo(now - s.lastRun) }) : t('systemPage.neverRun')}</div>
               </div>
               <input class="sched__cron sysx__cron" type="text" spellcheck="false" value={s.cron} title={t('systemPage.cronTitle')}
@@ -365,7 +365,7 @@
           <div class="sysx__job" class:is-failed={j.status === 'failed'}>
             <div class="sysx__job-head">
               <span class="sysx__chip" style="color:{jobTone(j.type)}; background:color-mix(in srgb, {jobTone(j.type)} 15%, transparent);">{jobLabel(j.type)}</span>
-              <span class="sysx__job-label">{j.label}</span>
+              <span class="sysx__job-label">{serverText(['jobs', 'tools'], j.label)}</span>
               <span class="sysx__badge sysx__badge--{j.status}"><span class="sysx__bdot"></span>{j.status}</span>
               <span class="sysx__job-time">{j.status === 'running'
                 ? t('systemPage.runningFor', { time: fmtAgo(now - j.startedAt) })
@@ -476,8 +476,8 @@
               <div class="sysx__tool-head">
                 <div class="sysx__tool-ico"><Icon name={toolIcon(tool.id)} size={18} /></div>
                 <div class="sysx__tool-id">
-                  <div class="sysx__tool-name">{tool.label}</div>
-                  <p class="sysx__tool-desc">{tool.desc}</p>
+                  <div class="sysx__tool-name">{serverText('tools', tool.label)}</div>
+                  <p class="sysx__tool-desc">{serverText('tools', tool.desc)}</p>
                 </div>
               </div>
               {#if runningTool === tool.id && st.total}

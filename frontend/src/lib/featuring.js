@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 /* Grouping and summarising for the "Credited on" / "Appears in" results — the
    list of every issue in the collection crediting a person or featuring a
    character or team. Pure functions so the shapes can be tested without a DOM;
@@ -60,7 +61,7 @@ export function groupBySeries(issues, { sort = 'series' } = {}) {
     const key = i.series_id != null ? `s${i.series_id}` : `n:${i.series || ''}`;
     let g = map.get(key);
     if (!g) {
-      g = { key, seriesId: i.series_id ?? null, series: i.series || 'Unknown series', items: [] };
+      g = { key, seriesId: i.series_id ?? null, series: i.series || t('featuring.unknownSeries'), items: [] };
       map.set(key, g);
     }
     g.items.push(i);
@@ -99,8 +100,8 @@ export function runsOf(numbers, { cap = 4 } = {}) {
   const parts = [];
   if (runs.length) {
     parts.push(runs.slice(0, cap).map((r) => '#' + r).join(', ')
-      + (runs.length > cap ? ` +${runs.length - cap} more runs` : ''));
+      + (runs.length > cap ? ' ' + t('featuring.moreRuns', { count: runs.length - cap }) : ''));
   }
-  if (odd) parts.push(`${odd} other`);
+  if (odd) parts.push(t('featuring.others', { count: odd }));
   return parts.join(' · ');
 }

@@ -1,0 +1,62 @@
+{
+  "scan-library": {
+    "label": "Analisar toda a biblioteca",
+    "desc": "Percorre as pastas raiz e indexa todos os ficheiros de banda desenhada — encontra ficheiros que ainda não estão na biblioteca e remove os apagados do disco."
+  },
+  "reindex-series": {
+    "label": "Reindexar as pastas das séries",
+    "desc": "Para cada série associada, reindexa a SUA pasta e atribui-lhe os ficheiros que lá estão — de forma autoritária, sem correspondência aproximada. Corrige ficheiros que ficaram ligados à série homónima errada. (Encontrar banda desenhada nova continua a ser 'Analisar toda a biblioteca'.)"
+  },
+  "tag-untagged": {
+    "label": "Etiquetar todos os ficheiros sem etiquetas",
+    "desc": "Escreve metadados em cada ficheiro possuído que não os tenha (converte .cbr quando necessário)."
+  },
+  "convert-cbr": {
+    "label": "Converter todos os CBR → CBZ",
+    "desc": "Reempacota cada .cbr como .cbz para que possa ser etiquetado e lido de forma consistente."
+  },
+  "unwrap-nested": {
+    "label": "Desaninhar arquivos",
+    "desc": "Alguns lançamentos trazem um .cbz que contém um .cbr em vez de páginas — abre, etiqueta e parece saudável, mas não tem nada para ler. Isto eleva as páginas do arquivo interior ao nível de topo, no mesmo sítio, mantendo o ComicInfo. O que não conseguir comprovar fica intocado."
+  },
+  "remove-duplicates": {
+    "label": "Remover ficheiros duplicados",
+    "desc": "Apaga cópias duplicadas da mesma edição em todas as bandas desenhadas. Cópias corrompidas que uma boa já substituiu vão logo embora. Onde existem duas cópias BOAS, fica a melhor — primeiro a etiquetada, depois a com mais páginas, depois a maior — e a outra é removida; essa parte corre como pré-visualização (veja Registos → ferramentas para a lista) a não ser que marque a caixa."
+  },
+  "verify": {
+    "label": "Verificar arquivos",
+    "desc": "Verifica a fundo cada ficheiro de banda desenhada à procura de corrupção e remove os que faltam no disco."
+  },
+  "relink-cv": {
+    "label": "Religar os ficheiros aos metadados",
+    "desc": "Reassocia os ficheiros possuídos às edições da fonte de metadados em cada banda desenhada associada (corrige as contagens de possuídas/em falta)."
+  },
+  "merge-duplicate-series": {
+    "label": "Fundir séries duplicadas",
+    "desc": "Junta linhas de séries que apontam para o mesmo volume (uma cópia adicionada diretamente da fonte de metadados enquanto a linha da própria pasta estava associada a outro). A linha ligada à pasta é mantida; os ficheiros, as edições em falta e os seguimentos da outra passam para ela. As cópias duplicadas que surjam são depois limpas com Remover ficheiros duplicados."
+  },
+  "rematch-mismatched": {
+    "label": "Reverificar volumes mal associados",
+    "desc": "Encontra séries cujos ficheiros vão além da última edição do volume associado — sinal de que foi associada uma minissérie ou um one-shot homónimo em vez da série verdadeira — e volta a associá-las. Um vencedor claro é aplicado e os seus ficheiros religados; o que for duvidoso fica para Corrigir associação na página da série."
+  },
+  "refresh-series": {
+    "label": "Atualizar os metadados das séries",
+    "desc": "Volta a obter os detalhes do volume e a lista de edições de cada série associada a partir do serviço de metadados — apanha o estado de publicação (Em curso / Terminada), o enriquecimento das séries guardadas antes de ele estar ativo e as edições publicadas desde então. Um pedido por segundo, por isso uma biblioteca grande demora; se o serviço limitar os pedidos, para de forma limpa e volta a executá-lo."
+  },
+  "fetch-metadata": {
+    "label": "Transferir os metadados das edições",
+    "desc": "Obtém os detalhes (descrições, créditos, datas, capas) de cada edição da sua coleção que ainda não os tenha. As edições já em cache são ignoradas; se a fonte de metadados limitar os pedidos, para de forma limpa — basta voltar a executar para terminar."
+  },
+  "rename-files": {
+    "label": "Renomear ficheiros segundo o padrão",
+    "desc": "Renomeia cada ficheiro associado segundo o seu padrão de nomes (mesma pasta — sem mover) para que ficheiros importados com nomes de scene correspondam aos transferidos. Colisões são ignoradas."
+  },
+  "backup-db": {
+    "label": "Fazer cópia de segurança da base de dados",
+    "desc": "Guarda uma cópia da base de dados do catálogo em backups/ ao lado dela (mantém as 5 mais recentes). Seguro com a aplicação em uso. Restauro: pare a aplicação e copie uma cópia por cima de catalog.db."
+  },
+  "remove-ghosts": {
+    "label": "Remover séries fantasma",
+    "desc": "Encontra séries deixadas de antes da associação de metadados — sem associação, sem ficheiros no disco — cujas edições \"em falta\" entulham o separador Em falta mas nunca poderão ser transferidas. Corre como pré-visualização (veja Registos → ferramentas para a lista); marque a caixa para as apagar mesmo."
+  }
+}

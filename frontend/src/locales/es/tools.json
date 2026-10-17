@@ -1,0 +1,62 @@
+{
+  "scan-library": {
+    "label": "Escanear toda la biblioteca",
+    "desc": "Recorre tus carpetas raíz e indexa cada archivo de cómic: encuentra archivos que aún no están en la biblioteca y descarta los borrados del disco."
+  },
+  "reindex-series": {
+    "label": "Reindexar las carpetas de las series",
+    "desc": "Para cada serie emparejada, reindexa SU propia carpeta y le atribuye los archivos que hay allí, de forma definitiva y sin coincidencias aproximadas. Corrige archivos que se habían adjuntado a la serie homónima equivocada. (Para encontrar cómics nuevos sigue siendo «Escanear toda la biblioteca».)"
+  },
+  "tag-untagged": {
+    "label": "Etiquetar todos los archivos sin etiquetas",
+    "desc": "Escribe metadatos en cada archivo en tu poder que no los tenga (convierte los .cbr cuando hace falta)."
+  },
+  "convert-cbr": {
+    "label": "Convertir todos los CBR → CBZ",
+    "desc": "Reempaqueta cada .cbr como .cbz para que pueda etiquetarse y leerse de forma coherente."
+  },
+  "unwrap-nested": {
+    "label": "Desempaquetar archivos anidados",
+    "desc": "Algunos lanzamientos traen un .cbz que contiene un .cbr en lugar de páginas: se abre, se etiqueta y parece sano, pero no hay nada que leer. Esta herramienta sube las páginas del archivo interno al nivel superior, en el mismo sitio, conservando el ComicInfo. Lo que no pueda demostrar se deja intacto."
+  },
+  "remove-duplicates": {
+    "label": "Eliminar archivos duplicados",
+    "desc": "Borra las copias duplicadas del mismo número en todos los cómics. Las copias corruptas que ya reemplazó una buena se van directamente. Cuando existen dos copias BUENAS, se conserva la mejor (primero la etiquetada, luego la de más páginas, luego la más grande) y se elimina la otra; esa parte se ejecuta como vista previa (consulta la lista en Registros → herramientas) a menos que marques la casilla."
+  },
+  "verify": {
+    "label": "Verificar archivos",
+    "desc": "Comprueba a fondo cada archivo de cómic en busca de corrupción y descarta los que faltan en el disco."
+  },
+  "relink-cv": {
+    "label": "Volver a vincular archivos con los metadatos",
+    "desc": "Vuelve a asignar los archivos en tu poder a los números de la fuente de metadatos para cada cómic emparejado (corrige los recuentos de en tu poder/pendientes)."
+  },
+  "merge-duplicate-series": {
+    "label": "Fusionar series duplicadas",
+    "desc": "Une las filas de series que apuntan al mismo volumen (una copia añadida directamente desde la fuente de metadatos mientras la fila propia de la carpeta se emparejó en otro sitio). Se conserva la fila respaldada por la carpeta; los archivos, números pendientes y seguimientos de la otra pasan a ella. Las copias duplicadas que aparezcan se limpian después con «Eliminar archivos duplicados»."
+  },
+  "rematch-mismatched": {
+    "label": "Revisar volúmenes mal emparejados",
+    "desc": "Encuentra series cuyos archivos van más allá del último número de su volumen emparejado (la señal de que se emparejó una miniserie o un one-shot homónimo en lugar de la serie real) y las vuelve a emparejar. Se aplica un ganador claro y se vuelven a vincular sus archivos; lo dudoso se deja para «Corregir emparejado» en la página de la serie."
+  },
+  "refresh-series": {
+    "label": "Actualizar metadatos de las series",
+    "desc": "Vuelve a descargar los detalles del volumen y la lista de números de cada serie emparejada desde el servicio de metadatos: recoge el estado de publicación (En curso / Finalizada), el enriquecimiento para series cacheadas antes de activarlo y los números publicados desde entonces. Una petición por segundo, así que una biblioteca grande tarda un rato; si el servicio limita las peticiones, se detiene limpiamente y lo vuelves a ejecutar."
+  },
+  "fetch-metadata": {
+    "label": "Descargar metadatos de números",
+    "desc": "Obtiene los detalles (descripciones, créditos, fechas, portadas) de cada número de tu colección que no los tenga. Los números ya cacheados se omiten; si la fuente de metadatos limita las peticiones, se detiene limpiamente: vuelve a ejecutarlo para terminar."
+  },
+  "rename-files": {
+    "label": "Renombrar archivos según el patrón",
+    "desc": "Renombra cada archivo emparejado según tu patrón de nombres (misma carpeta, sin mover nada) para que los archivos importados con nombres de scene coincidan con los descargados. Las colisiones se omiten."
+  },
+  "backup-db": {
+    "label": "Hacer copia de la base de datos",
+    "desc": "Guarda una instantánea de la base de datos del catálogo en backups/ junto a ella (conserva las 5 más recientes). Es seguro mientras la aplicación está en uso. Para restaurar: detén la aplicación y copia una instantánea sobre catalog.db."
+  },
+  "remove-ghosts": {
+    "label": "Eliminar series fantasma",
+    "desc": "Encuentra series sobrantes de antes del emparejado de metadatos (sin emparejar, sin archivos en el disco) cuyos números «pendientes» abarrotan la pestaña Pendientes pero nunca podrán descargarse. Se ejecuta como vista previa (consulta la lista en Registros → herramientas); marca la casilla para eliminarlas de verdad."
+  }
+}

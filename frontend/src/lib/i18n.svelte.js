@@ -47,6 +47,9 @@ export const { FALLBACK, currentLang, matchLanguage, addMessages, _setCatalogFor
 export function t(key, params) { void state.version; return core.t(key, params); }
 export function th(key, params) { void state.version; return core.th(key, params); }
 export function hasMessage(key) { void state.version; return core.hasMessage(key); }
+/** Server-sent text (labels, descriptions) shown in the reader's language when
+ *  the catalog knows its English; see i18n.js serverText. */
+export function st(ns, text) { void state.version; return core.serverText(ns, text); }
 
 /** The language's own name for itself ("Deutsch"), for pickers. */
 export function languageName(code) {

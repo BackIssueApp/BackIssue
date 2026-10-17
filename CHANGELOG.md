@@ -19,6 +19,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   still carries hardcoded text. Plugins get api.t / api.th / api.lang and
   api.registerMessages for their own strings. Series and issue data stay in
   the language the metadata source provides.
+  Labels the server defines (job, schedule and tool names, permission names,
+  source-card fields, plugin descriptions) are translated too, and plugins
+  can ship translations for the ones they register.
 - **Several metadata sources at once.** Settings → Metadata is now an ordered
   list, like download sources: turn on every source you want data from and
   move the one you trust most to the top. A search asks all of them and shows

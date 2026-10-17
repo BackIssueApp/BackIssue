@@ -7,7 +7,7 @@
   import { fmt } from '../lib/util.js';
   import { auth, logout, can, isTrusted } from '../lib/auth.svelte.js';
   import Icon from '../lib/Icon.svelte';
-  import { t } from '../lib/i18n.svelte.js';
+  import { t, hasMessage } from '../lib/i18n.svelte.js';
 
   let userMenuOpen = $state(false);
 
@@ -35,7 +35,9 @@
   // the account's reading rails, not the whole collection.
   const TYPE_KEYS = { comic: 'sidebar.typeComics', manga: 'sidebar.typeManga', magazine: 'sidebar.typeMagazines', ebook: 'sidebar.typeBooks' };
   const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-  const typeLabel = (type) => (TYPE_KEYS[type] ? t(TYPE_KEYS[type]) : cap(type));
+  // Core types have their own keys; a plugin's type is translated when its
+  // catalog ships _shared.libraryTypes.<type>, else capitalised as before.
+  const typeLabel = (type) => (TYPE_KEYS[type] ? t(TYPE_KEYS[type]) : hasMessage('libraryTypes.' + type) ? t('libraryTypes.' + type) : cap(type));
   const libraryEntries = $derived.by(() => {
     const libs = status.libraries || [];
     if (libs.length) return libs.map((l) => ({ key: 'lib:' + l.id, q: '/?library=' + l.id, label: l.name }));

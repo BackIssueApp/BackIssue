@@ -21,10 +21,11 @@ let lang = FALLBACK;
 let languages = [FALLBACK];
 let onChange = () => {};
 let dev = false;
+let generation = 0;
 
 /** Wire up the catalogs (done once by i18n.svelte.js at import). */
 export function configure({ en, languages: list, notify, isDev } = {}) {
-  if (en) { enCatalog = en; if (messages === undefined || lang === FALLBACK) messages = en; }
+  if (en) { enCatalog = en; generation++; if (messages === undefined || lang === FALLBACK) messages = en; }
   if (Array.isArray(list) && list.length) languages = list;
   if (typeof notify === 'function') onChange = notify;
   dev = !!isDev;
@@ -148,39 +149,53 @@ export function addMessages(catalogs) {
       if (!extra || typeof extra !== 'object') continue;
       target[ns] = { ...extra, ...(target[ns] || {}) };
       changed = true;
+      generation++;
+      generation++;
     }
   }
   if (changed) onChange();
   return changed;
 }
 
-// ---- server messages -------------------------------------------------------
-// The API answers with English text in { error }. Rather than teach every
-// route a code, the client recognises the English of the messages listed in
-// the errors namespace and shows the translation; anything unknown (plugin
-// errors, upstream detail) passes through unchanged. A message ending in
-// {detail} matches by prefix and carries the rest as the param.
-let reverse = null, reverseFor = null;
-function reverseMap() {
-  const errors = enCatalog.errors || {};
-  if (reverse && reverseFor === errors && reverse.size === Object.keys(errors).length) return reverse;
-  reverse = new Map();
-  reverseFor = errors;
-  for (const [key, text] of Object.entries(errors)) if (typeof text === 'string') reverse.set(text, key);
-  return reverse;
-}
-export function translateServerMessage(msg) {
-  if (typeof msg !== 'string' || !msg) return msg;
-  const map = reverseMap();
-  const exact = map.get(msg);
-  if (exact) return t('errors.' + exact);
-  for (const [text, key] of map) {
-    if (!text.endsWith('{detail}')) continue;
-    const prefix = text.slice(0, -'{detail}'.length);
-    if (msg.startsWith(prefix)) return t('errors.' + key, { detail: msg.slice(prefix.length) });
+// ---- server-sent text ------------------------------------------------------
+// The API answers with English: error messages, job and tool labels,
+// permission names, source-card fields, plugin descriptions. Rather than
+// teach every route a code, the client recognises the English of anything
+// listed in the matching namespace (flattened, so nested catalogs such as
+// permissions.library.view.label count) and shows the translation; unknown
+// text passes through unchanged. A message ending in {detail} matches by
+// prefix and carries the rest as the param.
+let reverseGen = -1;
+const reverseMaps = new Map();
+function flatten(node, prefix, out) {
+  for (const [k, v] of Object.entries(node || {})) {
+    if (typeof v === 'string') out.set(v, prefix + k);
+    else if (v && typeof v === 'object' && !isPlural(v)) flatten(v, prefix + k + '.', out);
   }
-  return msg;
+  return out;
 }
+function reverseMap(ns) {
+  if (reverseGen !== generation) { reverseMaps.clear(); reverseGen = generation; }
+  if (!reverseMaps.has(ns)) reverseMaps.set(ns, flatten(enCatalog[ns], ns + '.', new Map()));
+  return reverseMaps.get(ns);
+}
+/** Translate text the server sent, by its English, within one or more
+ *  namespaces (first match wins). Unknown text comes back unchanged. */
+export function serverText(ns, text) {
+  if (typeof text !== 'string' || !text) return text;
+  for (const n of Array.isArray(ns) ? ns : [ns]) {
+    const map = reverseMap(n);
+    const exact = map.get(text);
+    if (exact) return t(exact);
+    for (const [en, key] of map) {
+      if (!en.endsWith('{detail}')) continue;
+      const prefix = en.slice(0, -'{detail}'.length);
+      if (text.startsWith(prefix)) return t(key, { detail: text.slice(prefix.length) });
+    }
+  }
+  return text;
+}
+export const translateServerMessage = (msg) => serverText('errors', msg);
 
 /** Testing hook: swap the active catalog without touching any loader. */
 export function _setCatalogForTests(code, catalog) {

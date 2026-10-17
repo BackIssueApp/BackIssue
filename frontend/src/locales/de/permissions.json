@@ -1,0 +1,30 @@
+{
+  "categories": {
+    "library": "Bibliothek",
+    "system": "System"
+  },
+  "library": {
+    "view": { "label": "Bibliothek durchstöbern", "description": "Reihen, Hefte, Neuerscheinungen und die Warteschlange sehen" },
+    "manage": { "label": "Bibliothek verwalten", "description": "Reihen und Hefte hinzufügen/entfernen, scannen, taggen, importieren, Zuordnungen korrigieren" },
+    "restricted": { "label": "Inhalte ab 18 sehen", "description": "Als „ab 18“ bzw. eingeschränkt markierte Reihen sehen und lesen (für Rollen ohne dieses Recht verborgen)" }
+  },
+  "downloads": {
+    "grab": { "label": "Suchen & herunterladen", "description": "Quellen durchsuchen, Downloads in die Warteschlange stellen, wartende Einträge abbrechen" }
+  },
+  "lists": {
+    "share": { "label": "Leselisten teilen", "description": "Eigene Leselisten und Handlungsbögen veröffentlichen, damit jeder Benutzer sie sieht" }
+  },
+  "settings": {
+    "manage": { "label": "Einstellungen & Indexer", "description": "App-Einstellungen und Indexer ändern und Verbindungstests ausführen" }
+  },
+  "users": {
+    "manage": { "label": "Benutzer & Rollen", "description": "Konten, Rollen und Berechtigungen anlegen und verwalten" }
+  },
+  "plugins": {
+    "manage": { "label": "Plugins & Neustart", "description": "Plugins aktivieren/deaktivieren und die App neu starten" }
+  },
+  "system": {
+    "jobs": { "label": "Jobs & Werkzeuge", "description": "Jobs, Zeitpläne und Wartungswerkzeuge der Bibliothek ausführen" },
+    "logs": { "label": "Protokolle", "description": "Anwendungsprotokolle ansehen und leeren" }
+  }
+}

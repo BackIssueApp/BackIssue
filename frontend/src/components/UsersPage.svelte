@@ -8,7 +8,7 @@
   import { auth } from '../lib/auth.svelte.js';
   import { notify } from '../lib/toasts.svelte.js';
   import { confirmDialog } from './DialogModal.svelte';
-  import { t, currentLang } from '../lib/i18n.svelte.js';
+  import { t, currentLang, st } from '../lib/i18n.svelte.js';
 
   let { active = false } = $props();
   let users = $state([]);
@@ -26,7 +26,7 @@
   const permGroups = $derived.by(() => {
     const groups = new Map();
     for (const p of perms) {
-      const g = p.plugin ? t('usersPage.pluginGroup', { plugin: p.plugin }) : p.category || t('usersPage.otherGroup');
+      const g = p.plugin ? t('usersPage.pluginGroup', { plugin: p.plugin }) : (p.category ? st('permissions', p.category) : t('usersPage.otherGroup'));
       if (!groups.has(g)) groups.set(g, []);
       groups.get(g).push(p);
     }
@@ -236,10 +236,10 @@
                 <div class="usx__pgroup-head">{group}</div>
                 <div class="usx__perms">
                   {#each list as p (p.key)}
-                    <label class="usx__perm" class:is-on={editor.permissions.has(p.key)} title={p.description}>
+                    <label class="usx__perm" class:is-on={editor.permissions.has(p.key)} title={st('permissions', p.description)}>
                       <input type="checkbox" checked={editor.permissions.has(p.key)} onchange={() => togglePerm(p.key)} hidden />
                       <span class="usx__perm-box">{#if editor.permissions.has(p.key)}<Icon name="check" size={12} />{/if}</span>
-                      <span class="usx__perm-info"><span class="usx__perm-label">{p.label}</span><span class="usx__perm-desc">{p.description}</span></span>
+                      <span class="usx__perm-info"><span class="usx__perm-label">{st('permissions', p.label)}</span><span class="usx__perm-desc">{st('permissions', p.description)}</span></span>
                     </label>
                   {/each}
                 </div>

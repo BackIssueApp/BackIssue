@@ -8,13 +8,13 @@
   import { openIndexerModal, testIndexer } from './IndexerModal.svelte';
   import { confirmDialog } from './DialogModal.svelte';
   import { notify } from '../lib/toasts.svelte.js';
-  import { t, th, hasMessage } from '../lib/i18n.svelte.js';
+  import { t, th, hasMessage, st } from '../lib/i18n.svelte.js';
   import Icon from '../lib/Icon.svelte';
   import { hscroll } from '../lib/hscroll.js';
 
   // A label a plugin or source card sends may be a catalog key ('myplugin.apiKey')
   // or a plain string; show the translation when there is one.
-  const lbl = (x) => (typeof x === 'string' && hasMessage(x) ? t(x) : x);
+  const lbl = (x) => (typeof x === 'string' ? (hasMessage(x) ? t(x) : st('sourcekit', x)) : x);
   let { active = false } = $props();
 
   const DEFAULT_PORTS = { sabnzbd: '8080', nzbget: '6789' };
@@ -243,8 +243,8 @@
       const sw = block.querySelector('.switch input');
       out.push({
         key,
-        label: block.querySelector('.src-toggle b')?.textContent?.trim() || 'Plugin',
-        note: firstSentence(block.querySelector('.src-toggle .modal__note')?.textContent) || 'Plugin settings',
+        label: block.querySelector('.src-toggle b')?.textContent?.trim() || t('settingsPage.pluginFallbackLabel'),
+        note: firstSentence(block.querySelector('.src-toggle .modal__note')?.textContent) || t('settingsPage.pluginFallbackNote'),
         on: !!sw?.checked,
       });
       if (sw && !sw.dataset.setxWired) { sw.dataset.setxWired = '1'; sw.addEventListener('change', () => syncSourceUI()); }
@@ -923,7 +923,7 @@
               <div class="src-config setx-srcbody">
                 <div class="setx-card">
                   {#if c.unavailable}
-                    <p class="modal__note"><Icon name="alert-triangle" size={14} /> {c.unavailable}</p>
+                    <p class="modal__note"><Icon name="alert-triangle" size={14} /> {st('sourcekit', c.unavailable)}</p>
                   {:else if c.cloudflare}
                     <p class="modal__note">{@html th(c.browser === 'fallback' ? 'settingsPage.cloudflareNoteBrowser' : 'settingsPage.cloudflareNote')}</p>
                   {/if}

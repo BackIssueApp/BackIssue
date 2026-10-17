@@ -199,6 +199,8 @@
   "metaSources": "Metadatenquellen",
   "metaSourcesNote": "Jede Quelle einschalten, von der Reihen- und Heftdaten kommen sollen. Suchen fragen alle ab und zeigen die Antworten zusammen, beste zuerst — die Reihenfolge entscheidet also, welche gewinnt, wenn zwei dieselbe Reihe kennen. Eine Reihe kommt weiterhin von der Quelle, die sie gefunden hat. Der integrierte Dienst funktioniert sofort; die anderen fragen eine Datenbank direkt mit eigenem Schlüssel oder Konto ab, innerhalb ihrer Grenzen.",
   "useProvider": "{name} verwenden",
+  "pluginFallbackLabel": "Plugin",
+  "pluginFallbackNote": "Plugin-Einstellungen",
   "notSetUp": "nicht eingerichtet",
   "moveUp": "Nach oben",
   "moveDown": "Nach unten",

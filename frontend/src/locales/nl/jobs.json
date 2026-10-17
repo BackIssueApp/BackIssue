@@ -1,0 +1,21 @@
+{
+  "reorganize": "Bibliotheek herindelen",
+  "cvMatch": "Metadata van reeksen koppelen",
+  "cvMatchSchedule": "Metadata van reeksen koppelen (in bezit + gevolgd)",
+  "scanFolder": "Map scannen · {detail}",
+  "tagFiles": "Bestanden taggen · {detail}",
+  "importScanFull": "Bibliotheek scannen voor import (volledig)",
+  "importScanNew": "Bibliotheek scannen op nieuwe reeksen",
+  "importRun": "Bibliotheek importeren",
+  "releases": "Uitgaven van deze week controleren",
+  "refreshDetails": "Nummerdetails vernieuwen · {detail}",
+  "wantedSearch": "Gezochte nummers zoeken",
+  "wantedSearchSchedule": "Gezochte nummers zoeken (inhalen)",
+  "recentSearch": "Nieuwe uitgaven zoeken",
+  "rssWatch": "RSS van indexers volgen",
+  "rssWatchSchedule": "RSS van indexers volgen voor uitgaven",
+  "packImport": "Pakket importeren · {detail}",
+  "zeroDay": "Wekelijks 0-Day-pakket ophalen",
+  "zeroDaySchedule": "Wekelijks 0-Day-pakket ophalen (torrent)",
+  "dbBackup": "Back-up van database maken"
+}

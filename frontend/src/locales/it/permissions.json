@@ -1,0 +1,30 @@
+{
+  "categories": {
+    "library": "Biblioteca",
+    "system": "Sistema"
+  },
+  "library": {
+    "view": { "label": "Sfogliare la biblioteca", "description": "Vedere serie, albi, uscite e la coda" },
+    "manage": { "label": "Gestire la biblioteca", "description": "Aggiungere/rimuovere volumi e albi, scansionare, taggare, importare, correggere gli abbinamenti" },
+    "restricted": { "label": "Vedere i contenuti per adulti", "description": "Vedere e leggere le serie segnalate come per adulti/riservate (nascoste ai ruoli senza questo permesso)" }
+  },
+  "downloads": {
+    "grab": { "label": "Cercare e scaricare", "description": "Cercare nelle fonti, mettere in coda i download, annullare gli elementi in coda" }
+  },
+  "lists": {
+    "share": { "label": "Condividere le liste di lettura", "description": "Pubblicare le tue liste di lettura e i tuoi archi narrativi perché ogni utente possa vederli" }
+  },
+  "settings": {
+    "manage": { "label": "Impostazioni e indexer", "description": "Modificare le impostazioni dell'app e gli indexer, eseguire i test di connessione" }
+  },
+  "users": {
+    "manage": { "label": "Utenti e ruoli", "description": "Creare e gestire account, ruoli e permessi" }
+  },
+  "plugins": {
+    "manage": { "label": "Plugin e riavvio", "description": "Attivare/disattivare i plugin e riavviare l'app" }
+  },
+  "system": {
+    "jobs": { "label": "Attività e strumenti", "description": "Eseguire attività, pianificazioni e strumenti di manutenzione della biblioteca" },
+    "logs": { "label": "Log", "description": "Vedere e cancellare i log dell'applicazione" }
+  }
+}

@@ -153,7 +153,11 @@
 
   /* ---- Metadata editor (trusted): edit-in-place; edits lock against refreshes. */
   const EDIT_FIELDS = ['name', 'issue_number', 'cover_date', 'store_date', 'description', 'metron_rating', 'metron_price', 'metron_upc', 'metron_isbn'];
+  // Stored values stay English (the server and tags expect them); the option
+  // labels come from the metadata editor's catalog entries.
   const RATINGS = ['', 'Everyone', 'Teen', 'Teen Plus', 'Mature', 'Explicit', 'Adult'];
+  const RATING_KEYS = { Everyone: 'ratingEveryone', Teen: 'ratingTeen', 'Teen Plus': 'ratingTeenPlus', Mature: 'ratingMature', Explicit: 'ratingExplicit', Adult: 'ratingAdult' };
+  const ratingLabel = (r) => (r ? t('editMetadataModal.' + RATING_KEYS[r]) : '—');
   let editing = $state(false);
   let ef = $state({});
   let saving = $state(false);
@@ -293,7 +297,7 @@
                   <label class="ix__field"><span>{t('issueModal.fieldStoreDate')} {#if edited('store_date')}<span class="ix__edited">{t('issueModal.edited')}</span>{/if}</span>
                     <input type="text" placeholder={t('issueModal.datePlaceholder')} class:is-edited={edited('store_date')} bind:value={ef.store_date} /></label>
                   <label class="ix__field"><span>{t('issueModal.factRating')} {#if edited('metron_rating')}<span class="ix__edited">{t('issueModal.edited')}</span>{/if}</span>
-                    <select class:is-edited={edited('metron_rating')} bind:value={ef.metron_rating}>{#each RATINGS as r (r)}<option value={r}>{r || '—'}</option>{/each}</select></label>
+                    <select class:is-edited={edited('metron_rating')} bind:value={ef.metron_rating}>{#each RATINGS as r (r)}<option value={r}>{ratingLabel(r)}</option>{/each}</select></label>
                   <label class="ix__field"><span>{t('issueModal.factCoverPrice')} {#if edited('metron_price')}<span class="ix__edited">{t('issueModal.edited')}</span>{/if}</span>
                     <input type="text" inputmode="decimal" placeholder="3.99" class:is-edited={edited('metron_price')} bind:value={ef.metron_price} /></label>
                 </div>

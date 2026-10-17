@@ -1,0 +1,6 @@
+{
+  "siteUrl": "URL du site",
+  "downloadProxy": "Proxy de téléchargement",
+  "downloadProxyNote": "Proxy HTTP facultatif, utilisé uniquement pour le téléchargement du fichier, pour les hébergeurs qui bloquent les IP de datacenter.",
+  "browserRequired": "Cette source nécessite la version navigateur de l'application (l'image taguée -browser). Sur cette version, elle reste désactivée."
+}

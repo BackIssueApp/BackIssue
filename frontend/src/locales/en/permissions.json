@@ -1,0 +1,30 @@
+{
+  "categories": {
+    "library": "Library",
+    "system": "System"
+  },
+  "library": {
+    "view": { "label": "Browse the library", "description": "See series, issues, releases, and the queue" },
+    "manage": { "label": "Manage the library", "description": "Add/remove volumes and issues, scan, tag, import, fix matches" },
+    "restricted": { "label": "View mature content", "description": "See and read series flagged as mature/restricted (hidden from roles without this)" }
+  },
+  "downloads": {
+    "grab": { "label": "Search & download", "description": "Search sources, queue downloads, cancel queued items" }
+  },
+  "lists": {
+    "share": { "label": "Share reading lists", "description": "Publish your reading lists and story arcs so every user can see them" }
+  },
+  "settings": {
+    "manage": { "label": "Settings & indexers", "description": "Change app settings, indexers, and run connection tests" }
+  },
+  "users": {
+    "manage": { "label": "Users & roles", "description": "Create and manage accounts, roles, and permissions" }
+  },
+  "plugins": {
+    "manage": { "label": "Plugins & restart", "description": "Enable/disable plugins and restart the app" }
+  },
+  "system": {
+    "jobs": { "label": "Jobs & tools", "description": "Run jobs, schedules, and library maintenance tools" },
+    "logs": { "label": "Logs", "description": "View and clear application logs" }
+  }
+}

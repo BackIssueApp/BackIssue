@@ -1,0 +1,21 @@
+{
+  "reorganize": "Bibliothek neu ordnen",
+  "cvMatch": "Reihen-Metadaten zuordnen",
+  "cvMatchSchedule": "Reihen-Metadaten zuordnen (vorhanden + gefolgt)",
+  "scanFolder": "Ordner scannen · {detail}",
+  "tagFiles": "Dateien taggen · {detail}",
+  "importScanFull": "Bibliothek für den Import scannen (vollständig)",
+  "importScanNew": "Bibliothek nach neuen Reihen scannen",
+  "importRun": "Bibliothek importieren",
+  "releases": "Neuerscheinungen dieser Woche prüfen",
+  "refreshDetails": "Heftdetails aktualisieren · {detail}",
+  "wantedSearch": "Gesuchte Hefte suchen",
+  "wantedSearchSchedule": "Gesuchte Hefte suchen (Nachholen)",
+  "recentSearch": "Neuerscheinungen suchen",
+  "rssWatch": "Indexer-RSS beobachten",
+  "rssWatchSchedule": "Indexer-RSS auf Neuerscheinungen beobachten",
+  "packImport": "Paket importieren · {detail}",
+  "zeroDay": "Wöchentliches 0-Day-Paket holen",
+  "zeroDaySchedule": "Wöchentliches 0-Day-Paket holen (Torrent)",
+  "dbBackup": "Datenbank sichern"
+}

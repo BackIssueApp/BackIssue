@@ -1,0 +1,62 @@
+{
+  "scan-library": {
+    "label": "Gesamte Bibliothek scannen",
+    "desc": "Durchläuft die Stammordner und indexiert jede Comic-Datei – findet Dateien, die noch nicht in der Bibliothek sind, und entfernt von der Festplatte gelöschte."
+  },
+  "reindex-series": {
+    "label": "Reihenordner neu indexieren",
+    "desc": "Indexiert für jede zugeordnete Reihe ihren EIGENEN Ordner neu und ordnet ihr die Dateien darin zu – verbindlich, ohne unscharfe Zuordnung. Behebt Dateien, die an die falsche gleichnamige Reihe gehängt wurden. (Neue Comics findet weiterhin „Gesamte Bibliothek scannen“.)"
+  },
+  "tag-untagged": {
+    "label": "Alle ungetaggten Dateien taggen",
+    "desc": "Schreibt Metadaten in jede vorhandene Datei ohne Tags (konvertiert .cbr bei Bedarf)."
+  },
+  "convert-cbr": {
+    "label": "Alle CBR → CBZ konvertieren",
+    "desc": "Packt jede .cbr als .cbz neu, damit sie einheitlich getaggt und gelesen werden kann."
+  },
+  "unwrap-nested": {
+    "label": "Verschachtelte Archive auspacken",
+    "desc": "Manche Releases liefern eine .cbz, die statt Seiten eine .cbr enthält – sie lässt sich öffnen, taggen, sieht gesund aus und hat nichts zu lesen. Dieses Werkzeug hebt die Seiten des inneren Archivs an die oberste Ebene, an Ort und Stelle, und behält die ComicInfo. Alles, was es nicht belegen kann, bleibt unangetastet."
+  },
+  "remove-duplicates": {
+    "label": "Doppelte Dateien entfernen",
+    "desc": "Löscht doppelte Kopien desselben Hefts über alle Comics hinweg. Beschädigte Kopien, die eine intakte bereits ersetzt hat, gehen sofort. Gibt es zwei INTAKTE Kopien, bleibt die beste – zuerst getaggt, dann die mit den meisten Seiten, dann die größte – und die andere wird entfernt; dieser Teil läuft als Vorschau (Liste unter Protokolle → Werkzeuge), sofern das Kästchen nicht angehakt ist."
+  },
+  "verify": {
+    "label": "Archive prüfen",
+    "desc": "Prüft jede Comic-Datei gründlich auf Beschädigung und entfernt auf der Festplatte fehlende."
+  },
+  "relink-cv": {
+    "label": "Dateien neu mit Metadaten verknüpfen",
+    "desc": "Ordnet vorhandene Dateien für jeden zugeordneten Comic neu den Heften der Metadatenquelle zu (korrigiert die Zähler vorhanden/fehlend)."
+  },
+  "merge-duplicate-series": {
+    "label": "Doppelte Reihen zusammenführen",
+    "desc": "Führt Reihen zusammen, die auf denselben Band zeigen (eine direkt aus der Metadatenquelle hinzugefügte Kopie, während der eigene Eintrag des Ordners anderswo zugeordnet war). Der ordnerbasierte Eintrag bleibt; Dateien, gesuchte Hefte und Folgen des anderen wandern hinüber. Dabei auftauchende doppelte Kopien werden anschließend mit „Doppelte Dateien entfernen“ bereinigt."
+  },
+  "rematch-mismatched": {
+    "label": "Falsch zugeordnete Bände prüfen",
+    "desc": "Findet Reihen, deren Dateien über das letzte Heft ihres zugeordneten Bandes hinausgehen – das Zeichen, dass statt der eigentlichen Reihe eine gleichnamige Miniserie oder ein One-Shot zugeordnet wurde – und ordnet sie neu zu. Ein klarer Treffer wird übernommen und seine Dateien neu verknüpft; alles Unklare bleibt für „Zuordnung korrigieren“ auf der Reihenseite."
+  },
+  "refresh-series": {
+    "label": "Reihen-Metadaten aktualisieren",
+    "desc": "Holt für jede zugeordnete Reihe Banddetails und Heftliste neu vom Metadatendienst – übernimmt den Erscheinungsstatus (Laufend / Beendet), die Anreicherung für Reihen, die vor deren Aktivierung gecacht wurden, und seitdem erschienene Hefte. Eine Anfrage pro Sekunde, eine große Bibliothek dauert also eine Weile; drosselt der Dienst, stoppt das Werkzeug sauber und du startest es erneut."
+  },
+  "fetch-metadata": {
+    "label": "Heft-Metadaten herunterladen",
+    "desc": "Holt Heftdetails (Beschreibungen, Credits, Daten, Cover) für jedes Heft in deiner Sammlung, dem sie fehlen. Bereits gecachte Hefte werden übersprungen; drosselt die Metadatenquelle, stoppt das Werkzeug sauber – einfach erneut starten, um fertig zu werden."
+  },
+  "rename-files": {
+    "label": "Dateien nach Muster umbenennen",
+    "desc": "Benennt jede zugeordnete Datei nach deinem Dateimuster um (gleicher Ordner – keine Verschiebungen), damit importierte Dateien mit Scene-Namen zu heruntergeladenen passen. Kollisionen werden übersprungen."
+  },
+  "backup-db": {
+    "label": "Datenbank sichern",
+    "desc": "Legt einen Schnappschuss der Katalogdatenbank unter backups/ daneben ab (behält die neuesten 5). Sicher, während die App benutzt wird. Wiederherstellen: App stoppen und einen Schnappschuss über catalog.db kopieren."
+  },
+  "remove-ghosts": {
+    "label": "Geisterreihen entfernen",
+    "desc": "Findet Reihen-Überbleibsel aus der Zeit vor der Metadatenzuordnung – keine Zuordnung, keine Dateien auf der Festplatte –, deren „gesuchte“ Hefte den Tab „Gesucht“ zumüllen, aber nie heruntergeladen werden können. Läuft als Vorschau (Liste unter Protokolle → Werkzeuge); Kästchen anhaken, um sie wirklich zu löschen."
+  }
+}

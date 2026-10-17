@@ -1,0 +1,21 @@
+{
+  "reorganize": "Riorganizza la biblioteca",
+  "cvMatch": "Abbina i metadati delle serie",
+  "cvMatchSchedule": "Abbina i metadati delle serie (possedute + seguite)",
+  "scanFolder": "Scansiona cartella · {detail}",
+  "tagFiles": "Tagga file · {detail}",
+  "importScanFull": "Scansiona la biblioteca per l'importazione (completa)",
+  "importScanNew": "Scansiona la biblioteca in cerca di nuove serie",
+  "importRun": "Importa la biblioteca",
+  "releases": "Controlla le uscite di questa settimana",
+  "refreshDetails": "Aggiorna i dettagli degli albi · {detail}",
+  "wantedSearch": "Cerca gli albi mancanti",
+  "wantedSearchSchedule": "Cerca gli albi mancanti (recupero)",
+  "recentSearch": "Cerca le nuove uscite",
+  "rssWatch": "Controlla i feed RSS degli indexer",
+  "rssWatchSchedule": "Controlla i feed RSS degli indexer per le uscite",
+  "packImport": "Importa pacchetto · {detail}",
+  "zeroDay": "Preleva il pacchetto 0-Day settimanale",
+  "zeroDaySchedule": "Preleva il pacchetto 0-Day settimanale (torrent)",
+  "dbBackup": "Esegui il backup del database"
+}

@@ -1,0 +1,5 @@
+{
+  "unknownSeries": "Unbekannte Reihe",
+  "moreRuns": { "one": "+{count} weiterer Bereich", "other": "+{count} weitere Bereiche" },
+  "others": { "one": "{count} weiteres", "other": "{count} weitere" }
+}

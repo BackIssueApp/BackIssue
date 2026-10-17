@@ -1,0 +1,6 @@
+{
+  "siteUrl": "URL del sito",
+  "downloadProxy": "Proxy di download",
+  "downloadProxyNote": "Proxy HTTP facoltativo usato solo per il download dei file, per gli host che bloccano gli IP dei datacenter.",
+  "browserRequired": "Questa fonte richiede la build con browser dell'app (l'immagine con tag -browser). Su questa build resta disattivata."
+}

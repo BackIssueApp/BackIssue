@@ -1,0 +1,6 @@
+{
+  "siteUrl": "Site-URL",
+  "downloadProxy": "Download-Proxy",
+  "downloadProxyNote": "Optionaler HTTP-Proxy nur für den Dateidownload, für Hoster, die Rechenzentrums-IPs blockieren.",
+  "browserRequired": "Diese Quelle braucht die Browser-Variante der App (das Image mit dem Tag -browser). In dieser Variante bleibt sie aus."
+}

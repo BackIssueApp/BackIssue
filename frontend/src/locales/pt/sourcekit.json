@@ -1,0 +1,6 @@
+{
+  "siteUrl": "URL do site",
+  "downloadProxy": "Proxy de download",
+  "downloadProxyNote": "Proxy HTTP opcional usado apenas na transferência do ficheiro, para anfitriões que bloqueiam IPs de datacenter.",
+  "browserRequired": "Esta fonte precisa da versão com browser da aplicação (a imagem com a etiqueta -browser). Nesta versão fica desligada."
+}

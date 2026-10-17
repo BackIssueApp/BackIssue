@@ -1,0 +1,5 @@
+{
+  "unknownSeries": "Série desconhecida",
+  "moreRuns": { "one": "+{count} outra sequência", "other": "+{count} outras sequências" },
+  "others": { "one": "{count} outra", "other": "{count} outras" }
+}

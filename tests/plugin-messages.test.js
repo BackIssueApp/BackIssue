@@ -33,7 +33,11 @@ test('a plugin\'s locales/<lang>.json files are picked up under its own namespac
   const pdir = path.join(dir, 'greeter');
   fs.mkdirSync(path.join(pdir, 'locales'), { recursive: true });
   fs.writeFileSync(path.join(pdir, 'index.js'), 'export default function register() {}\n');
-  fs.writeFileSync(path.join(pdir, 'locales', 'en.json'), JSON.stringify({ title: 'Greeter', n: { one: '{count} hi', other: '{count} his' } }));
+  fs.writeFileSync(path.join(pdir, 'locales', 'en.json'), JSON.stringify({
+    title: 'Greeter', n: { one: '{count} hi', other: '{count} his' },
+    // Entries for namespaces the core UI reads land outside the plugin's own.
+    _shared: { permissions: { greeter: { use: { label: 'Use greeter' } } }, jobs: { 'greeter-wave': { label: 'Wave' } } },
+  }));
   fs.writeFileSync(path.join(pdir, 'locales', 'fr.json'), JSON.stringify({ title: 'Salueur' }));
   fs.writeFileSync(path.join(pdir, 'locales', 'broken.json'), '{ not json');
   fs.writeFileSync(path.join(pdir, 'locales', 'README.md'), 'ignored');
@@ -42,6 +46,9 @@ test('a plugin\'s locales/<lang>.json files are picked up under its own namespac
     try { await loadPluginsFromDir(dir); } finally { console.warn = warn; }
     const all = registeredMessages();
     assert.deepEqual(all.en.greeter, { title: 'Greeter', n: { one: '{count} hi', other: '{count} his' } });
+    assert.deepEqual(all.en.permissions, { greeter: { use: { label: 'Use greeter' } } });
+    assert.deepEqual(all.en.jobs, { 'greeter-wave': { label: 'Wave' } });
+    assert.equal(all.en.greeter._shared, undefined);
     assert.deepEqual(all.fr.greeter, { title: 'Salueur' });
     assert.equal(all.broken, undefined);
     assert.ok(warned.some((w) => /broken\.json/.test(w)), 'a broken catalog is reported');

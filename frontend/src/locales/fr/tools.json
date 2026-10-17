@@ -1,0 +1,62 @@
+{
+  "scan-library": {
+    "label": "Analyser toute la bibliothèque",
+    "desc": "Parcourt vos dossiers racines et indexe chaque fichier de comics — trouve les fichiers absents de la bibliothèque et retire ceux supprimés du disque."
+  },
+  "reindex-series": {
+    "label": "Réindexer les dossiers des séries",
+    "desc": "Pour chaque série associée, réindexe SON propre dossier et lui attribue les fichiers qui s'y trouvent — de façon certaine, sans correspondance approximative. Corrige les fichiers rattachés à la mauvaise série homonyme. (Pour trouver de nouveaux comics, utilisez toujours « Analyser toute la bibliothèque ».)"
+  },
+  "tag-untagged": {
+    "label": "Étiqueter tous les fichiers sans tags",
+    "desc": "Écrit les métadonnées dans chaque fichier possédé qui n'en a pas (convertit les .cbr si nécessaire)."
+  },
+  "convert-cbr": {
+    "label": "Convertir tous les CBR → CBZ",
+    "desc": "Réempaquette chaque .cbr en .cbz pour qu'il puisse être étiqueté et lu de façon cohérente."
+  },
+  "unwrap-nested": {
+    "label": "Extraire les archives imbriquées",
+    "desc": "Certaines releases livrent un .cbz qui contient un .cbr au lieu de pages — il s'ouvre, s'étiquette, semble sain, et n'a rien à lire. Cet outil remonte les pages de l'archive interne au niveau supérieur, sur place, en conservant le ComicInfo. Tout ce qu'il ne peut pas prouver est laissé intact."
+  },
+  "remove-duplicates": {
+    "label": "Supprimer les fichiers en double",
+    "desc": "Supprime les copies en double d'un même numéro dans tous les comics. Les copies corrompues déjà remplacées par une bonne partent directement. Quand deux BONNES copies existent, la meilleure est conservée — étiquetée d'abord, puis la plus de pages, puis la plus volumineuse — et l'autre supprimée ; cette partie s'exécute en aperçu (voir Journaux → outils pour la liste) sauf si vous cochez la case."
+  },
+  "verify": {
+    "label": "Vérifier les archives",
+    "desc": "Vérifie en profondeur chaque fichier de comics pour détecter la corruption et retire ceux absents du disque."
+  },
+  "relink-cv": {
+    "label": "Relier les fichiers aux métadonnées",
+    "desc": "Réassocie les fichiers possédés aux numéros de la source de métadonnées pour chaque comic associé (corrige les compteurs possédés/manquants)."
+  },
+  "merge-duplicate-series": {
+    "label": "Fusionner les séries en double",
+    "desc": "Regroupe les séries qui pointent vers le même volume (une copie ajoutée directement depuis la source de métadonnées alors que l'entrée du dossier était associée ailleurs). L'entrée adossée au dossier est conservée ; les fichiers, numéros manquants et suivis de l'autre lui sont transférés. Les copies en double qui apparaissent sont ensuite nettoyées avec « Supprimer les fichiers en double »."
+  },
+  "rematch-mismatched": {
+    "label": "Revérifier les volumes mal associés",
+    "desc": "Trouve les séries dont les fichiers dépassent le dernier numéro de leur volume associé — signe qu'une mini-série ou un one-shot homonyme a été associé à la place de la vraie série — et les réassocie. Un gagnant clair est appliqué et ses fichiers reliés ; tout cas douteux est laissé à « Corriger l'association » sur la page de la série."
+  },
+  "refresh-series": {
+    "label": "Actualiser les métadonnées des séries",
+    "desc": "Retélécharge les détails du volume et la liste des numéros de chaque série associée depuis le service de métadonnées — récupère le statut de publication (En cours / Terminée), l'enrichissement pour les séries mises en cache avant son activation, et les numéros publiés depuis. Une requête par seconde, donc une grande bibliothèque prend du temps ; si le service limite le débit, l'outil s'arrête proprement et vous le relancez."
+  },
+  "fetch-metadata": {
+    "label": "Télécharger les métadonnées des numéros",
+    "desc": "Récupère les détails des numéros (descriptions, crédits, dates, couvertures) pour chaque numéro de votre collection qui en manque. Les numéros déjà en cache sont ignorés ; si la source de métadonnées limite le débit, l'outil s'arrête proprement — relancez-le pour terminer."
+  },
+  "rename-files": {
+    "label": "Renommer les fichiers selon le modèle",
+    "desc": "Renomme chaque fichier associé selon votre modèle de nom de fichier (même dossier — aucun déplacement) pour que les fichiers importés avec des noms de scène correspondent aux téléchargés. Les collisions sont ignorées."
+  },
+  "backup-db": {
+    "label": "Sauvegarder la base de données",
+    "desc": "Prend un instantané de la base du catalogue dans backups/ à côté d'elle (conserve les 5 plus récents). Sans risque pendant l'utilisation de l'application. Restauration : arrêtez l'application et copiez un instantané par-dessus catalog.db."
+  },
+  "remove-ghosts": {
+    "label": "Supprimer les séries fantômes",
+    "desc": "Trouve les séries résiduelles d'avant l'association des métadonnées — aucune association, aucun fichier sur le disque — dont les numéros « manquants » encombrent l'onglet Manquants sans jamais pouvoir être téléchargés. S'exécute en aperçu (voir Journaux → outils pour la liste) ; cochez la case pour vraiment les supprimer."
+  }
+}

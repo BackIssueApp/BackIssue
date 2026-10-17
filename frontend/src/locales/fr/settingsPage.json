@@ -199,6 +199,8 @@
   "metaSources": "Sources de métadonnées",
   "metaSourcesNote": "Activez chaque source dont vous voulez les données de séries et de numéros. Les recherches les interrogent toutes et affichent les réponses ensemble, meilleure d'abord : l'ordre décide donc laquelle l'emporte quand deux connaissent la même série. Une série continue de venir de la source qui l'a trouvée. Le service intégré fonctionne d'emblée ; les autres interrogent directement une base avec votre propre clé ou compte, dans ses limites.",
   "useProvider": "Utiliser {name}",
+  "pluginFallbackLabel": "Plugin",
+  "pluginFallbackNote": "Paramètres du plugin",
   "notSetUp": "non configuré",
   "moveUp": "Monter",
   "moveDown": "Descendre",

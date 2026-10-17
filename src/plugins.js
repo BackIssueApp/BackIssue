@@ -97,6 +97,10 @@ function mergeMessages(catalogs) {
   for (const [lang, byNs] of Object.entries(catalogs)) {
     if (!byNs || typeof byNs !== 'object' || !/^[a-z]{2,3}(-[a-z0-9]{2,8}){0,2}$/i.test(lang)) continue;
     for (const [ns, messages] of Object.entries(byNs)) {
+      if (ns === '_shared') { // namespaces shared with core (permissions, jobs, notifications, …)
+        if (messages && typeof messages === 'object') mergeMessages({ [lang]: messages });
+        continue;
+      }
       if (!messages || typeof messages !== 'object' || Array.isArray(messages)) continue;
       const target = (messageCatalogs[lang] ??= {});
       target[ns] = { ...(target[ns] || {}), ...messages };
@@ -111,8 +115,11 @@ function loadPluginLocales(dir, name) {
   for (const f of files) {
     const lang = f.replace(/\.json$/, '');
     try {
-      const messages = JSON.parse(fs.readFileSync(path.join(ldir, f), 'utf8'));
-      mergeMessages({ [lang]: { [name]: messages } });
+      const { _shared, ...own } = JSON.parse(fs.readFileSync(path.join(ldir, f), 'utf8'));
+      // The plugin's own strings live under its name; _shared holds entries
+      // for namespaces the core UI reads by key or by English text
+      // (permissions, jobs, libraryTypes, notifications, plugins).
+      mergeMessages({ [lang]: { [name]: own, ...(_shared && typeof _shared === 'object' ? _shared : {}) } });
     } catch (e) { console.warn(`plugin "${name}": could not read locales/${f}:`, e?.message || e); }
   }
 }

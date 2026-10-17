@@ -199,6 +199,8 @@
   "metaSources": "Metadata sources",
   "metaSourcesNote": "Turn on every source you want series and issue data from. Searches ask all of them and show the answers together, best first, so the order decides which wins when two know the same series. A series keeps coming from the source that found it. The built-in service works out of the box; the others query a database directly with your own key or account, under its limits.",
   "useProvider": "Use {name}",
+  "pluginFallbackLabel": "Plugin",
+  "pluginFallbackNote": "Plugin settings",
   "notSetUp": "not set up",
   "moveUp": "Move up",
   "moveDown": "Move down",

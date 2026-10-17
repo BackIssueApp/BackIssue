@@ -1,0 +1,62 @@
+{
+  "scan-library": {
+    "label": "Scansiona tutta la biblioteca",
+    "desc": "Percorre le cartelle principali e indicizza ogni file di fumetti — trova i file non ancora in biblioteca e rimuove quelli cancellati dal disco."
+  },
+  "reindex-series": {
+    "label": "Re-indicizza le cartelle delle serie",
+    "desc": "Per ogni serie abbinata, re-indicizza la SUA cartella e le attribuisce i file che contiene — in modo autoritativo, senza corrispondenze approssimative. Corregge i file che erano stati attaccati alla serie omonima sbagliata. (Per trovare fumetti nuovi serve sempre 'Scansiona tutta la biblioteca'.)"
+  },
+  "tag-untagged": {
+    "label": "Tagga tutti i file senza tag",
+    "desc": "Scrive i metadati in ogni file posseduto che non ne ha (converte i .cbr se necessario)."
+  },
+  "convert-cbr": {
+    "label": "Converti tutti i CBR → CBZ",
+    "desc": "Reimpacchetta ogni .cbr come .cbz, così può essere taggato e letto in modo coerente."
+  },
+  "unwrap-nested": {
+    "label": "Estrai gli archivi annidati",
+    "desc": "Alcune release contengono un .cbz che racchiude un .cbr invece delle pagine — si apre, si tagga e sembra sano, ma non ha nulla da leggere. Questo porta le pagine dell'archivio interno al livello superiore, sul posto, conservando il ComicInfo. Tutto ciò che non può essere verificato resta intatto."
+  },
+  "remove-duplicates": {
+    "label": "Rimuovi i file duplicati",
+    "desc": "Elimina le copie duplicate dello stesso albo in ogni fumetto. Le copie corrotte già sostituite da una buona vengono eliminate subito. Dove esistono due copie BUONE, si conserva la migliore — prima quella taggata, poi quella con più pagine, poi la più grande — e l'altra viene rimossa; questa parte gira come anteprima (vedi Log → strumenti per l'elenco) a meno che non spunti la casella."
+  },
+  "verify": {
+    "label": "Verifica gli archivi",
+    "desc": "Controlla a fondo ogni file di fumetti in cerca di corruzione e rimuove quelli assenti dal disco."
+  },
+  "relink-cv": {
+    "label": "Ricollega i file ai metadati",
+    "desc": "Riassocia i file posseduti agli albi della fonte di metadati per ogni fumetto abbinato (corregge i conteggi posseduti/mancanti)."
+  },
+  "merge-duplicate-series": {
+    "label": "Unisci le serie duplicate",
+    "desc": "Fonde le righe di serie che puntano allo stesso volume (una copia aggiunta direttamente dalla fonte di metadati mentre la riga della cartella era abbinata altrove). Si conserva la riga legata alla cartella; i file, gli albi mancanti e i follow dell'altra vengono trasferiti. Le eventuali copie duplicate che emergono vengono poi eliminate con Rimuovi i file duplicati."
+  },
+  "rematch-mismatched": {
+    "label": "Ricontrolla i volumi abbinati male",
+    "desc": "Trova le serie i cui file vanno oltre l'ultimo albo del volume abbinato — il segno che è stata abbinata una miniserie o un one-shot omonimo invece della serie vera — e le riabbina. Un vincitore chiaro viene applicato e i suoi file ricollegati; i casi dubbi restano per Correggi abbinamento nella pagina della serie."
+  },
+  "refresh-series": {
+    "label": "Aggiorna i metadati delle serie",
+    "desc": "Riscarica i dettagli del volume e l'elenco degli albi di ogni serie abbinata dal servizio di metadati — recupera lo stato di pubblicazione (In corso / Conclusa), gli arricchimenti per le serie memorizzate prima che fossero attivi e gli albi pubblicati da allora. Una richiesta al secondo, quindi una biblioteca grande richiede tempo; se il servizio limita le richieste, si ferma in modo pulito e lo rilanci."
+  },
+  "fetch-metadata": {
+    "label": "Scarica i metadati degli albi",
+    "desc": "Recupera i dettagli (descrizioni, crediti, date, copertine) di ogni albo della tua collezione che ne è privo. Gli albi già in cache vengono saltati; se la fonte di metadati limita le richieste, si ferma in modo pulito — rilancialo per finire."
+  },
+  "rename-files": {
+    "label": "Rinomina i file secondo lo schema",
+    "desc": "Rinomina ogni file abbinato secondo il tuo schema dei nomi (stessa cartella — nessuno spostamento), così i file importati con nomi scene corrispondono a quelli scaricati. I conflitti vengono saltati."
+  },
+  "backup-db": {
+    "label": "Esegui il backup del database",
+    "desc": "Salva un'istantanea del database del catalogo in backups/ accanto a esso (conserva le 5 più recenti). Sicuro anche mentre l'app è in uso. Ripristino: ferma l'app e copia un'istantanea sopra catalog.db."
+  },
+  "remove-ghosts": {
+    "label": "Rimuovi le serie fantasma",
+    "desc": "Trova le serie residue di prima dell'abbinamento dei metadati — nessun abbinamento, nessun file su disco — i cui albi \"mancanti\" ingombrano la scheda Mancanti ma non potranno mai essere scaricati. Gira come anteprima (vedi Log → strumenti per l'elenco); spunta la casella per eliminarle davvero."
+  }
+}

@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach } from 'vitest';
 import { t, th, matchLanguage, addMessages, hasMessage, languageName, _setCatalogForTests, LANGUAGES } from '../src/lib/i18n.svelte.js';
-import { translateServerMessage } from '../src/lib/i18n.js';
+import { translateServerMessage, serverText } from '../src/lib/i18n.js';
 import en from '../src/locales/en/common.json';
 
 afterEach(() => _setCatalogForTests('en', { common: en }));
@@ -59,6 +59,28 @@ describe('language matching', () => {
   test('English is always first in the catalog list and names itself', () => {
     expect(LANGUAGES[0]).toBe('en');
     expect(languageName('en')).toBe('English');
+  });
+});
+
+describe('serverText()', () => {
+  test('translates server labels by their English across nested namespaces, with a detail suffix', () => {
+    _setCatalogForTests('de', {
+      permissions: { library: { view: { label: 'Bibliothek durchsuchen' } } },
+      jobs: { refreshDetails: 'Heftdetails aktualisieren · {detail}' },
+      tools: { 'scan-library': { label: 'Gesamte Bibliothek scannen' } },
+    });
+    expect(serverText('permissions', 'Browse the library')).toBe('Bibliothek durchsuchen');
+    expect(serverText('jobs', 'Refresh issue details · Blacksad')).toBe('Heftdetails aktualisieren · Blacksad');
+    expect(serverText(['jobs', 'tools'], 'Scan entire library')).toBe('Gesamte Bibliothek scannen');
+    expect(serverText('jobs', 'Something a plugin named')).toBe('Something a plugin named');
+    expect(serverText('jobs', '')).toBe('');
+  });
+  test('sees messages a plugin added to a shared namespace', () => {
+    _setCatalogForTests('en', { permissions: {} });
+    addMessages({ en: { permissions: { reader: { read: { label: 'Read comics' } } } } });
+    expect(serverText('permissions', 'Read comics')).toBe('Read comics');
+    _setCatalogForTests('fr', { permissions: { reader: { read: { label: 'Lire des comics' } } } });
+    expect(serverText('permissions', 'Read comics')).toBe('Lire des comics');
   });
 });
 

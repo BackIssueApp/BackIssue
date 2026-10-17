@@ -1,0 +1,5 @@
+{
+  "unknownSeries": "Série inconnue",
+  "moreRuns": { "one": "+{count} autre plage", "other": "+{count} autres plages" },
+  "others": { "one": "{count} autre", "other": "{count} autres" }
+}

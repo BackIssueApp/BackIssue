@@ -1,0 +1,5 @@
+{
+  "unknownSeries": "Unknown series",
+  "moreRuns": { "one": "+{count} more run", "other": "+{count} more runs" },
+  "others": { "one": "{count} other", "other": "{count} other" }
+}

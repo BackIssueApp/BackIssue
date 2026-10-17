@@ -1,0 +1,30 @@
+{
+  "categories": {
+    "library": "Bibliothèque",
+    "system": "Système"
+  },
+  "library": {
+    "view": { "label": "Parcourir la bibliothèque", "description": "Voir les séries, les numéros, les sorties et la file d'attente" },
+    "manage": { "label": "Gérer la bibliothèque", "description": "Ajouter/retirer des séries et des numéros, analyser, étiqueter, importer, corriger les associations" },
+    "restricted": { "label": "Voir le contenu pour adultes", "description": "Voir et lire les séries marquées pour adultes/restreintes (masquées pour les rôles sans cette permission)" }
+  },
+  "downloads": {
+    "grab": { "label": "Rechercher et télécharger", "description": "Rechercher dans les sources, mettre des téléchargements en file d'attente, annuler des éléments en attente" }
+  },
+  "lists": {
+    "share": { "label": "Partager les listes de lecture", "description": "Publier vos listes de lecture et arcs narratifs pour que tous les utilisateurs les voient" }
+  },
+  "settings": {
+    "manage": { "label": "Paramètres et indexeurs", "description": "Modifier les paramètres de l'application et les indexeurs, lancer des tests de connexion" }
+  },
+  "users": {
+    "manage": { "label": "Utilisateurs et rôles", "description": "Créer et gérer les comptes, les rôles et les permissions" }
+  },
+  "plugins": {
+    "manage": { "label": "Plugins et redémarrage", "description": "Activer/désactiver les plugins et redémarrer l'application" }
+  },
+  "system": {
+    "jobs": { "label": "Tâches et outils", "description": "Lancer des tâches, des planifications et des outils de maintenance de la bibliothèque" },
+    "logs": { "label": "Journaux", "description": "Consulter et effacer les journaux de l'application" }
+  }
+}

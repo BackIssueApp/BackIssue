@@ -199,6 +199,8 @@
   "metaSources": "Fuentes de metadatos",
   "metaSourcesNote": "Activa todas las fuentes de las que quieras datos de series y números. Las búsquedas consultan todas y muestran las respuestas juntas, la mejor primero, así que el orden decide cuál gana cuando dos conocen la misma serie. Una serie sigue viniendo de la fuente que la encontró. El servicio integrado funciona sin configuración; las demás consultan una base de datos directamente con tu propia clave o cuenta, bajo sus límites.",
   "useProvider": "Usar {name}",
+  "pluginFallbackLabel": "Plugin",
+  "pluginFallbackNote": "Ajustes del plugin",
   "notSetUp": "sin configurar",
   "moveUp": "Subir",
   "moveDown": "Bajar",

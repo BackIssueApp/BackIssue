@@ -1,0 +1,62 @@
+{
+  "scan-library": {
+    "label": "Hele bibliotheek scannen",
+    "desc": "Doorloopt je hoofdmappen en indexeert elk stripbestand — vindt bestanden die nog niet in de bibliotheek staan en laat bestanden vallen die van de schijf zijn verwijderd."
+  },
+  "reindex-series": {
+    "label": "Reeksmappen opnieuw indexeren",
+    "desc": "Indexeert voor elke gekoppelde reeks haar EIGEN map opnieuw en wijst de bestanden daar aan haar toe — gezaghebbend, zonder vage koppeling. Herstelt bestanden die aan de verkeerde reeks met dezelfde naam hingen. (Nieuwe strips vinden blijft 'Hele bibliotheek scannen'.)"
+  },
+  "tag-untagged": {
+    "label": "Alle ongetagde bestanden taggen",
+    "desc": "Schrijft metadata in elk bestand in bezit dat er nog geen heeft (zet .cbr om waar nodig)."
+  },
+  "convert-cbr": {
+    "label": "Alle CBR → CBZ omzetten",
+    "desc": "Pakt elke .cbr opnieuw in als .cbz, zodat die consequent getagd en gelezen kan worden."
+  },
+  "unwrap-nested": {
+    "label": "Geneste archieven uitpakken",
+    "desc": "Sommige releases bevatten een .cbz met daarin een .cbr in plaats van pagina's — die opent, tagt en lijkt gezond, maar heeft niets om te lezen. Dit tilt de pagina's van het binnenste archief naar het hoogste niveau, ter plekke, met behoud van de ComicInfo. Wat niet aantoonbaar is, blijft ongemoeid."
+  },
+  "remove-duplicates": {
+    "label": "Dubbele bestanden verwijderen",
+    "desc": "Verwijdert dubbele kopieën van hetzelfde nummer in elke strip. Beschadigde kopieën die al door een goede zijn vervangen gaan meteen weg. Waar twee GOEDE kopieën bestaan, blijft de beste — eerst de getagde, dan die met de meeste pagina's, dan de grootste — en wordt de andere verwijderd; dat deel draait als voorbeeld (zie Logboek → hulpmiddelen voor de lijst), tenzij je het vakje aanvinkt."
+  },
+  "verify": {
+    "label": "Archieven controleren",
+    "desc": "Controleert elk stripbestand grondig op beschadiging en verwijdert bestanden die op de schijf ontbreken."
+  },
+  "relink-cv": {
+    "label": "Bestanden opnieuw aan metadata koppelen",
+    "desc": "Koppelt de bestanden in bezit opnieuw aan de nummers van de metadatabron voor elke gekoppelde strip (herstelt de tellingen in bezit/gezocht)."
+  },
+  "merge-duplicate-series": {
+    "label": "Dubbele reeksen samenvoegen",
+    "desc": "Voegt reeksregels samen die naar hetzelfde deel verwijzen (een kopie rechtstreeks uit de metadatabron toegevoegd terwijl de regel van de map zelf elders gekoppeld was). De regel met de map blijft; de bestanden, gezochte nummers en volgingen van de andere gaan over. Dubbele kopieën die daarbij opduiken worden daarna opgeruimd met Dubbele bestanden verwijderen."
+  },
+  "rematch-mismatched": {
+    "label": "Verkeerd gekoppelde delen opnieuw controleren",
+    "desc": "Vindt reeksen waarvan de bestanden verder gaan dan het laatste nummer van het gekoppelde deel — het teken dat een miniserie of one-shot met dezelfde naam is gekoppeld in plaats van de echte reeks — en koppelt ze opnieuw. Een duidelijke winnaar wordt toegepast en zijn bestanden opnieuw gekoppeld; wat onduidelijk is, blijft over voor Koppeling herstellen op de reekspagina."
+  },
+  "refresh-series": {
+    "label": "Metadata van reeksen vernieuwen",
+    "desc": "Haalt van elke gekoppelde reeks de deelgegevens en nummerlijst opnieuw op bij de metadatadienst — pikt de publicatiestatus op (Lopend / Beëindigd), verrijking voor reeksen die vóór het inschakelen zijn opgeslagen, en nummers die sindsdien zijn verschenen. Eén verzoek per seconde, dus een grote bibliotheek duurt even; als de dienst de verzoeken beperkt, stopt het netjes en voer je het opnieuw uit."
+  },
+  "fetch-metadata": {
+    "label": "Nummermetadata downloaden",
+    "desc": "Haalt de details (beschrijvingen, credits, datums, covers) op van elk nummer in je verzameling dat ze mist. Nummers die al in de cache staan worden overgeslagen; als de metadatabron de verzoeken beperkt, stopt het netjes — voer het gewoon opnieuw uit om af te maken."
+  },
+  "rename-files": {
+    "label": "Bestanden hernoemen volgens patroon",
+    "desc": "Hernoemt elk gekoppeld bestand volgens je bestandspatroon (zelfde map — niets wordt verplaatst), zodat geïmporteerde bestanden met scene-namen overeenkomen met gedownloade. Botsingen worden overgeslagen."
+  },
+  "backup-db": {
+    "label": "Back-up van database maken",
+    "desc": "Maakt een momentopname van de catalogusdatabase in backups/ ernaast (bewaart de nieuwste 5). Veilig terwijl de app in gebruik is. Herstellen: stop de app en kopieer een momentopname over catalog.db."
+  },
+  "remove-ghosts": {
+    "label": "Spookreeksen verwijderen",
+    "desc": "Vindt overgebleven reeksen van vóór de metadatakoppeling — geen koppeling, geen bestanden op schijf — waarvan de \"gezochte\" nummers het tabblad Gezocht volstoppen maar nooit gedownload kunnen worden. Draait als voorbeeld (zie Logboek → hulpmiddelen voor de lijst); vink het vakje aan om ze echt te verwijderen."
+  }
+}

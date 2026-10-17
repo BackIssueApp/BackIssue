@@ -1,0 +1,30 @@
+{
+  "categories": {
+    "library": "Biblioteca",
+    "system": "Sistema"
+  },
+  "library": {
+    "view": { "label": "Navegar na biblioteca", "description": "Ver séries, edições, lançamentos e a fila" },
+    "manage": { "label": "Gerir a biblioteca", "description": "Adicionar/remover volumes e edições, analisar, etiquetar, importar, corrigir associações" },
+    "restricted": { "label": "Ver conteúdo para adultos", "description": "Ver e ler séries marcadas como para adultos/restritas (ocultas às funções sem esta permissão)" }
+  },
+  "downloads": {
+    "grab": { "label": "Procurar e transferir", "description": "Procurar nas fontes, pôr downloads na fila, cancelar itens em fila" }
+  },
+  "lists": {
+    "share": { "label": "Partilhar listas de leitura", "description": "Publicar as suas listas de leitura e arcos narrativos para que todos os utilizadores os vejam" }
+  },
+  "settings": {
+    "manage": { "label": "Definições e indexadores", "description": "Alterar definições da aplicação e indexadores, executar testes de ligação" }
+  },
+  "users": {
+    "manage": { "label": "Utilizadores e funções", "description": "Criar e gerir contas, funções e permissões" }
+  },
+  "plugins": {
+    "manage": { "label": "Plugins e reinício", "description": "Ativar/desativar plugins e reiniciar a aplicação" }
+  },
+  "system": {
+    "jobs": { "label": "Tarefas e ferramentas", "description": "Executar tarefas, agendamentos e ferramentas de manutenção da biblioteca" },
+    "logs": { "label": "Registos", "description": "Ver e limpar os registos da aplicação" }
+  }
+}

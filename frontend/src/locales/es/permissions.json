@@ -1,0 +1,30 @@
+{
+  "categories": {
+    "library": "Biblioteca",
+    "system": "Sistema"
+  },
+  "library": {
+    "view": { "label": "Explorar la biblioteca", "description": "Ver series, números, novedades y la cola" },
+    "manage": { "label": "Gestionar la biblioteca", "description": "Añadir/quitar series y números, escanear, etiquetar, importar, corregir emparejados" },
+    "restricted": { "label": "Ver contenido para adultos", "description": "Ver y leer series marcadas como para adultos/restringidas (ocultas para los roles sin este permiso)" }
+  },
+  "downloads": {
+    "grab": { "label": "Buscar y descargar", "description": "Buscar en las fuentes, poner descargas en cola, cancelar elementos en cola" }
+  },
+  "lists": {
+    "share": { "label": "Compartir listas de lectura", "description": "Publicar tus listas de lectura y arcos argumentales para que todos los usuarios los vean" }
+  },
+  "settings": {
+    "manage": { "label": "Ajustes e indexadores", "description": "Cambiar los ajustes de la aplicación y los indexadores, y ejecutar pruebas de conexión" }
+  },
+  "users": {
+    "manage": { "label": "Usuarios y roles", "description": "Crear y gestionar cuentas, roles y permisos" }
+  },
+  "plugins": {
+    "manage": { "label": "Plugins y reinicio", "description": "Activar/desactivar plugins y reiniciar la aplicación" }
+  },
+  "system": {
+    "jobs": { "label": "Tareas y herramientas", "description": "Ejecutar tareas, programaciones y herramientas de mantenimiento de la biblioteca" },
+    "logs": { "label": "Registros", "description": "Ver y borrar los registros de la aplicación" }
+  }
+}

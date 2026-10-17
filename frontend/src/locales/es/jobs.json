@@ -1,0 +1,21 @@
+{
+  "reorganize": "Reorganizar la biblioteca",
+  "cvMatch": "Emparejar metadatos de series",
+  "cvMatchSchedule": "Emparejar metadatos de series (en tu poder + seguidas)",
+  "scanFolder": "Escanear carpeta · {detail}",
+  "tagFiles": "Etiquetar archivos · {detail}",
+  "importScanFull": "Escanear la biblioteca para importar (completo)",
+  "importScanNew": "Escanear la biblioteca en busca de series nuevas",
+  "importRun": "Importar la biblioteca",
+  "releases": "Comprobar las novedades de esta semana",
+  "refreshDetails": "Actualizar detalles de números · {detail}",
+  "wantedSearch": "Buscar números pendientes",
+  "wantedSearchSchedule": "Buscar números pendientes (relleno)",
+  "recentSearch": "Buscar novedades",
+  "rssWatch": "Vigilar el RSS de los indexadores",
+  "rssWatchSchedule": "Vigilar el RSS de los indexadores en busca de novedades",
+  "packImport": "Importar pack · {detail}",
+  "zeroDay": "Capturar el pack 0-Day semanal",
+  "zeroDaySchedule": "Capturar el pack 0-Day semanal (torrent)",
+  "dbBackup": "Hacer copia de la base de datos"
+}

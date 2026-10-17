@@ -1,0 +1,21 @@
+{
+  "reorganize": "Reorganize library",
+  "cvMatch": "Match series metadata",
+  "cvMatchSchedule": "Match series metadata (owned + followed)",
+  "scanFolder": "Scan folder · {detail}",
+  "tagFiles": "Tag files · {detail}",
+  "importScanFull": "Scan library for import (full)",
+  "importScanNew": "Scan library for new volumes",
+  "importRun": "Import library",
+  "releases": "Check this week's releases",
+  "refreshDetails": "Refresh issue details · {detail}",
+  "wantedSearch": "Search wanted issues",
+  "wantedSearchSchedule": "Search wanted issues (backfill)",
+  "recentSearch": "Search new releases",
+  "rssWatch": "Watch indexer RSS",
+  "rssWatchSchedule": "Watch indexer RSS for releases",
+  "packImport": "Import pack · {detail}",
+  "zeroDay": "Grab weekly 0-Day pack",
+  "zeroDaySchedule": "Grab weekly 0-Day pack (torrent)",
+  "dbBackup": "Back up database"
+}

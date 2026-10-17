@@ -9,7 +9,7 @@
   import { confirmDialog } from './DialogModal.svelte';
   import Icon from '../lib/Icon.svelte';
   import { hscroll } from '../lib/hscroll.js';
-  import { t, th, currentLang } from '../lib/i18n.svelte.js';
+  import { t, th, currentLang, st as serverText } from '../lib/i18n.svelte.js';
 
   let { active = false } = $props();
 
@@ -430,7 +430,7 @@
                       {#if sRow.content}<span class="plx__site-tag">{sRow.content}</span>{/if}
                       {#if sRow.updateAvailable}<span class="plx__site-upd">{t('pluginsPage.updateTo', { version: sRow.catalogVersion })}</span>{/if}
                     </div>
-                    {#if sRow.description}<p class="plx__desc">{sRow.description}</p>{/if}
+                    {#if sRow.description}<p class="plx__desc">{serverText('plugins', sRow.description)}</p>{/if}
                     {#if sRow.requires === 'flaresolverr'}
                       <p class="plx__site-note"><Icon name="alert-triangle" size={13} /> {t('pluginsPage.needsFlaresolverr')}</p>
                     {:else if sRow.requires === 'browser'}
@@ -480,7 +480,7 @@
                 </div>
                 <span class="plx__status plx__status--{st}"><span class="plx__dot"></span>{statusLabel(p)}</span>
               </div>
-              {#if p.description}<p class="plx__desc">{p.description}</p>{/if}
+              {#if p.description}<p class="plx__desc">{serverText('plugins', p.description)}</p>{/if}
               {#if p.superseded}
                 <div class="plx__note plx__note--card">{t('pluginsPage.superseded')}</div>
               {/if}
@@ -535,7 +535,7 @@
                   <div class="plx__catlabel">{t(cm.key)}</div>
                 </div>
               </div>
-              {#if c.description}<p class="plx__desc plx__desc--grow">{c.description}</p>{/if}
+              {#if c.description}<p class="plx__desc plx__desc--grow">{serverText('plugins', c.description)}</p>{/if}
               <div class="plx__card-actions">
                 {#if c.installed}
                   {#if c.updateAvailable}
