@@ -45,10 +45,17 @@ export const languageList = () => languages;
 
 /** Match a BCP 47 tag (or list of them) to a catalog we have: exact, then base
  *  language ("pt-BR" → "pt"). Returns null when nothing matches. */
+// Browser tags that name a catalog differently: Simplified Chinese is filed
+// under its script, so a zh-CN or bare zh browser must find zh-hans.
+// (zh-TW / zh-HK are Traditional and deliberately do not match.)
+const ALIASES = { zh: 'zh-hans', 'zh-cn': 'zh-hans', 'zh-sg': 'zh-hans', 'zh-my': 'zh-hans' };
+
 export function matchLanguage(tags) {
   for (const raw of Array.isArray(tags) ? tags : [tags]) {
-    const tag = String(raw || '').toLowerCase();
+    let tag = String(raw || '').toLowerCase();
     if (!tag) continue;
+    if (tag.startsWith('zh-hans')) tag = 'zh-hans';
+    if (ALIASES[tag]) tag = ALIASES[tag];
     if (languages.includes(tag)) return tag;
     const base = tag.split('-')[0];
     if (languages.includes(base)) return base;

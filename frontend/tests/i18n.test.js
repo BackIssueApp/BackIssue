@@ -56,6 +56,16 @@ describe('language matching', () => {
     expect(matchLanguage('xx')).toBe(null);
     expect(matchLanguage(undefined)).toBe(null);
   });
+  test('Simplified Chinese is found from zh, zh-CN and zh-Hans tags but not Traditional ones', () => {
+    if (!LANGUAGES.includes('zh-hans')) return; // catalog not present in this build
+    for (const tag of ['zh', 'zh-CN', 'zh-SG', 'zh-Hans', 'zh-Hans-CN']) expect(matchLanguage(tag)).toBe('zh-hans');
+    expect(matchLanguage('zh-TW')).toBe(null);
+  });
+  test('pt-BR finds Brazilian Portuguese while pt-PT keeps European', () => {
+    if (!LANGUAGES.includes('pt-br')) return;
+    expect(matchLanguage('pt-BR')).toBe('pt-br');
+    expect(matchLanguage('pt-PT')).toBe('pt');
+  });
   test('English is always first in the catalog list and names itself', () => {
     expect(LANGUAGES[0]).toBe('en');
     expect(languageName('en')).toBe('English');
