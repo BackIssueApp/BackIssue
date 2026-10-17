@@ -5,6 +5,7 @@
   // server half resolves them into the series the real grid then shows.
   import { libraryFilterFor } from '../lib/plugins.svelte.js';
   import { apiGet } from '../lib/api.js';
+  import { t } from '../lib/i18n.svelte.js';
   import Icon from '../lib/Icon.svelte';
 
   let { open = false, type = null, libraryId = null, selection = {}, onapply, onclose } = $props();
@@ -56,21 +57,21 @@
 
 {#if open}
   <div class="modal" onclick={(e) => { if (e.target === e.currentTarget) onclose?.(); }}>
-    <div class="modal__panel filt" role="dialog" aria-label="Filters">
-      <div class="modal__head"><h3>Filters</h3>
-        <button class="modal__x" aria-label="Close" onclick={() => onclose?.()}><Icon name="close" /></button>
+    <div class="modal__panel filt" role="dialog" aria-label={t('filtersModal.title')}>
+      <div class="modal__head"><h3>{t('filtersModal.title')}</h3>
+        <button class="modal__x" aria-label={t('common.close')} onclick={() => onclose?.()}><Icon name="close" /></button>
       </div>
       <div class="modal__body filt__body">
         {#if loading && !groups.length}
-          <p class="filt__dim">Loading…</p>
+          <p class="filt__dim">{t('common.loading')}</p>
         {:else if !groups.length}
-          <p class="filt__dim">No filters available for this library.</p>
+          <p class="filt__dim">{t('filtersModal.noFilters')}</p>
         {/if}
         {#each groups as g (g.key)}
           <div class="filt__group">
             <div class="filt__label">{g.label}</div>
             {#if g.search}
-              <input class="filt__search" placeholder="Search {g.label.toLowerCase()}…"
+              <input class="filt__search" placeholder={t('filtersModal.searchGroup', { group: g.label.toLowerCase() })}
                 value={search[g.key] || ''} oninput={(e) => onSearch(g.key, e.currentTarget.value)} />
             {/if}
             <div class="filt__opts">
@@ -79,15 +80,15 @@
                   <span class="filt__opt-l">{o.label}</span><span class="filt__opt-c">{(o.count || 0).toLocaleString()}</span>
                 </button>
               {/each}
-              {#if !g.options.length}<span class="filt__dim">None</span>{/if}
+              {#if !g.options.length}<span class="filt__dim">{t('common.none')}</span>{/if}
             </div>
           </div>
         {/each}
       </div>
       <div class="modal__foot">
-        <button class="filt__clear" onclick={clearAll} disabled={!activeCount}>Clear{activeCount ? ` (${activeCount})` : ''}</button>
+        <button class="filt__clear" onclick={clearAll} disabled={!activeCount}>{activeCount ? t('filtersModal.clearCount', { count: activeCount }) : t('common.clear')}</button>
         <span class="modal__foot-spacer"></span>
-        <button class="btn btn--primary" onclick={apply}>Apply</button>
+        <button class="btn btn--primary" onclick={apply}>{t('common.apply')}</button>
       </div>
     </div>
   </div>
