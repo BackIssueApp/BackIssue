@@ -43,7 +43,7 @@
     }
 
     let list = [];
-    try { list = await (await fetch('/api/cv/search?q=' + encodeURIComponent(q))).json(); }
+    try { list = await (await fetch('/api/cv/search?q=' + encodeURIComponent(q) + (m.seriesId ? '&seriesId=' + m.seriesId : ''))).json(); }
     catch { if (!pinned) { m.searching = false; m.note = t('cvPickerModal.searchFailed'); return; } }
     if (list.error) list = [];
     // Everything the server returned, no cutoff: ComicVine lists same-name

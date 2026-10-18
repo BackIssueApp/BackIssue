@@ -13,7 +13,7 @@ function makeApp() {
     runDownloads: async (ids) => { calls.downloads.push(ids); },
     prepareRedownload: async (ids) => { calls.prepared = ids; },
     runCvMatch: () => { calls.cvMatch = (calls.cvMatch || 0) + 1; },
-    cvSearch: async (q) => { calls.cvSearch = q; return [{ id: 7, name: 'Earth X', start_year: '1999', publisher: 'Marvel', count_of_issues: 12 }]; },
+    cvSearch: async (q, opts) => { calls.cvSearch = q; calls.cvSearchOpts = opts; return [{ id: 7, name: 'Earth X', start_year: '1999', publisher: 'Marvel', count_of_issues: 12 }]; },
     cvIssueInfo: async (cvIssueId) => { calls.issueInfo = cvIssueId; return { cv_issue_id: cvIssueId, number: '1', name: 'One', credits: [], files: [] }; },
     cvVolumeInfo: async (id) => { calls.volumeInfo = id; return { id, name: 'Aquaman and The Others', start_year: '2014', count_of_issues: 11, publisher: 'DC Comics' }; },
     cleanupSeriesFiles: async (id) => { calls.cleaned = id; return { removed: 3, detail: { issues: [] } }; },
@@ -41,7 +41,7 @@ function makeApp() {
     skipImportCandidate: (id) => { calls.importSkip = id; return { id, status: 'skipped' }; },
     cvSetManual: async (id, cvId) => { calls.cvSet = { id, cvId }; return { series: { id }, cv: { id: cvId } }; },
     addFromCv: async (cvId, opts = {}) => {
-      calls.addedCv = cvId;
+      calls.addedCv = cvId; calls.addOpts = opts;
       // like the real add: the series gets the requested policy ('none' for a
       // "for these issues" add), else the default
       const row = db.prepare('SELECT id FROM series WHERE cv_id=?').get(cvId);
@@ -778,5 +778,24 @@ test('releases/download refreshes the volume once when the issue is not cached y
     assert.equal(r.status, 404);
     assert.equal(calls.refreshed, 9);
     assert.match((await r.json()).error, /isn't listed on ComicVine yet/);
+  } finally { s.close(); }
+});
+
+test('search and add use the right library metadata sources when the caller names none', async () => {
+  const { app, db, calls } = makeApp();
+  const comics = Number(db.prepare("INSERT INTO libraries (name, type, sort_order) VALUES ('Comics', 'comic', 1)").run().lastInsertRowid);
+  const manga = Number(db.prepare("INSERT INTO libraries (name, type, sort_order) VALUES ('Manga', 'manga', 0)").run().lastInsertRowid);
+  const mangaSeries = Number(db.prepare("INSERT INTO series (title, url, library_id) VALUES ('Berserk', '/c/berserk', ?)").run(manga).lastInsertRowid);
+  const s = await listen(app);
+  const base = `http://localhost:${s.address().port}`;
+  try {
+    await fetch(`${base}/api/cv/search?q=Saga`);
+    assert.equal(calls.cvSearchOpts.libraryId, comics, 'no library named: the default library new series land in');
+    await fetch(`${base}/api/cv/search?q=Berserk&seriesId=${mangaSeries}`);
+    assert.equal(calls.cvSearchOpts.libraryId, manga, "re-matching a series: that series' library");
+    await fetch(`${base}/api/cv/search?q=Saga&libraryId=${manga}`);
+    assert.equal(calls.cvSearchOpts.libraryId, manga, 'an explicit library wins');
+    await fetch(`${base}/api/collection/add-cv`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ comicvineId: 77 }) });
+    assert.equal(calls.addOpts.libraryId, comics, 'an add fetches through the library it lands in');
   } finally { s.close(); }
 });

@@ -7,7 +7,7 @@ import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
 import { initCountWorker, workerGetRow } from './countWorker.js';
-import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, collectionPage, collectionJumpOffset, collectionBuckets, buildCollCountSql, collCountRowToResult, seriesCollectionDetail, setSeriesPath, getSeriesById, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser, setMonitor, setIssueWants, clearIssuePicks, wantStates, MONITOR_STATES } from './db.js';
+import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, collectionPage, collectionJumpOffset, collectionBuckets, buildCollCountSql, collCountRowToResult, seriesCollectionDetail, setSeriesPath, getSeriesById, defaultLibrary, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser, setMonitor, setIssueWants, clearIssuePicks, wantStates, MONITOR_STATES } from './db.js';
 import { resolveSeriesDir, defaultRootedDir } from './paths.js';
 import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
@@ -1929,9 +1929,12 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   app.get('/api/cv/search', async (req, res) => {
     try {
       // Search with the destination library's metadata sources: the one
-      // asked for, else the manga library for the manga lane.
+      // asked for, else the library of the series being matched, else the
+      // manga library for the manga lane, else the default library new
+      // series land in.
       const manga = req.query.manga === '1';
-      const libraryId = Number(req.query.libraryId) || (manga ? listLibraries(db).find((l) => l.type === 'manga')?.id : null) || null;
+      const seriesLib = Number(req.query.seriesId) ? getSeriesById(db, Number(req.query.seriesId))?.library_id : null;
+      const libraryId = Number(req.query.libraryId) || seriesLib || (manga ? listLibraries(db).find((l) => l.type === 'manga')?.id : null) || defaultLibrary(db)?.id || null;
       const results = await cvSearch(String(req.query.q || ''), { manga, libraryId });
       // Flag results already in the collection so the picker can gray them out
       // and link straight to the existing series (not just say so after an add).
@@ -1969,7 +1972,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       // Otherwise it gets the "Monitor added series" default. An existing
       // series keeps whatever policy it has; the picks still land.
       // Fetch through the destination library's metadata sources.
-      const destLibrary = Number(req.body?.libraryId) || (req.body?.manga ? listLibraries(db).find((l) => l.type === 'manga')?.id : null) || null;
+      const destLibrary = Number(req.body?.libraryId) || (req.body?.manga ? listLibraries(db).find((l) => l.type === 'manga')?.id : null) || defaultLibrary(db)?.id || null;
       const r = await addFromCv(comicvineId, { ...(onlyRequested ? { monitor: 'none' } : {}), libraryId: destLibrary });
       if (onlyRequested && r?.seriesId != null) {
         setIssueWants(db, r.seriesId, wanted, true, { reason: String(req.body?.reason || 'requested').slice(0, 64), userId: req.user.id });

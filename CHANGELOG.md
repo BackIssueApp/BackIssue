@@ -8,6 +8,20 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Plugin task schedules save.** Changing the pattern or switching a plugin's
+  task on or off under Jobs (Rebuild the browse index, Fill approved book
+  requests, Sync remote audiobook catalog and others) now sticks. Before, the
+  change was silently dropped and the task kept its old schedule.
+- **Tag on download works without a ComicVine key.** With the switch on,
+  downloads are tagged from the hosted metadata service too. Before, nothing
+  was tagged unless a ComicVine key was set.
+- **Search and add use the library's own metadata sources.** Adding a series
+  searches with the sources of the library it lands in, and matching an
+  existing series searches with the sources of its library. Before, both used
+  the app-wide list whenever a library had its own.
+
 ## [0.9.1] — 2026-10-17
 
 ### Added
