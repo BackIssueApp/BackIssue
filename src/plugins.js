@@ -227,7 +227,9 @@ export const pluginApi = {
   // <label>" button that sends the browser to loginPath (a public plugin route
   // that starts the provider's flow). After the provider verifies the user, the
   // plugin's callback route calls req.app.locals.issueSession(...) to sign them
-  // in. { id, label, loginPath }.
+  // in. { id, label, loginPath, isEnabled?, getLabel? }. isEnabled() hides the
+  // button until the provider is set up; getLabel() reads the label live, so
+  // a renamed button needs no restart. Both are optional.
   registerAuthProvider(provider) {
     if (!provider?.id || !provider?.loginPath) return;
     if (authProviders.some((p) => p.id === provider.id)) return;
@@ -235,6 +237,8 @@ export const pluginApi = {
       id: String(provider.id),
       label: provider.label || String(provider.id),
       loginPath: String(provider.loginPath),
+      isEnabled: typeof provider.isEnabled === 'function' ? provider.isEnabled : null,
+      getLabel: typeof provider.getLabel === 'function' ? provider.getLabel : null,
       plugin: currentLoadingPlugin,
     });
   },

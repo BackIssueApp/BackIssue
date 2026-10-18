@@ -10,6 +10,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Sign-in buttons appear only once their provider is set up.** A plugin's
+  SSO button can stay hidden until it's configured, and a renamed button shows
+  without a restart.
 - **Set a user's password from the Users page.** Admins can give a locked-out
   user a new password. The box comes filled with a generated one to copy or
   replace, and the user is signed out everywhere. Accounts linked to an

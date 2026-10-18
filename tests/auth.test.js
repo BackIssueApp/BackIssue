@@ -570,3 +570,17 @@ test('libraries: creating, editing or deleting one needs settings.manage, since 
     assert.equal((await fetch(`${base}/api/libraries/${id}`, { method: 'DELETE', headers: H(admin) })).status, 200);
   } finally { s.close(); }
 });
+
+test('login page lists an auth provider only once it is set up, with its current label', async () => {
+  let ready = false; let label = 'SSO';
+  pluginApi.registerAuthProvider({ id: 'test-sso', label: 'SSO', loginPath: '/api/test-sso/login', isEnabled: () => ready, getLabel: () => label });
+  const { app } = makeApp();
+  const s = await listen(app);
+  const base = `http://localhost:${s.address().port}`;
+  const listed = async () => (await (await fetch(`${base}/api/auth/providers`)).json()).providers.find((p) => p.id === 'test-sso');
+  try {
+    assert.equal(await listed(), undefined, 'no button before it is configured');
+    ready = true; label = 'Company login';
+    assert.equal((await listed())?.label, 'Company login', 'shown once set up, with the label as it is now');
+  } finally { s.close(); }
+});

@@ -458,7 +458,13 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // auth-provider plugins) and whether the password form is enabled.
   app.get('/api/auth/providers', (req, res) => {
     res.json({
-      providers: registeredAuthProviders().map((p) => ({ id: p.id, label: p.label, loginPath: p.loginPath })),
+      providers: registeredAuthProviders()
+        .filter((p) => { try { return p.isEnabled ? !!p.isEnabled() : true; } catch { return false; } })
+        .map((p) => {
+          let label = p.label;
+          try { if (p.getLabel) label = String(p.getLabel() || '') || p.label; } catch { /* keep the static one */ }
+          return { id: p.id, label, loginPath: p.loginPath };
+        }),
       // The password form is also needed by credential backends (e.g. WHMCS),
       // so keep it visible whenever one is registered.
       passwordLogin: !config.passwordLoginDisabled || registeredCredentialProviders().length > 0,
