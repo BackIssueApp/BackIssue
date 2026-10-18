@@ -171,6 +171,13 @@ function migrate(db) {
     db.exec('ALTER TABLE series ADD COLUMN year TEXT');
   }
   const lf = db.prepare('PRAGMA table_info(library_files)').all().map((c) => c.name);
+  // Comic archives indexed as valid with no pages, from before page-less
+  // archives were flagged (2026-10-08): give them the verdict a scan now
+  // gives, so the issue counts as missing instead of owned-but-unreadable.
+  if (lf.includes('page_count') && lf.includes('error')) {
+    db.prepare(`UPDATE library_files SET valid=0, error='no pages — the archive contains no images'
+      WHERE valid=1 AND page_count=0 AND (lower(path) LIKE '%.cbz' OR lower(path) LIKE '%.cbr')`).run();
+  }
   if (lf.length && !lf.includes('series_id')) db.exec('ALTER TABLE library_files ADD COLUMN series_id INTEGER');
   if (lf.length && !lf.includes('issue_id')) db.exec('ALTER TABLE library_files ADD COLUMN issue_id INTEGER');
   if (lf.length && !lf.includes('cv_issue_id')) db.exec('ALTER TABLE library_files ADD COLUMN cv_issue_id INTEGER');

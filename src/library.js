@@ -109,7 +109,10 @@ export async function indexLibrary({ db, dir, deep = false, onProgress = () => {
       const mtime = Math.floor(st.mtimeMs);
       const size = st.size;
       const existing = getLibraryFile(db, f.path);
-      if (existing && existing.mtime === mtime && existing.size === size && (!deep || existing.verified)) {
+      // A comic archive recorded as valid with no pages was indexed before
+      // page-less archives were flagged: read it again rather than trust it.
+      const stalePageless = existing && existing.valid === 1 && existing.page_count === 0 && /\.(cbz|cbr)$/i.test(f.path);
+      if (existing && !stalePageless && existing.mtime === mtime && existing.size === size && (!deep || existing.verified)) {
         // Unchanged on disk — skip the re-read, but re-link if it isn't linked yet
         // (e.g. files indexed before linking existed). Uses the stored metadata, no I/O.
         if (existing.series_id == null) {
