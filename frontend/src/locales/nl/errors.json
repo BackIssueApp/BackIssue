@@ -1,6 +1,7 @@
 {
   "signInFirst": "meld je eerst aan met een echt account",
   "authRequired": "aanmelden vereist",
+  "setupRequired": "maak het eerste account aan om BackIssue verder in te stellen",
   "wrongCredentials": "Verkeerde gebruikersnaam of wachtwoord.",
   "currentPasswordWrong": "huidig wachtwoord is onjuist",
   "registrationDisabled": "registratie is uitgeschakeld — vraag een beheerder om een account",

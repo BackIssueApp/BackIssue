@@ -95,7 +95,7 @@ test('buildSupportPackage: every section lands in the zip, secrets are gone, fai
 
 test('GET /api/support/package answers a zip with a filename, and needs settings.manage', async () => {
   const db = openDb(':memory:');
-  const app = createApp({
+  const app = createApp({ openApiBeforeSetup: true,
     db, state: { queue: {} },
     getSettings: () => ({ comicvineKeys: 'k' }), saveSettings: (b) => b,
     prepareRedownload: async () => {}, runDownloads: async () => {},
@@ -171,7 +171,7 @@ test('lite package: no settings, folders, indexers, history or log; extra files 
 test('POST /api/support/mobile sends a lite package for a viewer and a full one for an admin', async () => {
   const db = openDb(':memory:');
   const sent = [];
-  const app = createApp({
+  const app = createApp({ openApiBeforeSetup: true,
     db, state: { queue: {} },
     getSettings: () => ({}), saveSettings: (b) => b,
     prepareRedownload: async () => {}, runDownloads: async () => {},

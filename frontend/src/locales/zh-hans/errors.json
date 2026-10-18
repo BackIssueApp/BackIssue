@@ -1,6 +1,7 @@
 {
   "signInFirst": "请先使用真实账户登录",
   "authRequired": "需要身份验证",
+  "setupRequired": "请创建第一个账户以完成 BackIssue 的设置",
   "wrongCredentials": "用户名或密码错误。",
   "currentPasswordWrong": "当前密码错误",
   "registrationDisabled": "注册已关闭——请向管理员申请账户",

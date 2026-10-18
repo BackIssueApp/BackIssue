@@ -189,7 +189,7 @@ test('migration: an old database maps followed to the policy, and a merge keeps 
 test('GET /api/wanted serves the paged list; ?followed=1 is the caller\'s ☆ stars; scope + sort are honoured', async () => {
   const { setUserFollow } = await import('../src/db.js');
   const { db, saga } = seed();
-  const app = createApp({ db, state: { queue: {} } });
+  const app = createApp({ openApiBeforeSetup: true, db, state: { queue: {} } });
   const s = await new Promise((res) => { const x = app.listen(0, () => res(x)); });
   const base = `http://localhost:${s.address().port}`;
   try {
@@ -337,7 +337,7 @@ test('Download all skips restricted series for someone who cannot see them', asy
   db.prepare('UPDATE users SET hide_mature=1 WHERE id=?').run(u.id); // hides mature content for themself
   const cookie = 'bi_session=' + users.createSession(db, u.id);
   let started = 0;
-  const app = createApp({ db, state: { queue: {} }, runDownloads: async () => { started++; } });
+  const app = createApp({ openApiBeforeSetup: true, db, state: { queue: {} }, runDownloads: async () => { started++; } });
   const s = await new Promise((res) => { const x = app.listen(0, () => res(x)); });
   const base = `http://localhost:${s.address().port}`;
   try {

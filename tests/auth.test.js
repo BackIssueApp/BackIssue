@@ -31,15 +31,23 @@ test('password hashing round-trips and rejects wrong passwords', () => {
   assert.ok(!verifyPassword('wrong', h));
 });
 
-test('zero users = open mode; first registration becomes admin and closes it', async () => {
+test('zero users: only sign-up is reachable; first registration becomes admin', async () => {
   const { app } = makeApp();
   const s = await listen(app);
   const base = `http://localhost:${s.address().port}`;
   try {
-    // open mode: API reachable without credentials, me() says so
+    // Before the first account: me() says setup is pending, and nothing else
+    // in the API (or a plugin route, or a change) answers without an account.
     const me0 = await (await fetch(`${base}/api/auth/me`)).json();
     assert.equal(me0.openMode, true);
-    assert.equal((await fetch(`${base}/api/series`)).status, 200);
+    const locked = await fetch(`${base}/api/series`);
+    assert.equal(locked.status, 401);
+    assert.equal((await locked.json()).setupRequired, true);
+    assert.equal((await fetch(`${base}/api/settings`)).status, 401);
+    assert.equal((await fetch(`${base}/api/settings`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status, 401);
+    assert.equal((await fetch(`${base}/api/users`)).status, 401);
+    assert.equal((await fetch(`${base}/plugins/anything/client/ui.js`)).status, 401);
+    assert.equal((await fetch(`${base}/api/auth/providers`)).status, 200, 'the sign-up screen still loads');
 
     // first registration → admin, gets a session cookie
     const reg = await fetch(`${base}/api/auth/register`, {
@@ -269,9 +277,9 @@ test('shell injection: plugin tags ride the served shell only for a session', as
   const s = await listen(app);
   const base = `http://localhost:${s.address().port}`;
   try {
-    // open mode: the shell carries the plugin bootstrap inline
-    const open = await (await fetch(`${base}/`)).text();
-    assert.match(open, /__BI_PLUGINS_INLINE__/, 'open mode gets inline plugin assets');
+    // no accounts yet: the create-account page is plugin-free too
+    const setup = await (await fetch(`${base}/`)).text();
+    assert.ok(!setup.includes('__BI_PLUGINS_INLINE__'), 'the setup page carries no plugin assets');
 
     // accounts exist: an anonymous shell is plugin-free, a session's is not
     const reg = await fetch(`${base}/api/auth/register`, {
@@ -366,7 +374,7 @@ test('basicAuth routes send a WWW-Authenticate challenge on 401; the SPA does no
   // readers know to send credentials. Core routes must NOT — a browser would
   // pop a native Basic dialog otherwise.
   const db = openDb(':memory:');
-  const app = createApp({
+  const app = createApp({ openApiBeforeSetup: true,
     db, state: { queue: {} },
     getSettings: () => ({}), saveSettings: (b) => b,
     prepareRedownload: async () => {}, runDownloads: async () => {},

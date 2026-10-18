@@ -8,7 +8,7 @@ function makeApp() {
   const sid = upsertSeries(db, { title: 'Batman', url: '/c/batman', publisher: 'DC', coverUrl: '' });
   upsertIssue(db, { seriesId: sid, title: 'Batman #1', issueNumber: '1', url: '/i/b1' });
   const calls = { crawl: 0, downloads: [], updates: [] };
-  const app = createApp({
+  const app = createApp({ openApiBeforeSetup: true,
     db,
     runDownloads: async (ids) => { calls.downloads.push(ids); },
     prepareRedownload: async (ids) => { calls.prepared = ids; },
@@ -383,7 +383,7 @@ test('sources: GET /api/sources lists enabled sources in priority order', async 
 
 test('an async route that throws returns 500 JSON instead of hanging (express 5)', async () => {
   const db = openDb(':memory:');
-  const app = createApp({
+  const app = createApp({ openApiBeforeSetup: true,
     db, state: { queue: {} },
     cleanupSeriesFiles: async () => { throw new Error('disk exploded'); },
   });
@@ -488,7 +488,7 @@ test('legacy basic-auth config migrates to an admin user; basic still works', as
   try {
     // createApp() runs the migration: authUser/authPass become the first admin.
     config.authUser = 'me'; config.authPass = 's3cretpass';
-    const app = createApp({ db, state: { queue: {} }, stats: () => ({ ok: 1 }) });
+    const app = createApp({ openApiBeforeSetup: true, db, state: { queue: {} }, stats: () => ({ ok: 1 }) });
     const s = await listen(app);
     const base = `http://localhost:${s.address().port}`;
     try {

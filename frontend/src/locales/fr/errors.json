@@ -1,6 +1,7 @@
 {
   "signInFirst": "connectez-vous d'abord avec un vrai compte",
   "authRequired": "authentification requise",
+  "setupRequired": "créez le premier compte pour terminer la configuration de BackIssue",
   "wrongCredentials": "Nom d'utilisateur ou mot de passe incorrect.",
   "currentPasswordWrong": "le mot de passe actuel est incorrect",
   "registrationDisabled": "les inscriptions sont désactivées — demandez un compte à un administrateur",

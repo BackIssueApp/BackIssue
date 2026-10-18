@@ -10,7 +10,7 @@ import { pluginApi, registeredRoutes } from '../src/plugins.js';
 
 function makeApp() {
   const db = openDb(':memory:');
-  const app = createApp({
+  const app = createApp({ openApiBeforeSetup: true,
     db, state: { queue: {} },
     getSettings: () => ({}), saveSettings: (b) => b,
     prepareRedownload: async () => {}, runDownloads: async () => {},

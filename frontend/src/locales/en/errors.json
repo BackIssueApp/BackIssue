@@ -1,6 +1,7 @@
 {
   "signInFirst": "sign in with a real account first",
   "authRequired": "authentication required",
+  "setupRequired": "create the first account to finish setting up BackIssue",
   "wrongCredentials": "Wrong username or password.",
   "currentPasswordWrong": "current password is wrong",
   "registrationDisabled": "registration is disabled — ask an admin for an account",

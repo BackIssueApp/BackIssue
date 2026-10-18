@@ -43,7 +43,7 @@ if (process.env.BUILD_CHANNEL && process.env.BUILD_CHANNEL !== 'release') {
   APP_VERSION += `-${process.env.BUILD_CHANNEL}${sha ? '.' + sha : ''}`;
 }
 
-export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, listSourceCards, testSource, sourceCatalog, installSource: installSourceFn, uninstallSource: uninstallSourceFn, queueProgress, packProgress, activeMedia, cancelGrab, metadataProviders, testMetadataProvider, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], pluginMessages = {}, matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, supportPackage, supportSend, supportSendMobile, state }) {
+export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, listSourceCards, testSource, sourceCatalog, installSource: installSourceFn, uninstallSource: uninstallSourceFn, queueProgress, packProgress, activeMedia, cancelGrab, metadataProviders, testMetadataProvider, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], pluginMessages = {}, matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, supportPackage, supportSend, supportSendMobile, state }) {
   const startDownloads = (arg) => {
     if (!state.queue.running) {
       state.queue.running = true;
@@ -411,12 +411,18 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     // session — the browser reaches it while signed out.
     const need = requiredPermission(req);
     if (need === 'public') return next();
-    // Zero accounts = open single-user mode (the appliance default, same as
-    // the old unset-basic-auth state). Creating the first account — which
-    // becomes the admin — activates authentication for everything.
+    // No accounts yet: the server is waiting for its admin. The web app shows
+    // the create-account screen (only /api/auth/* above is reachable); every
+    // other API and plugin request is refused, so a server exposed before
+    // setup can't be driven through the API. openApiBeforeSetup restores the
+    // old run-as-admin behaviour for test harnesses only; the server entry
+    // point never sets it.
     if (!anyUsers.get().e) {
-      req.user = { id: 0, username: 'local', role: 'admin' };
-      return next();
+      if (openApiBeforeSetup) {
+        req.user = { id: 0, username: 'local', role: 'admin' };
+        return next();
+      }
+      return res.status(401).json({ error: 'create the first account to finish setting up BackIssue', setupRequired: true });
     }
     // Session cookie / API key / local-password Basic first (synchronous); an
     // unmatched Basic request then falls through to external credential
@@ -893,8 +899,10 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     const file = path.join(publicDir, 'index.html');
     if (!fssync.existsSync(file)) return null;
     let html = fssync.readFileSync(file, 'utf8');
+    // Before the first account exists the page is the create-account screen:
+    // no plugin assets (they would be refused anyway).
     const u = anyUsers.get().e ? resolveUser(req) : null;
-    const authed = !anyUsers.get().e || !!u;
+    const authed = !!u || (openApiBeforeSetup && !anyUsers.get().e);
     if (authed) {
       const tags = ['<script>window.BackIssue={_q:[],registerClient(fn){this._q.push(fn)}};window.__BI_PLUGINS_INLINE__=1;</script>'];
       // The account's saved UI language, so the bundle picks it before the

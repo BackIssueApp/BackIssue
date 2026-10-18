@@ -1,6 +1,7 @@
 {
   "signInFirst": "najpierw zaloguj się prawdziwym kontem",
   "authRequired": "wymagane uwierzytelnienie",
+  "setupRequired": "utwórz pierwsze konto, aby dokończyć konfigurację BackIssue",
   "wrongCredentials": "Nieprawidłowa nazwa użytkownika lub hasło.",
   "currentPasswordWrong": "obecne hasło jest nieprawidłowe",
   "registrationDisabled": "rejestracja jest wyłączona — poproś administratora o konto",

@@ -1,6 +1,6 @@
 // Session state + auth actions. The app boots by asking /api/auth/me:
-//   openMode  — no accounts exist yet; the app runs unauthenticated (classic
-//               single-user appliance) and the sidebar offers to secure it.
+//   openMode  — no accounts exist yet; the app shows only the create-account
+//               screen, and the server refuses the rest of the API until then.
 //   user      — the signed-in account { id, username, role, permissions }.
 // The server resolves the role to a permission list ('*' = everything);
 // components use can()/isTrusted/isAdmin to hide affordances the server
@@ -63,10 +63,9 @@ export async function logout() {
   location.href = '/';
 }
 
-// api.js calls this on any 401 — the session expired or was revoked.
+// api.js calls this on any 401 — the session expired or was revoked. Before
+// the first account exists every API call is refused (setup pending), which
+// isn't a lost session: stay on the create-account screen.
 export function sessionLost() {
-  if (auth.ready && (auth.user || auth.openMode)) {
-    auth.user = null;
-    auth.openMode = false;
-  }
+  if (auth.ready && auth.user) auth.user = null;
 }

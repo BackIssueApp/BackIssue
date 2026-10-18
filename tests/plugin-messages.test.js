@@ -61,7 +61,7 @@ test('a plugin\'s locales/<lang>.json files are picked up under its own namespac
 test('the shell inlines English plus the account language; the API serves any language', async () => {
   const db = openDb(':memory:');
   const pluginMessages = { en: { demo: { hello: 'Hello' } }, fr: { demo: { hello: 'Bonjour' } }, de: { demo: { hello: 'Hallo' } } };
-  const app = createApp({
+  const app = createApp({ openApiBeforeSetup: true,
     db, state: { queue: {} }, getSettings: () => ({}), saveSettings: (b) => b,
     prepareRedownload: async () => {}, runDownloads: async () => {},
     pluginRoutes: registeredRoutes(), pluginMessages,

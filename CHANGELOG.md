@@ -8,6 +8,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Security
+
+- **A new server is locked until its admin account exists.** Before the first
+  account was created, every API request ran as an admin with no sign-in;
+  only the web UI insisted on the setup screen, so a server exposed before
+  setup could be driven through the API. Now only sign-up answers: the rest of
+  the API and plugin assets return `401` with `setupRequired: true` until the
+  admin account is created.
+
 ### Removed
 
 - **Legacy API routes.** `POST /api/download` (use

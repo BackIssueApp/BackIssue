@@ -33,7 +33,7 @@ test('listImportHistory: filters by source and pages', () => {
 
 test('GET /api/history serves the paged history', async () => {
   const db = seed();
-  const app = createApp({ db, state: { queue: {} } });
+  const app = createApp({ openApiBeforeSetup: true, db, state: { queue: {} } });
   const s = await new Promise((res) => { const x = app.listen(0, () => res(x)); });
   const base = `http://localhost:${s.address().port}`;
   const all = await (await fetch(`${base}/api/history`)).json();
