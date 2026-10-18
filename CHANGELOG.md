@@ -20,6 +20,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **Download all respects mature-content restrictions.** On the Wanted page,
+  Download all queued issues from restricted series even for people who
+  can't see them. It now queues only what that person's Wanted list shows.
 - **Turning off password login covers reader apps too.** With password login
   off, apps that send a username and password directly no longer let
   non-admin users in with their password. Admins keep their password

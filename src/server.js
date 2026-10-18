@@ -1497,6 +1497,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       userFollowedOnly: !!b.followed, hideUnreleased: !!b.hideUnreleased,
       search: String(b.q || '').trim(),
       userId: req.user?.id ?? 0, // "download all my Following" respects the caller's stars
+      includeRestricted: canRestricted(req), // only what the caller's Wanted list shows
     });
     const ids = [];
     const bySeries = new Map();
