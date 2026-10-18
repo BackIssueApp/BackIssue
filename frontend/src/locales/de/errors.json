@@ -74,6 +74,7 @@
   "srvSabnzbdRefusedHistoryDeleteFor": "SABnzbd hat das Löschen des Verlaufs für {detail} abgelehnt",
   "srvTheSupportServiceDidNot": "Der Supportdienst hat das Paket nicht angenommen: {detail}",
   "srvTorrentsAreNotEnabledSettings": "Torrents sind nicht eingeschaltet (Einstellungen → Downloadquellen → Torrents).",
+  "srvNoTorrentIndexersAreSetUp": "Es sind keine Torrent-Indexer eingerichtet (Einstellungen → Downloadquellen → Torrents).",
   "srvTransmissionHttp": "Transmission HTTP {detail}",
   "srvTransmissionAuthenticationFailedCheckThe": "Anmeldung bei Transmission fehlgeschlagen — prüfe Benutzername und Passwort",
   "srvTransmissionHostIsNotConfigured": "Der Transmission-Host ist nicht eingerichtet",

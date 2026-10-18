@@ -39,11 +39,12 @@ import { runCvMatch as runCvMatchLib, cacheAndLink, addSeriesFromCv, refreshCvVo
 import { getSeriesById, seriesCollectionDetail, untrackSeries, getCvIssue, upsertSeries, setSeriesPath,
   ensureCvIssueRow, recordGrab, getGrab, setGrabStatus, setIssueStatus, setSeriesAliases, setSeriesType, listLibraries, libraryFolders, createLibrary, assignSeriesLibrary, seriesSearchNames,
   clearImportCandidates, upsertImportCandidate, listImportCandidates, getImportCandidate, setImportCandidateMatch, setImportCandidateStatus, readyImportCandidates, listWantedIssues, queueIssues, getCvSeries, fulfilPicks } from './db.js';
-import { parseIndexers, searchNewznab } from './newznab.js';
+import { searchNewznab } from './newznab.js';
 import { makeNzbClient } from './nzbclients.js';
-import { parseIndexers as parseTorznab, searchTorznab } from './torznab.js';
+import { searchTorznab } from './torznab.js';
 import { makeTorrentClient } from './torrentclients.js';
 import { torrent as torrentSource } from './sources/torrent.js';
+import { resolveIndexers } from './indexerproviders.js';
 import { orderedSources } from './sources/index.js';
 import { pickZeroDayGrab } from './zeroday.js';
 import { validateCron } from './cron.js';
@@ -887,25 +888,26 @@ async function runRecentSearch() {
 }
 
 // RSS watch: poll the indexers' latest-uploads feed (empty-query search) and
-// grab anything matching a wanted issue. Each item is
+// grab anything matching a wanted issue. The indexers are the ones searches
+// use: the manual lists plus any indexer provider's (e.g. Prowlarr). Each item is
 // considered once (rss_seen); a match is PINNED to the issue so the queue
 // downloads exactly that release — no re-search. See src/rsswatch.js.
 async function runRssWatch() {
   const job = startJob('rss-watch', 'Watch indexer RSS');
   const feeds = [];
   if (config.torrentEnabled) {
-    const ixs = parseTorznab(config.torznabIndexers);
+    const ixs = await resolveIndexers(config, 'torznab');
     if (ixs.length) feeds.push(searchTorznab(ixs, '', { limit: 100 })
       .then((r) => r.map((x) => ({ ...x, source: 'torrent' })))
       .catch((e) => { logWarn(`RSS watch: torznab feed failed — ${e?.message || e}`, 'download'); return []; }));
   }
   if (config.usenetEnabled) {
-    const ixs = parseIndexers(config.newznabIndexers);
+    const ixs = await resolveIndexers(config, 'newznab');
     if (ixs.length) feeds.push(searchNewznab(ixs, '', { limit: 100 })
       .then((r) => r.map((x) => ({ ...x, source: 'usenet' })))
       .catch((e) => { logWarn(`RSS watch: newznab feed failed — ${e?.message || e}`, 'download'); return []; }));
   }
-  if (!feeds.length) { job.finish({ skipped: 'no sources enabled' }); return { skipped: true }; }
+  if (!feeds.length) { job.finish({ skipped: 'no indexers' }); return { skipped: true }; }
   const items = (await Promise.all(feeds)).flat();
   const fresh = unseenItems(db, items);
   const matches = fresh.length ? matchFeedItems(fresh, buildWantedIndex(db)) : [];
@@ -1143,7 +1145,12 @@ async function runZeroDayGrab() {
     job.fail('Torrents are not enabled');
     return { error: 'Torrents are not enabled (Settings → Download sources → Torrents).' };
   }
-  const indexers = parseTorznab(config.torznabIndexers);
+  // The same indexers torrent searches use, provider-supplied ones included.
+  const indexers = await resolveIndexers(config, 'torznab');
+  if (!indexers.length) {
+    job.fail('No torrent indexers');
+    return { error: 'No torrent indexers are set up (Settings → Download sources → Torrents).' };
+  }
   let results;
   try { results = await searchTorznab(indexers, config.zeroDayQuery || '0-Day Week', { cat: '' }); }
   catch (e) { logError(`0-Day search failed: ${e?.message || e}`, 'torrent'); job.fail(e); return { error: String(e?.message || e) }; }

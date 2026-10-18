@@ -74,6 +74,7 @@
   "srvSabnzbdRefusedHistoryDeleteFor": "SABnzbd が {detail} の履歴削除を拒否しました",
   "srvTheSupportServiceDidNot": "サポートサービスがパッケージを受け付けませんでした: {detail}",
   "srvTorrentsAreNotEnabledSettings": "トレントが有効になっていません（設定 → ダウンロードソース → トレント）。",
+  "srvNoTorrentIndexersAreSetUp": "トレントのインデクサーが設定されていません（設定 → ダウンロードソース → トレント）。",
   "srvTransmissionHttp": "Transmission HTTP {detail}",
   "srvTransmissionAuthenticationFailedCheckThe": "Transmission の認証に失敗しました。ユーザー名とパスワードを確認してください",
   "srvTransmissionHostIsNotConfigured": "Transmission のホストが設定されていません",

@@ -74,6 +74,7 @@
   "srvSabnzbdRefusedHistoryDeleteFor": "SABnzbd ha rifiutato di eliminare la cronologia di {detail}",
   "srvTheSupportServiceDidNot": "Il servizio di supporto non ha accettato il pacchetto: {detail}",
   "srvTorrentsAreNotEnabledSettings": "I torrent non sono attivi (Impostazioni → Fonti di download → Torrent).",
+  "srvNoTorrentIndexersAreSetUp": "Nessun indicizzatore torrent configurato (Impostazioni → Fonti di download → Torrent).",
   "srvTransmissionHttp": "Transmission HTTP {detail}",
   "srvTransmissionAuthenticationFailedCheckThe": "Autenticazione su Transmission non riuscita: controlla nome utente e password",
   "srvTransmissionHostIsNotConfigured": "L’host di Transmission non è configurato",

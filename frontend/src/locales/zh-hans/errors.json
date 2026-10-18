@@ -74,6 +74,7 @@
   "srvSabnzbdRefusedHistoryDeleteFor": "SABnzbd 拒绝删除 {detail} 的历史记录",
   "srvTheSupportServiceDidNot": "支持服务未接受该包：{detail}",
   "srvTorrentsAreNotEnabledSettings": "未启用种子（设置 → 下载来源 → 种子）。",
+  "srvNoTorrentIndexersAreSetUp": "未设置任何种子索引器（设置 → 下载来源 → 种子）。",
   "srvTransmissionHttp": "Transmission HTTP {detail}",
   "srvTransmissionAuthenticationFailedCheckThe": "Transmission 认证失败，请检查用户名和密码",
   "srvTransmissionHostIsNotConfigured": "未配置 Transmission 主机",

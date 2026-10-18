@@ -74,6 +74,7 @@
   "srvSabnzbdRefusedHistoryDeleteFor": "SABnzbd odmówił usunięcia historii dla {detail}",
   "srvTheSupportServiceDidNot": "Usługa pomocy nie przyjęła pakietu: {detail}",
   "srvTorrentsAreNotEnabledSettings": "Torrenty nie są włączone (Ustawienia → Źródła pobierania → Torrenty).",
+  "srvNoTorrentIndexersAreSetUp": "Nie skonfigurowano żadnych indeksatorów torrentów (Ustawienia → Źródła pobierania → Torrenty).",
   "srvTransmissionHttp": "Transmission HTTP {detail}",
   "srvTransmissionAuthenticationFailedCheckThe": "Uwierzytelnianie w Transmission nie powiodło się — sprawdź nazwę użytkownika i hasło",
   "srvTransmissionHostIsNotConfigured": "Host Transmission nie jest skonfigurowany",

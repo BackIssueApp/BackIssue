@@ -74,6 +74,7 @@
   "srvSabnzbdRefusedHistoryDeleteFor": "SABnzbd weigerde de geschiedenis van {detail} te wissen",
   "srvTheSupportServiceDidNot": "De ondersteuningsdienst nam het pakket niet aan: {detail}",
   "srvTorrentsAreNotEnabledSettings": "Torrents staan niet aan (Instellingen → Downloadbronnen → Torrents).",
+  "srvNoTorrentIndexersAreSetUp": "Er zijn geen torrent-indexers ingesteld (Instellingen → Downloadbronnen → Torrents).",
   "srvTransmissionHttp": "Transmission HTTP {detail}",
   "srvTransmissionAuthenticationFailedCheckThe": "Aanmelden bij Transmission mislukt — controleer gebruikersnaam en wachtwoord",
   "srvTransmissionHostIsNotConfigured": "De Transmission-host is niet ingesteld",

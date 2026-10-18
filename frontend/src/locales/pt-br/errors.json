@@ -74,6 +74,7 @@
   "srvSabnzbdRefusedHistoryDeleteFor": "O SABnzbd recusou apagar o histórico de {detail}",
   "srvTheSupportServiceDidNot": "O serviço de suporte não aceitou o pacote: {detail}",
   "srvTorrentsAreNotEnabledSettings": "Os torrents não estão ativados (Configurações → Fontes de download → Torrents).",
+  "srvNoTorrentIndexersAreSetUp": "Não há indexadores de torrents configurados (Configurações → Fontes de download → Torrents).",
   "srvTransmissionHttp": "Transmission HTTP {detail}",
   "srvTransmissionAuthenticationFailedCheckThe": "Falha na autenticação do Transmission — verifique o usuário e a senha",
   "srvTransmissionHostIsNotConfigured": "O host do Transmission não está configurado",

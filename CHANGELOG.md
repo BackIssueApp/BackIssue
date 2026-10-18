@@ -17,6 +17,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   the API and plugin assets return `401` with `setupRequired: true` until the
   admin account is created.
 
+### Fixed
+
+- **The RSS watch and the 0-Day pack job use Prowlarr's indexers.** Both
+  read only the manually entered indexer lists, so with Prowlarr managing
+  your indexers they had nothing to poll or search. They now use the same
+  indexers as searches.
+
 ### Removed
 
 - **Legacy API routes.** `POST /api/download` (use
