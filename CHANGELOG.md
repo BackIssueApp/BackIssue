@@ -24,6 +24,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   your indexers they had nothing to poll or search. They now use the same
   indexers as searches.
 
+### Added
+
+- **`GET /api/auth/providers` reports `apiKeyBasic: true`**, so clients know
+  a personal API key works as the HTTP Basic password, the way in for reader
+  apps when password login is off.
+
 ### Removed
 
 - **Legacy API routes.** `POST /api/download` (use

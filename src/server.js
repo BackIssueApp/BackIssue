@@ -476,6 +476,9 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
       // The password form is also needed by credential backends (e.g. WHMCS),
       // so keep it visible whenever one is registered.
       passwordLogin: !config.passwordLoginDisabled || registeredCredentialProviders().length > 0,
+      // A personal API key works as the HTTP Basic password (OPDS readers),
+      // so clients can say so when passwords are off. Absent before 0.9.2.
+      apiKeyBasic: true,
     });
   });
   // Sign in a user from an ALREADY-VERIFIED external identity. SSO/OIDC plugins

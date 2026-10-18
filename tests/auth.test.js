@@ -525,6 +525,8 @@ test('SSO-only: password login off also refuses non-admin passwords over HTTP Ba
     assert.equal(login.status, 403, 'the sign-in form refuses the password');
     assert.equal((await fetch(`${base}/api/series`, { headers: basic('reader', 'viewerpass1') })).status, 401, 'and so does Basic');
     assert.equal((await fetch(`${base}/api/series`, { headers: basic('boss', 'adminpass1') })).status, 200, 'admins keep the escape hatch');
+    const providers = await (await fetch(`${base}/api/auth/providers`)).json();
+    assert.equal(providers.apiKeyBasic, true, 'clients learn an API key is the way in');
     // An API key as the Basic password still gets a non-admin in (OPDS readers).
     const readerId = db.prepare("SELECT id FROM users WHERE username='reader'").get().id;
     const apiKey = users.createApiKey(db, readerId);
