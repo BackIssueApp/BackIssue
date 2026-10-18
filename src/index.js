@@ -193,7 +193,7 @@ function runTool(tool, opts = {}) {
   if (state.tools.running) return { busy: true };
   const t = TOOLS[tool];
   if (!t) return { error: 'unknown tool' };
-  if (t.needsCv) { try { cvClient(); } catch (e) { return { error: 'ComicVine keys required for this tool' }; } }
+  if (t.needsCv) { try { cvClient(); } catch (e) { return { error: 'this tool needs a metadata source — set one up under Settings → Metadata' }; } }
   state.tools = { running: true, tool, done: 0, total: 0 };
   const job = startJob('tool', t.label);
   (async () => {

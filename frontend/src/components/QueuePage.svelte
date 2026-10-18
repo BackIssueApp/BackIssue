@@ -7,7 +7,7 @@
   import { status } from '../lib/status.svelte.js';
   import { detail, refreshIssueStatuses } from '../lib/store.svelte.js';
   import { fmt, humanBytes } from '../lib/util.js';
-  import { t } from '../lib/i18n.svelte.js';
+  import { t, st } from '../lib/i18n.svelte.js';
   import Badge from './Badge.svelte';
   import { confirmDialog } from './DialogModal.svelte';
   import { notify } from '../lib/toasts.svelte.js';
@@ -283,7 +283,7 @@
               <div class="qx__release">{it.title}</div>
               {#if it.status === 'failed' && it.error}
                 <!-- The answer to "why did it fail?" belongs on the row itself. -->
-                <div class="qx__err">{it.error}</div>
+                <div class="qx__err">{st('errors', it.error)}</div>
               {/if}
               {@render liveBar(it.live, it.status)}
             </div>

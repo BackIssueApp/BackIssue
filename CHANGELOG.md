@@ -31,6 +31,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **Error messages in your language.** About 160 messages the server can
+  show, from download-client and indexer failures to account and library
+  rules, were English whatever language you picked. They are now translated,
+  including the failure reasons on the Queue and History pages and on an
+  issue's files. Messages from the metadata service no longer name a
+  particular provider.
 - **Hide mature content reaches reader apps.** An account that switched it on
   still saw flagged series when an OPDS or other reader app signed in with its
   username and password, or through an external sign-in such as billing. The

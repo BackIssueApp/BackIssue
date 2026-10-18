@@ -37,7 +37,7 @@
   import { can, isTrusted } from '../lib/auth.svelte.js';
   import Icon from '../lib/Icon.svelte';
   import { openFeaturing } from './FeaturingModal.svelte';
-  import { t } from '../lib/i18n.svelte.js';
+  import { t, st } from '../lib/i18n.svelte.js';
 
   const open = $derived(modals.stack.includes('issue'));
   const info = $derived(m.info && !m.info.error ? m.info : null);
@@ -410,7 +410,7 @@
                           {:else}<span class="ix__flag ix__flag--ok">{t('issueModal.fileTagged')}</span>{/if}
                           {#if f.assigned}<span class="ix__flag">{t('issueModal.assignedByHand')}</span>{/if}
                         </div>
-                        {#if !f.valid && f.error}<div class="ix__fileerr">{t('issueModal.reason', { error: f.error })}</div>{/if}
+                        {#if !f.valid && f.error}<div class="ix__fileerr">{t('issueModal.reason', { error: st('errors', f.error) })}</div>{/if}
                         {#if (isTrusted() || can('library.manage')) && otherIssues.length}
                           <div class="ix__move">
                             <select aria-label={t('issueModal.moveAria', { name: f.name })} bind:value={movePick[f.path]}>

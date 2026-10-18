@@ -1493,7 +1493,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       try { await refreshVolume(seriesId); } catch { /* the message below explains */ }
       ci = find();
     }
-    if (!ci) return res.status(404).json({ error: `issue #${number} isn't listed on ComicVine yet — try again in a day or two` });
+    if (!ci) return res.status(404).json({ error: `this issue isn't listed at the metadata source yet — try again in a day or two (#${number})` });
     const id = ensureCvIssueRow(db, { seriesId, cvIssueId: ci.comicvine_id, number: ci.issue_number, title: ci.name });
     setIssueWants(db, seriesId, [ci.comicvine_id], true, { reason: 'release', userId: req.user?.id ?? null });
     queueIssues(db, [id]);

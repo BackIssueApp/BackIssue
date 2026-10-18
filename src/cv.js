@@ -173,12 +173,12 @@ export function makeCvClient(config, opts = {}) {
     }
     if (resp.status === 420 || resp.status === 503 || resp.status === 429) {
       if (attempt < 2) { await sleep(1000); return call(pathAndQuery, attempt + 1); }
-      throw rateLimitError(`ComicVine HTTP ${resp.status} (rate limited)`);
+      throw rateLimitError(`metadata service HTTP ${resp.status} (rate limited)`);
     }
-    if (!resp.ok) throw new Error(`ComicVine HTTP ${resp.status}`);
+    if (!resp.ok) throw new Error(`metadata service HTTP ${resp.status}`);
     const data = await resp.json();
-    if (data.status_code === 107) throw rateLimitError('ComicVine rate limit exceeded (107)');
-    if (data.status_code !== 1) throw new Error(`ComicVine error ${data.status_code}: ${data.error}`);
+    if (data.status_code === 107) throw rateLimitError('metadata service rate limit exceeded (107)');
+    if (data.status_code !== 1) throw new Error(`metadata service error ${data.status_code}: ${data.error}`);
     return data;
   }
 

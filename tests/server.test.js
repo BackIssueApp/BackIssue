@@ -777,7 +777,7 @@ test('releases/download refreshes the volume once when the issue is not cached y
     r = await fetch(`${base}/api/releases/download`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ seriesId: 9, number: '2' }) });
     assert.equal(r.status, 404);
     assert.equal(calls.refreshed, 9);
-    assert.match((await r.json()).error, /isn't listed on ComicVine yet/);
+    assert.match((await r.json()).error, /isn't listed at the metadata source yet/);
   } finally { s.close(); }
 });
 

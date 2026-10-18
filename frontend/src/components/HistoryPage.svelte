@@ -5,7 +5,7 @@
   import { apiGet, apiPost, apiDelete } from '../lib/api.js';
   import { subscribe } from '../lib/events.svelte.js';
   import { fmt } from '../lib/util.js';
-  import { t, currentLang } from '../lib/i18n.svelte.js';
+  import { t, st, currentLang } from '../lib/i18n.svelte.js';
 
   let { active = false } = $props();
 
@@ -189,7 +189,7 @@
                 {:else}<span class="histx__t">{it.series_title || it.title || it.title_norm || '?'}</span>{/if}
                 <span class="histx__num">{it.issue_number != null && it.issue_number !== '' ? ` #${it.issue_number}` : ''}</span>
               </div>
-              {#if isFailed && it.error}<div class="histx__detail histx__detail--err">{it.error}</div>
+              {#if isFailed && it.error}<div class="histx__detail histx__detail--err">{st('errors', it.error)}</div>
               {:else if isBlock && it.title && it.title !== it.series_title}<div class="histx__detail histx__detail--mono">{it.title}{#if it.reason} · {it.reason}{/if}</div>
               {:else if isBlock && it.reason}<div class="histx__detail">{it.reason}</div>{/if}
             </div>
