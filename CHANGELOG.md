@@ -8,11 +8,16 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-10-17
+
 ### Added
 
 - **Translations.** BackIssue can now show its interface in other languages.
-  Pick one under Profile → Language, or leave it on "match the browser"; a
-  signed-in account keeps the choice on every device, and the page arrives
+  It ships in Chinese (Simplified), Dutch, French, German, Italian, Japanese,
+  Polish, Portuguese (Portugal and Brazil) and Spanish, and so do the public
+  plugins; the Android and iOS apps follow in their own releases. Pick one
+  under Profile → Language, or leave it on "match the browser"; a signed-in
+  account keeps the choice on every device, and the page arrives
   already translated rather than flashing English first. English is the
   source of truth, every string a person reads comes from a catalog under
   frontend/src/locales, and a test fails the build when a converted screen
@@ -22,14 +27,6 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   Labels the server defines (job, schedule and tool names, permission names,
   source-card fields, plugin descriptions) are translated too, and plugins
   can ship translations for the ones they register.
-- **Metadata sources per library.** Each library can keep the default source
-  list or choose its own under Settings → Library: a manga library on the
-  built-in service alone, a library of French albums with the French editions
-  source first. A series always refreshes through its own library's list, and
-  searching for or adding a series to a library uses that library's list too;
-  automatic matching and imports follow the library each series or folder
-  belongs to. Book and audiobook libraries keep getting their data from their
-  plugins.
 - **Several metadata sources at once.** Settings → Metadata is now an ordered
   list, like download sources: turn on every source you want data from and
   move the one you trust most to the top. A search asks all of them and shows
@@ -42,19 +39,20 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   source you had becomes a one-entry list. Plugin providers declare the id
   range they mint (`idRange` or `owns`) so lookups route to them; one that
   declares nothing is handed whatever id no other source claims.
-
-- **Jump to a letter in the Library** (#10). When the Library is sorted A-Z, a
-  letter rail runs down the right edge: click a letter and the grid scrolls
-  straight to the series starting with it, loading whatever it needs to get
-  there on the way. The current letter is highlighted as you scroll. The rail
-  appears only under the A-Z sort and only once a library has more than a
-  handful of series, and it works the same in the poster grid and the list, and
-  across comic, book and audiobook libraries.
+- **Metadata sources per library.** Each library can keep the default source
+  list or choose its own under Settings → Library: a manga library on the
+  built-in service alone, a library of French albums with the French editions
+  source first. A series always refreshes through its own library's list, and
+  searching for or adding a series to a library uses that library's list too;
+  automatic matching and imports follow the library each series or folder
+  belongs to. Book and audiobook libraries keep getting their data from their
+  plugins.
 - **Bring your own metadata provider.** Settings → Metadata now offers
   **Metron directly**, signed in with your own Metron account, alongside the
   built-in service and ComicVine. Series and issue data, covers, credits,
   characters, story arcs and the issue extras then come straight from Metron,
-  under its own rate limits, and the built-in service is never contacted. The
+  under its own rate limits, and comic lookups no longer go to the built-in
+  service. The
   source list is now a set of providers that plugins can extend
   (`api.registerMetadataProvider`), each with its own fields and Test button on
   the Metadata tab. Your existing library carries over: a series first added
@@ -63,6 +61,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   ComicVine ids. Series added while Metron is the source keep ids of their own
   that never collide with ComicVine's; those refresh while Metron is on.
   Discover still needs the built-in service or ComicVine.
+- **Jump to a letter in the Library** (#10). When the Library is sorted A-Z, a
+  letter rail runs down the right edge: click a letter and the grid scrolls
+  straight to the series starting with it, loading whatever it needs to get
+  there on the way. The current letter is highlighted as you scroll. The rail
+  appears only under the A-Z sort and only once a library has more than a
+  handful of series, and it works the same in the poster grid and the list, and
+  across comic, book and audiobook libraries.
 
 ### Fixed
 
@@ -73,10 +78,6 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   re-downloaded. They are flagged on the first start, and a library scan now
   re-checks any such file instead of trusting it. The issues show as missing
   again; nothing is downloaded automatically.
-- **Warning toasts have their own look.** A partly failed action (such as a
-  reading-list import with some misses) shows an amber toast instead of an
-  unstyled one, and a few places that passed the wrong toast type show the
-  right one.
 - **Each series remembers where its data comes from.** Every cached series and
   issue now records its catalog (ComicVine, MangaDex, Metron or a plugin's) and
   that catalog's own id, and lookups go by that record instead of guessing from
@@ -87,13 +88,6 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   automatically on the first start. Plugin metadata sources can declare
   `catalog`, `serves`, `alsoServes` and `refOf`; one that declares only
   `idRange` keeps working unchanged.
-- **A cover price in another currency is shown as sent.** The issue panel used
-  to put a dollar sign in front of every price; a source that prices in euros
-  or francs now has its own sign or code kept.
-- **Metron's Test sign-in no longer spins forever** when metron.cloud cannot
-  be reached. Every Metron request now gives up after 15 seconds and is
-  retried once, and the message says the host timed out and may be blocking
-  the server, so a blocked address is told apart from a wrong password.
 - **A download host's challenge page is no longer saved as the comic.** Some
   file hosts answer a download with a normal-looking web page — a challenge or
   rate-limit notice — rather than an error, and that page was being written to
@@ -101,6 +95,17 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   way in: the host is cleared through FlareSolverr where one is configured, or
   through the browser as a last resort, and the file is fetched again; failing
   both, the error names the page so it is clear what happened.
+- **Metron's Test sign-in no longer spins forever** when metron.cloud cannot
+  be reached. Every Metron request now gives up after 15 seconds and is
+  retried once, and the message says the host timed out and may be blocking
+  the server, so a blocked address is told apart from a wrong password.
+- **A cover price in another currency is shown as sent.** The issue panel used
+  to put a dollar sign in front of every price; a source that prices in euros
+  or francs now has its own sign or code kept.
+- **Warning toasts have their own look.** A partly failed action (such as a
+  reading-list import with some misses) shows an amber toast instead of an
+  unstyled one, and a few places that passed the wrong toast type show the
+  right one.
 
 ## [0.9.0] — 2026-10-09
 
