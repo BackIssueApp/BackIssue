@@ -8,8 +8,19 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+
+- **API keys work as a password for reader apps.** Apps that only send a
+  username and password, such as OPDS readers, accept your Profile API key
+  in the password box, with your username or a blank one.
+
 ### Fixed
 
+- **Turning off password login covers reader apps too.** With password login
+  off, apps that send a username and password directly no longer let
+  non-admin users in with their password. Admins keep their password
+  fallback, accounts from an external login backend are unaffected, and
+  everyone else uses their API key.
 - **Plugin task schedules save.** Changing the pattern or switching a plugin's
   task on or off under Jobs (Rebuild the browse index, Fill approved book
   requests, Sync remote audiobook catalog and others) now sticks. Before, the

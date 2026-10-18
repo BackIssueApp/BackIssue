@@ -498,3 +498,31 @@ test('HTTP Basic falls back to a credential provider (WHMCS/LDAP), so OPDS clien
     assert.match((await selfSet.json()).error, /external service/);
   } finally { clearAuthThrottle(); s.close(); }
 });
+
+test('SSO-only: password login off also refuses non-admin passwords over HTTP Basic', async () => {
+  const config = (await import('../src/config.js')).default;
+  const users = await import('../src/users.js');
+  const { app, db } = makeApp();
+  users.initUserTables(db);
+  users.createUser(db, { username: 'boss', password: 'adminpass1', role: 'admin' });
+  users.createUser(db, { username: 'reader', password: 'viewerpass1', role: 'viewer' });
+  const s = await listen(app);
+  const base = `http://localhost:${s.address().port}`;
+  const basic = (u, p) => ({ authorization: 'Basic ' + Buffer.from(`${u}:${p}`).toString('base64') });
+  const saved = config.passwordLoginDisabled;
+  try {
+    assert.equal((await fetch(`${base}/api/series`, { headers: basic('reader', 'viewerpass1') })).status, 200, 'Basic works while passwords are allowed');
+    config.passwordLoginDisabled = true;
+    const login = await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'reader', password: 'viewerpass1' }) });
+    assert.equal(login.status, 403, 'the sign-in form refuses the password');
+    assert.equal((await fetch(`${base}/api/series`, { headers: basic('reader', 'viewerpass1') })).status, 401, 'and so does Basic');
+    assert.equal((await fetch(`${base}/api/series`, { headers: basic('boss', 'adminpass1') })).status, 200, 'admins keep the escape hatch');
+    // An API key as the Basic password still gets a non-admin in (OPDS readers).
+    const readerId = db.prepare("SELECT id FROM users WHERE username='reader'").get().id;
+    const apiKey = users.createApiKey(db, readerId);
+    assert.equal((await fetch(`${base}/api/series`, { headers: basic('reader', apiKey) })).status, 200, 'API key over Basic works');
+    assert.equal((await fetch(`${base}/api/series`, { headers: basic('', apiKey) })).status, 200, 'blank username is fine');
+    assert.equal((await fetch(`${base}/api/series`, { headers: basic('boss', apiKey) })).status, 401, "another user's name with this key is refused");
+    assert.equal((await fetch(`${base}/api/series`, { headers: basic('reader', 'bi_' + '0'.repeat(40)) })).status, 401, 'an unknown key is refused');
+  } finally { config.passwordLoginDisabled = saved; s.close(); }
+});

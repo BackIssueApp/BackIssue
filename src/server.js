@@ -167,8 +167,20 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       const [name, ...rest] = Buffer.from(hdr.slice(6), 'base64').toString().split(':');
       const key = authKey(req, name);
       if (users.authBlockedFor(key)) return null; // locked out → plain 401, no scrypt spend
-      const u = users.verifyBasicCached(db, name, rest.join(':'));
+      // A personal API key as the Basic password: for clients that only speak
+      // Basic (OPDS readers), and the way in when password login is off. The
+      // username must be the key owner's (or blank). Anything else falls
+      // through to the password check (a password may start with bi_ too).
+      const secret = rest.join(':');
+      if (secret.startsWith('bi_')) {
+        const ku = users.apiKeyUser(db, secret);
+        if (ku && (!name || name.toLowerCase() === String(ku.username).toLowerCase())) { users.authSucceeded(key); return ku; }
+      }
+      const u = users.verifyBasicCached(db, name, secret);
       if (u) users.authSucceeded(key); else users.authFailed(key);
+      // Same rule as the sign-in form: with password login off (SSO-only),
+      // only admins may still use a password. Others use an API key.
+      if (u && config.passwordLoginDisabled && u.role !== 'admin') return null;
       return u;
     }
     return null;
