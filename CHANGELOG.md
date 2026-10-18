@@ -10,6 +10,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Wanted books and audiobooks on the Wanted page.** Plugins can add their
+  own tab beside Comics (`registerWantedTab`); the Books and Audiobooks
+  plugins use it to list what's wanted, search again, and cancel.
 - **Order your libraries and choose the default.** Arrows on each library
   under Settings → Library → Libraries set the order the sidebar lists them
   in, and **Make default** picks the comic or manga library that new series

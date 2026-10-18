@@ -14,6 +14,7 @@
   import { can } from '../lib/auth.svelte.js';
   import Icon from '../lib/Icon.svelte';
   import { hscroll } from '../lib/hscroll.js';
+  import { wantedTabs, renderWantedTab } from '../lib/plugins.svelte.js';
 
   let { active = false } = $props();
 
@@ -27,6 +28,20 @@
   let loaded = $state(false);
   let collapsed = $state({}); // series_id → true when the user collapses it
   const gaps = $derived(scope === 'gaps');
+  // Comics, plus a tab per plugin that has its own wanted list (books,
+  // audiobooks). ?kind=<tab id> picks one; the comic list is the default.
+  const kind = $derived.by(() => {
+    const k = new URLSearchParams(route.search).get('kind');
+    return k && wantedTabs.some((x) => x.id === k) ? k : 'comics';
+  });
+  const pluginTab = $derived(wantedTabs.find((x) => x.id === kind) || null);
+  const tabLabel = (x) => (typeof x.label === 'function' ? x.label() : x.label) || x.id;
+  let pluginBox = $state(null);
+  $effect(() => {
+    if (!active || !pluginTab || !pluginBox) return;
+    pluginBox.innerHTML = '';
+    renderWantedTab(pluginTab, pluginBox);
+  });
 
   // key → catalog key under wantedPage (resolved at render time).
   const SORTS = [
@@ -53,6 +68,7 @@
   // of truth: handlers only patch the query; this effect syncs state + refetches.
   $effect(() => {
     if (!active) { items = []; loaded = false; return; }
+    if (pluginTab) return; // a plugin's tab draws its own list
     const p = new URLSearchParams(route.search);
     untrack(() => {
       followed = p.get('wf') === 'followed';
@@ -209,8 +225,8 @@
     <div class="wx__head">
       <button id="wanted-back" class="wx__iconbtn" aria-label={t('common.back')} onclick={goBack}><Icon name="arrow-left" size={16} /></button>
       <h2 class="wx__title">{t('wantedPage.title')}</h2>
-      <span id="wanted-summary" class="wx__summary">{gaps ? t('wantedPage.summaryMissing', { count: total }) : t('wantedPage.summaryWanted', { count: total })}</span>
-      <div class="wx__right">
+      {#if !pluginTab}<span id="wanted-summary" class="wx__summary">{gaps ? t('wantedPage.summaryMissing', { count: total }) : t('wantedPage.summaryWanted', { count: total })}</span>{/if}
+      {#if !pluginTab}<div class="wx__right">
         <div class="wx__find">
           <Icon name="search" size={15} />
           <input id="wanted-search" type="search" spellcheck="false" placeholder={t('wantedPage.filterSeries')} bind:value={q} oninput={onSearchInput} />
@@ -218,8 +234,19 @@
         {#if can('downloads.grab')}
           <button id="wanted-dl-all" class="wx__dlall" onclick={downloadAll}><Icon name="download" size={15} /> {t('wantedPage.downloadShown')}</button>
         {/if}
-      </div>
+      </div>{/if}
     </div>
+
+    {#if wantedTabs.length}
+      <div class="wx__kinds" role="tablist" use:hscroll>
+        <button class="wx__kind" role="tab" aria-selected={kind === 'comics'} class:is-active={kind === 'comics'} onclick={() => setQuery({ kind: null })}>{t('wantedPage.tabComics')}</button>
+        {#each wantedTabs as x (x.id)}
+          <button class="wx__kind" role="tab" aria-selected={kind === x.id} class:is-active={kind === x.id} onclick={() => setQuery({ kind: x.id })}>{tabLabel(x)}</button>
+        {/each}
+      </div>
+    {/if}
+
+    {#if !pluginTab}
 
     <div class="wx__stats" use:hscroll>
       {#each stats as st (st.label)}
@@ -257,9 +284,13 @@
         <button class="wx__bulk-btn wx__bulk-btn--ghost" onclick={() => selected.clear()}>{t('common.clear')}</button>
       </div>
     {/if}
+    {/if}
   </div>
 
   <div class="wx__scroll">
+    {#if pluginTab}
+      <div class="wx__inner wx__plugin" bind:this={pluginBox}></div>
+    {:else}
     <div id="wanted-list" class="wx__inner">
       {#if loaded && !items.length}
         <div class="wx__empty">
@@ -338,6 +369,7 @@
 
       <button id="wanted-more" class="wx__more" hidden={items.length >= total} onclick={() => renderWanted({ append: true })}>{t('wantedPage.loadMore')}</button>
     </div>
+    {/if}
   </div>
 </main>
 
@@ -371,6 +403,13 @@
   .wx__chips::-webkit-scrollbar { display: none; }
   .wx__chip { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--muted); font: 600 12.5px var(--font-body); cursor: pointer; white-space: nowrap; flex: none; }
   .wx__chip.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  /* Comics / Books / Audiobooks: underline tabs, distinct from the filter chips. */
+  .wx__kinds { display: flex; gap: 4px; margin-top: 12px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+  .wx__kind { flex: none; border: none; background: none; color: var(--muted); font: 600 13.5px var(--font-body); padding: 9px 14px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+  .wx__kind:hover { color: var(--text); }
+  .wx__kind.is-active { color: var(--text); border-bottom-color: var(--accent); }
+  .wx__kind:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .wx__plugin { padding-top: 14px; }
   .wx__chip--hide.is-active { background: rgba(255,194,75,.12); border-color: var(--amber); color: var(--amber); }
   .wx__chips-sep { width: 1px; height: 22px; background: var(--line); flex: none; margin: 0 2px; }
   .wx__sort { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; color: var(--faint); flex: none; }

@@ -52,6 +52,22 @@ export function renderSeriesView(view, container, { series, issues, refresh }) {
   } catch (e) { console.warn('plugin series view failed', e); }
 }
 
+// Plugin-owned tabs on the Wanted page (e.g. wanted books and audiobooks).
+// Each is { id, label, render(container, ctx) }; the page shows a Comics tab
+// plus one per entry, and hands the active plugin tab a plain container to
+// draw into (cleared between calls). Reactive so a late registration shows.
+export const wantedTabs = $state([]);
+export function renderWantedTab(tab, container) {
+  try {
+    tab.render(container, {
+      get: bi.api.get, post: bi.api.post,
+      del: async (path) => (await fetch(path, { method: 'DELETE' })).json(),
+      can: bi.api.can, icon: bi.api.icon, toast: bi.api.toast,
+      openSeries: bi.api.openSeries,
+    });
+  } catch (e) { console.warn('plugin wanted tab failed', e); }
+}
+
 // Plugin-provided LIBRARY FILTERS. A plugin that owns a library type can supply
 // facet groups (author / decade / format / status / …) that core's Filters modal
 // renders over the REAL grid — core stays the grid renderer, the plugin is a pure
@@ -136,6 +152,12 @@ const bi = {
     // and holds the opaque `selection`; the matching series are resolved on the
     // server by the plugin's registerCollectionFilter. ctx = { get, post, type,
     // libraryId }.
+    // Add a tab to the Wanted page: { id, label, render(container, ctx) }.
+    // label may be a function (re-read on every render, so it can follow the
+    // language). ctx = { get, post, del, can, icon, toast, openSeries }.
+    registerWantedTab(tab) {
+      if (tab && tab.id && typeof tab.render === 'function' && !wantedTabs.some((x) => x.id === tab.id)) wantedTabs.push(tab);
+    },
     registerLibraryFilters(provider) {
       if (provider && Array.isArray(provider.types) && typeof provider.groups === 'function') libraryFilters.push(provider);
     },

@@ -1999,6 +1999,9 @@ textarea.dialog-input { resize: vertical; font-family: var(--font-mono); }
 .libcard__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .libcard__icon { color: var(--muted); display: inline-flex; }
 .libcard__order { display: inline-flex; gap: 4px; }
+.libcard__default { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+.libcard__default.is-on { color: var(--amber); }
+.libcard__default .link-btn { display: inline-flex; align-items: center; gap: 6px; }
 .libcard__name { flex: 1 1 140px; min-width: 120px; padding: 6px 10px; background: var(--ink); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font-weight: 600; }
 .libcard__mature { margin: 0; }
 .libcard__count { margin-left: auto; white-space: nowrap; }

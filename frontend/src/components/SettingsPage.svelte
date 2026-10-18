@@ -709,13 +709,13 @@
                   <label class="field field--check libcard__mature" title={t('settingsPage.matureTitle')}>
                     <input type="checkbox" checked={!!l.restricted} onchange={(e) => { l.restricted = e.currentTarget.checked ? 1 : 0; saveLib(l); }} /><span>{t('settingsPage.mature')}</span></label>
                   <span class="scan-muted libcard__count">{t('settingsPage.seriesCount', { count: l.series_count })}</span>
-                  {#if l.id === defaultLibId}
-                    <span class="rootrow__badge" title={t('settingsPage.libDefaultTitle')}>{t('settingsPage.defaultBadge')}</span>
-                  {:else if canBeDefault(l)}
-                    <button class="link-btn" type="button" title={t('settingsPage.libMakeDefaultTitle')} onclick={() => makeDefaultLib(l)}>{t('settingsPage.makeDefault')}</button>
-                  {/if}
                   <button class="rootrow__x" type="button" title={t('settingsPage.deleteLibraryBtnTitle')} aria-label={t('settingsPage.deleteLibrary')} onclick={() => removeLib(l)}><Icon name="trash" size={15} /></button>
                 </div>
+                {#if l.id === defaultLibId}
+                  <div class="libcard__default is-on"><Icon name="star" size={13} fill /> {t('settingsPage.libIsDefault')}</div>
+                {:else if canBeDefault(l)}
+                  <div class="libcard__default"><button class="link-btn" type="button" onclick={() => makeDefaultLib(l)}><Icon name="star" size={13} /> {t('settingsPage.libMakeDefault')}</button></div>
+                {/if}
                 <div class="rootlist">
                   {#each l.folders as _f, i (i)}
                     <div class="rootrow">
