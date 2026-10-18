@@ -23,6 +23,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **Hide mature content reaches reader apps.** An account that switched it on
+  still saw flagged series when an OPDS or other reader app signed in with its
+  username and password, or through an external sign-in such as billing. The
+  switch now applies to every way an account signs in, and a change takes
+  effect on the app's next request.
 - **Stats shows the metadata sources in use.** Its Metadata badge read the old
   single-source setting, so with several sources it could say "No key" for a
   working setup. It now reflects the ordered list and shows how many sources

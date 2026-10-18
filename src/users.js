@@ -304,7 +304,7 @@ export function createUser(db, { username, password, role = 'viewer' }) {
 }
 
 export function getUser(db, id) {
-  return db.prepare('SELECT id, username, email, role, disabled, created_at FROM users WHERE id=?').get(id) || null;
+  return db.prepare('SELECT id, username, email, role, disabled, created_at, hide_mature, lang FROM users WHERE id=?').get(id) || null;
 }
 
 export function listUsers(db) {
@@ -374,7 +374,9 @@ export function verifyCredentials(db, username, password) {
   const stored = row?.password_hash || hashPassword('timing-pad');
   const ok = verifyPassword(password, stored);
   if (!ok || !row || row.disabled) return null;
-  return { id: row.id, username: row.username, role: row.role, disabled: row.disabled };
+  // Same shape as sessionUser: hide_mature and lang ride every request's user,
+  // so password Basic (OPDS apps) honors the account's mature-content switch.
+  return { id: row.id, username: row.username, role: row.role, disabled: row.disabled, hide_mature: row.hide_mature, lang: row.lang };
 }
 
 export function setPassword(db, id, password) {

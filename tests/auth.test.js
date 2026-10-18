@@ -584,3 +584,40 @@ test('login page lists an auth provider only once it is set up, with its current
     assert.equal((await listed())?.label, 'Company login', 'shown once set up, with the label as it is now');
   } finally { s.close(); }
 });
+
+test('the account switch for mature content holds over Basic, for local and provider accounts', async () => {
+  // OPDS apps sign in with HTTP Basic. An account that hid mature content for
+  // itself must not get it back that way, and toggling takes effect at once.
+  const { clearAuthThrottle } = await import('../src/users.js');
+  clearAuthThrottle();
+  pluginApi.registerCredentialProvider(async (username, password) =>
+    username === 'grown@x.com' && password === 'remote-pass'
+      ? { provider: 'mock-mature-billing', subject: 'm-1', email: 'grown@x.com', name: 'Grown', defaultRole: 'admin' }
+      : null);
+  const { app, db } = makeApp();
+  const s = await listen(app);
+  const base = `http://localhost:${s.address().port}`;
+  try {
+    await fetch(`${base}/api/auth/register`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: 'admin', password: 'adminpass1' }),
+    });
+    db.prepare("INSERT INTO series (title, url, restricted) VALUES ('Plain', 'u:plain', 0), ('Mature', 'u:mature', 1)").run();
+    const titles = async (auth) => (await (await fetch(`${base}/api/series`, { headers: { authorization: auth } })).json()).map((x) => x.title).sort();
+    const toggle = (auth, hide) => fetch(`${base}/api/auth/hide-mature`, {
+      method: 'POST', headers: { authorization: auth, 'content-type': 'application/json' }, body: JSON.stringify({ hide }),
+    });
+
+    const local = 'Basic ' + Buffer.from('admin:adminpass1').toString('base64');
+    assert.deepEqual(await titles(local), ['Mature', 'Plain']);
+    assert.equal((await toggle(local, true)).status, 200);
+    assert.deepEqual(await titles(local), ['Plain'], 'password Basic honors the switch');
+
+    const remote = 'Basic ' + Buffer.from('grown@x.com:remote-pass').toString('base64');
+    assert.deepEqual(await titles(remote), ['Mature', 'Plain']);
+    assert.equal((await toggle(remote, true)).status, 200);
+    assert.deepEqual(await titles(remote), ['Plain'], 'provider Basic honors it too, without waiting out its cache');
+    await toggle(remote, false);
+    assert.deepEqual(await titles(remote), ['Mature', 'Plain']);
+  } finally { s.close(); }
+});

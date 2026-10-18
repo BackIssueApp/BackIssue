@@ -581,6 +581,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     if (!req.user || req.user.id === 0) return res.status(403).json({ error: 'sign in with a real account first' });
     const on = users.setHideMature(db, req.user.id, !!(req.body || {}).hide);
     users.clearBasicCache();
+    providerBasicCache.clear(); // external-provider Basic users cache their row too
     res.json({ hideMature: on });
   });
   // Personal UI language (self-service). null/'' = follow the browser. The
