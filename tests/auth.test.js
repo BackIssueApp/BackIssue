@@ -526,3 +526,25 @@ test('SSO-only: password login off also refuses non-admin passwords over HTTP Ba
     assert.equal((await fetch(`${base}/api/series`, { headers: basic('reader', 'bi_' + '0'.repeat(40)) })).status, 401, 'an unknown key is refused');
   } finally { config.passwordLoginDisabled = saved; s.close(); }
 });
+
+test('admin sets a local user\'s password: the new one works, the old one and their sessions do not', async () => {
+  const users = await import('../src/users.js');
+  const { app, db } = makeApp();
+  users.initUserTables(db);
+  const boss = users.createUser(db, { username: 'boss2', password: 'adminpass1', role: 'admin' });
+  const locked = users.createUser(db, { username: 'forgot', password: 'oldpassword1', role: 'viewer' });
+  const oldSession = users.createSession(db, locked.id);
+  const s = await listen(app);
+  const base = `http://localhost:${s.address().port}`;
+  const adminH = { 'content-type': 'application/json', cookie: 'bi_session=' + users.createSession(db, boss.id) };
+  const login = (password) => fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'forgot', password }) });
+  try {
+    const r = await fetch(`${base}/api/users/${locked.id}`, { method: 'PATCH', headers: adminH, body: JSON.stringify({ password: 'brandNewPass9' }) });
+    assert.equal(r.status, 200);
+    assert.equal((await login('brandNewPass9')).status, 200, 'the new password signs in');
+    assert.equal((await login('oldpassword1')).status, 401, 'the old one no longer does');
+    assert.equal(users.sessionUser(db, oldSession), null, 'their existing sessions were signed out');
+    const short = await fetch(`${base}/api/users/${locked.id}`, { method: 'PATCH', headers: adminH, body: JSON.stringify({ password: 'short' }) });
+    assert.equal(short.status, 400, 'too short is refused');
+  } finally { s.close(); }
+});

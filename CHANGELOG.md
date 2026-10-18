@@ -10,6 +10,10 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Set a user's password from the Users page.** Admins can give a locked-out
+  user a new password. The box comes filled with a generated one to copy or
+  replace, and the user is signed out everywhere. Accounts linked to an
+  external sign-in are left out, since they have no local password.
 - **API keys work as a password for reader apps.** Apps that only send a
   username and password, such as OPDS readers, accept your Profile API key
   in the password box, with your username or a blank one.

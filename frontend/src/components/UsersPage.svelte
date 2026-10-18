@@ -7,7 +7,7 @@
   import { apiGet, apiPost, apiPatch, apiDelete } from '../lib/api.js';
   import { auth } from '../lib/auth.svelte.js';
   import { notify } from '../lib/toasts.svelte.js';
-  import { confirmDialog } from './DialogModal.svelte';
+  import { confirmDialog, inputDialog } from './DialogModal.svelte';
   import { t, currentLang, st, roleName } from '../lib/i18n.svelte.js';
 
   let { active = false } = $props();
@@ -57,6 +57,24 @@
     const r = await apiPatch(`/api/users/${u.id}`, { disabled: !u.disabled });
     if (r.error) { notify(r.error, 'error'); return; }
     refresh();
+  }
+  // A readable throwaway password the admin passes on (no look-alike characters).
+  function suggestPassword() {
+    const abc = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const bytes = crypto.getRandomValues(new Uint8Array(14));
+    return Array.from(bytes, (b) => abc[b % abc.length]).join('');
+  }
+  async function setPassword(u) {
+    const password = await inputDialog({
+      title: t('usersPage.setPasswordTitle', { username: u.username }),
+      message: t('usersPage.setPasswordMessage'),
+      value: suggestPassword(),
+      confirmLabel: t('usersPage.setPassword'),
+    });
+    if (password == null) return;
+    const r = await apiPatch(`/api/users/${u.id}`, { password });
+    if (r.error) { notify(r.error, 'error'); return; }
+    notify(t('usersPage.passwordSet', { username: u.username }), 'ok');
   }
   async function remove(u) {
     if (!(await confirmDialog({
@@ -173,6 +191,7 @@
               </select>
               <div class="usx__uactions">
                 {#if !isSelf(u)}
+                  {#if !(u.providers || []).length}<button class="usx__ghost" onclick={() => setPassword(u)}>{t('usersPage.setPassword')}</button>{/if}
                   <button class="usx__ghost" onclick={() => toggleDisabled(u)}>{u.disabled ? t('usersPage.enable') : t('usersPage.disable')}</button>
                   <button class="usx__del" aria-label={t('usersPage.deleteUser', { username: u.username })} onclick={() => remove(u)}><Icon name="trash" size={14} /></button>
                 {/if}
@@ -278,8 +297,10 @@
   .usx__inner { max-width: 860px; margin: 0 auto; }
 
   /* accounts table */
-  .usx__table { border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.012); overflow: hidden; margin-bottom: 22px; }
-  .usx__thead, .usx__urow { display: grid; grid-template-columns: 1.5fr 1fr 150px auto; gap: 12px; align-items: center; padding: 11px 16px; }
+  /* One column template for every row (subgrid), so rows with different
+     action buttons still line up. */
+  .usx__table { display: grid; grid-template-columns: 1.5fr 1fr 150px max-content; column-gap: 12px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.012); overflow: hidden; margin-bottom: 22px; }
+  .usx__thead, .usx__urow { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; row-gap: 8px; align-items: center; padding: 11px 16px; }
   .usx__thead { padding: 10px 16px; border-bottom: 1px solid var(--line); font: 600 10px var(--font-body); text-transform: uppercase; letter-spacing: .06em; color: var(--faint); }
   .usx__r { text-align: right; }
   .usx__urow { border-bottom: 1px solid #221e2c; }
@@ -350,8 +371,9 @@
   .usx__editor-actions .usx__ghost { height: 36px; padding: 0 16px; }
 
   @media (max-width: 720px) {
-    .usx__thead, .usx__urow { grid-template-columns: 1fr 150px auto; }
-    .usx__col-seen { display: none; }
+    .usx__table { grid-template-columns: minmax(0, 1fr) 150px; }
+    .usx__col-seen, .usx__thead .usx__r { display: none; }
+    .usx__uactions { grid-column: 1 / -1; }
     .usx__create-form { grid-template-columns: 1fr; }
     .usx__editor-ids, .usx__perms { grid-template-columns: 1fr; }
   }
