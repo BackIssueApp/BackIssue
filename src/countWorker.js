@@ -21,7 +21,6 @@ function ensureWorker() {
   if (worker || !dbPath) return worker;
   try {
     worker = new Worker(threadFile, { workerData: { dbPath } });
-    worker.unref(); // never keeps the process alive
     worker.on('message', (m) => {
       const p = pending.get(m.id);
       if (!p) return;
@@ -35,6 +34,10 @@ function ensureWorker() {
     };
     worker.on('error', die);
     worker.on('exit', die);
+    // Never keeps the process alive. After the listeners: attaching a
+    // 'message' listener re-references the worker's port, so an earlier
+    // unref() is undone and the process can never exit (a hung test run).
+    worker.unref();
   } catch {
     worker = null;
   }
