@@ -145,7 +145,7 @@
         // Only a book already on the shelf has a series to open; one that was
         // merely wanted has nothing to point at yet.
         if (r.seriesId) v.seriesId = r.seriesId;
-        if (r.note) notify(r.note, s === 'error' ? 'error' : inLib || s === 'grabbed' || s === 'downloading' ? 'success' : 'info');
+        if (r.note) notify(r.note, s === 'error' ? 'error' : inLib || s === 'grabbed' || s === 'downloading' ? 'ok' : 'info');
         if (inLib) loadCollection();
       } catch { notify(t('addModal.addFailed'), 'error'); v._busy = false; v._label = 'add'; }
       return;

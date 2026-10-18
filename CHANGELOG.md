@@ -66,6 +66,17 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **Comics with no pages no longer count as owned.** Archives indexed before
+  page-less files were flagged (for example a `.cbz` holding only a
+  ComicInfo.xml, left behind by a broken post-processing step) stayed marked
+  as good copies, so their issues showed as owned but could not be read or
+  re-downloaded. They are flagged on the first start, and a library scan now
+  re-checks any such file instead of trusting it. The issues show as missing
+  again; nothing is downloaded automatically.
+- **Warning toasts have their own look.** A partly failed action (such as a
+  reading-list import with some misses) shows an amber toast instead of an
+  unstyled one, and a few places that passed the wrong toast type show the
+  right one.
 - **Each series remembers where its data comes from.** Every cached series and
   issue now records its catalog (ComicVine, MangaDex, Metron or a plugin's) and
   that catalog's own id, and lookups go by that record instead of guessing from

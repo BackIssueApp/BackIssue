@@ -34,6 +34,15 @@ describe('Toasts', () => {
   });
 });
 
+describe('notify types', () => {
+  test('aliases map to the four looks; unknown types fall back to info', () => {
+    toasts.length = 0;
+    notify('a', 'success'); notify('b', 'warning'); notify('c', 'warn'); notify('d', 'bogus');
+    expect(toasts.map((x) => x.type)).toEqual(['ok', 'warn', 'warn', 'info']);
+    toasts.length = 0;
+  });
+});
+
 describe('DialogModal', () => {
   test('confirmDialog resolves true on confirm, false on cancel', async () => {
     render(DialogModal);

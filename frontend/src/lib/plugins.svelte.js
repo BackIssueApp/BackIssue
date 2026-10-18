@@ -87,7 +87,7 @@ const bi = {
     // '' for an unknown name. e.g. api.icon('download'), api.icon('star', { fill: true }).
     icon: (name, opts) => iconSvg(name, opts),
     // Host toast system — plugins report outcomes the same way core does.
-    // type: 'info' | 'ok' | 'error'.
+    // type: 'info' | 'ok' | 'warn' | 'error'.
     toast: (msg, type) => notify(msg, type),
     // Neutralize javascript:/data: URLs on plugin-rendered links (returns ''
     // to drop an unsafe scheme). Plugins building <a href> from CV/user data
