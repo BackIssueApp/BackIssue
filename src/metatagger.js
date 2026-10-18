@@ -5,7 +5,6 @@ import { getCvIssue, getCvSeries, setCvIssueDetail, getLibraryFile } from './db.
 import { logWarn } from './logstore.js';
 import { convertCbrToCbz, sidecarPath } from './archive.js';
 import { normalizeNumber } from './matcher.js';
-import { cvKey } from './cv.js';
 import { isMintedId } from './metron.js';
 import { BUILTIN_CATALOG_RANGES } from './db.js';
 import config from './config.js';
@@ -14,8 +13,10 @@ import config from './config.js';
 // ComicVine data and writes it into the CBZ. Replaces ComicTagger — matching is
 // already solved (library files carry cv_issue_id), so tagging is just data.
 
+// Tagging reads the cached record through whichever metadata sources are in
+// use (the hosted service included), so it needs no key of its own.
 export function taggingEnabled() {
-  return config.tagOnDownload === 'on' && !!cvKey(config.comicvineKeys);
+  return config.tagOnDownload === 'on';
 }
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));

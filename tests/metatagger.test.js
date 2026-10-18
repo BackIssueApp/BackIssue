@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import JSZip from 'jszip';
 import config from '../src/config.js';
-import { buildComicInfoXml, stripHtml, mapCredits, namesOf, tagCbzBuffer, writeComicInfo, ensureCvIssueDetail, tagFileFromCv, fetchAllIssueMetadata } from '../src/metatagger.js';
+import { taggingEnabled, buildComicInfoXml, stripHtml, mapCredits, namesOf, tagCbzBuffer, writeComicInfo, ensureCvIssueDetail, tagFileFromCv, fetchAllIssueMetadata } from '../src/metatagger.js';
 import { openDb, upsertSeries, upsertCvSeries, upsertCvIssue, upsertLibraryFile, linkLibraryFile, linkFileCvIssue, getLibraryFile } from '../src/db.js';
 
 const SERIES = { comicvine_id: 46568, name: 'Saga', publisher: 'Image', start_year: '2012', count_of_issues: 72, site_detail_url: 'https://cv/saga' };
@@ -295,4 +295,15 @@ test('a metadata server without enrichment is asked once, not on every access', 
     await ensureCvIssueDetail(db, client, 11);
     assert.equal(calls, 1, 'asked once; the absent metron key is a recorded miss');
   } finally { config.cvEnrich = prior; }
+});
+
+test('taggingEnabled follows the switch alone: no ComicVine key needed', () => {
+  const saved = { on: config.tagOnDownload, keys: config.comicvineKeys };
+  try {
+    config.comicvineKeys = '';
+    config.tagOnDownload = 'on';
+    assert.equal(taggingEnabled(), true, 'tags through the hosted metadata service');
+    config.tagOnDownload = 'off';
+    assert.equal(taggingEnabled(), false);
+  } finally { config.tagOnDownload = saved.on; config.comicvineKeys = saved.keys; }
 });

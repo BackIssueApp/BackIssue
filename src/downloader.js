@@ -251,7 +251,7 @@ export async function finishImport(db, { issue, ic, fetched, source, onProgress 
     onProgress({ event: 'tag-result', issue, series: ic.seriesTitle, source, result: {
       outcome: result.tagged ? 'tagged' : 'no-match',
       reason: result.tagged
-        ? (ic.tagPlacement === 'sidecar' ? 'ComicVine metadata written to sidecar' : 'ComicVine metadata embedded')
+        ? (ic.tagPlacement === 'sidecar' ? 'metadata written to sidecar' : 'metadata embedded')
         : (ic.series?.cv_id ? 'no matching issue at the metadata source' : 'series not matched to a metadata record'),
       path: result.path,
     } });
