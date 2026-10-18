@@ -24,6 +24,7 @@
   "builtInService": "Ingebouwde dienst",
   "keySet": "Sleutel ingesteld",
   "noKey": "Geen sleutel",
+  "nSources": { "one": "{count} bron", "other": "{count} bronnen" },
   "seriesMatched": "Reeksen gekoppeld",
   "nUnmatched": "{count} niet gekoppeld",
   "issuesCached": "Nummers in cache",

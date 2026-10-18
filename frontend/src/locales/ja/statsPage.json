@@ -24,6 +24,7 @@
   "builtInService": "組み込みサービス",
   "keySet": "キー設定済み",
   "noKey": "キーなし",
+  "nSources": { "other": "{count} 件のソース" },
   "seriesMatched": "照合済みシリーズ",
   "nUnmatched": "{count} 件未照合",
   "issuesCached": "キャッシュ済みの号",

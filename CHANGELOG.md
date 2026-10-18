@@ -23,6 +23,10 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **Stats shows the metadata sources in use.** Its Metadata badge read the old
+  single-source setting, so with several sources it could say "No key" for a
+  working setup. It now reflects the ordered list and shows how many sources
+  are in use.
 - **Only admins can create, edit or delete libraries.** A library decides which
   folders on disk the app scans and files into. Before, anyone allowed to
   manage the library could point one at any folder on the server. Moving

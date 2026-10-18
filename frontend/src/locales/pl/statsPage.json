@@ -24,6 +24,7 @@
   "builtInService": "Wbudowana usługa",
   "keySet": "Klucz ustawiony",
   "noKey": "Brak klucza",
+  "nSources": { "one": "{count} źródło", "few": "{count} źródła", "many": "{count} źródeł", "other": "{count} źródła" },
   "seriesMatched": "Dopasowane serie",
   "nUnmatched": "niedopasowane: {count}",
   "issuesCached": "Zeszyty w pamięci podręcznej",

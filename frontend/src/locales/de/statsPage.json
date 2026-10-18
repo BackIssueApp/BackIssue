@@ -24,6 +24,7 @@
   "builtInService": "Eingebauter Dienst",
   "keySet": "Schlüssel gesetzt",
   "noKey": "Kein Schlüssel",
+  "nSources": { "one": "{count} Quelle", "other": "{count} Quellen" },
   "seriesMatched": "Zugeordnete Reihen",
   "nUnmatched": "{count} nicht zugeordnet",
   "issuesCached": "Hefte im Cache",

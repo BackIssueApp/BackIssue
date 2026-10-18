@@ -24,6 +24,7 @@
   "builtInService": "Serviço integrado",
   "keySet": "Chave definida",
   "noKey": "Sem chave",
+  "nSources": { "one": "{count} fonte", "other": "{count} fontes" },
   "seriesMatched": "Séries associadas",
   "nUnmatched": "{count} por associar",
   "issuesCached": "Edições em cache",

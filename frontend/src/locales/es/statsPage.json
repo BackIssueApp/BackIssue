@@ -24,6 +24,7 @@
   "builtInService": "Servicio integrado",
   "keySet": "Clave configurada",
   "noKey": "Sin clave",
+  "nSources": { "one": "{count} fuente", "other": "{count} fuentes" },
   "seriesMatched": "Series emparejadas",
   "nUnmatched": "{count} sin emparejar",
   "issuesCached": "Números en caché",

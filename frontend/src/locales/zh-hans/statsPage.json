@@ -24,6 +24,7 @@
   "builtInService": "内置服务",
   "keySet": "已设置密钥",
   "noKey": "无密钥",
+  "nSources": { "other": "{count} 个来源" },
   "seriesMatched": "已匹配系列",
   "nUnmatched": "{count} 个未匹配",
   "issuesCached": "已缓存期刊",

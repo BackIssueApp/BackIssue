@@ -24,6 +24,7 @@
   "builtInService": "Service intégré",
   "keySet": "Clé définie",
   "noKey": "Pas de clé",
+  "nSources": { "one": "{count} source", "other": "{count} sources" },
   "seriesMatched": "Séries associées",
   "nUnmatched": "{count} non associées",
   "issuesCached": "Numéros en cache",

@@ -24,6 +24,7 @@
   "builtInService": "Built-in service",
   "keySet": "Key set",
   "noKey": "No key",
+  "nSources": { "one": "{count} source", "other": "{count} sources" },
   "seriesMatched": "Series matched",
   "nUnmatched": "{count} unmatched",
   "issuesCached": "Issues cached",

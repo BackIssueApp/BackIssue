@@ -116,7 +116,7 @@
               </div>
             </div>
             <div class="statx__panel statx__panel--pad">
-              <div class="statx__cvhead"><span class="statx__panel-title">{t('statsPage.metadata')}</span><span class="statx__cvkey" class:is-off={cv.source !== 'hosted' && !cv.keys}>{cv.source === 'hosted' ? t('statsPage.builtInService') : cv.keys ? t('statsPage.keySet') : t('statsPage.noKey')}</span></div>
+              <div class="statx__cvhead"><span class="statx__panel-title">{t('statsPage.metadata')}</span><span class="statx__cvkey" class:is-off={cv.source !== 'hosted' && !cv.keys}>{(cv.sources || 1) > 1 ? t('statsPage.nSources', { count: cv.sources }) : cv.source === 'hosted' ? t('statsPage.builtInService') : cv.keys ? t('statsPage.keySet') : t('statsPage.noKey')}</span></div>
               <div class="statx__cvrows">
                 <div class="statx__cvrow"><span class="statx__cvlbl">{t('statsPage.seriesMatched')}</span><span class="statx__cvval">{fmt(cv.seriesMatched)}</span><span class="statx__cvsub">{t('statsPage.nUnmatched', { count: fmt(cv.seriesUnmatched) })}</span></div>
                 <div class="statx__cvrow"><span class="statx__cvlbl">{t('statsPage.issuesCached')}</span><span class="statx__cvval">{fmt(cv.issues)}</span><span class="statx__cvsub">{t('statsPage.pctDetailed', { pct: spct(cv.detailed, cv.issues) })}</span></div>

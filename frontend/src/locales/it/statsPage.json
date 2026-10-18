@@ -24,6 +24,7 @@
   "builtInService": "Servizio integrato",
   "keySet": "Chiave impostata",
   "noKey": "Nessuna chiave",
+  "nSources": { "one": "{count} fonte", "other": "{count} fonti" },
   "seriesMatched": "Serie abbinate",
   "nUnmatched": "{count} non abbinate",
   "issuesCached": "Albi in cache",
