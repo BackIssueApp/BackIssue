@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import config from './config.js';
-import { registeredSettings } from './plugins.js';
+import { registeredSettings, registeredJobs } from './plugins.js';
 import { metadataSourceIds } from './metadata.js';
 import { hoursToCron } from './cron.js';
 
@@ -151,10 +151,25 @@ export const SETTING_FIELDS = {
   zeroDayAddNew:           { type: 'bool' },
 };
 
+// A plugin job's schedule lives in <base>Cron + <base>Enabled, named from its
+// scheduleKey ('shelvesRebuildHours' → shelvesRebuildCron/Enabled), the same
+// way the scheduler reads it. Declared here so a Jobs page edit persists
+// without each plugin registering the pair itself.
+export function jobScheduleFields() {
+  const out = {};
+  for (const job of registeredJobs()) {
+    if (!job?.scheduleKey) continue;
+    const base = String(job.scheduleKey).replace(/Hours$/, '');
+    out[base + 'Cron'] = { type: 'string', allowEmpty: true };
+    out[base + 'Enabled'] = { type: 'bool' };
+  }
+  return out;
+}
+
 // All settable fields: the core set plus any a plugin registered (e.g. a private
 // source's credentials). Recomputed each call so plugins loaded after import count.
 function allFields() {
-  return { ...SETTING_FIELDS, ...registeredSettings() };
+  return { ...SETTING_FIELDS, ...jobScheduleFields(), ...registeredSettings() };
 }
 
 export function currentSettings() {

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateSettings, applySettings, currentSettings } from '../src/settings.js';
+import { pluginApi } from '../src/plugins.js';
 
 test('validateSettings clamps ints and ignores invalid/unknown keys', () => {
   const v = validateSettings({
@@ -92,4 +93,13 @@ test('validateSettings clamps tagConcurrency', () => {
   assert.equal(validateSettings({ tagConcurrency: 0 }).tagConcurrency, 1);    // min
   assert.equal(validateSettings({ tagConcurrency: 99 }).tagConcurrency, 16);  // max
   assert.equal('tagBacklogMax' in validateSettings({ tagBacklogMax: 5 }), false); // removed
+});
+
+test("a plugin job's schedule (cron + on/off) survives validation, so Jobs page edits persist", () => {
+  assert.equal('testRebuildCron' in validateSettings({ testRebuildCron: '0 4 * * *' }), false, 'unknown before the job exists');
+  pluginApi.registerJob({ id: 'test-rebuild', label: 'Test rebuild', scheduleKey: 'testRebuildHours', run: () => {} });
+  const v = validateSettings({ testRebuildCron: '0 4 * * *', testRebuildEnabled: 'on' });
+  assert.equal(v.testRebuildCron, '0 4 * * *');
+  assert.equal(v.testRebuildEnabled, true);
+  assert.equal(validateSettings({ testRebuildCron: '' }).testRebuildCron, '', 'clearing the pattern is allowed');
 });
