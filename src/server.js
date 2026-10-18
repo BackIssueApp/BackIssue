@@ -350,6 +350,10 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   const requiredPermission = (req) => {
     const p = req.path;
     if (p.startsWith('/api/auth/')) return 'authed'; // self-service: logout, password — any signed-in user
+    // Creating, editing or deleting a library decides which folders on disk
+    // the app scans and files into, so it sits with settings (admin), not
+    // with library management. Viewing the list stays library.view.
+    if (/^\/api\/libraries(\/\d+)?$/.test(p) && req.method !== 'GET') return 'settings.manage';
     for (const [re, perm] of PERM_RULES) if (re.test(p)) return perm;
     const plug = pluginAccess(req);
     if (plug) return plug === 'public' ? 'public' : (TIER_PERMS[plug] || plug);
@@ -1682,8 +1686,8 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   });
 
   // ---- Explicit libraries (named containers with a behavior type) ----
-  // Viewing the list only needs library.view; mutations need library.manage
-  // (pinned in PERM_RULES). Deleting a library unassigns its series — files
+  // Viewing the list only needs library.view; creating, editing or deleting
+  // one needs settings.manage (see requiredPermission). Deleting a library unassigns its series — files
   // and series are never deleted here.
   // Libraries OWN the storage locations: the legacy rootFolders setting is
   // derived from their folders (first library = default filing target), so

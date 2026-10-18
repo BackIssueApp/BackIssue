@@ -548,3 +548,25 @@ test('admin sets a local user\'s password: the new one works, the old one and th
     assert.equal(short.status, 400, 'too short is refused');
   } finally { s.close(); }
 });
+
+test('libraries: creating, editing or deleting one needs settings.manage, since it decides folders on disk', async () => {
+  const users = await import('../src/users.js');
+  const { app, db } = makeApp();
+  users.initUserTables(db);
+  const admin = users.createUser(db, { username: 'root1', password: 'adminpass1', role: 'admin' });
+  const trusted = users.createUser(db, { username: 'helper', password: 'helperpass1', role: 'trusted' });
+  const H = (u) => ({ 'content-type': 'application/json', cookie: 'bi_session=' + users.createSession(db, u.id) });
+  const s = await listen(app);
+  const base = `http://localhost:${s.address().port}`;
+  try {
+    const post = (u, path, body) => fetch(`${base}${path}`, { method: 'POST', headers: H(u), body: JSON.stringify(body) });
+    assert.equal((await fetch(`${base}/api/libraries`, { headers: H(trusted) })).status, 200, 'viewing the list is fine');
+    assert.equal((await post(trusted, '/api/libraries', { name: 'Sneaky', type: 'comic', rootFolder: '/etc' })).status, 403, 'a library manager cannot point a library at a folder');
+    const made = await post(admin, '/api/libraries', { name: 'Comics', type: 'comic' });
+    assert.equal(made.status, 200);
+    const id = db.prepare("SELECT id FROM libraries WHERE name='Comics'").get().id;
+    assert.equal((await post(trusted, `/api/libraries/${id}`, { name: 'Comics', type: 'comic', rootFolder: '/etc' })).status, 403);
+    assert.equal((await fetch(`${base}/api/libraries/${id}`, { method: 'DELETE', headers: H(trusted) })).status, 403);
+    assert.equal((await fetch(`${base}/api/libraries/${id}`, { method: 'DELETE', headers: H(admin) })).status, 200);
+  } finally { s.close(); }
+});

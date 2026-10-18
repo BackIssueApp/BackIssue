@@ -20,6 +20,10 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **Only admins can create, edit or delete libraries.** A library decides which
+  folders on disk the app scans and files into. Before, anyone allowed to
+  manage the library could point one at any folder on the server. Moving
+  series between libraries still only needs library management.
 - **Download all respects mature-content restrictions.** On the Wanted page,
   Download all queued issues from restricted series even for people who
   can't see them. It now queues only what that person's Wanted list shows.
