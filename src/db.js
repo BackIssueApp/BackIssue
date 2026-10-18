@@ -250,6 +250,9 @@ function migrate(db) {
   // Per-library tag placement override: null = global setting, 'embed' |
   // 'sidecar'. Sidecar keeps archives byte-identical (seeding/share-safe).
   if (libCols.length && !libCols.includes('tag_placement')) db.exec('ALTER TABLE libraries ADD COLUMN tag_placement TEXT');
+  // The library new comic series land in when nothing names one (Settings →
+  // Libraries). At most one row is flagged; none = the first comic library.
+  if (libCols.length && !libCols.includes('is_default')) db.exec('ALTER TABLE libraries ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0');
   // Per-library metadata sources: an ordered list of provider ids like the
   // app-wide metadataSources setting; null = use the app-wide list.
   if (libCols.length && !libCols.includes('metadata_sources')) db.exec('ALTER TABLE libraries ADD COLUMN metadata_sources TEXT');
@@ -579,9 +582,32 @@ export function deleteLibrary(db, id) {
 // The library new series land in by default: the first comic-typed one (the
 // migration's "Comics"), else the first library at all, else none (pre-library
 // installs — the startup migration adopts later).
+// Types a default library may have: new series from Add, matching and imports
+// are comic metadata, so they belong in a comic or manga library.
+export const DEFAULT_LIBRARY_TYPES = ['comic', 'manga'];
 export function defaultLibrary(db) {
   const libs = db.prepare('SELECT * FROM libraries ORDER BY sort_order, id').all();
-  return libs.find((l) => l.type === 'comic') || libs[0] || null;
+  return libs.find((l) => l.is_default && DEFAULT_LIBRARY_TYPES.includes(l.type))
+    || libs.find((l) => l.type === 'comic') || libs[0] || null;
+}
+/** Make a library the default home for new comic series. */
+export function setDefaultLibrary(db, id) {
+  const lib = getLibrary(db, id);
+  if (!lib) throw new Error('unknown library');
+  if (!DEFAULT_LIBRARY_TYPES.includes(lib.type)) throw new Error('only a comic or manga library can be the default');
+  db.transaction(() => {
+    db.prepare('UPDATE libraries SET is_default=0 WHERE is_default=1').run();
+    db.prepare('UPDATE libraries SET is_default=1 WHERE id=?').run(id);
+  })();
+}
+/** Put libraries in the given order (the sidebar and every library list
+ *  follow it). Ids not named keep their relative order after the named ones. */
+export function reorderLibraries(db, ids) {
+  const want = [...new Set((ids || []).map(Number).filter(Number.isFinite))];
+  const all = db.prepare('SELECT id FROM libraries ORDER BY sort_order, id').all().map((r) => r.id);
+  const order = [...want.filter((id) => all.includes(id)), ...all.filter((id) => !want.includes(id))];
+  const set = db.prepare('UPDATE libraries SET sort_order=? WHERE id=?');
+  db.transaction(() => { order.forEach((id, i) => set.run(i + 1, id)); })();
 }
 
 // Move a series into a library (typing it accordingly), or out (null). A

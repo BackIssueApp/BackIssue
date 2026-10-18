@@ -10,6 +10,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Order your libraries and choose the default.** Arrows on each library
+  under Settings → Library → Libraries set the order the sidebar lists them
+  in, and **Make default** picks the comic or manga library that new series
+  go to when you don't choose one. Before, the order was fixed by when each
+  library was created, and new series always went to the first comic library.
 - **Sign-in buttons appear only once their provider is set up.** A plugin's
   SSO button can stay hidden until it's configured, and a renamed button shows
   without a restart.

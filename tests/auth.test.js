@@ -621,3 +621,45 @@ test('the account switch for mature content holds over Basic, for local and prov
     assert.deepEqual(await titles(remote), ['Mature', 'Plain']);
   } finally { s.close(); }
 });
+
+test('libraries: reorder and pick the default; both admin-only, and new series land in the default', async () => {
+  const users = await import('../src/users.js');
+  const { defaultLibrary, createCvSeries, assignSeriesLibrary } = await import('../src/db.js');
+  pluginApi.registerLibraryType({ id: 'ebook', label: 'Books' }); // as the ebooks plugin does
+  const { app, db } = makeApp();
+  users.initUserTables(db);
+  const admin = users.createUser(db, { username: 'root2', password: 'adminpass1', role: 'admin' });
+  const trusted = users.createUser(db, { username: 'helper2', password: 'helperpass1', role: 'trusted' });
+  const H = (u) => ({ 'content-type': 'application/json', cookie: 'bi_session=' + users.createSession(db, u.id) });
+  const s = await listen(app);
+  const base = `http://localhost:${s.address().port}`;
+  try {
+    const post = (u, path, body) => fetch(`${base}${path}`, { method: 'POST', headers: H(u), body: JSON.stringify(body || {}) });
+    for (const [name, type] of [['Comics', 'comic'], ['Indie', 'comic'], ['Books', 'ebook']]) await post(admin, '/api/libraries', { name, type });
+    const id = (name) => db.prepare('SELECT id FROM libraries WHERE name=?').get(name).id;
+    const names = async () => (await (await fetch(`${base}/api/libraries`, { headers: H(admin) })).json()).libraries.map((l) => l.name);
+    assert.deepEqual(await names(), ['Comics', 'Indie', 'Books']);
+    assert.equal(defaultLibrary(db).name, 'Comics', 'no choice yet: the first comic library');
+
+    assert.equal((await post(trusted, '/api/libraries/order', { ids: [id('Books')] })).status, 403);
+    const moved = await post(admin, '/api/libraries/order', { ids: [id('Books'), id('Indie')] });
+    assert.equal(moved.status, 200);
+    assert.deepEqual(await names(), ['Books', 'Indie', 'Comics'], 'named ids first, the rest after');
+    assert.equal(defaultLibrary(db).name, 'Indie', 'reordering alone moves the fallback default');
+
+    assert.equal((await post(trusted, `/api/libraries/${id('Comics')}/default`)).status, 403);
+    assert.equal((await post(admin, `/api/libraries/${id('Books')}/default`)).status, 400, 'a book library cannot take comic series');
+    const set = await post(admin, `/api/libraries/${id('Comics')}/default`);
+    assert.equal((await set.json()).defaultId, id('Comics'));
+    assert.equal(defaultLibrary(db).name, 'Comics', 'the chosen default wins over order');
+    await post(admin, '/api/libraries/order', { ids: [id('Indie')] });
+    assert.equal(defaultLibrary(db).name, 'Comics', 'and survives a reorder');
+
+    const sid = createCvSeries(db, { cvId: 4242, title: 'New Thing' });
+    assignSeriesLibrary(db, sid, defaultLibrary(db).id);
+    assert.equal(db.prepare('SELECT library_id FROM series WHERE id=?').get(sid).library_id, id('Comics'));
+
+    db.prepare('UPDATE libraries SET type=? WHERE id=?').run('ebook', id('Comics'));
+    assert.equal(defaultLibrary(db).name, 'Indie', 'a default retyped away from comics falls back');
+  } finally { s.close(); }
+});

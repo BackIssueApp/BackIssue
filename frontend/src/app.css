@@ -1998,6 +1998,7 @@ textarea.dialog-input { resize: vertical; font-family: var(--font-mono); }
 .libcard { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin: 10px 0; display: flex; flex-direction: column; gap: 8px; }
 .libcard__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .libcard__icon { color: var(--muted); display: inline-flex; }
+.libcard__order { display: inline-flex; gap: 4px; }
 .libcard__name { flex: 1 1 140px; min-width: 120px; padding: 6px 10px; background: var(--ink); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font-weight: 600; }
 .libcard__mature { margin: 0; }
 .libcard__count { margin-left: auto; white-space: nowrap; }

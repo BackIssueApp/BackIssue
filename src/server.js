@@ -7,7 +7,7 @@ import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
 import { initCountWorker, workerGetRow } from './countWorker.js';
-import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, collectionPage, collectionJumpOffset, collectionBuckets, buildCollCountSql, collCountRowToResult, seriesCollectionDetail, setSeriesPath, getSeriesById, defaultLibrary, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser, setMonitor, setIssueWants, clearIssuePicks, wantStates, MONITOR_STATES } from './db.js';
+import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, collectionPage, collectionJumpOffset, collectionBuckets, buildCollCountSql, collCountRowToResult, seriesCollectionDetail, setSeriesPath, getSeriesById, defaultLibrary, setDefaultLibrary, reorderLibraries, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser, setMonitor, setIssueWants, clearIssuePicks, wantStates, MONITOR_STATES } from './db.js';
 import { resolveSeriesDir, defaultRootedDir } from './paths.js';
 import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
@@ -353,7 +353,9 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     // Creating, editing or deleting a library decides which folders on disk
     // the app scans and files into, so it sits with settings (admin), not
     // with library management. Viewing the list stays library.view.
-    if (/^\/api\/libraries(\/\d+)?$/.test(p) && req.method !== 'GET') return 'settings.manage';
+    // Every library write (create, edit, delete, reorder, default) is admin
+    // configuration, whatever the path below /api/libraries.
+    if (/^\/api\/libraries(\/|$)/.test(p) && req.method !== 'GET') return 'settings.manage';
     for (const [re, perm] of PERM_RULES) if (re.test(p)) return perm;
     const plug = pluginAccess(req);
     if (plug) return plug === 'public' ? 'public' : (TIER_PERMS[plug] || plug);
@@ -1699,12 +1701,18 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // Libraries OWN the storage locations: the legacy rootFolders setting is
   // derived from their folders (first library = default filing target), so
   // every scan/filing code path keeps working unchanged.
+  // The default library's folders lead, so the legacy first-root fallback
+  // follows the chosen default rather than whichever library is listed first.
   const syncRootsFromLibraries = () => {
-    const folders = listLibraries(db).flatMap((l) => libraryFolders(l.root_folder));
+    const home = defaultLibrary(db)?.id;
+    const libs = listLibraries(db).sort((a, b) => (b.id === home) - (a.id === home));
+    const folders = libs.flatMap((l) => libraryFolders(l.root_folder));
     if (typeof saveSettings === 'function') saveSettings({ rootFolders: folders.join('\n') });
   };
   app.get('/api/libraries', (req, res) => res.json({
     libraries: listLibraries(db).filter((l) => !l.restricted || canRestricted(req)),
+    // Where new comic series land when nothing names a library.
+    defaultId: defaultLibrary(db)?.id ?? null,
     // Assignable types: the core pair + anything a plugin registered — the
     // Settings type selector is built from this, so a type only appears when
     // something actually implements its behavior.
@@ -1725,8 +1733,20 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     try { const id = createLibrary(db, { name: req.body?.name, type: req.body?.type || 'comic', rootFolder: req.body?.rootFolder }); syncRootsFromLibraries(); kickLibraryScanners(id, req.body?.type); res.json({ id, libraries: listLibraries(db) }); }
     catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
   });
+  // Registered before /:id, which would otherwise take 'order' as an id.
+  // Reorder: the sidebar, the Library page and every library list follow it.
+  app.post('/api/libraries/order', (req, res) => {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : null;
+    if (!ids) return res.status(400).json({ error: 'ids must be a list of library ids' });
+    reorderLibraries(db, ids);
+    res.json({ libraries: listLibraries(db), defaultId: defaultLibrary(db)?.id ?? null });
+  });
   app.post('/api/libraries/:id', (req, res) => {
     try { updateLibrary(db, Number(req.params.id), { name: req.body?.name, type: req.body?.type, rootFolder: req.body?.rootFolder, folderPattern: req.body?.folderPattern, restricted: req.body?.restricted, sortOrder: req.body?.sortOrder, tagPlacement: req.body?.tagPlacement, metadataSources: req.body?.metadataSources }); syncRootsFromLibraries(); const lib = listLibraries(db).find((l) => l.id === Number(req.params.id)); kickLibraryScanners(lib?.id, lib?.type); res.json({ libraries: listLibraries(db) }); }
+    catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
+  });
+  app.post('/api/libraries/:id/default', (req, res) => {
+    try { setDefaultLibrary(db, Number(req.params.id)); syncRootsFromLibraries(); res.json({ libraries: listLibraries(db), defaultId: defaultLibrary(db)?.id ?? null }); }
     catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
   });
   app.delete('/api/libraries/:id', (req, res) => { const removed = deleteLibrary(db, Number(req.params.id)); syncRootsFromLibraries(); res.json({ removed, libraries: listLibraries(db) }); });

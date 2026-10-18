@@ -8,6 +8,7 @@
   import { openIndexerModal, testIndexer } from './IndexerModal.svelte';
   import { confirmDialog } from './DialogModal.svelte';
   import { notify } from '../lib/toasts.svelte.js';
+  import { status } from '../lib/status.svelte.js';
   import { t, th, hasMessage, st } from '../lib/i18n.svelte.js';
   import Icon from '../lib/Icon.svelte';
   import { hscroll } from '../lib/hscroll.js';
@@ -88,6 +89,7 @@
   // Explicit libraries (named containers with a behavior type, shown in the
   // sidebar). CRUD applies immediately — not part of the settings Save cycle.
   let libs = $state([]);
+  let defaultLibId = $state(null); // where new comic series land when nothing names a library
   let newLib = $state({ name: '', type: 'comic', rootFolder: '' });
   let LIB_TYPES = $state([['comic', t('settingsPage.libTypeComics')], ['manga', t('settingsPage.libTypeManga')]]);
   const parseRoots = (text) => String(text || '').split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
@@ -96,6 +98,7 @@
     try {
       const r = await apiGet('/api/libraries');
       libs = (r.libraries || []).map(withFolders);
+      defaultLibId = r.defaultId ?? null;
       if (Array.isArray(r.types) && r.types.length) LIB_TYPES = r.types.map((x) => [x.id, x.label]);
     } catch { notify(t('settingsPage.librariesLoadFailed'), 'error'); }
   }
@@ -114,6 +117,27 @@
     libs = r.libraries.map(withFolders); notify(t('settingsPage.libraryUpdated'), 'ok');
   }
   const libAddFolder = (l) => { l.folders = [...l.folders, '']; };
+  // Library order (the sidebar follows it) and the default library.
+  async function moveLib(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= libs.length) return;
+    const ids = libs.map((x) => x.id);
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    const r = await apiPost('/api/libraries/order', { ids });
+    if (r.error) return notify(r.error, 'error');
+    libs = r.libraries.map(withFolders); defaultLibId = r.defaultId ?? defaultLibId;
+    // The sidebar follows at once (its list comes from the polled status,
+    // which may be served from a short cache).
+    const pos = new Map(ids.map((id, k) => [id, k]));
+    status.libraries = [...status.libraries].sort((a, b) => (pos.get(a.id) ?? 99) - (pos.get(b.id) ?? 99));
+  }
+  async function makeDefaultLib(l) {
+    const r = await apiPost('/api/libraries/' + l.id + '/default');
+    if (r.error) return notify(r.error, 'error');
+    libs = r.libraries.map(withFolders); defaultLibId = r.defaultId ?? l.id;
+    notify(t('settingsPage.libDefaultSet', { name: l.name }), 'ok');
+  }
+  const canBeDefault = (l) => ['comic', 'manga'].includes(l.type);
   // Per-library metadata sources. null = the default list (Settings →
   // Metadata); otherwise this library's own ordered list of provider ids.
   // Book and audiobook libraries get their data from their own plugins.
@@ -668,9 +692,15 @@
           <div class="setx-panel" class:is-active={libPanel === 'libraries'}>
             <h3 class="setx-panel__title">{t('settingsPage.librariesTitle')}</h3>
             <p class="setx-panel__sub">{@html th('settingsPage.librariesSub')}</p>
-            {#each libs as l (l.id)}
+            {#each libs as l, li (l.id)}
               <div class="libcard">
                 <div class="libcard__head">
+                  {#if libs.length > 1}
+                    <span class="libcard__order">
+                      <button class="srcpri-btn" type="button" title={t('settingsPage.moveUp')} aria-label={t('settingsPage.moveUp')} disabled={li === 0} onclick={() => moveLib(li, -1)}><Icon name="arrow-up" size={13} /></button>
+                      <button class="srcpri-btn" type="button" title={t('settingsPage.moveDown')} aria-label={t('settingsPage.moveDown')} disabled={li === libs.length - 1} onclick={() => moveLib(li, 1)}><Icon name="arrow-down" size={13} /></button>
+                    </span>
+                  {/if}
                   <span class="libcard__icon"><Icon name="book" /></span>
                   <input class="libcard__name" type="text" spellcheck="false" bind:value={l.name} onchange={() => saveLib(l)} title={t('settingsPage.libraryName')} />
                   <select bind:value={l.type} onchange={() => saveLib(l)} title={t('settingsPage.libraryTypeTitle')}>
@@ -679,6 +709,11 @@
                   <label class="field field--check libcard__mature" title={t('settingsPage.matureTitle')}>
                     <input type="checkbox" checked={!!l.restricted} onchange={(e) => { l.restricted = e.currentTarget.checked ? 1 : 0; saveLib(l); }} /><span>{t('settingsPage.mature')}</span></label>
                   <span class="scan-muted libcard__count">{t('settingsPage.seriesCount', { count: l.series_count })}</span>
+                  {#if l.id === defaultLibId}
+                    <span class="rootrow__badge" title={t('settingsPage.libDefaultTitle')}>{t('settingsPage.defaultBadge')}</span>
+                  {:else if canBeDefault(l)}
+                    <button class="link-btn" type="button" title={t('settingsPage.libMakeDefaultTitle')} onclick={() => makeDefaultLib(l)}>{t('settingsPage.makeDefault')}</button>
+                  {/if}
                   <button class="rootrow__x" type="button" title={t('settingsPage.deleteLibraryBtnTitle')} aria-label={t('settingsPage.deleteLibrary')} onclick={() => removeLib(l)}><Icon name="trash" size={15} /></button>
                 </div>
                 <div class="rootlist">
@@ -737,6 +772,7 @@
                 </div>
               </div>
             {/each}
+            {#if libs.length > 1}<p class="modal__note">{t('settingsPage.librariesOrder')}</p>{/if}
             <div class="rootrow libcard__new">
               <input class="rootrow__path" style="max-width:200px" type="text" spellcheck="false" placeholder={t('settingsPage.newLibraryPlaceholder')} bind:value={newLib.name} onkeydown={(e) => { if (e.key === 'Enter') addLib(); }} />
               <select bind:value={newLib.type}>
