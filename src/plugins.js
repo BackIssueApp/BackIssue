@@ -422,7 +422,6 @@ export function registeredImportHandlers() { return importHandlers; }
 export function registeredLibraryScanners() { return libraryScanners; }
 export function registeredBookMetadataSources() { return [...bookMetadataSources].sort((a, b) => a.priority - b.priority); }
 export function registeredCollectionFilters() { return [...collectionFilters]; }
-export function registeredMediaHandlers() { return [...mediaHandlers]; }
 export function mediaHandlerFor(type) { return mediaHandlers.find((h) => h.type === String(type || '').toLowerCase()) || null; }
 export function registeredMediaListeners() { return [...mediaListeners]; }
 export function registeredRemoteMediaSources(mediaType) {

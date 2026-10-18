@@ -23,10 +23,6 @@ function makeApp() {
     runTool: (tool, opts) => { calls.tool = tool; calls.toolOpts = opts; return { started: true }; },
     stats: () => ({ files: { total: 5 }, collection: { series: 2 } }),
     listSources: () => [{ id: 'usenet', label: 'usenet' }, { id: 'torrent', label: 'torrent' }],
-    usenetSearch: async (q) => { calls.usenetSearch = q; return { results: [{ title: 'Saga 001 (2012)', size: 42000000, nzbUrl: 'http://nz/1.nzb', indexer: 'nz' }] }; },
-    usenetGrab: async (b) => { calls.usenetGrab = b; return { grabbed: true }; },
-    torrentSearch: async (b) => { calls.torrentSearch = b; return { results: [{ title: 'Saga v1 (001-054) pack', size: 3e9, seeders: 40, indexer: 'p', downloadUrl: 'magnet:?xt=urn:btih:x' }] }; },
-    torrentGrabPack: async (b) => { calls.torrentGrabPack = b; return { grabbed: true }; },
     searchSources: async (b) => { calls.searchSources = b; return { results: [{ source: 'usenet', rid: 'usenet:0', title: 'Saga 012', size: 42e6, meta: 'nz', score: 100 }], searched: ['Saga 012'], errors: [], sources: ['usenet'] }; },
     manualGrabResult: (b) => { calls.manualGrab = b; return { queued: true, issueId: 99 }; },
     grabSourcePack: (b) => { calls.grabPack = b; return { grabbed: true, grabId: 5 }; },
@@ -114,20 +110,6 @@ test('client routes serve the app shell; unknown /api 404s', async () => {
   } finally {
     s.close();
   }
-});
-
-test('POST /api/download queues issues and invokes runDownloads', async () => {
-  const { app, calls, db } = makeApp();
-  const s = await listen(app);
-  const issueId = db.prepare('SELECT id FROM issues LIMIT 1').get().id;
-  const r = await fetch(`http://localhost:${s.address().port}/api/download`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ issueIds: [issueId] }),
-  });
-  const body = await r.json();
-  assert.equal(body.queued, 1);
-  assert.deepEqual(calls.downloads[0], [issueId]);
-  s.close();
 });
 
 test('GET /api/settings returns current settings; POST saves them', async () => {
@@ -390,21 +372,6 @@ test('POST /api/collection/:id/aliases saves alternative names', async () => {
   s.close();
 });
 
-test('usenet: manual search returns releases; grab validates + forwards', async () => {
-  const { app, calls } = makeApp();
-  const s = await listen(app);
-  const base = `http://localhost:${s.address().port}`;
-  const search = await (await fetch(`${base}/api/usenet/search`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query: 'Saga 1' }) })).json();
-  assert.equal(calls.usenetSearch.query, 'Saga 1');
-  assert.equal(search.results[0].nzbUrl, 'http://nz/1.nzb');
-  // grab requires seriesId + cvIssueId + nzbUrl
-  assert.equal((await fetch(`${base}/api/usenet/grab`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status, 400);
-  const grab = await (await fetch(`${base}/api/usenet/grab`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ seriesId: 3, cvIssueId: 71, nzbUrl: 'http://nz/1.nzb', releaseTitle: 'Saga 001' }) })).json();
-  assert.equal(grab.grabbed, true);
-  assert.equal(calls.usenetGrab.nzbUrl, 'http://nz/1.nzb');
-  s.close();
-});
-
 test('sources: GET /api/sources lists enabled sources in priority order', async () => {
   const { app } = makeApp();
   const s = await listen(app);
@@ -541,21 +508,6 @@ test('legacy basic-auth config migrates to an admin user; basic still works', as
   } finally {
     config.authUser = ''; config.authPass = '';
   }
-});
-
-test('manual torrent pack search + grab routes', async () => {
-  const { app, calls } = makeApp();
-  const s = await listen(app);
-  const base = `http://localhost:${s.address().port}`;
-  const sr = await (await fetch(`${base}/api/torrent/search`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ seriesId: 3 }) })).json();
-  assert.deepEqual(calls.torrentSearch, { seriesId: 3 });
-  assert.equal(sr.results[0].seeders, 40);
-  const bad = await fetch(`${base}/api/torrent/grab-pack`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ seriesId: 3 }) });
-  assert.equal(bad.status, 400); // downloadUrl required
-  const ok = await (await fetch(`${base}/api/torrent/grab-pack`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ seriesId: 3, downloadUrl: 'magnet:?x', releaseTitle: 'pack' }) })).json();
-  assert.equal(ok.grabbed, true);
-  assert.equal(calls.torrentGrabPack.seriesId, 3);
-  s.close();
 });
 
 test('CV redownload re-queues an issue whose row is already done (the delete-then-cannot-queue bug)', async () => {

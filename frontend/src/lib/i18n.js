@@ -40,8 +40,6 @@ export function activate(code, catalog) {
 
 /** Non-reactive read of the active language code. */
 export const currentLang = () => lang;
-/** Codes with a catalog, English first. */
-export const languageList = () => languages;
 
 /** Match a BCP 47 tag (or list of them) to a catalog we have: exact, then base
  *  language ("pt-BR" → "pt"). Returns null when nothing matches. */

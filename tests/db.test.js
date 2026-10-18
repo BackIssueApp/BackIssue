@@ -7,7 +7,6 @@ import {
   resetDownloading, claimNextQueued, setSeriesComplete, getSeriesById, requeueFailed,
   clearIssuesForRedownload, listQueue, queuedCount,
   setSeriesMeta, getSeriesByUrl, clearFailed,
-  setScanOverride, getScanOverride, clearScanOverride,
   upsertLibraryFile, getLibraryFile, listLibraryFiles, libraryStats, pruneLibraryFiles,
   setSeriesRestricted, isSeriesRestricted,
   linkLibraryFile, collectionSeries, seriesCollectionDetail, setFollowed,
@@ -198,17 +197,6 @@ test('library_files: upsert/get/list/stats/prune', () => {
   assert.equal(s.total, 3); assert.equal(s.tagged, 1); assert.equal(s.untagged, 1); assert.equal(s.corrupt, 1); assert.equal(s.cbr, 1);
   assert.equal(pruneLibraryFiles(db, new Set(['/a.cbz'])), 2);
   assert.equal(libraryStats(db).total, 1);
-});
-
-test('scan overrides set/get/upsert/clear', () => {
-  const db = openDb(':memory:');
-  assert.equal(getScanOverride(db, '/lib/X'), undefined);
-  setScanOverride(db, '/lib/X', 42);
-  assert.equal(getScanOverride(db, '/lib/X'), 42);
-  setScanOverride(db, '/lib/X', 99); // upsert same dir
-  assert.equal(getScanOverride(db, '/lib/X'), 99);
-  assert.equal(clearScanOverride(db, '/lib/X'), 1);
-  assert.equal(getScanOverride(db, '/lib/X'), undefined);
 });
 
 test('clearFailed resets failed issues to pending and drops the error', () => {

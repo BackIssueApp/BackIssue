@@ -7,7 +7,7 @@ import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
 import { initCountWorker, workerGetRow } from './countWorker.js';
-import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, setFollowed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, collectionPage, collectionJumpOffset, collectionBuckets, buildCollCountSql, collCountRowToResult, seriesCollectionDetail, setSeriesPath, getSeriesById, defaultLibrary, setDefaultLibrary, reorderLibraries, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser, setMonitor, setIssueWants, clearIssuePicks, wantStates, MONITOR_STATES } from './db.js';
+import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, collectionPage, collectionJumpOffset, collectionBuckets, buildCollCountSql, collCountRowToResult, seriesCollectionDetail, setSeriesPath, getSeriesById, defaultLibrary, setDefaultLibrary, reorderLibraries, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser, setMonitor, setIssueWants, clearIssuePicks, wantStates, MONITOR_STATES } from './db.js';
 import { resolveSeriesDir, defaultRootedDir } from './paths.js';
 import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
@@ -43,7 +43,7 @@ if (process.env.BUILD_CHANNEL && process.env.BUILD_CHANNEL !== 'release') {
   APP_VERSION += `-${process.env.BUILD_CHANNEL}${sha ? '.' + sha : ''}`;
 }
 
-export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, listSourceCards, testSource, sourceCatalog, installSource: installSourceFn, uninstallSource: uninstallSourceFn, queueProgress, packProgress, activeMedia, cancelGrab, testCvKeys, metadataProviders, testMetadataProvider, usenetSearch, usenetGrab, torrentSearch, torrentGrabPack, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], pluginMessages = {}, matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, supportPackage, supportSend, supportSendMobile, state }) {
+export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvSearch, cvVolumeInfo, cvIssueInfo, arcSearch, arcIssues, cblResolve, cleanupSeriesFiles, runImportScan, runImport, importState, runTool, toolsState, runLibraryRefile, refileState, stats, listSources, listSourceCards, testSource, sourceCatalog, installSource: installSourceFn, uninstallSource: uninstallSourceFn, queueProgress, packProgress, activeMedia, cancelGrab, metadataProviders, testMetadataProvider, searchSources, manualGrabResult, grabSourcePack, searchPacks, grabPack, setAliases, pluginRoutes = [], pluginClientAssets = [], pluginMessages = {}, matchImportCandidate, confirmImportCandidate, skipImportCandidate, cvSetManual, addFromCv, scanSeriesFolder, deleteComic, refreshVolume, tagSeriesFiles, checkReleases, listJobs, clearJobs, listLogs, clearLogs, listSchedules, setScheduleCron, runScheduleNow, getSettings, saveSettings, requestRestart, supportPackage, supportSend, supportSendMobile, state }) {
   const startDownloads = (arg) => {
     if (!state.queue.running) {
       state.queue.running = true;
@@ -1085,13 +1085,6 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   });
   app.get('/api/events', hub.handler);
 
-  app.post('/api/download', (req, res) => {
-    const ids = Array.isArray(req.body.issueIds) ? req.body.issueIds.map(Number) : [];
-    queueIssues(db, ids);
-    startDownloads(ids);
-    res.json({ queued: ids.length });
-  });
-
   // Download ComicVine issues of a collection series. We create a synthetic queue
   // row per CV issue and queue it; the worker resolves a download source on demand.
   app.post('/api/collection/:id/download', (req, res) => {
@@ -1155,9 +1148,6 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   // Alternative search names for a volume (indexers that name it differently).
   app.post('/api/collection/:id/aliases', (req, res) => res.json(setAliases(Number(req.params.id), req.body?.aliases ?? '')));
 
-  // Try ComicVine keys without saving them (the Settings Test button).
-  app.post('/api/cv/test', async (req, res) => res.json(await testCvKeys(req.body?.keys)));
-
   // Built-in metadata service: registration status + live round-trip test.
   // Provisions the instance key if this install doesn't have one yet (that IS
   // the registration), then proves it with a real authenticated search.
@@ -1198,22 +1188,6 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     const r = manualGrabResult(b);
     if (!r.error) startDownloads();
     res.json(r);
-  });
-
-  // ---- Manual usenet search + grab (per issue) — legacy, superseded by /api/search ----
-  app.post('/api/usenet/search', async (req, res) => res.json(await usenetSearch(req.body || {})));
-  app.post('/api/usenet/grab', async (req, res) => {
-    const b = req.body || {};
-    if (!b.nzbUrl || !b.seriesId || !b.cvIssueId) return res.status(400).json({ error: 'seriesId, cvIssueId and nzbUrl required' });
-    res.json(await usenetGrab(b));
-  });
-
-  // ---- Manual torrent PACK search + grab (per series) ----
-  app.post('/api/torrent/search', async (req, res) => res.json(await torrentSearch(req.body || {})));
-  app.post('/api/torrent/grab-pack', async (req, res) => {
-    const b = req.body || {};
-    if (!b.downloadUrl || !b.seriesId) return res.status(400).json({ error: 'seriesId and downloadUrl required' });
-    res.json(await torrentGrabPack(b));
   });
 
   // ---- Multi-source PACK search + grab (per series) ----

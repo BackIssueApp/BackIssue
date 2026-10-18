@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { listSeries, listIssues, getScanOverride, getSeriesById } from './db.js';
+import { listSeries, listIssues } from './db.js';
 import { scoreMatch, extractYear, normalizeTitle } from './matcher.js';
 import { matchCatalogSeries, issueKey, parseIssueFromFilename } from './scanner.js';
 
@@ -16,14 +16,11 @@ function matchSeriesByMeta(db, name, year) {
   return best && RANK[best.confidence] >= RANK.low ? best.seriesId : null;
 }
 
-// Link a library file to a catalog series (+ specific issue). Hybrid: a saved
-// override wins; else a tagged file matches by its ComicInfo series; else fall
-// back to the folder name. Then the issue is matched by number (edition-aware).
+// Link a library file to a catalog series (+ specific issue). A tagged file
+// matches by its ComicInfo series; else fall back to the folder name. Then the issue is matched by number (edition-aware).
 export function linkFile(db, f) {
   let seriesId = null;
-  const override = f.dir ? getScanOverride(db, f.dir) : undefined;
-  if (override != null && getSeriesById(db, override)) seriesId = override;
-  if (!seriesId && f.ci_series) {
+  if (f.ci_series) {
     const yr = extractYear(f.ci_volume || '') || (f.ci_volume || null);
     seriesId = matchSeriesByMeta(db, f.ci_series, yr);
   }

@@ -13,7 +13,6 @@ export function closeModal(name) {
   if (i >= 0) modals.stack.splice(i, 1);
 }
 
-export function isModalOpen(name) { return modals.stack.includes(name); }
 
 // Close the topmost open modal; returns false when none was open.
 export function closeTopModal() {

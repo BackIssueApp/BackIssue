@@ -28,9 +28,6 @@ export const DEFAULT_FOLDER_PATTERN = '{publisher}/{series} ({year})';
 // does have it) so the reorganizer doesn't churn freshly-downloaded files.
 export const DEFAULT_FILE_PATTERN = '{series} V{year} {edition} #{issue}';
 
-// The tokens each pattern may use (for the settings UI reference + validation).
-export const FOLDER_TOKENS = ['publisher', 'series', 'year'];
-export const FILE_TOKENS = ['publisher', 'series', 'year', 'issue', 'issueTitle', 'date', 'edition'];
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
@@ -58,7 +55,6 @@ const DATE_FORMATS = {
   y: (p) => p.y,                    // 2011
   mon: (p) => p.mon,                // Nov
 };
-export const DATE_MODIFIERS = Object.keys(DATE_FORMATS).filter(Boolean);
 
 function formatDate(raw, mod) {
   const parts = dateParts(raw);

@@ -101,4 +101,3 @@ export function iconSvg(name, opts) {
     + ` stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
 }
 
-export const hasIcon = (name) => Object.prototype.hasOwnProperty.call(ICON_PATHS, name);

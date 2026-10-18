@@ -32,10 +32,3 @@ export function trapFocus(node) {
   };
 }
 
-// Shared keydown handler for role="button" divs: the role contracts BOTH
-// Enter and Space (Space alone would scroll the page).
-export function onActivate(fn) {
-  return (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(e); }
-  };
-}

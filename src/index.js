@@ -787,50 +787,6 @@ function setAliases(seriesId, aliases) {
   return { detail: seriesCollectionDetail(db, Number(seriesId)), searchNames: seriesSearchNames(db, Number(seriesId)) };
 }
 
-// Manual usenet search: run the configured Newznab indexers and return the raw
-// releases (no auto-scoring) so the user can pick one. With a free-text `query`
-// it searches exactly that; with `seriesId` (+ number) it searches under EVERY
-// known name for the volume (title + CV/user aliases) and merges the results, so
-// an indexer that names it differently is still found.
-async function usenetSearch({ query, seriesId, number } = {}) {
-  const indexers = parseIndexers(config.newznabIndexers);
-  if (!indexers.length) return { error: 'No Newznab indexers configured (Settings → Download sources → Usenet).' };
-  const q = String(query || '').trim();
-  let queries;
-  if (q) queries = [q];
-  else if (seriesId) {
-    const token = /^\d+$/.test(String(number ?? '')) ? String(number).padStart(3, '0') : '';
-    queries = seriesSearchNames(db, Number(seriesId)).map((n) => [n, token].filter(Boolean).join(' ').trim()).filter(Boolean);
-  }
-  if (!queries || !queries.length) return { error: 'Enter something to search for.' };
-  try {
-    const byUrl = new Map();
-    for (const qq of queries) {
-      for (const r of await searchNewznab(indexers, qq, {})) if (r.nzbUrl && !byUrl.has(r.nzbUrl)) byUrl.set(r.nzbUrl, r);
-    }
-    return { results: [...byUrl.values()].sort((a, b) => b.size - a.size), searched: queries };
-  } catch (e) { return { error: String(e?.message || e) }; }
-}
-
-// Manually grab a specific usenet release for a CV issue: create/reuse the queue
-// row, hand the chosen NZB to the client, and record the grab so the background
-// monitor imports it when it finishes (same path as an auto-grab).
-async function usenetGrab({ seriesId, cvIssueId, number, name, nzbUrl, releaseTitle }) {
-  if (!nzbUrl) return { error: 'no release selected' };
-  const issueId = ensureCvIssueRow(db, { seriesId: Number(seriesId), cvIssueId: Number(cvIssueId), number, title: name });
-  try {
-    const client = makeNzbClient(config, {});
-    const downloadId = await client.add(nzbUrl, { name: releaseTitle, category: config.nzbCategory });
-    recordGrab(db, { issueId, source: 'usenet', client: config.nzbClient, downloadId, category: config.nzbCategory, title: releaseTitle });
-    setIssueStatus(db, issueId, 'grabbed');
-    logInfo(`Grabbed via usenet (manual): ${releaseTitle}`, 'usenet');
-    return { grabbed: true };
-  } catch (e) {
-    setIssueStatus(db, issueId, 'failed', { error: String(e?.message || e) });
-    return { error: String(e?.message || e) };
-  }
-}
-
 // A picked issue that has landed on disk: tell whoever asked for it (a
 // targeted notification — only they see it), then the pick retires. Runs
 // after anything that can put a file on disk; the nightly backfill sweeps
@@ -971,12 +927,6 @@ async function runRssWatch() {
   return { items: items.length, fresh: fresh.length, queued: ids.length };
 }
 
-// Try a real search with the given key (or the saved one) — the Settings
-// "Test" button for the API credential.
-async function testCvKeys(keysText) {
-  return testMetadataProvider(config, { provider: 'comicvine', values: { comicvineKeys: keysText || config.comicvineKeys } });
-}
-
 // Cancel an in-flight grab: remove the download from its client (with files —
 // nothing was imported yet), fail the grab, and put the issue back to pending so
 // it can be retried. Works for issue grabs and pack grabs alike.
@@ -994,45 +944,6 @@ async function cancelActiveGrab(grabId) {
   if (grab.kind === 'media') { try { const { grabPayload } = await import('./db.js'); emitMedia({ event: 'failed', ...grabPayload(grab), ref: grab.ref, source: grab.source, error: 'cancelled by user' }); } catch { /* best-effort */ } }
   logInfo(`Cancelled ${grab.kind === 'pack' ? 'pack ' : grab.kind === 'media' ? 'book ' : ''}grab: ${grab.title || grab.id}`, grab.source || 'download');
   return { cancelled: true };
-}
-
-// Manual torrent PACK search for a series. Comics live on trackers as
-// multi-issue packs, so this searches by series names only (no issue token) and
-// returns candidates ranked by seeders for the user to pick from.
-async function torrentSearch({ query, seriesId } = {}) {
-  const indexers = parseTorznab(config.torznabIndexers);
-  if (!indexers.length) return { error: 'No Torznab indexers configured (Settings → Download sources → Torrents).' };
-  const q = String(query || '').trim();
-  let queries;
-  if (q) queries = [q];
-  else if (seriesId) queries = seriesSearchNames(db, Number(seriesId)).filter(Boolean);
-  if (!queries || !queries.length) return { error: 'Enter something to search for.' };
-  try {
-    const byUrl = new Map();
-    for (const qq of queries) {
-      for (const r of await searchTorznab(indexers, qq, { cat: '' })) {
-        if (r.downloadUrl && !byUrl.has(r.downloadUrl)) byUrl.set(r.downloadUrl, r);
-      }
-    }
-    return { results: [...byUrl.values()].sort((a, b) => (b.seeders - a.seeders) || (b.size - a.size)).slice(0, 100), searched: queries };
-  } catch (e) { return { error: String(e?.message || e) }; }
-}
-
-// Manually grab a torrent PACK for a series: hand it to qBittorrent under our
-// category and record a kind='pack' grab pinned to the series — the monitor
-// post-processes it on completion (every missing issue of THAT volume imports;
-// the pack keeps seeding).
-async function torrentGrabPack({ seriesId, downloadUrl, releaseTitle }) {
-  if (!downloadUrl) return { error: 'no release selected' };
-  const sid = Number(seriesId);
-  if (!sid || !getSeriesById(db, sid)) return { error: 'unknown series' };
-  try {
-    const client = makeTorrentClient(config, {});
-    const downloadId = await client.add(downloadUrl, { name: releaseTitle, category: config.torrentCategory });
-    recordGrab(db, { source: 'torrent', client: config.torrentClient || 'qbittorrent', downloadId, category: config.torrentCategory, title: releaseTitle, kind: 'pack', seriesId: sid });
-    logInfo(`Grabbed torrent pack (manual): ${releaseTitle}`, 'torrent');
-    return { grabbed: true };
-  } catch (e) { return { error: String(e?.message || e) }; }
 }
 
 // Manual multi-source search: query every enabled source that supports it and
@@ -1410,13 +1321,8 @@ const app = createApp({
   // Books and audiobooks in flight (immediate downloads + deferred grabs).
   activeMedia: () => activeMediaList(db, downloadMonitor.getMediaProgress()),
   cancelGrab: cancelActiveGrab,
-  testCvKeys,
   metadataProviders: () => metadataProviderList(config),
   testMetadataProvider: (body) => testMetadataProvider(config, body),
-  usenetSearch,
-  usenetGrab,
-  torrentSearch,
-  torrentGrabPack,
   searchSources,
   manualGrabResult,
   grabSourcePack,

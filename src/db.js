@@ -34,11 +34,9 @@ export function initSchema(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_issues_series ON issues(series_id);
     CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);
-    CREATE TABLE IF NOT EXISTS scan_overrides (
-      dir TEXT PRIMARY KEY,
-      series_id INTEGER NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
+    -- scan_overrides held folder → series picks for a scan report that no
+    -- released version ever wrote to; nothing reads it any more.
+    DROP TABLE IF EXISTS scan_overrides;
     -- A file assigned to a ComicVine issue by hand (its number could not be
     -- read, or was read wrongly). Keyed by path; every relink honours it.
     CREATE TABLE IF NOT EXISTS file_issue_overrides (
@@ -1026,20 +1024,6 @@ export function getSeriesById(db, id) {
 
 export function getSeriesByUrl(db, url) {
   return db.prepare('SELECT * FROM series WHERE url = ?').get(url);
-}
-
-// Manual scanner match overrides: a library folder -> catalog series link that
-// survives re-scans (from the "Fix match" control).
-export function setScanOverride(db, dir, seriesId) {
-  db.prepare("INSERT INTO scan_overrides (dir, series_id, created_at) VALUES (?, ?, datetime('now')) ON CONFLICT(dir) DO UPDATE SET series_id=excluded.series_id, created_at=excluded.created_at")
-    .run(dir, seriesId);
-}
-export function getScanOverride(db, dir) {
-  const r = db.prepare('SELECT series_id FROM scan_overrides WHERE dir = ?').get(dir);
-  return r ? r.series_id : undefined;
-}
-export function clearScanOverride(db, dir) {
-  return db.prepare('DELETE FROM scan_overrides WHERE dir = ?').run(dir).changes;
 }
 
 // A file → ComicVine issue assignment made by hand. The scanner reads a
@@ -2220,7 +2204,7 @@ export function mergeSeriesRows(db, keepId, dropId) {
     db.prepare('UPDATE issues SET series_id=? WHERE series_id=?').run(keepId, dropId);
     db.prepare('INSERT OR IGNORE INTO user_follows (user_id, series_id) SELECT user_id, ? FROM user_follows WHERE series_id=?').run(keepId, dropId);
     db.prepare('DELETE FROM user_follows WHERE series_id=?').run(dropId);
-    for (const t of ['grabs', 'scan_overrides', 'import_history', 'import_candidates', 'issue_picks']) {
+    for (const t of ['grabs', 'import_history', 'import_candidates', 'issue_picks']) {
       try { db.prepare(`UPDATE ${t} SET series_id=? WHERE series_id=?`).run(keepId, dropId); } catch { /* table or column absent */ }
     }
     db.prepare('DELETE FROM series WHERE id=?').run(dropId);
@@ -2395,10 +2379,6 @@ export function listQueue(db, limit = 200) {
      ORDER BY CASE i.status WHEN 'downloading' THEN 0 WHEN 'grabbed' THEN 1 WHEN 'tagging' THEN 2 WHEN 'queued' THEN 3 ELSE 4 END, i.id
      LIMIT ?`
   ).all(limit);
-}
-
-export function countQueue(db) {
-  return db.prepare("SELECT COUNT(*) n FROM issues WHERE status IN ('queued','downloading','grabbed')").get().n;
 }
 
 export function queuedCount(db) {

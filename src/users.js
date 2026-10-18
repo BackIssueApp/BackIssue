@@ -14,7 +14,6 @@
 import crypto from 'node:crypto';
 
 export const ROLES = ['viewer', 'trusted', 'admin'];
-export const roleAtLeast = (have, need) => ROLES.indexOf(have) >= ROLES.indexOf(need);
 
 // ---- permissions ------------------------------------------------------------
 // Every gated action maps to a named permission. The three built-in roles grant

@@ -8,6 +8,19 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Removed
+
+- **Legacy API routes.** `POST /api/download` (use
+  `/api/collection/{id}/download`), `/api/usenet/search` and `/api/usenet/grab`
+  (use `/api/search` and `/api/search/grab`), `/api/torrent/search` and
+  `/api/torrent/grab-pack` (use `/api/packs/search` and `/api/packs/grab`), and
+  `/api/cv/test` (use `/api/metadata/providers/test`). The app stopped calling
+  them long ago.
+- **Leftovers of an old folder-scan report.** Its saved per-folder matches
+  were never written by any release, so the empty table is dropped and the
+  library scan no longer looks it up. The unused webhook helper the
+  Notifications Hub replaced is gone too.
+
 ### Added
 
 - **Wanted books and audiobooks on the Wanted page.** Plugins can add their

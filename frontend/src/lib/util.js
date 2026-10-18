@@ -2,8 +2,6 @@ import { currentLang, t } from './i18n.js';
 
 export const fmt = (n) => (n ?? 0).toLocaleString(currentLang());
 
-export const pad3 = (n) => (/^\d+$/.test(String(n)) ? String(n).padStart(3, '0') : String(n ?? ''));
-
 export function escapeHtml(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
