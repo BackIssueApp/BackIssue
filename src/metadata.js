@@ -8,7 +8,10 @@
 // api.registerMetadataProvider.
 //
 // `metadataSources` in settings is an ordered list of the providers in use,
-// like `sourcePriority` for downloads. A provider in the list that is not
+// like `sourcePriority` for downloads, and the default for every library; a
+// library can carry its own list (libraries.metadata_sources). A lookup for a
+// stored record uses the list of the library that holds it; a search or a new
+// add uses the list of the library it is for. A provider in the list that is not
 // configured (no key, no account) is skipped rather than failing every lookup;
 // with nothing usable the hosted service answers.
 //
@@ -208,10 +211,23 @@ export function metadataSourceOrder(config) {
 }
 
 /** The providers lookups actually go to: the enabled ones that are
- *  configured, in order; the hosted service when none is. */
-export function enabledMetadataProviders(config) {
-  const usable = metadataSourceOrder(config).map(byId).filter((p) => p && p.isConfigured(config));
+ *  configured, in order; the hosted service when none is. `sources` is a
+ *  library's own list; without one the app-wide list applies. */
+export function enabledMetadataProviders(config, sources = null) {
+  const own = sources ? parseMetadataSources(sources) : [];
+  const order = own.length ? own : metadataSourceOrder(config);
+  const usable = order.map(byId).filter((p) => p && p.isConfigured(config));
   return usable.length ? usable : [hosted()];
+}
+
+// Libraries come from the database; index.js installs the readers.
+let libraryResolver = { ofRecord: () => null, sourcesOf: () => null };
+/** Install { ofRecord(kind, id) → libraryId|null, sourcesOf(libraryId) → list|null }. */
+export function setLibraryResolver(r) {
+  libraryResolver = {
+    ofRecord: typeof r?.ofRecord === 'function' ? r.ofRecord : () => null,
+    sourcesOf: typeof r?.sourcesOf === 'function' ? r.sourcesOf : () => null,
+  };
 }
 
 /** The first provider in the list (what the old single setting named). */
@@ -263,18 +279,33 @@ const catalogLabel = (c) => CATALOG_LABELS[c] || providers.find((p) => p.serves.
 /** One client over the enabled providers: each lookup goes to the provider
  *  that serves the record's catalog; searches ask everyone and merge. */
 export function makeCompositeClient(config, opts = {}) {
-  const enabled = enabledMetadataProviders(config);
-  const clients = enabled.map((p) => ({ p, c: p.makeClient(config, opts) }));
+  const { libraryId: boundLibrary = null, ...clientOpts } = opts;
+  // One client set per distinct source list (the app-wide one, or a
+  // library's own), built on first use.
+  const sets = new Map();
+  const setFor = (libraryId) => {
+    let src = null;
+    try { src = libraryId != null ? libraryResolver.sourcesOf(libraryId) : null; } catch { src = null; }
+    const key = src ? parseMetadataSources(src).join(',') : '';
+    if (!sets.has(key)) sets.set(key, enabledMetadataProviders(config, key || null).map((p) => ({ p, c: p.makeClient(config, clientOpts) })));
+    return sets.get(key);
+  };
+  const libraryFor = (kind, id) => {
+    let lib = null;
+    try { lib = libraryResolver.ofRecord(kind, id); } catch { lib = null; }
+    return lib ?? boundLibrary;
+  };
+  const clients = setFor(boundLibrary);
 
-  // Native first, in the user's order; then a cross-reference; then a
+  // Native first, in the library's order; then a cross-reference; then a
   // provider from before catalogs existed (see registerMetadataProvider).
-  const providerFor = (catalog) => (catalog && clients.find((x) => x.p.serves.includes(catalog)))
-    || (catalog && clients.find((x) => x.p.alsoServes.includes(catalog)))
-    || clients.find((x) => x.p.fallback)
-    || (!catalog && clients.length === 1 ? clients[0] : null);
+  const providerFor = (set, catalog) => (catalog && set.find((x) => x.p.serves.includes(catalog)))
+    || (catalog && set.find((x) => x.p.alsoServes.includes(catalog)))
+    || set.find((x) => x.p.fallback)
+    || (!catalog && set.length === 1 ? set[0] : null);
   const route = (kind, id) => {
     const catalog = catalogOf(kind, id);
-    const hit = providerFor(catalog);
+    const hit = providerFor(kind === 'arc' ? clients : setFor(libraryFor(kind, id)), catalog);
     if (!hit) {
       const where = catalog ? ` (it comes from ${catalogLabel(catalog)})` : '';
       const hint = catalog === 'mangadex' ? ' Manga comes through the built-in metadata service; turn it on under Settings → Metadata.' : '';
@@ -296,9 +327,10 @@ export function makeCompositeClient(config, opts = {}) {
     return out;
   };
   const nativeCatalog = (x) => x.p.serves[0] || null;
-  // Ask everyone; a source that fails is left out unless they all fail.
-  async function fanOut(method, ...args) {
-    const able = clients.filter((x) => typeof x.c[method] === 'function');
+  // Ask everyone in the library's list; a source that fails is left out
+  // unless they all fail.
+  async function fanOut(method, libraryId, ...args) {
+    const able = setFor(libraryId).filter((x) => typeof x.c[method] === 'function');
     const settled = await Promise.allSettled(able.map((x) => x.c[method](...args)));
     const lists = [];
     let firstErr = null;
@@ -312,12 +344,15 @@ export function makeCompositeClient(config, opts = {}) {
     return mergeSearchResults(lists);
   }
   const composite = {
-    search: (q, o) => fanOut('search', q, o),
+    search: (q, o) => { const { libraryId, ...rest } = o || {}; return fanOut('search', libraryId ?? boundLibrary, q, rest); },
     async volume(id) { const h = route('volume', id); return stamp(await h.c.volume(id, { catalog: h.catalog }), h, id); },
     async issue(id) { const h = route('issue', id); return stamp(await h.c.issue(id, { catalog: h.catalog }), h, id); },
     async findIssue(volumeId, number) { const h = route('volume', volumeId); return stamp(await h.c.findIssue(volumeId, number, { catalog: h.catalog }), h, null); },
     async storyArcIssues(arcId) { const h = route('arc', arcId); return h.c.storyArcIssues(arcId, { catalog: h.catalog }); },
-    searchArcs: (q) => fanOut('searchArcs', q),
+    searchArcs: (q) => fanOut('searchArcs', boundLibrary, q),
+    // The same client, for one library's list (searches and new adds made
+    // on that library's behalf).
+    forLibrary: (libraryId) => (libraryId == null || libraryId === boundLibrary ? composite : makeCompositeClient(config, { ...opts, libraryId })),
     async issuesByIds(ids) {
       const groups = new Map();
       for (const id of ids || []) {

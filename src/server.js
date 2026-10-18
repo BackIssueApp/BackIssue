@@ -1702,7 +1702,7 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
     catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
   });
   app.post('/api/libraries/:id', (req, res) => {
-    try { updateLibrary(db, Number(req.params.id), { name: req.body?.name, type: req.body?.type, rootFolder: req.body?.rootFolder, folderPattern: req.body?.folderPattern, restricted: req.body?.restricted, sortOrder: req.body?.sortOrder, tagPlacement: req.body?.tagPlacement }); syncRootsFromLibraries(); const lib = listLibraries(db).find((l) => l.id === Number(req.params.id)); kickLibraryScanners(lib?.id, lib?.type); res.json({ libraries: listLibraries(db) }); }
+    try { updateLibrary(db, Number(req.params.id), { name: req.body?.name, type: req.body?.type, rootFolder: req.body?.rootFolder, folderPattern: req.body?.folderPattern, restricted: req.body?.restricted, sortOrder: req.body?.sortOrder, tagPlacement: req.body?.tagPlacement, metadataSources: req.body?.metadataSources }); syncRootsFromLibraries(); const lib = listLibraries(db).find((l) => l.id === Number(req.params.id)); kickLibraryScanners(lib?.id, lib?.type); res.json({ libraries: listLibraries(db) }); }
     catch (e) { res.status(400).json({ error: String(e?.message || e) }); }
   });
   app.delete('/api/libraries/:id', (req, res) => { const removed = deleteLibrary(db, Number(req.params.id)); syncRootsFromLibraries(); res.json({ removed, libraries: listLibraries(db) }); });
@@ -1928,7 +1928,11 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
   app.get('/api/cv', (req, res) => res.json(state.cv || { running: false }));
   app.get('/api/cv/search', async (req, res) => {
     try {
-      const results = await cvSearch(String(req.query.q || ''), { manga: req.query.manga === '1' });
+      // Search with the destination library's metadata sources: the one
+      // asked for, else the manga library for the manga lane.
+      const manga = req.query.manga === '1';
+      const libraryId = Number(req.query.libraryId) || (manga ? listLibraries(db).find((l) => l.type === 'manga')?.id : null) || null;
+      const results = await cvSearch(String(req.query.q || ''), { manga, libraryId });
       // Flag results already in the collection so the picker can gray them out
       // and link straight to the existing series (not just say so after an add).
       if (Array.isArray(results)) for (const v of results) {
@@ -1964,7 +1968,9 @@ export function createApp({ db, runDownloads, prepareRedownload, runCvMatch, cvS
       // issues picked, so automation keeps after exactly what was asked for.
       // Otherwise it gets the "Monitor added series" default. An existing
       // series keeps whatever policy it has; the picks still land.
-      const r = await addFromCv(comicvineId, onlyRequested ? { monitor: 'none' } : {});
+      // Fetch through the destination library's metadata sources.
+      const destLibrary = Number(req.body?.libraryId) || (req.body?.manga ? listLibraries(db).find((l) => l.type === 'manga')?.id : null) || null;
+      const r = await addFromCv(comicvineId, { ...(onlyRequested ? { monitor: 'none' } : {}), libraryId: destLibrary });
       if (onlyRequested && r?.seriesId != null) {
         setIssueWants(db, r.seriesId, wanted, true, { reason: String(req.body?.reason || 'requested').slice(0, 64), userId: req.user.id });
         r.picked = wanted.length;

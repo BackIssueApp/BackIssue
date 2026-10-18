@@ -109,11 +109,43 @@
   }
   async function saveLib(l) {
     const rootFolder = (l.folders || []).map((s) => s.trim()).filter(Boolean).join('\n');
-    const r = await apiPost('/api/libraries/' + l.id, { name: l.name, type: l.type, rootFolder: rootFolder || null, folderPattern: l.folder_pattern || null, restricted: !!l.restricted, tagPlacement: l.tag_placement || null });
+    const r = await apiPost('/api/libraries/' + l.id, { name: l.name, type: l.type, rootFolder: rootFolder || null, folderPattern: l.folder_pattern || null, restricted: !!l.restricted, tagPlacement: l.tag_placement || null, metadataSources: l.metadata_sources || null });
     if (r.error) return notify(r.error, 'error');
     libs = r.libraries.map(withFolders); notify(t('settingsPage.libraryUpdated'), 'ok');
   }
   const libAddFolder = (l) => { l.folders = [...l.folders, '']; };
+  // Per-library metadata sources. null = the default list (Settings →
+  // Metadata); otherwise this library's own ordered list of provider ids.
+  // Book and audiobook libraries get their data from their own plugins.
+  const libUsesMeta = (l) => !['ebook', 'audiobook'].includes(l.type);
+  const libMetaIds = (l) => String(l.metadata_sources || '').split(',').map((x) => x.trim()).filter(Boolean);
+  // Every provider, this library's chosen ones first in its order.
+  function libMetaRows(l) {
+    const on = libMetaIds(l);
+    const all = metaOrder.length ? metaOrder : [];
+    const rows = on.map((id) => all.find((p) => p.id === id)).filter(Boolean).map((p) => ({ ...p, on: true }));
+    for (const p of all) if (!on.includes(p.id)) rows.push({ ...p, on: false });
+    return rows;
+  }
+  function libMetaSet(l, ids) { l.metadata_sources = ids.length ? ids.join(',') : null; saveLib(l); }
+  function libMetaMode(l, custom) {
+    if (!custom) return libMetaSet(l, []);
+    // Start from the default list as it stands.
+    libMetaSet(l, metaOrder.filter((p) => p.enabled).map((p) => p.id));
+  }
+  function libMetaToggle(l, id, on) {
+    const ids = libMetaIds(l).filter((x) => x !== id);
+    if (on) ids.push(id);
+    // Never leave a custom list empty: turning the last one off reverts to the default.
+    libMetaSet(l, ids);
+  }
+  function libMetaMove(l, id, dir) {
+    const ids = libMetaIds(l);
+    const i = ids.indexOf(id), j = i + dir;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    libMetaSet(l, ids);
+  }
   const libRemoveFolder = (l, i) => { l.folders = l.folders.filter((_, k) => k !== i); if (!l.folders.length) l.folders = ['']; saveLib(l); };
   const libMakeDefault = (l, i) => { if (i <= 0) return; const next = [...l.folders]; const [f] = next.splice(i, 1); l.folders = [f, ...next]; saveLib(l); };
   async function removeLib(l) {
@@ -395,6 +427,7 @@
   let dirty = $state(false);
   function markDirty(e) {
     if (e?.target?.closest?.('.setx-search')) return; // searching isn't a setting
+    if (e?.target?.closest?.('.libcard')) return; // library cards save themselves
     dirty = true;
     const page = e?.target?.closest?.('.setx-page');
     if (page?.dataset.tab && !dirtySections.has(page.dataset.tab)) {
@@ -674,6 +707,33 @@
                       <option value="embed">{t('settingsPage.tagEmbed')}</option>
                       <option value="sidecar">{t('settingsPage.tagSidecar')}</option>
                     </select></label>
+                  {#if libUsesMeta(l)}
+                    <div class="field libmeta">
+                      <span>{t('settingsPage.libMetaSources')}</span>
+                      <select value={l.metadata_sources ? 'custom' : 'default'} onchange={(e) => libMetaMode(l, e.currentTarget.value === 'custom')} title={t('settingsPage.libMetaTitle')}>
+                        <option value="default">{t('settingsPage.libMetaDefault')}</option>
+                        <option value="custom">{t('settingsPage.libMetaCustom')}</option>
+                      </select>
+                      {#if l.metadata_sources}
+                        {@const rows = libMetaRows(l)}
+                        {@const onCount = rows.filter((r) => r.on).length}
+                        <div class="libmeta__list">
+                          {#each rows as p (p.id)}
+                            <div class="libmeta__row" class:is-on={p.on}>
+                              <label class="libmeta__pick"><input type="checkbox" checked={p.on} onchange={(e) => libMetaToggle(l, p.id, e.currentTarget.checked)} />
+                                <span>{providerName(p)}</span>{#if p.on && !p.configured}<span class="metasrc__warn">{t('settingsPage.notSetUp')}</span>{/if}</label>
+                              {#if p.on}
+                                {@const idx = rows.indexOf(p)}
+                                <button class="srcpri-btn" type="button" aria-label={t('settingsPage.moveUp')} disabled={idx === 0} onclick={() => libMetaMove(l, p.id, -1)}><Icon name="arrow-up" size={13} /></button>
+                                <button class="srcpri-btn" type="button" aria-label={t('settingsPage.moveDown')} disabled={idx >= onCount - 1} onclick={() => libMetaMove(l, p.id, 1)}><Icon name="arrow-down" size={13} /></button>
+                              {/if}
+                            </div>
+                          {/each}
+                        </div>
+                        <p class="modal__note">{t('settingsPage.libMetaNote')}</p>
+                      {/if}
+                    </div>
+                  {/if}
                 </div>
               </div>
             {/each}
@@ -1003,7 +1063,7 @@
       <p class="setx-panel__sub">{t('settingsPage.metaSub')}</p>
       <div class="setx-card">
         <h4 class="setx-card__head">{t('settingsPage.metaSources')}</h4>
-        <p class="modal__note">{t('settingsPage.metaSourcesNote')}</p>
+        <p class="modal__note">{t('settingsPage.metaSourcesNote')} {t('settingsPage.metaDefaultForLibraries')}</p>
         <div id="metadata-source-list">
           {#each metaOrder as p, i (p.id)}
             <div class="metasrc" class:is-on={p.enabled}>

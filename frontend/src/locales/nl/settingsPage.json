@@ -244,5 +244,11 @@
   "browsePlugins": "Plugins bekijken",
   "unsaved": "Je hebt niet-opgeslagen wijzigingen.",
   "discard": "Verwerpen",
-  "saveChanges": "Wijzigingen opslaan"
+  "saveChanges": "Wijzigingen opslaan",
+  "libMetaSources": "Metadatabronnen",
+  "libMetaTitle": "Waar de reeks- en nummergegevens van deze bibliotheek vandaan komen",
+  "libMetaDefault": "Standaardlijst gebruiken",
+  "libMetaCustom": "Kiezen voor deze bibliotheek",
+  "libMetaNote": "Reeksen in deze bibliotheek worden opgezocht via de bronnen die je hier aanvinkt, in deze volgorde. Vink ze allemaal uit om terug te gaan naar de standaardlijst.",
+  "metaDefaultForLibraries": "Deze lijst is de standaard; een bibliotheek kan onder Instellingen → Bibliotheek een eigen lijst kiezen."
 }

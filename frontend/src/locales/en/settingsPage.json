@@ -35,7 +35,10 @@
   "ovDirect": "Direct lookups with your own key or account",
   "ovCached": "Cached + enriched, no setup needed",
   "ovLibraries": "Libraries",
-  "ovLibrariesCount": { "one": "{count} library", "other": "{count} libraries" },
+  "ovLibrariesCount": {
+    "one": "{count} library",
+    "other": "{count} libraries"
+  },
   "ovSeriesCount": "{count} series in the collection",
   "ovStorage": "Storage",
   "ovWithFolders": "{count} with folders",
@@ -47,7 +50,10 @@
   "ovFormat": "Format: {format}",
   "ovDownloadsOnAdd": " · downloads on add",
   "ovNotifications": "Notifications",
-  "ovChannels": { "one": "{count} channel", "other": "{count} channels" },
+  "ovChannels": {
+    "one": "{count} channel",
+    "other": "{count} channels"
+  },
   "ovNoneInstalled": "None installed",
   "ovOutbound": "Outbound alerts configured",
   "ovBellOnly": "In-app bell only",
@@ -238,5 +244,11 @@
   "browsePlugins": "Browse plugins",
   "unsaved": "You have unsaved changes.",
   "discard": "Discard",
-  "saveChanges": "Save changes"
+  "saveChanges": "Save changes",
+  "libMetaSources": "Metadata sources",
+  "libMetaTitle": "Where this library's series and issue data comes from",
+  "libMetaDefault": "Use the default list",
+  "libMetaCustom": "Choose for this library",
+  "libMetaNote": "This library's series are looked up through the sources ticked here, in this order. Turn them all off to go back to the default list.",
+  "metaDefaultForLibraries": "This list is the default; a library can choose its own under Settings → Library."
 }

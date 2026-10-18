@@ -242,5 +242,11 @@
   "browsePlugins": "プラグインを見る",
   "unsaved": "保存していない変更があります。",
   "discard": "破棄",
-  "saveChanges": "変更を保存"
+  "saveChanges": "変更を保存",
+  "libMetaSources": "メタデータソース",
+  "libMetaTitle": "このライブラリのシリーズと号のデータの取得元",
+  "libMetaDefault": "既定のリストを使う",
+  "libMetaCustom": "このライブラリ用に選ぶ",
+  "libMetaNote": "このライブラリのシリーズは、ここでチェックしたソースをこの順番で参照します。すべて外すと既定のリストに戻ります。",
+  "metaDefaultForLibraries": "このリストが既定です。ライブラリごとに［設定］→［ライブラリ］で独自のリストを選べます。"
 }

@@ -597,7 +597,7 @@ button .bi-icon, a .bi-icon { pointer-events: none; }
   background: var(--accent); color: #fff; font: 700 13px var(--font-body);
 }
 .sideuser__name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 4.5em; flex-shrink: 1; }
-.sideuser__role { margin-left: auto; font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; color: var(--muted); min-width: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 2; }
+.sideuser__role { margin-left: auto; font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; color: var(--muted); max-width: 9em; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sideuser__role--admin { color: var(--accent); border-color: rgba(255,45,111,.4); }
 .sideuser__role--trusted { color: var(--green); border-color: rgba(95,211,138,.4); }
 .sideuser__menu {
@@ -1628,6 +1628,13 @@ body.import .import-page { display: flex; flex-direction: column; height: 100%; 
 .srcpri-btn:hover:not(:disabled) { background: var(--line); }
 .srcpri-btn:disabled { opacity: .3; cursor: default; }
 .metasrc .srcpri-row { margin-bottom: 0; }
+/* Per-library metadata sources (Settings → Library card). */
+.libmeta { grid-column: 1 / -1; }
+.libmeta__list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.libmeta__row { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); }
+.libmeta__row:not(.is-on) { opacity: .65; }
+.libmeta__pick { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; font-size: 12.5px; cursor: pointer; }
+.libmeta__pick span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .metasrc { margin-bottom: 6px; }
 .metasrc.is-on .srcpri-row { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 .metasrc__body { border: 1px solid var(--line); border-top: 0; border-radius: 0 0 7px 7px; padding: 8px 12px 10px; background: rgba(255,255,255,.012); }

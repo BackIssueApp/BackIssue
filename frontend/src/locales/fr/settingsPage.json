@@ -35,7 +35,10 @@
   "ovDirect": "Requêtes directes avec votre propre clé ou compte",
   "ovCached": "En cache + enrichi, aucune configuration nécessaire",
   "ovLibraries": "Bibliothèques",
-  "ovLibrariesCount": { "one": "{count} bibliothèque", "other": "{count} bibliothèques" },
+  "ovLibrariesCount": {
+    "one": "{count} bibliothèque",
+    "other": "{count} bibliothèques"
+  },
   "ovSeriesCount": "{count} séries dans la collection",
   "ovStorage": "Stockage",
   "ovWithFolders": "{count} avec dossiers",
@@ -47,7 +50,10 @@
   "ovFormat": "Format : {format}",
   "ovDownloadsOnAdd": " · téléchargement à l'ajout",
   "ovNotifications": "Notifications",
-  "ovChannels": { "one": "{count} canal", "other": "{count} canaux" },
+  "ovChannels": {
+    "one": "{count} canal",
+    "other": "{count} canaux"
+  },
   "ovNoneInstalled": "Aucun installé",
   "ovOutbound": "Alertes sortantes configurées",
   "ovBellOnly": "Cloche dans l'application seulement",
@@ -238,5 +244,11 @@
   "browsePlugins": "Parcourir les extensions",
   "unsaved": "Vous avez des modifications non enregistrées.",
   "discard": "Abandonner",
-  "saveChanges": "Enregistrer les modifications"
+  "saveChanges": "Enregistrer les modifications",
+  "libMetaSources": "Sources de métadonnées",
+  "libMetaTitle": "D’où viennent les données des séries et des numéros de cette bibliothèque",
+  "libMetaDefault": "Utiliser la liste par défaut",
+  "libMetaCustom": "Choisir pour cette bibliothèque",
+  "libMetaNote": "Les séries de cette bibliothèque sont recherchées dans les sources cochées ici, dans cet ordre. Décochez-les toutes pour revenir à la liste par défaut.",
+  "metaDefaultForLibraries": "Cette liste est celle par défaut ; une bibliothèque peut choisir la sienne dans Paramètres → Bibliothèque."
 }

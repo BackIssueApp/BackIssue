@@ -7,7 +7,7 @@ import {
   metadataProviderList, metadataSourceOrder, enabledMetadataProviders, mergeSearchResults,
   makeCompositeClient, parseMetadataSources, setCatalogLookup, classifyId, catalogOf,
 } from '../src/metadata.js';
-import { openDb, upsertCvSeries, upsertCvIssue, recordedCatalog, backfillCatalogs } from '../src/db.js';
+import { openDb, upsertCvSeries, upsertCvIssue, recordedCatalog, backfillCatalogs, updateLibrary } from '../src/db.js';
 import { buildComicInfoXml } from '../src/metatagger.js';
 import { makeCvClient } from '../src/cv.js';
 import { validateSettings } from '../src/settings.js';
@@ -233,4 +233,34 @@ test('a provider that declares no id range answers for ids nobody else claims', 
   assert.equal((await c.volume(5e9)).from, 'legacy');
   // A ComicVine id still goes to the hosted service, which declares that range.
   assert.equal(typeof c.list, 'function');
+});
+
+test('a library with its own sources uses them; others use the app-wide list', async () => {
+  const { setLibraryResolver } = await import('../src/metadata.js');
+  registerMetadataProvider(fake('cvd', ['comicvine']));
+  registerMetadataProvider(fake('xref', ['xrefcat'], { alsoServes: ['comicvine'] }));
+  // Library 2 keeps its records on xref; series 42 lives in library 2.
+  setLibraryResolver({
+    ofRecord: (kind, id) => (kind === 'volume' && id === 42 ? 2 : null),
+    sourcesOf: (lib) => (lib === 2 ? 'xref' : null),
+  });
+  try {
+    const c = makeCompositeClient({ metadataSources: 'cvd' });
+    assert.equal((await c.volume(42)).from, 'xref');      // stored record follows its library
+    assert.equal((await c.volume(43)).from, 'cvd');       // unstored, no library: app-wide list
+    assert.equal((await c.forLibrary(2).volume(43)).from, 'xref'); // a new add for library 2
+    assert.equal((await c.forLibrary(1).volume(43)).from, 'cvd');  // a library without its own list
+  } finally { setLibraryResolver(null); }
+});
+
+test('a library list is stored validated, and cleared back to the default', () => {
+  const db = openDb(':memory:');
+  const id = db.prepare("INSERT INTO libraries (name, type) VALUES ('Comics', 'comic')").run().lastInsertRowid;
+  const get = () => db.prepare('SELECT metadata_sources s FROM libraries WHERE id=?').get(id).s;
+  updateLibrary(db, id, { metadataSources: ' BNF, hosted ,bnf, bad id!' });
+  assert.equal(get(), 'bnf,hosted');
+  updateLibrary(db, id, { name: 'Renamed' }); // untouched when not sent
+  assert.equal(get(), 'bnf,hosted');
+  updateLibrary(db, id, { metadataSources: null });
+  assert.equal(get(), null);
 });

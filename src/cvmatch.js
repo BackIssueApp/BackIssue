@@ -255,6 +255,8 @@ export function seriesTagTitle(db, seriesId) {
 // Search + rank one title; when the first pass isn't a clear, right-year,
 // enough-issues winner, fold in that year's volumes by name and rank again.
 async function rankForTitle(client, s, title) {
+  // A library with its own metadata sources searches those.
+  if (s?.library_id != null && typeof client.forLibrary === 'function') client = client.forLibrary(s.library_id);
   let candidates = await client.search(title);
   let r = rankCandidates({ ...s, title }, candidates);
   const year = s.year ? extractYear(String(s.year)) : null;

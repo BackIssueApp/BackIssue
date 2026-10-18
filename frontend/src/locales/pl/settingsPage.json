@@ -248,5 +248,11 @@
   "browsePlugins": "Przeglądaj wtyczki",
   "unsaved": "Masz niezapisane zmiany.",
   "discard": "Odrzuć",
-  "saveChanges": "Zapisz zmiany"
+  "saveChanges": "Zapisz zmiany",
+  "libMetaSources": "Źródła metadanych",
+  "libMetaTitle": "Skąd pochodzą dane serii i zeszytów tej biblioteki",
+  "libMetaDefault": "Użyj listy domyślnej",
+  "libMetaCustom": "Wybierz dla tej biblioteki",
+  "libMetaNote": "Serie z tej biblioteki są wyszukiwane w zaznaczonych tu źródłach, w tej kolejności. Odznacz wszystkie, aby wrócić do listy domyślnej.",
+  "metaDefaultForLibraries": "Ta lista jest domyślna; biblioteka może wybrać własną w Ustawienia → Biblioteka."
 }

@@ -243,6 +243,9 @@ function migrate(db) {
   // Per-library tag placement override: null = global setting, 'embed' |
   // 'sidecar'. Sidecar keeps archives byte-identical (seeding/share-safe).
   if (libCols.length && !libCols.includes('tag_placement')) db.exec('ALTER TABLE libraries ADD COLUMN tag_placement TEXT');
+  // Per-library metadata sources: an ordered list of provider ids like the
+  // app-wide metadataSources setting; null = use the app-wide list.
+  if (libCols.length && !libCols.includes('metadata_sources')) db.exec('ALTER TABLE libraries ADD COLUMN metadata_sources TEXT');
   const cvcols = db.prepare('PRAGMA table_info(cv_series)').all().map((c) => c.name);
   if (cvcols.length && !cvcols.includes('site_detail_url')) db.exec('ALTER TABLE cv_series ADD COLUMN site_detail_url TEXT');
   // ComicVine-provided alternative names (its `aliases` field, newline-separated).
@@ -393,6 +396,23 @@ function backfillBuiltinCatalogs(db) {
   }
 }
 
+/** The library a cached series or issue belongs to (through the series that
+ *  holds it), or null when no series in the library points at it. */
+export function libraryOfRecord(db, kind, id) {
+  try {
+    if (kind === 'issue') {
+      return db.prepare('SELECT s.library_id l FROM cv_issues i JOIN series s ON s.cv_id = i.cv_series_id WHERE i.comicvine_id=? AND s.library_id IS NOT NULL LIMIT 1').get(Number(id))?.l ?? null;
+    }
+    return db.prepare('SELECT library_id l FROM series WHERE cv_id=? AND library_id IS NOT NULL LIMIT 1').get(Number(id))?.l ?? null;
+  } catch { return null; }
+}
+
+/** A library's own metadata source list, or null when it uses the app-wide one. */
+export function librarySources(db, libraryId) {
+  if (libraryId == null) return null;
+  try { return db.prepare('SELECT metadata_sources s FROM libraries WHERE id=?').get(Number(libraryId))?.s || null; } catch { return null; }
+}
+
 /** The catalog a cached series or issue was recorded under, or null when the
  *  row is unknown or predates any way to tell. kind: 'volume' | 'issue'. */
 export function recordedCatalog(db, kind, id) {
@@ -508,7 +528,7 @@ export function listLibraries(db) {
 export function getLibrary(db, id) {
   return db.prepare('SELECT * FROM libraries WHERE id=?').get(id);
 }
-export function updateLibrary(db, id, { name, type, rootFolder, folderPattern, restricted, sortOrder, tagPlacement } = {}) {
+export function updateLibrary(db, id, { name, type, rootFolder, folderPattern, restricted, sortOrder, tagPlacement, metadataSources } = {}) {
   const lib = getLibrary(db, id);
   if (!lib) throw new Error('unknown library');
   if (type != null && !SERIES_TYPES.includes(type)) throw new Error(`unknown series type "${type}"`);
@@ -520,6 +540,12 @@ export function updateLibrary(db, id, { name, type, rootFolder, folderPattern, r
     restricted !== undefined ? (restricted ? 1 : 0) : lib.restricted,
     sortOrder ?? lib.sort_order,
     tagPlacement !== undefined ? normPlacement(tagPlacement) : lib.tag_placement, id);
+  // Metadata sources: undefined = unchanged; null/'' = back to the app-wide
+  // list; otherwise an ordered list of provider ids (validated by the caller).
+  if (metadataSources !== undefined) {
+    const v = metadataSources == null ? '' : String(metadataSources).split(',').map((x) => x.trim().toLowerCase()).filter((x) => /^[a-z0-9][a-z0-9_-]{0,31}$/.test(x));
+    db.prepare('UPDATE libraries SET metadata_sources=? WHERE id=?').run(v.length ? [...new Set(v)].join(',') : null, id);
+  }
   // A type change re-types the members (the library defines their behavior).
   if (type != null && type !== lib.type) db.prepare('UPDATE series SET type=? WHERE library_id=?').run(type, id);
   // A restricted flag flip re-flags the members — they ride the existing

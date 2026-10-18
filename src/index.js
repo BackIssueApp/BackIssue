@@ -1,4 +1,4 @@
-import { openDb, clearIssuesForRedownload, SELF_DESCRIBED_TYPES, recordedCatalog, backfillCatalogs } from './db.js';
+import { openDb, clearIssuesForRedownload, SELF_DESCRIBED_TYPES, recordedCatalog, backfillCatalogs, libraryOfRecord, librarySources } from './db.js';
 import { runQueue, reconcileDownloading } from './downloader.js';
 import { processPack } from './pack.js';
 import { createApp } from './server.js';
@@ -23,7 +23,7 @@ import { findComicFiles, groupSeries, importMetaForFolder } from './scanner.js';
 import { extractYear } from './matcher.js';
 import { poolWithResource } from './pool.js';
 import { makeCvClient, rankSearchResults } from './cv.js';
-import { metadataProviderList, testMetadataProvider, setCatalogLookup, classifyId } from './metadata.js';
+import { metadataProviderList, testMetadataProvider, setCatalogLookup, classifyId, setLibraryResolver } from './metadata.js';
 import { resolveBooks } from './cbl.js';
 import { tagFileFromCv, ensureCvIssueDetail, fetchAllIssueMetadata } from './metatagger.js';
 import { fetchWeeklyReleases, matchReleases, shiftWeek, currentWeek } from './releases.js';
@@ -62,6 +62,9 @@ const db = openDb(config.dbPath);
 // are loaded by now, so rows from a plugin catalog cached before catalogs were
 // recorded get theirs from the plugin's id block, once.
 setCatalogLookup((kind, id) => (kind === 'arc' ? null : recordedCatalog(db, kind, id)));
+// Each library may carry its own metadata source list; a stored record uses
+// the list of the library holding it.
+setLibraryResolver({ ofRecord: (kind, id) => (kind === 'arc' ? null : libraryOfRecord(db, kind, id)), sourcesOf: (libraryId) => librarySources(db, libraryId) });
 try { const n = backfillCatalogs(db, classifyId); if (n) console.log(`Recorded the metadata catalog of ${n} cached records`); }
 catch (e) { console.warn('catalog backfill failed:', e?.message || e); }
 attachLogDb(db); // persist logs (and flush anything captured before the db opened)
@@ -229,7 +232,9 @@ function runLibraryRefile() {
 const refileState = () => ({ ...state.refile });
 
 // --- ComicVine metadata matching ---
-function cvClient() { return makeCvClient(config); }
+// A metadata client; with a library id, searches and new adds use that
+// library's own source list (stored records always follow their library).
+function cvClient(libraryId = null) { return makeCvClient(config, libraryId != null ? { libraryId } : {}); }
 
 // The app-level CV match sweep (job/progress wrapper around cvmatch.js's runCvMatch).
 async function runCvMatchSweep() {
@@ -250,7 +255,8 @@ async function runCvMatchSweep() {
 }
 
 async function cvSearch(q, opts = {}) {
-  const results = await cvClient().search(q, opts);
+  const { libraryId = null, ...searchOpts } = opts;
+  const results = await cvClient(libraryId).search(q, searchOpts);
   // The user's own publishers rank alongside the familiar ones — someone with
   // a shelf of Panini Verlag wants those on top, not buried.
   let favoured = [];
@@ -319,7 +325,7 @@ async function cvIssueInfo(cvIssueId) {
 
 // Add a comic to the collection from a ComicVine volume.
 async function addFromCv(comicvineId, opts = {}) {
-  const r = await addSeriesFromCv(db, cvClient(), comicvineId, opts);
+  const r = await addSeriesFromCv(db, cvClient(opts.libraryId ?? null), comicvineId, opts);
   logInfo(`Added from ComicVine: ${r.title || 'volume ' + comicvineId} (${r.outcome})`, 'collection');
   return r;
 }
@@ -494,6 +500,7 @@ async function runImportScan({ fresh = false } = {}) {
         // Folders in a manga library search the manga lane (MangaDex facade)
         // instead of ComicVine — the comic matcher never sees manga and vice versa.
         const mangaLane = libs.find((l) => l.id === libraryFor(g.dir))?.type === 'manga';
+        const lc = client?.forLibrary ? client.forLibrary(libraryFor(g.dir)) : client;
         const name = meta?.series || cleanVolumeName(g.seriesName);
         const year = extractYear(g.seriesName) || meta?.year || null;
         const publisher = meta?.publisher || g.publisher;
@@ -504,8 +511,8 @@ async function runImportScan({ fresh = false } = {}) {
         // here (stale id, CV hiccup) just falls back to the name search.
         if (meta?.cvVolumeId || meta?.cvIssueId) {
           try {
-            const volId = meta.cvVolumeId || (await client.issue(meta.cvIssueId))?.volume?.id;
-            const v = volId ? await client.volume(volId) : null;
+            const volId = meta.cvVolumeId || (await lc.issue(meta.cvIssueId))?.volume?.id;
+            const v = volId ? await lc.volume(volId) : null;
             if (v?.id) { cand = { id: v.id, name: v.name, start_year: v.start_year, image_url: v.image_url }; confidence = 'high'; }
           } catch (e) { console.warn('import scan: embedded CV id lookup failed for', name, e?.message || e); }
         }
@@ -515,7 +522,7 @@ async function runImportScan({ fresh = false } = {}) {
         // "ComicVine has no such volume".
         for (let attempt = 1; attempt <= 3 && !cand; attempt++) {
           try {
-            const results = await client.search(name, { manga: mangaLane });
+            const results = await lc.search(name, { manga: mangaLane });
             const { best } = rankCandidates({ title: name, year, publisher }, results);
             if (best) { cand = best.cand; confidence = best.confidence; }
             break;
@@ -569,7 +576,7 @@ async function runImport() {
         }
         let seriesId;
         if (c.cv_id && client) {
-          seriesId = (await addSeriesFromCv(db, client, c.cv_id)).seriesId;
+          seriesId = (await addSeriesFromCv(db, c.library_id && client.forLibrary ? client.forLibrary(c.library_id) : client, c.cv_id)).seriesId;
         } else {
           seriesId = upsertSeries(db, { title: c.name || 'Unknown', url: 'local:' + c.folder, publisher: c.publisher || null });
           if (c.year) db.prepare('UPDATE series SET year=? WHERE id=?').run(c.year, seriesId);

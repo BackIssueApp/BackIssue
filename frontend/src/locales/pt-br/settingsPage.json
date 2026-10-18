@@ -244,5 +244,11 @@
   "browsePlugins": "Ver plugins",
   "unsaved": "Tem alterações por salvar.",
   "discard": "Descartar",
-  "saveChanges": "Salvar alterações"
+  "saveChanges": "Salvar alterações",
+  "libMetaSources": "Fontes de metadados",
+  "libMetaTitle": "De onde vêm os dados das séries e edições desta biblioteca",
+  "libMetaDefault": "Usar a lista padrão",
+  "libMetaCustom": "Escolher para esta biblioteca",
+  "libMetaNote": "As séries desta biblioteca são buscadas nas fontes marcadas aqui, nesta ordem. Desmarque todas para voltar à lista padrão.",
+  "metaDefaultForLibraries": "Esta lista é a padrão; cada biblioteca pode escolher a sua em Configurações → Biblioteca."
 }

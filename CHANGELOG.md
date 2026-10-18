@@ -22,6 +22,14 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   Labels the server defines (job, schedule and tool names, permission names,
   source-card fields, plugin descriptions) are translated too, and plugins
   can ship translations for the ones they register.
+- **Metadata sources per library.** Each library can keep the default source
+  list or choose its own under Settings → Library: a manga library on the
+  built-in service alone, a library of French albums with the French editions
+  source first. A series always refreshes through its own library's list, and
+  searching for or adding a series to a library uses that library's list too;
+  automatic matching and imports follow the library each series or folder
+  belongs to. Book and audiobook libraries keep getting their data from their
+  plugins.
 - **Several metadata sources at once.** Settings → Metadata is now an ordered
   list, like download sources: turn on every source you want data from and
   move the one you trust most to the top. A search asks all of them and shows

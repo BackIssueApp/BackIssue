@@ -242,5 +242,11 @@
   "browsePlugins": "浏览插件",
   "unsaved": "你有未保存的更改。",
   "discard": "放弃",
-  "saveChanges": "保存更改"
+  "saveChanges": "保存更改",
+  "libMetaSources": "元数据来源",
+  "libMetaTitle": "此书库的系列和期刊数据来源",
+  "libMetaDefault": "使用默认列表",
+  "libMetaCustom": "为此书库单独选择",
+  "libMetaNote": "此书库中的系列按此处勾选的来源依次查询。全部取消勾选即可恢复默认列表。",
+  "metaDefaultForLibraries": "此列表为默认设置；各书库可在“设置 → 书库”中选择自己的列表。"
 }

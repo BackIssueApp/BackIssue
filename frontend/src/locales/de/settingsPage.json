@@ -35,7 +35,10 @@
   "ovDirect": "Direkte Abfragen mit eigenem Schlüssel oder Konto",
   "ovCached": "Zwischengespeichert + angereichert, keine Einrichtung nötig",
   "ovLibraries": "Bibliotheken",
-  "ovLibrariesCount": { "one": "{count} Bibliothek", "other": "{count} Bibliotheken" },
+  "ovLibrariesCount": {
+    "one": "{count} Bibliothek",
+    "other": "{count} Bibliotheken"
+  },
   "ovSeriesCount": "{count} Reihen in der Sammlung",
   "ovStorage": "Speicher",
   "ovWithFolders": "{count} mit Ordnern",
@@ -47,7 +50,10 @@
   "ovFormat": "Format: {format}",
   "ovDownloadsOnAdd": " · lädt beim Hinzufügen",
   "ovNotifications": "Benachrichtigungen",
-  "ovChannels": { "one": "{count} Kanal", "other": "{count} Kanäle" },
+  "ovChannels": {
+    "one": "{count} Kanal",
+    "other": "{count} Kanäle"
+  },
   "ovNoneInstalled": "Keine installiert",
   "ovOutbound": "Ausgehende Benachrichtigungen eingerichtet",
   "ovBellOnly": "Nur die Glocke in der App",
@@ -238,5 +244,11 @@
   "browsePlugins": "Plugins durchstöbern",
   "unsaved": "Es gibt ungespeicherte Änderungen.",
   "discard": "Verwerfen",
-  "saveChanges": "Änderungen speichern"
+  "saveChanges": "Änderungen speichern",
+  "libMetaSources": "Metadatenquellen",
+  "libMetaTitle": "Woher die Reihen- und Heftdaten dieser Bibliothek kommen",
+  "libMetaDefault": "Standardliste verwenden",
+  "libMetaCustom": "Für diese Bibliothek wählen",
+  "libMetaNote": "Reihen dieser Bibliothek werden über die hier angehakten Quellen in dieser Reihenfolge abgerufen. Alle abwählen, um zur Standardliste zurückzukehren.",
+  "metaDefaultForLibraries": "Diese Liste ist der Standard; eine Bibliothek kann unter Einstellungen → Bibliothek eine eigene wählen."
 }

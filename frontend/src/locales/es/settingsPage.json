@@ -35,7 +35,10 @@
   "ovDirect": "Consultas directas con tu propia clave o cuenta",
   "ovCached": "En caché y enriquecido, sin configuración",
   "ovLibraries": "Bibliotecas",
-  "ovLibrariesCount": { "one": "{count} biblioteca", "other": "{count} bibliotecas" },
+  "ovLibrariesCount": {
+    "one": "{count} biblioteca",
+    "other": "{count} bibliotecas"
+  },
   "ovSeriesCount": "{count} series en la colección",
   "ovStorage": "Almacenamiento",
   "ovWithFolders": "{count} con carpetas",
@@ -47,7 +50,10 @@
   "ovFormat": "Formato: {format}",
   "ovDownloadsOnAdd": " · descarga al añadir",
   "ovNotifications": "Notificaciones",
-  "ovChannels": { "one": "{count} canal", "other": "{count} canales" },
+  "ovChannels": {
+    "one": "{count} canal",
+    "other": "{count} canales"
+  },
   "ovNoneInstalled": "Ninguno instalado",
   "ovOutbound": "Alertas salientes configuradas",
   "ovBellOnly": "Solo la campana de la aplicación",
@@ -238,5 +244,11 @@
   "browsePlugins": "Explorar plugins",
   "unsaved": "Tienes cambios sin guardar.",
   "discard": "Descartar",
-  "saveChanges": "Guardar cambios"
+  "saveChanges": "Guardar cambios",
+  "libMetaSources": "Fuentes de metadatos",
+  "libMetaTitle": "De dónde vienen los datos de series y números de esta biblioteca",
+  "libMetaDefault": "Usar la lista predeterminada",
+  "libMetaCustom": "Elegir para esta biblioteca",
+  "libMetaNote": "Las series de esta biblioteca se consultan en las fuentes marcadas aquí, en este orden. Desmárcalas todas para volver a la lista predeterminada.",
+  "metaDefaultForLibraries": "Esta lista es la predeterminada; cada biblioteca puede elegir la suya en Ajustes → Biblioteca."
 }
