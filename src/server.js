@@ -7,7 +7,7 @@ import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
 import { initCountWorker, workerGetRow } from './countWorker.js';
-import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, collectionPage, collectionJumpOffset, collectionBuckets, buildCollCountSql, collCountRowToResult, seriesCollectionDetail, setSeriesPath, getSeriesById, defaultLibrary, setDefaultLibrary, reorderLibraries, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser, setMonitor, setIssueWants, clearIssuePicks, wantStates, MONITOR_STATES } from './db.js';
+import { listSeries, listIssues, queueIssues, countByStatus, requeueFailed, clearFailed, listQueue, cancelQueued, cancelIssue, collectionSeries, collectionCounts, collectionPage, collectionJumpQuery, jumpOffsetFromRow, collectionBucketsQuery, bucketsFromRow, buildCollCountSql, collCountRowToResult, seriesCollectionDetail, setSeriesPath, getSeriesById, defaultLibrary, setDefaultLibrary, reorderLibraries, getSeriesByCvId, getCvIssue, ensureCvIssueRow, clearIssuesForRedownload, listImportHistory, listFailedGrabs, listBlacklist, deleteBlacklistEntry, clearBlacklist, listWantedIssues, activePackGrabs, listCvIssues, setSeriesRestricted, isSeriesRestricted, setSeriesType, restrictedSeriesIds, isCvIssueRestricted, createLibrary, listLibraries, libraryFolders, updateLibrary, deleteLibrary, assignSeriesLibrary, setUserFollow, updateCvSeriesUser, updateCvIssueUser, resetCvSeriesUser, resetCvIssueUser, setMonitor, setIssueWants, clearIssuePicks, wantStates, MONITOR_STATES } from './db.js';
 import { resolveSeriesDir, defaultRootedDir } from './paths.js';
 import { planSeries, refileSeries, planLibrary, canRefile } from './refile.js';
 import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
@@ -1025,8 +1025,12 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
     }
   });
 
+  // Paged: the catalog can hold hundreds of thousands of rows (?limit, max 500;
+  // ?offset). An unbounded list froze the server and built a ~300 MB response.
   app.get('/api/series', (req, res) => {
-    res.json(listSeries(db, { search: req.query.search, includeRestricted: canRestricted(req) }));
+    const limit = Math.min(500, Math.max(1, Number.parseInt(req.query.limit, 10) || 100));
+    const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0);
+    res.json(listSeries(db, { search: req.query.search, includeRestricted: canRestricted(req), limit, offset }));
   });
 
   app.get('/api/series/:id/issues', (req, res) => {
@@ -1546,24 +1550,51 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
   // age — staleness only triggers a background refresh on the worker. Combined
   // with the boot-time pre-warm below, an interactive request never waits on a
   // count recompute; the TTL is just the refresh cadence for the badges.
-  const countsFor = (opts) => {
-    const key = JSON.stringify([opts.userId, opts.includeRestricted, opts.library ?? null, opts.search || '',
-      opts.filter || 'all', opts.restrictIds || null, opts.collectionsOnly || false]);
-    const hit = countsCache.get(key);
+  const swrGet = (cache, key, compute) => {
+    const hit = cache.get(key);
     if (hit) {
       if (Date.now() - hit.at >= COUNTS_TTL_MS && !hit.refreshing) {
         hit.refreshing = true;
-        computeCounts(opts)
-          .then((v) => countsCache.set(key, { at: Date.now(), promise: Promise.resolve(v) }))
+        compute()
+          .then((v) => cache.set(key, { at: Date.now(), promise: Promise.resolve(v) }))
           .catch(() => { hit.refreshing = false; }); // keep serving stale; retry next hit
       }
       return hit.promise;
     }
-    const promise = computeCounts(opts);
-    promise.catch(() => countsCache.delete(key)); // never cache a failure
-    if (countsCache.size > 200) countsCache.clear(); // search/facet keys are unbounded — cap crudely
-    countsCache.set(key, { at: Date.now(), promise });
+    const promise = compute();
+    promise.catch(() => cache.delete(key)); // never cache a failure
+    if (cache.size > 200) cache.clear(); // search/facet keys are unbounded — cap crudely
+    cache.set(key, { at: Date.now(), promise });
     return promise;
+  };
+  const countsFor = (opts) => {
+    const key = JSON.stringify([opts.userId, opts.includeRestricted, opts.library ?? null, opts.search || '',
+      opts.filter || 'all', opts.restrictIds || null, opts.collectionsOnly || false]);
+    return swrGet(countsCache, key, () => computeCounts(opts));
+  };
+  // A facet selection's matching series ids, from the first collection filter
+  // that claims it (an array); later resolvers aren't run.
+  const facetIds = (selection, ctx) => {
+    for (const f of registeredCollectionFilters()) {
+      let r = null;
+      try { r = f.resolve(selection, ctx); } catch { /* resolver failed: not ours */ }
+      if (Array.isArray(r)) return r;
+    }
+    return null;
+  };
+  // The A-Z rail's offsets come from the same count pass as the chips, so they
+  // run on the worker behind the same stale-while-revalidate cache.
+  const jumpCache = new Map();
+  const jumpFor = (opts) => {
+    const key = JSON.stringify([opts.letter ? String(opts.letter).toUpperCase().slice(0, 1) : '*', opts.userId, opts.includeRestricted,
+      opts.library ?? null, opts.search || '', opts.filter || 'all', opts.restrictIds || null, opts.collectionsOnly || false]);
+    const compute = async () => {
+      const { sql, params } = opts.letter ? collectionJumpQuery(opts) : collectionBucketsQuery(opts);
+      const off = workerGetRow(sql, params);
+      const row = off ? await off : db.prepare(sql).get(params);
+      return opts.letter ? { offset: jumpOffsetFromRow(row) } : bucketsFromRow(row);
+    };
+    return swrGet(jumpCache, key, compute);
   };
   // Pre-warm a user's per-library counts the moment they ping /api/status (the
   // first thing every client does), so by the time they click into a library
@@ -1589,11 +1620,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
     // null (no restriction); a selection matching nothing → [] (no rows).
     if (req.query.facet) {
       try {
-        const selection = JSON.parse(req.query.facet);
-        const ctx = { db, userId: req.user.id, includeRestricted: opts.includeRestricted, library: opts.library };
-        const ids = registeredCollectionFilters()
-          .map((f) => { try { return f.resolve(selection, ctx); } catch { return null; } })
-          .find((r) => Array.isArray(r));
+        const ids = facetIds(JSON.parse(req.query.facet), { db, userId: req.user.id, includeRestricted: opts.includeRestricted, library: opts.library });
         if (ids) opts.restrictIds = ids;
       } catch { /* malformed facet param → ignore */ }
     }
@@ -1641,11 +1668,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
     };
     if (req.query.facet) {
       try {
-        const selection = JSON.parse(req.query.facet);
-        const ctx = { db, userId: req.user.id, includeRestricted: opts.includeRestricted, library: opts.library };
-        const ids = registeredCollectionFilters()
-          .map((f) => { try { return f.resolve(selection, ctx); } catch { return null; } })
-          .find((r) => Array.isArray(r));
+        const ids = facetIds(JSON.parse(req.query.facet), { db, userId: req.user.id, includeRestricted: opts.includeRestricted, library: opts.library });
         if (ids) opts.restrictIds = ids;
       } catch { /* malformed facet param → ignore */ }
     }
@@ -1660,7 +1683,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
   // rail. Same filter/search/library/facet scope as /api/collection, so the
   // offset lands in the exact list the grid is showing. Only meaningful under
   // the default title (A-Z) sort — the rail is hidden for other sorts.
-  app.get('/api/collection/jump', (req, res) => {
+  app.get('/api/collection/jump', async (req, res) => {
     const opts = {
       letter: req.query.letter, filter: req.query.filter, search: req.query.search,
       includeRestricted: canRestricted(req), userId: req.user.id,
@@ -1669,18 +1692,12 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
     };
     if (req.query.facet) {
       try {
-        const selection = JSON.parse(req.query.facet);
-        const ctx = { db, userId: req.user.id, includeRestricted: opts.includeRestricted, library: opts.library };
-        const ids = registeredCollectionFilters()
-          .map((f) => { try { return f.resolve(selection, ctx); } catch { return null; } })
-          .find((r) => Array.isArray(r));
+        const ids = facetIds(JSON.parse(req.query.facet), { db, userId: req.user.id, includeRestricted: opts.includeRestricted, library: opts.library });
         if (ids) opts.restrictIds = ids;
       } catch { /* malformed facet param → ignore */ }
     }
     try {
-      res.json(req.query.letter
-        ? { offset: collectionJumpOffset(db, opts) }    // one letter
-        : collectionBuckets(db, opts));                 // all 26 at once (rail preload)
+      res.json(await jumpFor(opts)); // one letter's offset, or all 26 at once (rail preload)
     } catch {
       res.json(req.query.letter ? { offset: 0 } : { '#': 0 });
     }

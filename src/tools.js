@@ -10,7 +10,7 @@ import { removeSupersededFiles, removeExtraCopies, indexLibrary } from './librar
 import { walkFiles } from './sources/usenet.js';
 import { pruneLibraryFiles, SELF_DESCRIBED_TYPES } from './db.js';
 import { libraryStats } from './db.js';
-import { linkFilesToCv, refreshCvVolume } from './cvmatch.js';
+import { linkFilesToCv, refreshCvVolume, relinkMatchedSeries } from './cvmatch.js';
 import { tagFileFromCv } from './metatagger.js';
 import { fileStemFromPattern } from './naming.js';
 import { deleteLibraryFile, getLibraryFile } from './db.js';
@@ -305,13 +305,10 @@ export async function backupDatabase(db, dbPath, onProgress = () => {}) {
 // Re-map owned files to ComicVine issues for every matched series (useful after
 // issue-number parsing improvements, or to repair a stale rollup).
 export async function relinkAllCv(db, onProgress = () => {}) {
-  const series = db.prepare('SELECT id, cv_id FROM series WHERE cv_id IS NOT NULL').all();
-  let done = 0, filesLinked = 0;
-  for (const s of series) {
-    try { filesLinked += linkFilesToCv(db, s.id, s.cv_id); } catch { /* skip */ }
-    onProgress({ done: ++done, total: series.length, message: `${filesLinked} linked` });
-  }
-  return { seriesRelinked: series.length, filesLinked };
+  const r = await relinkMatchedSeries(db, {
+    onProgress: (p) => onProgress({ done: p.done, total: p.total, message: `${p.filesLinked} linked` }),
+  });
+  return { seriesRelinked: r.series, filesLinked: r.filesLinked };
 }
 
 // Ghost series: legacy scrape-era catalog rows — never ComicVine-matched, not a

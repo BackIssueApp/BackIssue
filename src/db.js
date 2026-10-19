@@ -298,6 +298,7 @@ function migrate(db) {
     if (!have.includes('meta_source')) db.exec(`ALTER TABLE ${table} ADD COLUMN meta_source TEXT`);
     if (!have.includes('meta_ref')) db.exec(`ALTER TABLE ${table} ADD COLUMN meta_ref TEXT`);
   }
+  migratePeopleIndex(db);
   backfillBuiltinCatalogs(db);
   // Pack grabs (per-series or 0-day) carry a series_id (null = whole-collection
   // 0-day pack) and kind='pack'; individual-issue grabs stay kind='issue'.
@@ -465,17 +466,34 @@ export function upsertIssue(db, { seriesId, title, issueNumber = null, url }) {
   return db.prepare('SELECT id FROM issues WHERE url = ?').get(url).id;
 }
 
-export function listSeries(db, { search, includeRestricted = true } = {}) {
+// `limit`/`offset` page through the title order; the per-row issue count is a
+// correlated lookup, so a page never aggregates the whole catalog.
+export function listSeries(db, { search, includeRestricted = true, limit = null, offset = 0 } = {}) {
   const clauses = [];
-  if (search) clauses.push('s.title LIKE @q');
+  const params = {};
+  if (search) { clauses.push('s.title LIKE @q'); params.q = `%${search}%`; }
   if (!includeRestricted) clauses.push('s.restricted = 0');
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  let page = '';
+  if (limit != null) { page = 'LIMIT @limit OFFSET @offset'; params.limit = limit; params.offset = offset; }
   return db.prepare(
-    `SELECT s.*, COUNT(i.id) AS issue_count
-     FROM series s LEFT JOIN issues i ON i.series_id = s.id
+    `SELECT s.*, (SELECT COUNT(*) FROM issues i WHERE i.series_id = s.id) AS issue_count
+     FROM series s
      ${where}
-     GROUP BY s.id ORDER BY s.title`
-  ).all(search ? { q: `%${search}%` } : {});
+     ORDER BY s.title ${page}`
+  ).all(params);
+}
+
+// Candidate series for matching a comic FILE to its series by title: only the
+// columns the matcher reads, and only types that hold comic files (the large
+// self-described catalogs such as ebooks can never own a comic archive). The
+// type index is pinned: the planner's stats can't tell that comic rows are a
+// sliver of a catalog holding hundreds of thousands of books.
+export function seriesTitleCandidates(db, word) {
+  const types = SERIES_TYPES.filter((t) => !SELF_DESCRIBED_TYPES.has(t));
+  return db.prepare(
+    `SELECT id, title FROM series INDEXED BY idx_series_type WHERE type IN (${types.map(() => '?').join(',')}) AND title LIKE ?`
+  ).all(...types, `%${word}%`);
 }
 
 export function setSeriesRestricted(db, id, restricted) {
@@ -661,22 +679,20 @@ export function isCvIssueRestricted(db, cvIssueId) {
  *  surface filters them.
  */
 export function issuesFeaturing(db, { kind, name, includeRestricted = false } = {}) {
-  const COLS = {
-    creator: [['credits', '$.name'], ['metron_credits', '$.creator']],
-    character: [['character_credits', '$.name'], ['metron_characters', '$.name']],
-    team: [['team_credits', '$.name'], ['metron_teams', '$.name']],
-  }[kind];
-  if (!COLS || !name) return [];
-  // One scan per column, unioned: json_each cannot span two arrays in one pass,
-  // and over ~42k rows each side answers in tens of milliseconds.
-  const sql = COLS.map(([col, path]) => `
+  if (!PEOPLE_SOURCES[kind] || !name) return [];
+  // Driven by the people index (kind, name); a CV-sourced role wins over a
+  // Metron one when both name the person. Until the index's first fill has
+  // finished, fall back to scanning the credit JSON of every issue.
+  const people = peopleIndexReady(db) ? 'cv_issue_people' : `(${peopleSelect('ci2', 'cv_issues ci2, ', [kind])})`;
+  const hitSql = `
       SELECT ci.comicvine_id AS cv_issue_id, ci.issue_number, ci.name AS title,
              ci.cover_date, ci.image_url, ci.cv_series_id,
-             ${col === 'credits' ? "json_extract(j.value,'$.role')" : col === 'metron_credits' ? "(SELECT group_concat(json_extract(r.value,'$.name'), ', ') FROM json_each(json_extract(j.value,'$.role')) r)" : 'NULL'} AS role
-        FROM cv_issues ci, json_each(ci.${col}) j
-       WHERE ci.${col} IS NOT NULL AND json_extract(j.value, '${path}') = @name`).join(' UNION ');
+             COALESCE(MAX(CASE WHEN p.src = 0 THEN p.role END), MAX(p.role)) AS role
+        FROM ${people} p JOIN cv_issues ci ON ci.comicvine_id = p.cv_issue_id
+       WHERE p.kind = @kind AND p.name = @name
+       GROUP BY ci.comicvine_id`;
   const rows = db.prepare(`
-    WITH hit AS (${sql})
+    WITH hit AS (${hitSql})
     SELECT h.cv_issue_id, h.issue_number, h.title, h.cover_date, h.image_url, h.role,
            s.id AS series_id, COALESCE(cs.name, s.title) AS series, s.year AS series_year,
            EXISTS (SELECT 1 FROM library_files lf WHERE lf.cv_issue_id = h.cv_issue_id AND lf.valid = 1) AS owned
@@ -690,8 +706,97 @@ export function issuesFeaturing(db, { kind, name, includeRestricted = false } = 
     // (843 is the busiest in a 42k-row library, and that grows as metadata is
     // filled in). Truncating silently would quietly lie about the collection;
     // the caller windows the list instead so the DOM stays small.
-    .all({ name: String(name), includeRestricted: includeRestricted ? 1 : 0 });
+    .all({ kind, name: String(name), includeRestricted: includeRestricted ? 1 : 0 });
   return rows.map((r) => ({ ...r, owned: !!r.owned }));
+}
+
+// Where each kind of person lives on a cv_issues row: [column, JSON path of
+// the name, source rank (0 = the primary catalog, 1 = enrichment)].
+const PEOPLE_SOURCES = {
+  creator: [['credits', '$.name', 0], ['metron_credits', '$.creator', 1]],
+  character: [['character_credits', '$.name', 0], ['metron_characters', '$.name', 1]],
+  team: [['team_credits', '$.name', 0], ['metron_teams', '$.name', 1]],
+};
+const PEOPLE_COLS = Object.values(PEOPLE_SOURCES).flat().map(([c]) => c);
+
+// SELECT of every (kind, name, issue, role, src) for the cv_issues row `row`
+// (NEW in a trigger; `ci` with from = 'cv_issues ci, ' for a backfill).
+// Malformed JSON and non-object entries are skipped rather than aborting the write.
+function peopleSelect(row, from = '', kinds = Object.keys(PEOPLE_SOURCES), extra = '') {
+  return kinds.flatMap((kind) => PEOPLE_SOURCES[kind].map(([col, path, src]) => {
+    const role = col === 'credits' ? "json_extract(j.value,'$.role')"
+      : col === 'metron_credits' ? "(SELECT group_concat(json_extract(r.value,'$.name'), ', ') FROM json_each(CASE WHEN json_type(j.value,'$.role') = 'array' THEN json_extract(j.value,'$.role') END) r)"
+      : 'NULL';
+    return `SELECT '${kind}' AS kind, json_extract(j.value, '${path}') AS name, ${row}.comicvine_id AS cv_issue_id, ${role} AS role, ${src} AS src
+      FROM ${from}json_each(CASE WHEN json_valid(${row}.${col}) THEN ${row}.${col} END) j
+     WHERE j.type = 'object' AND json_extract(j.value, '${path}') IS NOT NULL${extra ? ` AND ${extra}` : ''}`;
+  })).join(' UNION ALL ');
+}
+
+// cv_issue_people: one row per person credited on / appearing in an issue,
+// indexed by (kind, name) so a creator or character chip is a lookup. Triggers
+// keep it in step with every write to the credit columns, whatever the path.
+function migratePeopleIndex(db) {
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='cv_issue_people'").get();
+  const cvi = db.prepare('PRAGMA table_info(cv_issues)').all().map((c) => c.name);
+  if (!PEOPLE_COLS.every((c) => cvi.includes(c))) return;
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS cv_issue_people (
+      kind TEXT NOT NULL, name TEXT NOT NULL, cv_issue_id INTEGER NOT NULL, role TEXT, src INTEGER NOT NULL DEFAULT 0);
+    CREATE INDEX IF NOT EXISTS idx_people_kind_name ON cv_issue_people(kind, name);
+    CREATE INDEX IF NOT EXISTS idx_people_issue ON cv_issue_people(cv_issue_id);
+    DROP TRIGGER IF EXISTS trg_people_ins;
+    DROP TRIGGER IF EXISTS trg_people_upd;
+    DROP TRIGGER IF EXISTS trg_people_del;
+    CREATE TRIGGER trg_people_ins AFTER INSERT ON cv_issues BEGIN
+      INSERT INTO cv_issue_people (kind, name, cv_issue_id, role, src) ${peopleSelect('NEW')};
+    END;
+    CREATE TRIGGER trg_people_upd AFTER UPDATE OF ${PEOPLE_COLS.join(', ')}, comicvine_id ON cv_issues BEGIN
+      DELETE FROM cv_issue_people WHERE cv_issue_id = OLD.comicvine_id;
+      INSERT INTO cv_issue_people (kind, name, cv_issue_id, role, src) ${peopleSelect('NEW')};
+    END;
+    CREATE TRIGGER trg_people_del AFTER DELETE ON cv_issues BEGIN
+      DELETE FROM cv_issue_people WHERE cv_issue_id = OLD.comicvine_id;
+    END;`);
+  // First boot with the index: what's already cached is filled in afterwards,
+  // in the background (backfillPeopleIndex). The cursor row marks it pending.
+  db.exec('CREATE TABLE IF NOT EXISTS cv_issue_people_fill (next_id INTEGER)');
+  if (!exists) {
+    const lo = db.prepare('SELECT MIN(comicvine_id) AS lo FROM cv_issues').get().lo;
+    if (lo != null) db.prepare('INSERT INTO cv_issue_people_fill (next_id) VALUES (?)').run(lo - 1);
+  }
+}
+
+const peopleReady = new WeakSet();
+function peopleIndexReady(db) {
+  if (peopleReady.has(db)) return true;
+  let pending = true;
+  try { pending = !!db.prepare('SELECT 1 FROM cv_issue_people_fill').get(); } catch { /* no index on this db */ }
+  if (!pending) peopleReady.add(db);
+  return !pending;
+}
+
+// Fill the people index from issues cached before it existed: a few hundred
+// issues per transaction, yielding between them (a big catalog takes a while
+// and must not freeze the server). Resumes from its cursor after a restart.
+export async function backfillPeopleIndex(db, { chunk = 500 } = {}) {
+  const cursor = () => db.prepare('SELECT next_id FROM cv_issue_people_fill').get()?.next_id;
+  const insert = db.prepare(`INSERT INTO cv_issue_people (kind, name, cv_issue_id, role, src)
+    ${peopleSelect('ci', 'cv_issues ci, ', undefined, 'ci.comicvine_id > @lo AND ci.comicvine_id <= @hi')}`);
+  let from;
+  try { from = cursor(); } catch { return; }
+  while (from != null) {
+    const hi = db.prepare('SELECT MAX(comicvine_id) AS hi FROM (SELECT comicvine_id FROM cv_issues WHERE comicvine_id > ? ORDER BY comicvine_id LIMIT ?)').get(from, chunk).hi;
+    db.transaction(() => {
+      if (hi == null) { db.exec('DELETE FROM cv_issue_people_fill'); return; }
+      // Rows the triggers already wrote for this range are replaced, not doubled.
+      db.prepare('DELETE FROM cv_issue_people WHERE cv_issue_id > ? AND cv_issue_id <= ?').run(from, hi);
+      insert.run({ lo: from, hi });
+      db.prepare('UPDATE cv_issue_people_fill SET next_id=?').run(hi);
+    })();
+    from = hi;
+    await new Promise((r) => setImmediate(r));
+  }
 }
 
 export function listIssues(db, { seriesId, status } = {}) {
@@ -1334,18 +1439,28 @@ function collCountPass(db, opts = {}) {
 // the caller handles without asking. Matches the title sort's binary ordering.
 export function collectionJumpOffset(db, { letter, ...opts } = {}) {
   if (!letter) return 0;
-  const { sql, params } = buildCollCountSql({ ...opts, keys: [], jumpLetter: String(letter).toUpperCase().slice(0, 1) });
-  const row = db.prepare(sql).get(params) || {};
-  return Number(row.__total) || 0;
+  const { sql, params } = collectionJumpQuery({ letter, ...opts });
+  return jumpOffsetFromRow(db.prepare(sql).get(params));
 }
+// The SQL behind collectionJumpOffset / collectionBuckets, and their row
+// mappers, so the server can run them on the count worker.
+export function collectionJumpQuery({ letter, ...opts } = {}) {
+  return buildCollCountSql({ ...opts, keys: [], jumpLetter: String(letter).toUpperCase().slice(0, 1) });
+}
+export const jumpOffsetFromRow = (row) => Number(row?.__total) || 0;
 
 // Every letter's row offset in one query, for the A-Z rail: { '#': 0, A, B, …Z }.
 // '#' (digits/symbols) is always the first bucket at 0.
 export function collectionBuckets(db, opts = {}) {
-  const { sql, params } = buildCollCountSql({ ...opts, keys: [], buckets: true });
-  const row = db.prepare(sql).get(params) || {};
+  const { sql, params } = collectionBucketsQuery(opts);
+  return bucketsFromRow(db.prepare(sql).get(params));
+}
+export function collectionBucketsQuery(opts = {}) {
+  return buildCollCountSql({ ...opts, keys: [], buckets: true });
+}
+export function bucketsFromRow(row) {
   const out = { '#': 0 };
-  for (const L of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') out[L] = Number(row[L]) || 0;
+  for (const L of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') out[L] = Number(row?.[L]) || 0;
   return out;
 }
 

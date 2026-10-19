@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { setSeriesAliases, seriesSearchNames, createCvSeries, mergeSeriesRows, issuesFeaturing } from '../src/db.js';
+import { setSeriesAliases, seriesSearchNames, createCvSeries, mergeSeriesRows, issuesFeaturing, backfillPeopleIndex } from '../src/db.js';
 import {
   openDb, upsertSeries, upsertIssue, listSeries, listIssues,
   setIssueStatus, queueIssues, getNextQueued, countByStatus, getSeriesTitleById,
@@ -961,4 +961,46 @@ test('issuesFeaturing: a restricted series stays hidden unless the caller may se
 
   assert.equal(issuesFeaturing(db, { kind: 'character', name: 'Someone' }).length, 0, 'hidden by default');
   assert.equal(issuesFeaturing(db, { kind: 'character', name: 'Someone', includeRestricted: true }).length, 1);
+});
+
+test('issuesFeaturing: a database cached before the people index gets backfilled, and edits keep it current', async () => {
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const file = join(mkdtempSync(join(tmpdir(), 'bi-people-')), 'c.db');
+  let db = openDb(file);
+  upsertCvSeries(db, { id: 1, name: 'Detective Comics' });
+  upsertCvIssue(db, { id: 101, cv_series_id: 1, number: '1' });
+  upsertCvIssue(db, { id: 102, cv_series_id: 1, number: '2' });
+  setCvIssueDetail(db, 101, { credits: [{ name: 'Chuck Dixon', role: 'writer' }] });
+  setCvIssueDetail(db, 102, { metron: { id: 5, credits: [{ creator: 'Chuck Dixon', role: [{ name: 'Writer' }, { name: 'Cover' }] }] } });
+  // Simulate an install from before the index existed.
+  db.exec('DROP TABLE cv_issue_people; DROP TABLE cv_issue_people_fill; DROP TRIGGER trg_people_ins; DROP TRIGGER trg_people_upd; DROP TRIGGER trg_people_del;');
+  db.close();
+  db = openDb(file);
+  // Before the background fill finishes, the scan fallback answers.
+  assert.deepEqual(issuesFeaturing(db, { kind: 'creator', name: 'Chuck Dixon' }).map((i) => i.cv_issue_id).sort(), [101, 102]);
+  await backfillPeopleIndex(db, { chunk: 1 });
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM cv_issue_people_fill').get().n, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM cv_issue_people WHERE name='Chuck Dixon'").get().n, 2);
+  const dixon = issuesFeaturing(db, { kind: 'creator', name: 'Chuck Dixon' });
+  assert.deepEqual(dixon.map((i) => i.cv_issue_id).sort(), [101, 102]);
+  assert.equal(dixon.find((i) => i.cv_issue_id === 102).role, 'Writer, Cover');
+  // A refresh that drops the credit removes the issue from the chip.
+  setCvIssueDetail(db, 101, { credits: [{ name: 'Someone Else', role: 'writer' }] });
+  assert.deepEqual(issuesFeaturing(db, { kind: 'creator', name: 'Chuck Dixon' }).map((i) => i.cv_issue_id), [102]);
+  // Malformed JSON in a credit column never blocks the write.
+  db.prepare("UPDATE cv_issues SET credits='not json' WHERE comicvine_id=101").run();
+  db.close();
+});
+
+test('listSeries pages through title order with issue counts', () => {
+  const db = openDb(':memory:');
+  for (const t of ['Cerebus', 'Akira', 'Bone']) upsertSeries(db, { title: t, url: '/c/' + t });
+  const bone = db.prepare("SELECT id FROM series WHERE title='Bone'").get().id;
+  upsertIssue(db, { seriesId: bone, title: 'Bone #1', url: '/i/b1' });
+  assert.deepEqual(listSeries(db, { limit: 2 }).map((s) => s.title), ['Akira', 'Bone']);
+  const page2 = listSeries(db, { limit: 2, offset: 2 });
+  assert.deepEqual(page2.map((s) => s.title), ['Cerebus']);
+  assert.equal(listSeries(db, { search: 'bon', limit: 10 })[0].issue_count, 1);
 });

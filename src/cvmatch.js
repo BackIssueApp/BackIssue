@@ -23,10 +23,18 @@ function fileIssueKeys(f) {
 
 // Match a series' owned files to CV issues by number and record cv_issue_id on
 // each. This is what makes the collection roll up against CV's issue list.
+// One transaction per series (a series of 500 files is one commit, not 500).
 export function linkFilesToCv(db, seriesId, cvSeriesId) {
+  let tx = linkTxs.get(db);
+  if (!tx) { tx = db.transaction(linkFilesToCvBody); linkTxs.set(db, tx); }
+  return tx(db, seriesId, cvSeriesId);
+}
+const linkTxs = new WeakMap();
+function linkFilesToCvBody(db, seriesId, cvSeriesId) {
   const byNum = new Map();
   const ids = new Set();
-  for (const ci of listCvIssues(db, cvSeriesId)) {
+  const cvRows = db.prepare('SELECT comicvine_id, issue_number FROM cv_issues WHERE cv_series_id=? ORDER BY CAST(issue_number AS REAL), issue_number').all(cvSeriesId);
+  for (const ci of cvRows) {
     ids.add(ci.comicvine_id);
     const k = normalizeNumber(ci.issue_number);
     if (k && !byNum.has(k)) byNum.set(k, ci.comicvine_id);
@@ -36,17 +44,39 @@ export function linkFilesToCv(db, seriesId, cvSeriesId) {
   const overrides = fileIssueOverridesForSeries(db, seriesId);
   // Link ALL files (incl. invalid/corrupt ones) by number, so a corrupt copy maps
   // to its CV issue and surfaces as "corrupt" in the detail — not silently missing.
-  const files = db.prepare('SELECT path, ci_number, name FROM library_files WHERE series_id=?').all(seriesId);
+  const files = db.prepare('SELECT path, ci_number, name, cv_issue_id FROM library_files WHERE series_id=?').all(seriesId);
   let linked = 0;
   for (const f of files) {
     let cvId = overrides.get(f.path) ?? null;
     if (cvId && !ids.has(cvId)) cvId = null;
     if (!cvId) for (const k of fileIssueKeys(f)) { cvId = byNum.get(k) ?? null; if (cvId) break; }
-    linkFileCvIssue(db, f.path, cvId);
+    if ((f.cv_issue_id ?? null) !== cvId) linkFileCvIssue(db, f.path, cvId); // skip no-op rewrites
     if (cvId) linked++;
   }
   return linked;
 }
+
+// Relink many series without freezing the server: a batch of series per
+// transaction, yielding to the event loop between batches. `seriesIds` limits
+// it to those series (default: every matched series).
+export async function relinkMatchedSeries(db, { seriesIds = null, onProgress = () => {} } = {}) {
+  let rows = db.prepare('SELECT id, cv_id FROM series WHERE cv_id IS NOT NULL').all();
+  if (seriesIds) rows = rows.filter((s) => seriesIds.has(s.id));
+  let done = 0, filesLinked = 0;
+  for (let i = 0; i < rows.length; i += RELINK_BATCH) {
+    const batch = rows.slice(i, i + RELINK_BATCH);
+    db.transaction(() => {
+      for (const s of batch) {
+        try { filesLinked += linkFilesToCv(db, s.id, s.cv_id); } catch { /* skip */ }
+      }
+    })();
+    done += batch.length;
+    onProgress({ done, total: rows.length, filesLinked });
+    await new Promise((r) => setImmediate(r));
+  }
+  return { series: rows.length, filesLinked };
+}
+const RELINK_BATCH = 50;
 
 // Score one CV volume against one of our series. Pure — no network.
 // Name is the gate; year and publisher refine confidence.
@@ -406,10 +436,7 @@ export async function runCvMatch(db, client, { onProgress = () => {}, concurrenc
   // Backfill file→CV-issue linkage for every matched series — this catches
   // series matched before linkage existed and files indexed after a match.
   // Pure DB work, no API calls.
-  let relinked = 0;
-  for (const s of db.prepare('SELECT id, cv_id FROM series WHERE cv_id IS NOT NULL').all()) {
-    try { relinked += linkFilesToCv(db, s.id, s.cv_id); } catch { /* skip */ }
-  }
+  const { filesLinked: relinked } = await relinkMatchedSeries(db);
   return { total: list.length, matched, ambiguous, relinked };
 }
 

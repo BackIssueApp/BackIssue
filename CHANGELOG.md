@@ -22,6 +22,21 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   **Update all** beside the Installed heading. It updates each one in turn, keeps going past a
   failure, and the updates apply on the next restart, like a single update.
 
+### Changed
+
+- **Large libraries stay responsive during scans and on the Library page.**
+  - Scanned files match to their series without searching the whole catalog, so a scan no longer
+    stalls the server for a fraction of a second per file.
+  - Re-linking files to their issues after a scan or at startup now runs in short batches in the
+    background instead of freezing the server for up to tens of seconds. After a scan, only the
+    series whose files changed are re-linked.
+  - The A–Z rail is computed in the background and cached, like the filter counts, instead of
+    blocking every Library load and search for about a second.
+  - Creator, character and team pages answer from an index instead of reading every issue's
+    credits. Existing libraries build the index in the background after the update.
+- **`GET /api/series` is paged.** It returns up to 100 series by default (`?limit=` up to 500, plus
+  `?offset=`). It used to return the entire catalog in one response.
+
 ### Fixed
 
 - **A finished download no longer deletes a different issue with the same number.** Replacing the old

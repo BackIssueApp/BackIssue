@@ -5,8 +5,8 @@ import { readArchiveInfo, verifyArchive, sidecarPath } from './archive.js';
 import { upsertLibraryFile, getLibraryFile, pruneLibraryFiles, libraryStats, linkLibraryFile, deleteLibraryFile, getCvIssue } from './db.js';
 import { normalizeNumber } from './matcher.js';
 import { poolWithResource } from './pool.js';
-import { linkFile } from './collection.js';
-import { linkFilesToCv } from './cvmatch.js';
+import { linkFile, issueForFile } from './collection.js';
+import { linkFilesToCv, relinkMatchedSeries } from './cvmatch.js';
 
 // After a fresh download lands for an issue, remove any OTHER file in the series
 // that represents the SAME issue — a re-download replaces the old copy (incl. a
@@ -104,6 +104,8 @@ export async function indexLibrary({ db, dir, deep = false, onProgress = () => {
   if (!dirOk) return { total: 0, error: `folder not found: ${dir}` };
   const files = await findComicFiles(dir);
   const seen = collect ?? new Set();
+  const memo = new Map(); // series/issue lookups shared by this scan's files
+  const touched = new Set(); // series whose files this scan added, changed or linked
   let done = 0;
   await poolWithResource(
     files, config.libraryConcurrency || 8,
@@ -126,8 +128,9 @@ export async function indexLibrary({ db, dir, deep = false, onProgress = () => {
             path: existing.path, dir: existing.dir, name: existing.name,
             ci_series: existing.ci_series, ci_volume: existing.ci_volume,
             ci_number: existing.ci_number, has_metadata: existing.has_metadata,
-          });
+          }, memo);
           linkLibraryFile(db, existing.path, link.seriesId, link.issueId);
+          if (link.seriesId) touched.add(link.seriesId);
         }
         onProgress({ done: ++done, total: files.length, read: 0 });
         return;
@@ -156,8 +159,11 @@ export async function indexLibrary({ db, dir, deep = false, onProgress = () => {
       // that already have a series keep it (upsertLibraryFile preserves it);
       // this mirrors the unchanged-file path above.
       if (existing?.series_id == null) {
-        const link = linkFile(db, { path: f.path, dir: f.dir, name: f.name, ci_series: ci.series, ci_volume: ci.volume, ci_number: ci.number, has_metadata: info.hasComicInfo ? 1 : 0 });
+        const link = linkFile(db, { path: f.path, dir: f.dir, name: f.name, ci_series: ci.series, ci_volume: ci.volume, ci_number: ci.number, has_metadata: info.hasComicInfo ? 1 : 0 }, memo);
         linkLibraryFile(db, f.path, link.seriesId, link.issueId);
+        if (link.seriesId) touched.add(link.seriesId);
+      } else {
+        touched.add(existing.series_id); // its number/metadata may have changed
       }
       onProgress({ done: ++done, total: files.length, read: 1 });
     },
@@ -165,11 +171,9 @@ export async function indexLibrary({ db, dir, deep = false, onProgress = () => {
   );
   if (!collect) pruneLibraryFiles(db, seen, COMIC_RE); // multi-root callers prune once, at the end; comic files only — other indexers own their own rows
   // Now that files are attributed to series (above), link them to CV issues for
-  // every matched series so the collection's owned/missing rolls up against
-  // ComicVine. Pure DB, no I/O.
-  for (const s of db.prepare('SELECT id, cv_id FROM series WHERE cv_id IS NOT NULL').all()) {
-    try { linkFilesToCv(db, s.id, s.cv_id); } catch { /* skip */ }
-  }
+  // the matched series this scan touched so the collection's owned/missing rolls
+  // up against ComicVine. Pure DB, no I/O. (Boot and the relink tool cover all.)
+  await relinkMatchedSeries(db, { seriesIds: touched });
   return libraryStats(db);
 }
 
@@ -182,6 +186,7 @@ export async function indexFolderForSeries({ db, dir, seriesId, cvId = null, dee
   const dirOk = await fs.stat(dir).then((s) => s.isDirectory()).catch(() => false);
   if (!dirOk) return { total: 0, error: `folder not found: ${dir}` };
   const files = await findComicFiles(dir);
+  const memo = new Map();
   let done = 0;
   await poolWithResource(
     files, config.libraryConcurrency || 8,
@@ -203,11 +208,10 @@ export async function indexFolderForSeries({ db, dir, seriesId, cvId = null, dee
           valid, error, verified,
         });
       }
-      // Force attribution to THIS comic; borrow the source issue id from the
-      // matcher when it agrees on the series (owned still rolls up via CV).
+      // Force attribution to THIS comic (the folder is its location) and match
+      // the file to one of its issues by number (owned still rolls up via CV).
       const row = getLibraryFile(db, f.path);
-      const link = linkFile(db, row);
-      linkLibraryFile(db, f.path, seriesId, link.seriesId === seriesId ? link.issueId : null);
+      linkLibraryFile(db, f.path, seriesId, issueForFile(db, seriesId, row, memo));
       onProgress({ done: ++done, total: files.length });
     },
     () => {},
@@ -259,13 +263,19 @@ export async function indexDownloadedFile(db, { path: p, seriesId, issueId = nul
 // One-time cleanup for libraries indexed under the old global model: attribute
 // any orphaned files to their catalog series, CV-link matched series, then prune
 // files that don't belong to a tracked comic (followed or ComicVine-matched).
+// Series that just gained files are CV-linked here; the relink of every
+// matched series is left to the caller (relinkMatchedSeries), which yields so
+// boot isn't frozen behind it.
 export function reconcileLibrary(db) {
   let attributed = 0;
+  const memo = new Map();
+  const gained = new Set();
   for (const f of db.prepare('SELECT * FROM library_files WHERE series_id IS NULL').all()) {
-    const link = linkFile(db, f);
-    if (link.seriesId) { linkLibraryFile(db, f.path, link.seriesId, link.issueId); attributed++; }
+    const link = linkFile(db, f, memo);
+    if (link.seriesId) { linkLibraryFile(db, f.path, link.seriesId, link.issueId); attributed++; gained.add(link.seriesId); }
   }
   for (const s of db.prepare('SELECT id, cv_id FROM series WHERE cv_id IS NOT NULL').all()) {
+    if (!gained.has(s.id)) continue;
     try { linkFilesToCv(db, s.id, s.cv_id); } catch { /* skip */ }
   }
   // Members of an explicit library are tracked by definition (libraries own

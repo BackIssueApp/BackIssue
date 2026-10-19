@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { issueNumberFromTitle } from './matcher.js';
-import { listSeries } from './db.js';
+import { seriesTitleCandidates } from './db.js';
 import { scoreMatch, normalizeNumber, normalizeTitle, extractYear } from './matcher.js';
 import { detectEdition } from './editions.js';
 import { readArchiveInfo } from './archive.js';
@@ -201,11 +201,15 @@ export async function findComicFiles(dir) {
 }
 
 // Best catalog series for a scanned folder name (local catalog only, no network).
-export function matchCatalogSeries(db, name, year) {
+// `memo` (optional Map) caches the candidate list per search word for a scan.
+export function matchCatalogSeries(db, name, year, memo = null) {
   const word = normalizeTitle(name).split(' ')[0];
   if (!word) return null;
   let best = null;
-  for (const c of listSeries(db, { search: word })) {
+  const k = `w:${word}`;
+  let candidates = memo?.get(k);
+  if (!candidates) { candidates = seriesTitleCandidates(db, word); memo?.set(k, candidates); }
+  for (const c of candidates) {
     const { confidence } = scoreMatch({ name, year }, c.title);
     if (!best || RANK[confidence] > RANK[best.confidence]) best = { seriesId: c.id, title: c.title, confidence };
   }

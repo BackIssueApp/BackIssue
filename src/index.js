@@ -1,4 +1,4 @@
-import { openDb, clearIssuesForRedownload, SELF_DESCRIBED_TYPES, recordedCatalog, backfillCatalogs, libraryOfRecord, librarySources } from './db.js';
+import { openDb, backfillPeopleIndex, clearIssuesForRedownload, SELF_DESCRIBED_TYPES, recordedCatalog, backfillCatalogs, libraryOfRecord, librarySources } from './db.js';
 import { runQueue, reconcileDownloading } from './downloader.js';
 import { processPack } from './pack.js';
 import { createApp } from './server.js';
@@ -35,7 +35,7 @@ import { tagAllUntagged, convertAllCbr, unwrapNestedArchives, removeAllDuplicate
 import { collectionStats } from './stats.js';
 import { installConsoleCapture, attachLogDb, listLogs, clearLogs, logInfo, logWarn, logError, logCounts, logCategories } from './logstore.js';
 import { startWatchdog } from './watchdog.js';
-import { runCvMatch as runCvMatchLib, cacheAndLink, addSeriesFromCv, refreshCvVolume, refreshAllIssueDetails, rankCandidates, rematchMismatched, mergeDuplicateSeries } from './cvmatch.js';
+import { runCvMatch as runCvMatchLib, relinkMatchedSeries, cacheAndLink, addSeriesFromCv, refreshCvVolume, refreshAllIssueDetails, rankCandidates, rematchMismatched, mergeDuplicateSeries } from './cvmatch.js';
 import { getSeriesById, seriesCollectionDetail, untrackSeries, getCvIssue, upsertSeries, setSeriesPath,
   ensureCvIssueRow, recordGrab, getGrab, setGrabStatus, setIssueStatus, setSeriesAliases, setSeriesType, listLibraries, libraryFolders, createLibrary, assignSeriesLibrary, seriesSearchNames,
   clearImportCandidates, upsertImportCandidate, listImportCandidates, getImportCandidate, setImportCandidateMatch, setImportCandidateStatus, readyImportCandidates, listWantedIssues, queueIssues, getCvSeries, fulfilPicks } from './db.js';
@@ -168,6 +168,9 @@ initRssTables(db);
 // Per-volume is now the ownership model: attribute any orphaned files, CV-link
 // matched series, and drop index rows for comics you don't track.
 try { const rec = reconcileLibrary(db); if (rec.attributed || rec.pruned) console.log(`Library reconcile: attributed ${rec.attributed}, pruned ${rec.pruned} untracked file rows.`); } catch (e) { console.warn('reconcile failed', e?.message || e); }
+// The relink yields between batches, so the server answers while it runs.
+relinkMatchedSeries(db).catch((e) => console.warn('relink failed', e?.message || e));
+backfillPeopleIndex(db).catch((e) => console.warn('people index fill failed', e?.message || e));
 
 const state = { crawl: { running: false }, queue: { running: false }, follow: { running: false }, updates: { running: false }, cv: { running: false }, scanFolder: { running: false }, tagFiles: { running: false }, releases: { running: false }, import: { running: false }, tools: { running: false }, refile: { running: false } };
 
