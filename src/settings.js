@@ -11,6 +11,14 @@ import { hoursToCron } from './cron.js';
 // resolves DATA_DIR), so a relocated/mounted data volume keeps settings too.
 const FILE = path.join(config.dataDir, 'settings.json');
 
+// Write settings.json whole or not at all: a crash mid-write must never leave
+// a torn file (which the next boot could not read).
+function writeSettingsFile(obj) {
+  const tmp = `${FILE}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(obj, null, 2));
+  fs.renameSync(tmp, FILE);
+}
+
 export const SETTING_FIELDS = {
   crawlConcurrency:    { type: 'int', min: 1, max: 16 },
   downloadConcurrency: { type: 'int', min: 1, max: 16 },
@@ -223,7 +231,18 @@ export function applySettings(input) {
 }
 
 export function loadSettings() {
-  try { applySettings(JSON.parse(fs.readFileSync(FILE, 'utf8'))); } catch { /* first run */ }
+  let raw = null;
+  try { raw = fs.readFileSync(FILE, 'utf8'); } catch { /* first run: no file yet */ }
+  if (raw != null) {
+    try { applySettings(JSON.parse(raw)); } catch (e) {
+      // Unreadable (a hand-edit typo, a torn write from an older version).
+      // Starting on defaults is the only way to boot, and the next save will
+      // replace the file — so keep the original beside it first and say so.
+      const keep = `${FILE}.unreadable-${Date.now()}`;
+      try { fs.copyFileSync(FILE, keep); } catch { /* read-only data dir */ }
+      console.error(`settings.json could not be read (${e?.message || e}); starting on defaults. The original is saved as ${keep}.`);
+    }
+  }
   // The 'Library folder' setting was folded into 'Root folders'. Seed it from
   // the old value so existing libraries keep organizing correctly.
   if (!config.rootFolders && config.libraryDir) config.rootFolders = config.libraryDir;
@@ -266,7 +285,7 @@ export function loadSettings() {
       // instead of looking unset. Everything else on disk is left alone.
       try {
         const onDisk = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-        if (!onDisk.flaresolverrUrl) fs.writeFileSync(FILE, JSON.stringify({ ...onDisk, flaresolverrUrl: config.flaresolverrUrl }, null, 2));
+        if (!onDisk.flaresolverrUrl) writeSettingsFile({ ...onDisk, flaresolverrUrl: config.flaresolverrUrl });
       } catch { /* first run, or a read-only data dir: memory is enough */ }
     }
   }
@@ -293,6 +312,6 @@ export function saveSettings(input) {
   // is already on disk so an unloaded plugin's settings survive until it's back.
   let onDisk = {};
   try { onDisk = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { /* first run: nothing to preserve */ }
-  fs.writeFileSync(FILE, JSON.stringify({ ...onDisk, ...currentSettings() }, null, 2));
+  writeSettingsFile({ ...onDisk, ...currentSettings() });
   return currentSettings();
 }

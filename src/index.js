@@ -766,10 +766,13 @@ async function deleteComic(seriesId, { deleteFiles = false } = {}) {
       const side = sidecarPath(f.path);
       if (side !== f.path) await fsp.rm(side, { force: true }).catch(() => {});
     }
-    const dirs = [...new Set(fileRows.map((f) => f.dir).filter(Boolean))];
+    // Only folders the deletion left EMPTY go (rmdir refuses anything else), so
+    // another series or the user's own files sharing a folder are never touched.
+    // Deepest first, so a nested empty folder goes before its parent is tried.
+    const dirs = [...new Set(fileRows.map((f) => f.dir).filter(Boolean))].sort((x, y) => y.length - x.length);
     for (const d of dirs) {
-      if (String(d).split(/[\\/]/).filter(Boolean).length < 3) continue; // guard: never rm a share/drive root
-      try { await fsp.rm(d, { recursive: true, force: true }); dirsRemoved++; } catch { /* leftovers stay */ }
+      if (String(d).split(/[\\/]/).filter(Boolean).length < 3) continue; // guard: never touch a share/drive root
+      try { await fsp.rmdir(d); dirsRemoved++; } catch { /* not empty, or already gone */ }
     }
   }
   logInfo(`Removed from collection: ${series.title || 'series ' + seriesId}${deleteFiles ? ` (${filesDeleted} file(s) deleted)` : ''}`, 'collection');

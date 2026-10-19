@@ -12,9 +12,13 @@ import { linkFilesToCv } from './cvmatch.js';
 // that represents the SAME issue — a re-download replaces the old copy (incl. a
 // stale/corrupt .cbr the new .cbz supersedes). Matches by CV issue id and by
 // normalized issue number, so it also catches files that were never CV-linked.
+// Never on a broken download (the old copy is the only good one), never a file
+// linked to a DIFFERENT issue, and a number match needs both or neither to be
+// an annual (Batman Annual 001 is not Batman #1).
+const isAnnual = (name) => /\bannual\b/i.test(String(name || ''));
 async function supersedeOldFiles(db, newPath, seriesId) {
   const row = getLibraryFile(db, newPath);
-  if (!row || seriesId == null) return 0;
+  if (!row || seriesId == null || !row.valid) return 0;
   let num = null;
   if (row.cv_issue_id != null) { const ci = getCvIssue(db, row.cv_issue_id); if (ci) num = normalizeNumber(ci.issue_number); }
   if (!num) num = normalizeNumber(row.ci_number || parseIssueFromFilename(row.name));
@@ -22,7 +26,9 @@ async function supersedeOldFiles(db, newPath, seriesId) {
   let removed = 0;
   for (const f of siblings) {
     const sameCv = row.cv_issue_id != null && f.cv_issue_id === row.cv_issue_id;
-    const sameNum = num && normalizeNumber(f.ci_number || parseIssueFromFilename(f.name)) === num;
+    const otherIssue = row.cv_issue_id != null && f.cv_issue_id != null && f.cv_issue_id !== row.cv_issue_id;
+    const sameNum = !otherIssue && num && isAnnual(f.name) === isAnnual(row.name)
+      && normalizeNumber(f.ci_number || parseIssueFromFilename(f.name)) === num;
     if (!sameCv && !sameNum) continue;
     try { await fs.unlink(f.path); } catch { /* already gone */ }
     deleteLibraryFile(db, f.path);

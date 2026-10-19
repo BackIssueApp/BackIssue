@@ -22,6 +22,18 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   **Update all** beside the Installed heading. It updates each one in turn, keeps going past a
   failure, and the updates apply on the next restart, like a single update.
 
+### Fixed
+
+- **A finished download no longer deletes a different issue with the same number.** Replacing the old
+  copy of an issue matched on the issue number alone, so downloading Batman #1 could delete
+  Batman Annual #1 from the same folder. A download that fails its archive check no longer
+  replaces anything either.
+- **Removing a comic with its files deletes only folders it leaves empty.** It used to delete each
+  folder that held one of its files with everything still inside, including other series sharing it.
+- **An unreadable settings.json is kept, not silently replaced.** BackIssue starts on defaults, saves
+  the original beside it as settings.json.unreadable-<time>, and logs where; settings are now
+  written in one step so a crash mid-save can no longer leave a broken file.
+
 ## [0.9.2] — 2026-10-18
 
 ### Security
