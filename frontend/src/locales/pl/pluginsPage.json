@@ -119,5 +119,14 @@
   "install": "Zainstaluj",
   "superseded": "To jest teraz strona pobierania i masz ją już tam zainstalowaną. Wtyczka nie jest wczytywana — możesz ją usunąć.",
   "badgeUpdate": "Aktualizacja",
-  "badgeInstalled": "Zainstalowana"
+  "badgeInstalled": "Zainstalowana",
+  "updateAll": "Zaktualizuj wszystko ({count})",
+  "updatingAll": "Aktualizowanie {done}/{count}…",
+  "updateAllDone": {
+    "one": "Zaktualizowano {count} wtyczkę — uruchom ponownie BackIssue, aby z niej korzystać.",
+    "few": "Zaktualizowano {count} wtyczki — uruchom ponownie BackIssue, aby z nich korzystać.",
+    "many": "Zaktualizowano {count} wtyczek — uruchom ponownie BackIssue, aby z nich korzystać.",
+    "other": "Zaktualizowano {count} wtyczki — uruchom ponownie BackIssue, aby z nich korzystać."
+  },
+  "updateAllFailed": "Niektóre aktualizacje nie powiodły się: {errors}"
 }

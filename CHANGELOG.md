@@ -8,6 +8,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+
+- **Update all plugins at once.** When installed plugins have updates, the Plugins page shows
+  **Update all** beside the Installed heading. It updates each one in turn, keeps going past a
+  failure, and the updates apply on the next restart, like a single update.
+
 ## [0.9.2] — 2026-10-18
 
 ### Security

@@ -307,6 +307,34 @@
   const catalogById = $derived(new Map(catalog.map((c) => [String(c.id).toLowerCase(), c])));
   const updateFor = (p) => { const c = catalogById.get(String(p.name).toLowerCase()); return c?.updateAvailable ? c : null; };
 
+  // Every installed plugin with a newer catalog version, for Update all.
+  // Updates run one at a time (each one rewrites the plugins folder) and a
+  // failure doesn't stop the rest; like a single update, they apply on restart.
+  const pluginUpdates = $derived(plugins.filter((p) => p.kind !== 'source' && !p.superseded).map(updateFor).filter(Boolean));
+  let updatingAll = $state(null); // { done, count } while Update all runs
+  async function updateAll() {
+    const list = pluginUpdates;
+    const failed = [];
+    updatingAll = { done: 0, count: list.length };
+    for (const c of list) {
+      busy = { ...busy, [c.id]: true };
+      try {
+        const r = await apiPost('/api/plugins/install', { id: c.id });
+        if (r.error) throw new Error(r.error);
+      } catch (e) {
+        failed.push(`${c.name}: ${e.message || e}`);
+      } finally {
+        busy = { ...busy, [c.id]: false };
+        updatingAll = { done: updatingAll.done + 1, count: list.length };
+      }
+    }
+    await refresh(); await loadCatalog();
+    if (failed.length < list.length) restartRequired = true;
+    updatingAll = null;
+    if (failed.length) notify(t('pluginsPage.updateAllFailed', { errors: failed.join('; ') }), 'error');
+    else notify(t('pluginsPage.updateAllDone', { count: list.length }), 'ok');
+  }
+
   // Configure deep-links to the settings tab a plugin's category maps to (its
   // settings mount lives there) rather than dumping the user on the overview.
   const SETTINGS_TAB = { notifications: 'notifications', auth: 'signin', sources: 'sources', metadata: 'metadata', utility: 'library' };
@@ -464,7 +492,13 @@
 
       {#if view === 'plugins'}
       {#if installedVis.length}
-        <div class="plx__section"><span class="plx__section-name">{t('pluginsPage.sectionInstalled')}</span><span class="plx__section-count">{t('pluginsPage.shownCount', { count: installedVis.length })}</span></div>
+        <div class="plx__section"><span class="plx__section-name">{t('pluginsPage.sectionInstalled')}</span><span class="plx__section-count">{t('pluginsPage.shownCount', { count: installedVis.length })}</span>
+          {#if pluginUpdates.length || updatingAll}
+            <button id="plugins-update-all" class="plx__install plx__install--sm plx__section-action" disabled={!!updatingAll} onclick={updateAll}>{updatingAll
+              ? t('pluginsPage.updatingAll', { done: updatingAll.done, count: updatingAll.count })
+              : t('pluginsPage.updateAll', { count: pluginUpdates.length })}</button>
+          {/if}
+        </div>
         <div class="plx__grid">
           {#each installedVis as p (p.name)}
             {@const cm = CAT_META[categoryOf(p)]}
@@ -502,7 +536,7 @@
                 <div class="plx__foot-actions">
                   {#if !p.superseded}
                     {#if upd}
-                      <button class="plx__install plx__install--sm" disabled={busy[upd.id]} onclick={() => install(upd)}>{busy[upd.id] ? '…' : t('pluginsPage.updateArrow', { version: upd.version })}</button>
+                      <button class="plx__install plx__install--sm" disabled={busy[upd.id] || !!updatingAll} onclick={() => install(upd)}>{busy[upd.id] ? '…' : t('pluginsPage.updateArrow', { version: upd.version })}</button>
                     {/if}
                     {#if p.counts?.settings && !p.error}
                       <button class="plx__configure" onclick={() => navigate('/settings?tab=' + settingsTabFor(p))}>{t('pluginsPage.configure')}</button>
@@ -629,6 +663,7 @@
   .plx__section--gap { margin-top: 26px; }
   .plx__section-name { font-family: var(--font-display); font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: #c4bdd4; }
   .plx__section-count { font-size: 12px; color: var(--faint); }
+  .plx__section-action { margin-left: auto; align-self: center; }
   .plx__cat-note { font-size: 12.5px; color: var(--amber); background: rgba(255,194,75,.06); border: 1px solid rgba(255,194,75,.25); border-radius: 8px; padding: 10px 13px; margin-bottom: 12px; }
 
   .plx__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }

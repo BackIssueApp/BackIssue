@@ -101,5 +101,11 @@
   "install": "インストール",
   "superseded": "これは現在ダウンロードサイトになっており、そちらにすでにインストールされています。このプラグインは読み込まれていないので、削除して構いません。",
   "badgeUpdate": "更新あり",
-  "badgeInstalled": "インストール済み"
+  "badgeInstalled": "インストール済み",
+  "updateAll": "すべて更新 ({count})",
+  "updatingAll": "更新中 {done}/{count}…",
+  "updateAllDone": {
+    "other": "{count} 個のプラグインを更新しました — BackIssue を再起動すると反映されます。"
+  },
+  "updateAllFailed": "一部の更新に失敗しました: {errors}"
 }

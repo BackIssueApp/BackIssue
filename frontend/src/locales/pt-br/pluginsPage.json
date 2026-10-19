@@ -107,5 +107,12 @@
   "install": "Instalar",
   "superseded": "Isto é agora um site de download, e já o tem instalado lá. O plugin não é carregado — pode removê-lo.",
   "badgeUpdate": "Atualização",
-  "badgeInstalled": "Instalado"
+  "badgeInstalled": "Instalado",
+  "updateAll": "Atualizar tudo ({count})",
+  "updatingAll": "Atualizando {done}/{count}…",
+  "updateAllDone": {
+    "one": "{count} plugin atualizado — reinicie o BackIssue para usá-lo.",
+    "other": "{count} plugins atualizados — reinicie o BackIssue para usá-los."
+  },
+  "updateAllFailed": "Algumas atualizações falharam: {errors}"
 }

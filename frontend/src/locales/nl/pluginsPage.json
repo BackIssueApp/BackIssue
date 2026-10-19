@@ -89,5 +89,12 @@
   "install": "Installeren",
   "superseded": "Dit is nu een downloadsite, en die heb je daar al geïnstalleerd. De plugin wordt niet geladen — je kunt hem verwijderen.",
   "badgeUpdate": "Update",
-  "badgeInstalled": "Geïnstalleerd"
+  "badgeInstalled": "Geïnstalleerd",
+  "updateAll": "Alles bijwerken ({count})",
+  "updatingAll": "Bijwerken {done}/{count}…",
+  "updateAllDone": {
+    "one": "{count} plugin bijgewerkt — herstart BackIssue om hem te gebruiken.",
+    "other": "{count} plugins bijgewerkt — herstart BackIssue om ze te gebruiken."
+  },
+  "updateAllFailed": "Sommige updates zijn mislukt: {errors}"
 }

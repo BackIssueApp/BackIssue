@@ -101,5 +101,11 @@
   "install": "安装",
   "superseded": "它现在是一个下载站点，而且你已经在那里安装了它。该插件未加载——你可以移除它。",
   "badgeUpdate": "更新",
-  "badgeInstalled": "已安装"
+  "badgeInstalled": "已安装",
+  "updateAll": "全部更新 ({count})",
+  "updatingAll": "正在更新 {done}/{count}…",
+  "updateAllDone": {
+    "other": "已更新 {count} 个插件 — 重启 BackIssue 后生效。"
+  },
+  "updateAllFailed": "部分更新失败：{errors}"
 }

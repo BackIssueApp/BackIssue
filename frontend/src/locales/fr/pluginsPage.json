@@ -89,5 +89,12 @@
   "install": "Installer",
   "superseded": "Ceci est désormais un site de téléchargement, et vous l'avez déjà installé là-bas. L'extension n'est pas chargée — vous pouvez la supprimer.",
   "badgeUpdate": "Mise à jour",
-  "badgeInstalled": "Installée"
+  "badgeInstalled": "Installée",
+  "updateAll": "Tout mettre à jour ({count})",
+  "updatingAll": "Mise à jour {done}/{count}…",
+  "updateAllDone": {
+    "one": "{count} plugin mis à jour — redémarrez BackIssue pour l'utiliser.",
+    "other": "{count} plugins mis à jour — redémarrez BackIssue pour les utiliser."
+  },
+  "updateAllFailed": "Certaines mises à jour ont échoué : {errors}"
 }

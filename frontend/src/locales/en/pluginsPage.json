@@ -89,5 +89,12 @@
   "install": "Install",
   "superseded": "This is now a download site, and you already have it installed there. The plugin is not loaded — you can remove it.",
   "badgeUpdate": "Update",
-  "badgeInstalled": "Installed"
+  "badgeInstalled": "Installed",
+  "updateAll": "Update all ({count})",
+  "updatingAll": "Updating {done}/{count}…",
+  "updateAllDone": {
+    "one": "Updated {count} plugin — restart BackIssue to switch to it.",
+    "other": "Updated {count} plugins — restart BackIssue to switch to them."
+  },
+  "updateAllFailed": "Some updates failed: {errors}"
 }
