@@ -28,6 +28,16 @@ test('judge: silence past the stall window kills; heap pressure must be sustaine
   assert.equal(fmtMb(3 * 1048576), '3 MB');
 });
 
+test('judge: a gap in the worker checks (system sleep) resets instead of killing', () => {
+  const base = { stallMs: 1000, heapFrac: 0.9, heapStallMs: 500, checkMs: 100, lastSample: null, heapHighSince: null };
+  // Woke from sleep: last ping and last check both long ago.
+  const r = judge({ ...base, now: 60_000, lastPingAt: 0, lastCheckAt: 50 });
+  assert.equal(r.kill, false);
+  assert.equal(r.resetPing, true);
+  // Checks on schedule while pings stopped: the main loop is wedged.
+  assert.equal(judge({ ...base, now: 60_000, lastPingAt: 0, lastCheckAt: 59_900 }).kill, true);
+});
+
 test('a process whose main loop wedges is killed by the worker', async () => {
   // A child that starts the watchdog with short windows, then spins forever.
   // Without the watchdog it would never exit; with it, the worker's SIGKILL

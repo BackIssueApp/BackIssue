@@ -48,6 +48,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 - **A library scan that can't read a folder keeps that folder's comics.** A brief share or disk error
   on one subfolder used to drop all of its files from the library, so they showed as missing and
   could be downloaded again.
+- **BackIssue no longer stops itself after the computer wakes from sleep.** The freeze watchdog took
+  the time spent asleep for a hung server and shut the app down.
 
 ## [0.9.2] — 2026-10-18
 

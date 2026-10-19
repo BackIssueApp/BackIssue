@@ -73,7 +73,13 @@ export function startWatchdog(opts = {}) {
 }
 
 /** The worker side: judge the pings, kill when they stop. Exported for tests. */
-export function judge({ now, lastPingAt, lastSample, heapHighSince, stallMs, heapFrac, heapStallMs }) {
+export function judge({ now, lastPingAt, lastSample, heapHighSince, stallMs, heapFrac, heapStallMs, lastCheckAt = null, checkMs = null }) {
+  // The worker's own check came late: the whole process was frozen (system
+  // sleep, a paused VM), not just the main loop. The main thread's silence
+  // over that gap proves nothing, so restart the clocks instead of judging.
+  if (lastCheckAt != null && checkMs && now - lastCheckAt > 2 * checkMs) {
+    return { kill: false, heapHighSince: null, resetPing: true };
+  }
   if (now - lastPingAt > stallMs) {
     return { kill: true, reason: `main thread unresponsive for ${Math.round((now - lastPingAt) / 1000)}s` };
   }
@@ -92,9 +98,13 @@ if (!isMainThread && parentPort) {
   let lastPingAt = Date.now();
   let lastSample = null;
   let heapHighSince = null;
+  let lastCheckAt = Date.now();
   parentPort.on('message', (s) => { lastPingAt = Date.now(); lastSample = s; });
   const t = setInterval(() => {
-    const r = judge({ now: Date.now(), lastPingAt, lastSample, heapHighSince, stallMs, heapFrac, heapStallMs });
+    const now = Date.now();
+    const r = judge({ now, lastPingAt, lastSample, heapHighSince, stallMs, heapFrac, heapStallMs, lastCheckAt, checkMs });
+    lastCheckAt = now;
+    if (r.resetPing) lastPingAt = now;
     heapHighSince = r.heapHighSince ?? null;
     if (!r.kill) return;
     const mem = lastSample ? ` (rss ${fmtMb(lastSample.rss)}, heap ${fmtMb(lastSample.heapUsed)})` : '';
