@@ -331,6 +331,11 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
   // Plugin routes declare access as a tier name or a registered permission
   // key; tiers map onto the core permission of the same weight.
   const TIER_PERMS = { viewer: 'library.view', trusted: 'library.manage', admin: 'plugins.manage' };
+  // Express routes ignore case and a trailing slash (/API/users/ reaches the
+  // /api/users handler), so every access decision reads the path the same
+  // way: lowercased, trailing slashes dropped. Matching the raw path let
+  // /API/... skip sign-in and /x/ skip a /x$ permission rule.
+  const accessPath = (req) => req.path.toLowerCase().replace(/\/+$/, '') || '/';
   const pluginAccess = (() => {
     let table = null;
     return (req) => {
@@ -338,17 +343,18 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
         table = registeredRoutes().map((r) => ({
           method: r.method,
           access: r.access || (r.method === 'get' ? 'viewer' : 'trusted'),
-          re: new RegExp('^' + r.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          re: new RegExp('^' + r.path.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
             .replace(/\\\{[^}]+\\\}/g, '[^/]+').replace(/:[A-Za-z_]+/g, '[^/]+') + '/?$'),
         }));
       }
       const m = req.method.toLowerCase();
-      const hit = table.find((r) => r.method === m && r.re.test(req.path));
+      const p = accessPath(req);
+      const hit = table.find((r) => r.method === m && r.re.test(p));
       return hit ? hit.access : null;
     };
   })();
   const requiredPermission = (req) => {
-    const p = req.path;
+    const p = accessPath(req);
     if (p.startsWith('/api/auth/')) return 'authed'; // self-service: logout, password — any signed-in user
     // Creating, editing or deleting a library decides which folders on disk
     // the app scans and files into, so it sits with settings (admin), not
@@ -388,7 +394,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
     .filter((r) => r.basicAuth)
     .map((r) => String(r.path).split('/:')[0].replace(/\/+$/, ''));
   const wantsBasicChallenge = (req) => basicChallengePrefixes.some(
-    (p) => p && (req.path === p || req.path.startsWith(p + '/')),
+    (p) => p && (accessPath(req) === p.toLowerCase() || accessPath(req).startsWith(p.toLowerCase() + '/')),
   );
 
   // Unauthenticated liveness probe (Docker/Unraid HEALTHCHECK, uptime monitors).
@@ -403,8 +409,9 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
     try {
     // The SPA shell, its assets, and auth endpoints are public — everything
     // under /api and /plugins requires an authenticated user.
-    if (!req.path.startsWith('/api') && !req.path.startsWith('/plugins')) return next();
-    if (/^\/api\/auth\/(login|register|me|providers)$/.test(req.path)) return next();
+    const path = accessPath(req);
+    if (!/^\/(api|plugins)(\/|$)/.test(path)) return next();
+    if (/^\/api\/auth\/(login|register|me|providers)$/.test(path)) return next();
     if (basicCsrfBlocked(req)) return res.status(403).json({ error: 'cross-origin request refused' });
     // Resolve the route's required access BEFORE authenticating: a route
     // explicitly marked public (e.g. an SSO plugin's login/callback) needs no

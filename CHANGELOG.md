@@ -8,6 +8,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Security
+
+- **Sign-in and permission checks now apply to every spelling of a path.** The server matched
+  routes without regard to letter case or a trailing slash, but its access checks did not, so
+  some requests could skip them. Update promptly.
+
 ### Added
 
 - **Update all plugins at once.** When installed plugins have updates, the Plugins page shows
