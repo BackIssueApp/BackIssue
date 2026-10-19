@@ -2,12 +2,14 @@
   // The Library: a poster wall of every volume (grid), or a dense table
   // (list) for power flows. Replaces the old side rail as the main '/' view.
   import { navigate, route, setQuery } from '../lib/router.svelte.js';
-  import { rail, railSelect, ops, loadCollection, loadMoreCollection, setLibrarySort, collectionJumpOffset, loadUpTo } from '../lib/store.svelte.js';
+  import { rail, railSelect, ops, loadCollection, loadMoreCollection, setLibrarySort, collectionJumpOffset, loadUpTo, startOp, refileSeries } from '../lib/store.svelte.js';
   import { tick } from 'svelte';
   import { status } from '../lib/status.svelte.js';
   import { apiGet, apiPost } from '../lib/api.js';
   import { notify } from '../lib/toasts.svelte.js';
-  import { fmt, humanBytes, windowRange } from '../lib/util.js';
+  import { fmt, humanBytes, windowRange, measureGrid } from '../lib/util.js';
+  import { metaValue } from '../lib/metaValues.js';
+  import LoadError from './LoadError.svelte';
   import Cover from './Cover.svelte';
   import { openAddModal } from './AddModal.svelte';
   import { hscroll } from '../lib/hscroll.js';
@@ -39,7 +41,7 @@
     { key: 'unmatched', label: 'libraryPage.filterUnmatched' },
   ];
 
-  // Grid ⊞ / list ≣ — a device preference, not a URL one.
+  // Grid / list — a device preference, not a URL one.
   let view = $state(localStorage.getItem('libraryView') || 'grid');
   function setView(v) { view = v; localStorage.setItem('libraryView', v); }
 
@@ -127,11 +129,9 @@
 
   // Scan one series' folder. Goes through the shared ops.scan state so the
   // progress and the completion toast are the same ones the series page shows.
-  async function scanSeries(s) {
+  function scanSeries(s) {
     if (ops.scan.running) return notify(t('libraryPage.scanAlreadyRunning'), 'info');
-    ops.scan = { running: true, seriesId: s.id, done: 0, total: 0 };
-    try { await apiPost('/api/collection/' + s.id + '/scan'); }
-    catch { notify(t('libraryPage.scanFailed'), 'error'); ops.scan = { running: false }; }
+    startOp('scan', '/api/collection/' + s.id + '/scan', undefined, { seriesId: s.id, failKey: 'store.scanFailed' });
   }
 
   // The metadata editor wants the ComicVine record and the resolved folder,
@@ -145,26 +145,10 @@
     openEditMetadata(s.id, d.cv, d.series, d.location);
   }
 
-  // Same dry-run-then-confirm flow as the series page: never move files
-  // without saying how many, and never silently skip a collision.
+  // Same dry-run-then-confirm flow as the series page (shared): never move
+  // files without saying how many, and never silently skip a collision.
   async function renameFiles(s) {
-    let plan;
-    try { plan = (await apiPost(`/api/collection/${s.id}/refile`, { dryRun: true })).plan || []; }
-    catch (e) { return notify(t('libraryPage.planRenameFailed', { error: e?.message || e }), 'error'); }
-    const moves = plan.filter((x) => x.status === 'move').length;
-    const collisions = plan.filter((x) => x.status === 'skip:collision').length;
-    if (!moves) return notify(collisions ? t('libraryPage.nothingToDoCollide', { count: collisions }) : t('libraryPage.filesMatchPattern'), 'info');
-    if (!(await confirmDialog({
-      title: t('libraryPage.renameTitle', { count: moves }),
-      message: t('libraryPage.renameMessage', { title: s.title, collisions: collisions ? t('libraryPage.renameCollisions', { count: collisions }) : '' }),
-      confirmLabel: t('libraryPage.renameFiles'),
-    }))) return;
-    let r;
-    try { r = await apiPost(`/api/collection/${s.id}/refile`, {}); }
-    catch (e) { r = { error: String(e?.message || e) }; }
-    if (r.error) return notify(r.error, 'error');
-    notify(t('libraryPage.renamed', { count: r.moved, skipped: r.skipped ? t('libraryPage.renamedSkipped', { count: r.skipped }) : '' }), 'ok');
-    loadCollection();
+    if (await refileSeries(s.id, s.title, confirmDialog)) loadCollection();
   }
 
   // Right-click menu for a series card. Built on open so Follow/Unfollow and
@@ -313,10 +297,8 @@
     : t('libraryPage.matchButton'));
   let cvResult = $state(null); // { matched, ambiguous } after a run
   const cvTitle = $derived(cvResult ? t('libraryPage.matchResultTitle', cvResult) : t('libraryPage.matchTitle'));
-  async function startCvMatch() {
-    if (ops.cv.running) return;
-    ops.cv = { running: true, done: 0, total: 0 }; // optimistic until the next SSE tick
-    await apiPost('/api/cv/match', {});
+  function startCvMatch() {
+    startOp('cv', '/api/cv/match', {}, { failKey: 'store.matchFailed' });
   }
   let sawCv = false;
   $effect(() => {
@@ -375,16 +357,8 @@
   function measure() {
     if (!scroller) return;
     viewH = scroller.clientHeight || viewH;
-    const items = scroller.querySelectorAll(view === 'grid' ? '.libx-card' : '.libx-row');
-    if (items.length >= 2) {
-      const top0 = items[0].offsetTop;
-      let c = 1;
-      while (c < items.length && items[c].offsetTop === top0) c++;
-      cols = Math.max(1, c);
-      const next = items[c] || items[1];
-      const d = next.offsetTop - top0;
-      if (d > 10) stride = d;
-    }
+    const m = measureGrid(scroller.querySelectorAll(view === 'grid' ? '.libx-card' : '.libx-row'));
+    if (m) { cols = m.cols; if (m.stride) stride = m.stride; }
     const listEl = scroller.querySelector('.libx-grid, .libx-list');
     listTop = listEl ? listEl.offsetTop : 0;
   }
@@ -574,6 +548,7 @@
          stay mounted (never gate behind {#if}). Its height feeds listTop; it's
          hidden by CSS while browsing so rails are a Home-only surface. -->
     <div id="home-plugin-rail" class="home-rail"></div>
+    {#if !homeMode && rail.error && rail.rows.length}<LoadError compact error={rail.error} onretry={loadCollection} />{/if}
     {#if homeMode}
       {#if railSettled && !railHasContent}
         <div class="libx__empty">
@@ -598,6 +573,8 @@
           {/each}
         </div>
       {/if}
+    {:else if rail.error && !rail.rows.length}
+      <LoadError error={rail.error} onretry={loadCollection} />
     {:else if rail.loaded && !rail.rows.length}
       <div class="libx__empty">
         <div class="libx__empty-art"><Icon name="star" size={26} /></div>
@@ -633,7 +610,7 @@
               <div class="libx-card__meta">
                 <span class="libx-card__count">{s.owned}/{s.total}</span>
                 {#if s.on_demand}<span class="libx-badge libx-badge--avail" title={t('libraryPage.availableOnDemand', { n: fmt(s.available) })}><Icon name="download" size={11} /> {fmt(s.available)}</span>{/if}
-                {#if s.corrupt > 0}<span class="libx-card__flag libx-card__flag--bad" title={t('libraryPage.corruptFiles', { count: s.corrupt })}>!</span>{/if}
+                {#if s.corrupt > 0}<span class="libx-card__flag libx-card__flag--bad" title={t('libraryPage.corruptFiles', { count: s.corrupt })} aria-label={t('libraryPage.corruptFiles', { count: s.corrupt })}><Icon name="alert-triangle" size={12} /></span>{/if}
               </div>
             {:else}
               <div class="libx-card__title libx-card__title--unmatched" title={s.folder}>{s.folder || t('libraryPage.unidentified')}</div>
@@ -669,7 +646,7 @@
                   {:else if s.on_demand}<span class="libx-badge libx-badge--avail"><Icon name="download" size={12} /> {t('libraryPage.nAvailable', { n: fmt(s.available) })}</span>
                   {:else if s.total > 0}<span class="libx-badge libx-badge--ok">{t('libraryPage.complete')}</span>{/if}
                   {#if s.untagged > 0}<span class="libx-badge libx-badge--plain">{t('libraryPage.nUntagged', { n: fmt(s.untagged) })}</span>{/if}
-                  {#if s.pub_status && s.pub_status !== 'Ongoing'}<span class="libx-badge libx-badge--plain" title={t('libraryPage.pubStatusTitle')}>{s.pub_status.toLowerCase()}</span>{/if}
+                  {#if s.pub_status && s.pub_status !== 'Ongoing'}<span class="libx-badge libx-badge--plain" title={t('libraryPage.pubStatusTitle')}>{metaValue('status', s.pub_status)}</span>{/if}
                   {#if s.monitor === 'new'}<span class="libx-badge libx-badge--plain" title={t('libraryPage.newFromTitle')}>{t('libraryPage.newFrom', { n: s.monitor_from ?? '?' })}</span>
                   {:else if s.monitor === 'none' && s.missing > 0}<span class="libx-badge libx-badge--plain" title={t('libraryPage.notMonitoredRowTitle')}>{t('libraryPage.notMonitored')}</span>{/if}
                   {#if s.corrupt > 0}<span class="libx-badge libx-badge--warn">{t('libraryPage.nCorrupt', { n: fmt(s.corrupt) })}</span>{/if}

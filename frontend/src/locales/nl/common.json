@@ -67,5 +67,7 @@
   "nIssues": { "one": "{count} nummer", "other": "{count} nummers" },
   "nFiles": { "one": "{count} bestand", "other": "{count} bestanden" },
   "nSeries": { "one": "{count} reeks", "other": "{count} reeksen" },
-  "nSelected": { "one": "{count} geselecteerd", "other": "{count} geselecteerd" }
+  "nSelected": { "one": "{count} geselecteerd", "other": "{count} geselecteerd" },
+  "loadFailed": "Kon dit niet laden.",
+  "loadFailedStale": "Vernieuwen mislukt — de laatst geladen gegevens worden getoond."
 }

@@ -82,7 +82,7 @@
 
 {#if open}
   <div id="search-modal" class="modal srchx-overlay" onclick={(e) => { if (e.target === e.currentTarget) closeModal('search'); }}>
-    <div class="srchx" use:trapFocus role="dialog" aria-label={t('sourceSearchModal.title')}>
+    <div class="srchx" use:trapFocus role="dialog" aria-modal="true" aria-label={t('sourceSearchModal.title')}>
       <div class="srchx__head">
         <div class="srchx__icon"><Icon name="search" size={16} /></div>
         <div class="srchx__titles">
@@ -121,7 +121,7 @@
                 </div>
                 <div class="srchx__rmeta">
                   {#if r.size}<span>{humanBytes(r.size)}</span>{/if}
-                  {#if r.seeders != null && r.seeders >= 0}<span style="color:{seedTone(r.seeders)};">▲ {r.seeders}</span>{/if}
+                  {#if r.seeders != null && r.seeders >= 0}<span class="srchx__seed" style="color:{seedTone(r.seeders)};" title={t('sourceSearchModal.seedersTitle', { count: r.seeders })}><Icon name="arrow-up" size={11} /> {r.seeders}</span>{/if}
                   {#if metaText(r)}<span>{metaText(r)}</span>{/if}
                 </div>
               </div>
@@ -176,6 +176,7 @@
   .srchx__pack { font: 600 9.5px var(--font-body); text-transform: uppercase; letter-spacing: .04em; color: var(--amber); border: 1px solid rgba(255,194,75,.4); border-radius: 4px; padding: 2px 6px; }
   .srchx__rtitle { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .srchx__rmeta { display: flex; align-items: center; gap: 10px; margin-top: 5px; font: 11.5px var(--font-mono); color: var(--faint); flex-wrap: wrap; }
+  .srchx__seed { display: inline-flex; align-items: center; gap: 3px; }
   .srchx__grab { height: 32px; padding: 0 15px; border: none; background: var(--accent); color: #fff; border-radius: 8px; font: 600 12.5px var(--font-body); cursor: pointer; flex: none; }
   .srchx__grab:disabled { background: var(--panel-2); color: var(--faint); cursor: default; }
   .srchx__note { padding: 40px 20px; text-align: center; color: var(--faint); font-size: 13px; line-height: 1.5; }

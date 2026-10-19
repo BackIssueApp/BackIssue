@@ -1,6 +1,6 @@
 <script>
   import { goBack } from '../lib/router.svelte.js';
-  import { apiGet, apiPost } from '../lib/api.js';
+  import { apiGetOk, apiPost } from '../lib/api.js';
   import { subscribe } from '../lib/events.svelte.js';
   import { fmt } from '../lib/util.js';
   import { openCvPicker } from './CvPickerModal.svelte';
@@ -25,7 +25,7 @@
   let filter = $state('all');
 
   async function renderImport() {
-    try { st = await apiGet('/api/import'); } catch { /* keep last */ }
+    try { st = await apiGetOk('/api/import'); } catch { /* keep last */ }
   }
 
   $effect(() => {
@@ -44,7 +44,6 @@
     if (cands.length) bits.push(t('importPage.nFound', { count: fmt(cands.length) }));
     if (review) bits.push(t('importPage.nToReview', { count: fmt(review) }));
     if (ready) bits.push(t('importPage.nReady', { count: fmt(ready) }));
-    if (st?.error) bits.push('⚠ ' + st.error);
     return bits.join(' · ');
   });
 
@@ -94,7 +93,7 @@
   <div class="scan-page__bar">
     <button id="import-back" class="btn btn--ghost" onclick={goBack}><Icon name="arrow-left" /> {t('common.back')}</button>
     <h2 class="scan-page__title">{t('importPage.title')}</h2>
-    <span id="import-summary" class="scan-summary">{summary}</span>
+    <span id="import-summary" class="scan-summary">{summary}{#if st?.error}{summary ? ' · ' : ''}<span class="import-err"><Icon name="alert-triangle" size={13} /> {st.error}</span>{/if}</span>
     <span class="settings-spacer"></span>
     <button id="import-scan" class="btn btn--ghost" title={t('importPage.scanTitle')} disabled={busy} onclick={scan}>
       {#if busy && st?.phase === 'scanning'}{t('importPage.scanning', { done: fmt(st.done || 0), total: fmt(st.total || 0) })}{:else}<Icon name="refresh" /> {t('importPage.scanForNew')}{/if}</button>
@@ -166,3 +165,7 @@
     </div>
   </div>
 </main>
+
+<style>
+  .import-err { display: inline-flex; align-items: center; gap: 4px; color: var(--red); }
+</style>

@@ -16,32 +16,8 @@
     "other": "Dodano do kolejki {n} zeszytu."
   },
   "scanAlreadyRunning": "Skanowanie folderu już trwa.",
-  "scanFailed": "Skanowanie nie powiodło się",
   "loadSeriesFailed": "Nie udało się wczytać tej serii: {error}",
-  "planRenameFailed": "Nie udało się zaplanować zmiany nazw: {error}",
-  "nothingToDoCollide": {
-    "one": "Nic do zrobienia — {count} plik spowodowałby kolizję.",
-    "few": "Nic do zrobienia — {count} pliki spowodowałyby kolizję.",
-    "many": "Nic do zrobienia — {count} plików spowodowałoby kolizję.",
-    "other": "Nic do zrobienia — {count} pliku spowodowałoby kolizję."
-  },
-  "filesMatchPattern": "Pliki już pasują do wzorca.",
-  "renameTitle": {
-    "one": "Zmienić nazwę {count} pliku?",
-    "few": "Zmienić nazwy {count} plików?",
-    "many": "Zmienić nazwy {count} plików?",
-    "other": "Zmienić nazwy {count} pliku?"
-  },
-  "renameMessage": "Pliki serii „{title}” zostaną przeniesione lub przemianowane zgodnie ze wzorcami folderów i plików{collisions}.",
-  "renameCollisions": " (kolizje: {count} — zostaną pominięte)",
   "renameFiles": "Zmień nazwy plików",
-  "renamed": {
-    "one": "Zmieniono nazwę {count} pliku{skipped}.",
-    "few": "Zmieniono nazwy {count} plików{skipped}.",
-    "many": "Zmieniono nazwy {count} plików{skipped}.",
-    "other": "Zmieniono nazwy {count} pliku{skipped}."
-  },
-  "renamedSkipped": ", pominięto: {count}",
   "menuOpen": "Otwórz",
   "follow": "Obserwuj",
   "unfollow": "Przestań obserwować",

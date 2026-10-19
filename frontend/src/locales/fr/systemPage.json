@@ -97,5 +97,11 @@
   "nothingMatches": "Rien ne correspond à « {query} ».",
   "copied": "copié",
   "copyLine": "Copier la ligne",
-  "logsCleared": "Journaux effacés."
+  "logsCleared": "Journaux effacés.",
+  "logLevel": {
+    "error": "erreur",
+    "warn": "avertissement",
+    "info": "info",
+    "debug": "débogage"
+  }
 }

@@ -1,7 +1,6 @@
 {
   "title": "统计",
   "summary": "{series} 个系列 · {issues} 期 · {size}",
-  "couldNotLoad": "无法加载统计——应用是否正在运行？",
   "complete": "完整",
   "youOwn": "在已知的 <b>{total}</b> 期中，你拥有 <b>{owned}</b> 期。",
   "incomplete": "不完整",
@@ -17,7 +16,7 @@
   "allValid": "全部有效",
   "biggestGaps": "缺口最大",
   "issuesMissing": "期缺失",
-  "allComplete": "所有已匹配的系列都已完整。🎉",
+  "allComplete": "所有已匹配的系列都已完整。",
   "formatMix": "格式分布",
   "formatOther": "其他",
   "metadata": "元数据",

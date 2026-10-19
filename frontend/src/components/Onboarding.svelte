@@ -6,7 +6,7 @@
   // setup at all (the built-in service self-provisions; switching to a personal
   // ComicVine key lives in Settings → Metadata).
   // Skippable at every step; skipping only sets the onboardingDone flag.
-  import { apiGet, apiPost } from '../lib/api.js';
+  import { apiPost, apiGetOk, errorText } from '../lib/api.js';
   import { route, setQuery } from '../lib/router.svelte.js';
   import { flags, loadFlags, loadCollection } from '../lib/store.svelte.js';
   import { notify } from '../lib/toasts.svelte.js';
@@ -37,7 +37,7 @@
   let libTypesFetched = false;
   async function loadLibTypes() {
     if (libTypesFetched) return; libTypesFetched = true;
-    try { const r = await apiGet('/api/libraries'); if (Array.isArray(r.types) && r.types.length) libTypes = r.types; } catch { /* keep defaults */ }
+    try { const r = await apiGetOk('/api/libraries'); if (Array.isArray(r.types) && r.types.length) libTypes = r.types; } catch { /* keep defaults */ }
   }
   $effect(() => { if (step === 1) loadLibTypes(); });
   function addLib() { libs = [...libs, { id: Date.now(), name: '', type: 'comic', folder: '' }]; }
@@ -52,7 +52,7 @@
     if (pluginsFetched) return;
     pluginsFetched = true;
     try {
-      const r = await apiGet('/api/plugins/catalog');
+      const r = await apiGetOk('/api/plugins/catalog');
       catalogPlugins = (r.plugins || []).filter((p) => !p.installed);
       for (const p of catalogPlugins) pluginSel[p.id] = p.id === 'reader'; // pre-tick the reader
     } catch { catalogPlugins = []; }
@@ -110,38 +110,54 @@
         if (k !== 'torrentClient' && typeof v === 'string' && v) body[k] = v;
       }
     }
-    try {
-      await apiPost('/api/settings', body);
-      // Create the named libraries the user defined (skip empty-name rows). A
-      // blank folder is allowed — the library exists as a container and its
-      // folder can be set later.
-      for (const l of namedLibs) {
-        try { await apiPost('/api/libraries', { name: l.name.trim(), type: l.type, rootFolder: l.folder.trim() }); }
-        catch { /* skip a failed one — the rest still land */ }
-      }
-      // Install any plugins the user ticked, then restart to load them.
-      const chosen = catalogPlugins.filter((p) => pluginSel[p.id]);
-      if (chosen.length) {
-        installing = true;
-        for (const p of chosen) {
-          try { await apiPost('/api/plugins/install', { id: p.id }); } catch { /* skip a failed one */ }
-        }
-        installing = false;
-      }
-      flags.needsOnboarding = false;
-      if (forced) setQuery({ onboarding: null });
-      if (chosen.length) {
-        notify(t('onboarding.installedRestarting'), 'ok');
-        try { await apiPost('/api/restart'); } catch { /* the connection drops as it restarts */ }
-        setTimeout(() => location.reload(), 4000);
-        return;
-      }
-      await loadFlags();
-      loadCollection();
-      notify(t('onboarding.allSet'), 'ok');
-    } catch {
-      notify(t('onboarding.saveFailed'), 'error');
+    // Every step reports its own result: the wizard closes only when all of
+    // them landed. A failure keeps it open, names what failed, and a retry
+    // skips what already worked (no duplicate libraries).
+    const post = (url, b) => apiPost(url, b).catch((e) => ({ error: errorText(e) }));
+    const r = await post('/api/settings', body);
+    if (r?.error) {
+      notify(t('onboarding.saveFailedReason', { error: r.error }), 'error');
+      saving = false;
+      return;
     }
+    const failed = [];
+    // Create the named libraries the user defined (skip empty-name rows). A
+    // blank folder is allowed — the library exists as a container and its
+    // folder can be set later.
+    for (const l of namedLibs) {
+      if (l.created) continue;
+      const res = await post('/api/libraries', { name: l.name.trim(), type: l.type, rootFolder: l.folder.trim() });
+      if (res?.error) failed.push(t('onboarding.libraryFailed', { name: l.name.trim(), error: res.error }));
+      else l.created = true;
+    }
+    // Install any plugins the user ticked, then restart to load them.
+    const chosen = catalogPlugins.filter((p) => pluginSel[p.id] && !p.justInstalled);
+    let installed = catalogPlugins.filter((p) => p.justInstalled).length;
+    if (chosen.length) {
+      installing = true;
+      for (const p of chosen) {
+        const res = await post('/api/plugins/install', { id: p.id });
+        if (res?.error) failed.push(t('onboarding.pluginFailed', { name: p.name || p.id, error: res.error }));
+        else { p.justInstalled = true; installed++; }
+      }
+      installing = false;
+    }
+    if (failed.length) {
+      notify(t('onboarding.stepsFailed', { list: failed.join('; ') }), 'error');
+      saving = false;
+      return;
+    }
+    flags.needsOnboarding = false;
+    if (forced) setQuery({ onboarding: null });
+    if (installed) {
+      notify(t('onboarding.installedRestarting'), 'ok');
+      try { await apiPost('/api/restart'); } catch { /* the connection drops as it restarts */ }
+      setTimeout(() => location.reload(), 4000);
+      return;
+    }
+    await loadFlags();
+    loadCollection();
+    notify(t('onboarding.allSet'), 'ok');
     saving = false;
   }
 
@@ -180,7 +196,7 @@
       </div>
     </aside>
 
-    <div class="obx__main" use:trapFocus role="dialog" aria-label={t('onboarding.dialogLabel')}>
+    <div class="obx__main" use:trapFocus role="dialog" aria-modal="true" aria-label={t('onboarding.dialogLabel')}>
       <div class="obx__content">
         <div class="obx__inner">
           {#if EYEBROWS[step]}<div class="obx__eyebrow">{t(EYEBROWS[step])}</div>{/if}

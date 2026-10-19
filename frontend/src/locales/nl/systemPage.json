@@ -97,5 +97,11 @@
   "nothingMatches": "Niets komt overeen met “{query}”.",
   "copied": "gekopieerd",
   "copyLine": "Regel kopiëren",
-  "logsCleared": "Logboek gewist."
+  "logsCleared": "Logboek gewist.",
+  "logLevel": {
+    "error": "fout",
+    "warn": "waarschuwing",
+    "info": "info",
+    "debug": "debug"
+  }
 }

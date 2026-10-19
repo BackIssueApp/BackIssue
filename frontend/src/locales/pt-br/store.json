@@ -4,5 +4,30 @@
   "downloadFailed": "Não foi possível pôr o download na fila: {error}",
   "downloadFailedUnreachable": "Não foi possível pôr o download na fila — o aplicativo está acessível?",
   "redownloadFailed": "O novo download falhou: {error}",
-  "redownloadFailedUnreachable": "O novo download falhou — o aplicativo está acessível?"
+  "redownloadFailedUnreachable": "O novo download falhou — o aplicativo está acessível?",
+  "untitledSeries": "Série sem título",
+  "scanFailed": "A análise falhou: {error}",
+  "tagFailed": "A etiquetagem falhou: {error}",
+  "matchFailed": "Não foi possível iniciar a associação: {error}",
+  "thisSeries": "esta série",
+  "planRenameFailed": "Não foi possível planear a renomeação: {error}",
+  "nothingToDoCollide": {
+    "one": "Nada a fazer — {count} arquivo entraria em conflito.",
+    "other": "Nada a fazer — {count} arquivos entrariam em conflito."
+  },
+  "filesMatchPattern": "Os arquivos já correspondem ao padrão.",
+  "renameTitle": {
+    "one": "Mudar o nome a {count} arquivo?",
+    "other": "Mudar o nome a {count} arquivos?"
+  },
+  "renameMessage": "Os arquivos de \"{title}\" são movidos/renomeados para corresponder aos seus padrões de pastas e arquivos{collisions}.",
+  "renameCollisions": " ({count} entrariam em conflito e são ignorados)",
+  "renameFiles": "Mudar o nome aos arquivos",
+  "renamed": {
+    "one": "{count} arquivo renomeado{skipped}.",
+    "other": "{count} arquivos renomeados{skipped}."
+  },
+  "renamedSkipped": ", {count} ignorados",
+  "fileAssigned": "Arquivo atribuído à edição — mantém-se lá nas análises seguintes.",
+  "choiceOwned": "{label} (em sua posse)"
 }

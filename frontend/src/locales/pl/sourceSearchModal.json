@@ -13,5 +13,11 @@
   "failed": "Pobieranie nie powiodło się: {error}",
   "unknownError": "nieznany błąd",
   "sending": "Wysyłanie…",
-  "download": "Pobierz"
+  "download": "Pobierz",
+  "seedersTitle": {
+    "one": "{count} seeder",
+    "few": "{count} seedery",
+    "many": "{count} seederów",
+    "other": "{count} seedera"
+  }
 }

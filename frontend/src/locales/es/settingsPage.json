@@ -94,7 +94,7 @@
   "railMaintNote": "Respaldos y procesos",
   "backLibrary": "Biblioteca",
   "librariesTitle": "Bibliotecas",
-  "librariesSub": "Divide la colección en bibliotecas con nombre — cada una aparece como entrada propia en la barra lateral. El <b>tipo</b> de una biblioteca define cómo se comportan sus series (manga = búsqueda por capítulos, lectura de derecha a izquierda); sus carpetas son donde se archivan y escanean sus cómics. Mueve series desde el menú ⋯ de un volumen.",
+  "librariesSub": "Divide la colección en bibliotecas con nombre — cada una aparece como entrada propia en la barra lateral. El <b>tipo</b> de una biblioteca define cómo se comportan sus series (manga = búsqueda por capítulos, lectura de derecha a izquierda); sus carpetas son donde se archivan y escanean sus cómics. Mueve series desde el menú … de un volumen.",
   "libraryName": "Nombre de la biblioteca",
   "libraryTypeTitle": "Tipo de biblioteca — define cómo se comportan sus series",
   "matureTitle": "Ocultar esta biblioteca (y todo su contenido) a los roles sin el permiso “Ver contenido adulto”",
@@ -145,7 +145,7 @@
   "monitorAll": "Todos los números",
   "monitorNew": "Solo números nuevos",
   "monitorOff": "Desactivada",
-  "monitorNote": "La política de supervisión que recibe una serie al entrar en la biblioteca — añadida a mano, desde Descubrir, Novedades, listas de lectura, solicitudes o una importación. <b>Todos los números</b> mantiene la etapa completa; <b>Solo números nuevos</b> quiere los números desde el más reciente en adelante y deja en paz el catálogo anterior; <b>Desactivada</b> no obtiene nada hasta que la supervises o elijas números tú mismo. Cualquier serie se puede cambiar después desde su menú ⋯.",
+  "monitorNote": "La política de supervisión que recibe una serie al entrar en la biblioteca — añadida a mano, desde Descubrir, Novedades, listas de lectura, solicitudes o una importación. <b>Todos los números</b> mantiene la etapa completa; <b>Solo números nuevos</b> quiere los números desde el más reciente en adelante y deja en paz el catálogo anterior; <b>Desactivada</b> no obtiene nada hasta que la supervises o elijas números tú mismo. Cualquier serie se puede cambiar después desde su menú ….",
   "onlyRequested": "Solo los números que se pidieron",
   "onlyRequestedNote": "Cuando una serie se añade por números concretos — una entrada en una lista de lectura, una novedad, una importación CBL — llega con la supervisión desactivada y solo esos números pendientes, de modo que solo se descargan ellos (ahora y si una captura falla después). Añadir desde la Biblioteca o Descubrir sigue aplicando la política de arriba. Requiere \"Descargar al añadir\".",
   "downloadFormat": "Formato de descarga",
@@ -254,5 +254,6 @@
   "libMetaDefault": "Usar la lista predeterminada",
   "libMetaCustom": "Elegir para esta biblioteca",
   "libMetaNote": "Las series de esta biblioteca se consultan en las fuentes marcadas aquí, en este orden. Desmárcalas todas para volver a la lista predeterminada.",
-  "metaDefaultForLibraries": "Esta lista es la predeterminada; cada biblioteca puede elegir la suya en Ajustes → Biblioteca."
+  "metaDefaultForLibraries": "Esta lista es la predeterminada; cada biblioteca puede elegir la suya en Ajustes → Biblioteca.",
+  "saveNeedsLoad": "Los ajustes no se cargaron — vuelve a intentarlo antes de guardar."
 }

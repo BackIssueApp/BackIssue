@@ -38,7 +38,7 @@
   "chipGaps": "Toutes les lacunes",
   "chipGapsTitle": "Chaque numéro manquant de chaque série de la bibliothèque, recherché ou non",
   "chipFollowing": "Suivies",
-  "chipFollowingTitle": "Les séries que vous suivez (le ☆ sur la page d'une série)",
+  "chipFollowingTitle": "Les séries que vous suivez (l'étoile sur la page d'une série)",
   "chipHideUnreleased": "Masquer les non parus",
   "chipHideUnreleasedTitle": "Masque les numéros dont la date de couverture connue est dans le futur (la plupart des numéros en cache n'ont pas de date — seuls ceux connus sont masqués)",
   "sortOrder": "Ordre de tri",

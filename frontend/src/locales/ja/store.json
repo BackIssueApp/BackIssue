@@ -4,5 +4,27 @@
   "downloadFailed": "ダウンロードをキューに追加できませんでした：{error}",
   "downloadFailedUnreachable": "ダウンロードをキューに追加できませんでした。アプリに接続できますか？",
   "redownloadFailed": "再ダウンロードに失敗しました：{error}",
-  "redownloadFailedUnreachable": "再ダウンロードに失敗しました。アプリに接続できますか？"
+  "redownloadFailedUnreachable": "再ダウンロードに失敗しました。アプリに接続できますか？",
+  "untitledSeries": "無題のシリーズ",
+  "scanFailed": "スキャンに失敗しました：{error}",
+  "tagFailed": "タグ付けに失敗しました：{error}",
+  "matchFailed": "照合を開始できませんでした：{error}",
+  "thisSeries": "このシリーズ",
+  "planRenameFailed": "名前変更の計画を立てられませんでした：{error}",
+  "nothingToDoCollide": {
+    "other": "何もすることはありません。{count} ファイルの名前が衝突します。"
+  },
+  "filesMatchPattern": "ファイルはすでにパターンに一致しています。",
+  "renameTitle": {
+    "other": "{count} ファイルの名前を変更しますか？"
+  },
+  "renameMessage": "「{title}」のファイルを、フォルダーとファイル名のパターンに合わせて移動・名前変更します{collisions}。",
+  "renameCollisions": "（{count} 件は名前が衝突するためスキップします）",
+  "renameFiles": "ファイル名を変更",
+  "renamed": {
+    "other": "{count} ファイルの名前を変更しました{skipped}。"
+  },
+  "renamedSkipped": "（{count} 件スキップ）",
+  "fileAssigned": "ファイルをその号に割り当てました。再スキャン後もそのままです。",
+  "choiceOwned": "{label}（所有）"
 }

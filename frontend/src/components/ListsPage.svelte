@@ -3,12 +3,13 @@
   // (from the volume page's "Add to list") or imported from a ComicVine story
   // arc. Two-pane master-detail; a selected list rides ?list=<id>.
   import { goBack, navigate, route, setQuery } from '../lib/router.svelte.js';
-  import { apiGet, apiPost, apiPatch, apiDelete, apiPostText } from '../lib/api.js';
+  import { apiGet, apiGetOk, apiPost, apiPatch, apiDelete, apiPostText, errorText } from '../lib/api.js';
+  import LoadError from './LoadError.svelte';
   import { notify } from '../lib/toasts.svelte.js';
   import { confirmDialog, inputDialog } from './DialogModal.svelte';
   import { issueActions, issueActionsTick, issueCoverProviders } from '../lib/plugins.svelte.js';
   import { can, isTrusted } from '../lib/auth.svelte.js';
-  import { fmt, windowRange } from '../lib/util.js';
+  import { fmt, windowRange, latestGuard, measureGrid } from '../lib/util.js';
   import { arcModel, arcTicks, arcStatus, pickResume } from '../lib/arcs.js';
   import { t } from '../lib/i18n.svelte.js';
   import Cover from './Cover.svelte';
@@ -143,15 +144,23 @@
     } catch { arcProgress = null; readStates = null; }
   }
 
+  // Last request wins: switching lists A → B quickly must never leave A's
+  // detail showing under B. A failed list load says so (with a retry) rather
+  // than reading as an empty or missing list; the rail keeps its last good set.
+  const refreshSeq = latestGuard();
+  let detError = $state('');
   async function refresh() {
-    try {
-      const r = await apiGet('/api/lists');
-      if (!r.error) { lists = r.lists || []; loaded = true; }
-      if (listId) {
-        const d = await apiGet('/api/lists/' + listId);
-        det = d.error ? null : d;
-      } else det = null;
-    } catch { /* keep last */ }
+    const isLatest = refreshSeq();
+    const want = listId;
+    const [r, d] = await Promise.all([
+      apiGetOk('/api/lists').catch((e) => ({ failed: errorText(e) })),
+      want ? apiGetOk('/api/lists/' + want).catch((e) => ({ failed: errorText(e) })) : null,
+    ]);
+    if (!isLatest()) return;
+    if (!r.failed) { lists = r.lists || []; loaded = true; }
+    if (!want) { det = null; detError = ''; }
+    else if (d.failed) { if (det?.id !== want) det = null; detError = d.failed; }
+    else { det = d; detError = ''; }
     refreshProgress();
   }
   $effect(() => { if (active) { void listId; refresh(); } });
@@ -214,11 +223,8 @@
   }
   function measureRows() {
     if (scroller) viewH = scroller.clientHeight || viewH;
-    const items = itemsEl?.querySelectorAll('.listx__item');
-    if (items && items.length >= 2) {
-      const d = items[1].offsetTop - items[0].offsetTop;
-      if (d > 10) stride = d;
-    }
+    const m = measureGrid(itemsEl?.querySelectorAll('.listx__item'));
+    if (m?.stride) stride = m.stride;
   }
   $effect(() => { void rows; void itemsEl; measureRows(); });
   $effect(() => {
@@ -357,8 +363,16 @@
       if (!bySeries.has(it.series_id)) bySeries.set(it.series_id, []);
       bySeries.get(it.series_id).push(it.cv_issue_id);
     }
-    for (const [sid, ids] of bySeries) await apiPost(`/api/collection/${sid}/download`, { cvIssueIds: ids });
-    notify(t('listsPage.queuedMissingToast', { issues: t('common.nIssues', { count: fmt(missing.length) }), series: t('common.nSeries', { count: bySeries.size }) }), 'ok');
+    // Count only what the server accepted; say what it refused.
+    let issues = 0, series = 0, firstErr = '';
+    for (const [sid, ids] of bySeries) {
+      let r;
+      try { r = await apiPost(`/api/collection/${sid}/download`, { cvIssueIds: ids }); } catch (e) { r = { error: errorText(e) }; }
+      if (r?.error) { firstErr ||= r.error; continue; }
+      issues += ids.length; series++;
+    }
+    if (issues) notify(t('listsPage.queuedMissingToast', { issues: t('common.nIssues', { count: fmt(issues) }), series: t('common.nSeries', { count: series }) }), 'ok');
+    if (firstErr) notify(t('store.downloadFailed', { error: firstErr }), 'error');
   }
 
   // ---- story-arc import ----
@@ -367,9 +381,9 @@
   async function searchArcs() {
     if (!arcQ.trim()) return;
     arcBusy = true;
-    const r = await apiGet('/api/cv/arcs?q=' + encodeURIComponent(arcQ.trim()));
+    const r = await apiGet('/api/cv/arcs?q=' + encodeURIComponent(arcQ.trim())).catch((e) => ({ error: errorText(e) }));
     arcBusy = false;
-    if (r.error) return notify(r.error, 'error');
+    if (r?.error) return notify(r.error, 'error');
     arcResults = r.arcs || [];
   }
   async function importArc(a) {
@@ -391,8 +405,8 @@
   }
   async function loadCatalog() {
     cblErr = '';
-    const r = await apiGet('/api/lists/cbl-catalog');
-    if (r.error) { cblErr = r.error; cblFiles = []; return; }
+    const r = await apiGet('/api/lists/cbl-catalog').catch((e) => ({ error: errorText(e) }));
+    if (r?.error) { cblErr = r.error; cblFiles = []; return; }
     cblFiles = r.files || [];
   }
   // Both import paths land here. A clean import opens the new list; one with
@@ -742,7 +756,10 @@
         </div>
       </div>
       {/if}
+    {:else if detError && !det}
+      <LoadError error={detError} onretry={refresh} />
     {:else if det}
+      {#if detError}<LoadError compact error={detError} onretry={refresh} />{/if}
       <div class="listx__dhead">
         <button class="listx__iconbtn listx__back" aria-label={t('listsPage.lists')} onclick={() => setQuery({ list: null })}><Icon name="arrow-left" size={16} /></button>
         <div class="listx__dtitle-wrap">
@@ -1138,6 +1155,10 @@
   .listx__cbl-done { font: 600 10px var(--font-body); text-transform: uppercase; letter-spacing: .04em; color: var(--green); border: 1px solid rgba(95,211,138,.4); border-radius: 5px; padding: 3px 8px; flex: none; }
   .listx__cbl-import { opacity: .45; height: 32px; padding: 0 14px; border: none; background: var(--accent); color: #fff; border-radius: 7px; font: 600 12px var(--font-body); cursor: pointer; flex: none; transition: opacity .12s; }
   .listx__cbl-import.is-again { opacity: 1; border: 1px solid var(--line); background: transparent; color: var(--muted); }
+  /* Touch: no hover to reveal them, so the row actions and Import show at rest. */
+  @media (hover: none), (pointer: coarse) {
+    .listx__iact, .listx__cbl-import { opacity: 1; }
+  }
   .listx__cbl-import:disabled { cursor: progress; }
   .listx__cbl-more { display: block; margin: 14px auto 0; height: 38px; padding: 0 20px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 9px; font: 600 13px var(--font-body); cursor: pointer; }
   .listx__cbl-card .listx__cbl-ghost { opacity: .7; }

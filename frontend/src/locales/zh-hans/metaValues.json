@@ -1,0 +1,29 @@
+{
+  "status": {
+    "ongoing": "连载中",
+    "completed": "已完结",
+    "cancelled": "已取消",
+    "hiatus": "休刊中"
+  },
+  "seriesType": {
+    "annualSeries": "年刊系列",
+    "cancelledSeries": "已取消系列",
+    "digitalChapters": "数字章节",
+    "graphicNovel": "图像小说",
+    "hardCover": "精装本",
+    "limitedSeries": "限定系列",
+    "magazine": "杂志",
+    "omnibus": "合集",
+    "oneShot": "单期特刊",
+    "tradePaperback": "平装合订本"
+  },
+  "rating": {
+    "unknown": "未知",
+    "everyone": "全年龄",
+    "teen": "青少年",
+    "teenPlus": "青少年+",
+    "mature": "成熟",
+    "explicit": "露骨",
+    "adult": "成人"
+  }
+}

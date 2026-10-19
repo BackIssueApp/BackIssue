@@ -14,26 +14,8 @@
     "other": "{n} números en cola."
   },
   "scanAlreadyRunning": "Ya hay un escaneo de carpetas en marcha.",
-  "scanFailed": "Error en el escaneo",
   "loadSeriesFailed": "No se pudo cargar esa serie: {error}",
-  "planRenameFailed": "No se pudo planificar el renombrado: {error}",
-  "nothingToDoCollide": {
-    "one": "Nada que hacer — {count} archivo entraría en conflicto.",
-    "other": "Nada que hacer — {count} archivos entrarían en conflicto."
-  },
-  "filesMatchPattern": "Los archivos ya coinciden con el patrón.",
-  "renameTitle": {
-    "one": "¿Renombrar {count} archivo?",
-    "other": "¿Renombrar {count} archivos?"
-  },
-  "renameMessage": "Los archivos de “{title}” se mueven o renombran según tus patrones de carpeta y archivo{collisions}.",
-  "renameCollisions": " ({count} entrarían en conflicto y se omiten)",
   "renameFiles": "Renombrar archivos",
-  "renamed": {
-    "one": "Se renombró {count} archivo{skipped}.",
-    "other": "Se renombraron {count} archivos{skipped}."
-  },
-  "renamedSkipped": ", {count} omitidos",
   "menuOpen": "Abrir",
   "follow": "Seguir",
   "unfollow": "Dejar de seguir",

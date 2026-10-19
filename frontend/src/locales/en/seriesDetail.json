@@ -1,25 +1,6 @@
 {
-  "fileAssigned": "File assigned to the issue — it stays there through rescans.",
-  "choiceOwned": "{label} (owned)",
   "thisSeries": "this series",
-  "planRenameFailed": "Could not plan the rename: {error}",
-  "nothingToDoCollide": {
-    "one": "Nothing to do — {count} file would collide.",
-    "other": "Nothing to do — {count} files would collide."
-  },
-  "filesMatchPattern": "Files already match the pattern.",
-  "renameTitle": {
-    "one": "Rename {count} file?",
-    "other": "Rename {count} files?"
-  },
-  "renameMessage": "Files for \"{title}\" are moved/renamed to match your folder and file patterns{collisions}.",
-  "renameCollisions": " ({count} would collide and are skipped)",
   "renameFiles": "Rename files",
-  "renamed": {
-    "one": "Renamed {count} file{skipped}.",
-    "other": "Renamed {count} files{skipped}."
-  },
-  "renamedSkipped": ", {count} skipped",
   "nIssuesLabel": "{n} issues",
   "nItems": {
     "one": "{n} item",
@@ -39,7 +20,7 @@
   },
   "summaryBase": "{issues} issues · {owned} owned",
   "summaryMissing": " · {n} missing",
-  "summaryCorrupt": " · ⚠ {n} corrupt",
+  "summaryCorrupt": " · {n} corrupt",
   "summaryUntagged": " · {n} untagged",
   "refreshing": "Refreshing metadata…",
   "refreshFailed": "Refresh failed: {error}",
@@ -115,7 +96,6 @@
   "alreadyOnList": "Already on that list.",
   "scanning": "Scanning {progress}…",
   "scanningElsewhere": "Scanning elsewhere…",
-  "scanFailed": "Scan failed",
   "scanError": "Scan error: {error}",
   "scanComplete": "Folder scan complete{pruned}.",
   "scanPruned": {
@@ -124,7 +104,6 @@
   },
   "tagging": "Tagging {progress}…",
   "taggingElsewhere": "Tagging elsewhere…",
-  "taggingFailed": "Tagging failed",
   "taggingError": "Tagging error: {error}",
   "tagged": "Tagged {tagged} of {total} files{problems}.",
   "taggedProblems": {
@@ -161,7 +140,7 @@
   "unknownPublisher": "Unknown publisher",
   "nextShipTitle": "From the weekly release list",
   "nextShip": "Next: #{number} · {date}",
-  "monitorTagTitle": "What download automation fetches for this series — change it under ⋯",
+  "monitorTagTitle": "What download automation fetches for this series — change it under …",
   "seriesTypeTitle": "Series type (from enriched metadata)",
   "genresTitle": "Genres (from enriched metadata)",
   "openSourcePage": "Open the source page",
@@ -291,5 +270,6 @@
   "assignAria": "Assign {name} to an issue",
   "assignTo": "Assign to issue…",
   "assign": "Assign",
-  "showAll": "Show all {n}"
+  "showAll": "Show all {n}",
+  "selectIssue": "Select issue #{number}"
 }

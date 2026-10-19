@@ -17,7 +17,11 @@
   import { navigate } from '../lib/router.svelte.js';
   import { loadCollection } from '../lib/store.svelte.js';
   import { notify } from '../lib/toasts.svelte.js';
-  import { fmt, parseCvVolumeRef, isExactCvRef } from '../lib/util.js';
+  import { fmt, parseCvVolumeRef, isExactCvRef, safeUrl } from '../lib/util.js';
+  import { can } from '../lib/auth.svelte.js';
+  // A result's page at its metadata source: only for those who manage
+  // settings (where sources are named anyway), and only a safe http(s) URL.
+  const sourceUrl = (v) => (can('settings.manage') ? safeUrl(v.site_detail_url) : '');
   import { trapFocus } from '../lib/dom.js';
   import { status } from '../lib/status.svelte.js';
   import { t, th } from '../lib/i18n.svelte.js';
@@ -175,7 +179,7 @@
 
 {#if open}
   <div id="add-modal" class="modal addx-overlay" onclick={(e) => { if (e.target === e.currentTarget) closeModal('add'); }}>
-    <div class="addx" use:trapFocus role="dialog" aria-label={title}>
+    <div class="addx" use:trapFocus role="dialog" aria-modal="true" aria-label={title}>
       <div class="addx__head">
         <div class="addx__icon"><Icon name="plus" size={18} /></div>
         <div class="addx__titles">
@@ -229,7 +233,7 @@
               <Cover coverUrl={v.image_url} title={v.name || '?'} />
               <div class="addx__info">
                 <div class="addx__name">
-                  {#if v.site_detail_url}<a class="addx__link" href={v.site_detail_url} target="_blank" rel="noreferrer" title={t('addModal.viewDetails')}>{v.name || '?'}</a>{:else}{v.name || '?'}{/if}
+                  {#if sourceUrl(v)}<a class="addx__link" href={sourceUrl(v)} target="_blank" rel="noreferrer" title={t('addModal.viewDetails')}>{v.name || '?'}</a>{:else}{v.name || '?'}{/if}
                   {#if v.start_year}<span class="addx__year">({v.start_year})</span>{/if}
                 </div>
                 <div class="addx__meta">{#if v._meta !== undefined}{v._meta}{:else}{v.publisher || ''}{v.publisher ? ' · ' : ''}{t('common.nIssues', { count: fmt(v.count_of_issues || 0) })}{/if}</div>

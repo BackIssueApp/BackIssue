@@ -1,7 +1,6 @@
 {
   "title": "Estatísticas",
   "summary": "{series} séries · {issues} edições · {size}",
-  "couldNotLoad": "Não foi possível carregar as estatísticas — o aplicativo está em execução?",
   "complete": "Completas",
   "youOwn": "Tem <b>{owned}</b> de <b>{total}</b> edições conhecidas.",
   "incomplete": "Incompletas",
@@ -17,7 +16,7 @@
   "allValid": "todos válidos",
   "biggestGaps": "Maiores lacunas",
   "issuesMissing": "edições em falta",
-  "allComplete": "Todas as séries associadas estão completas. 🎉",
+  "allComplete": "Todas as séries associadas estão completas.",
   "formatMix": "Formatos",
   "formatOther": "Outros",
   "metadata": "Metadados",

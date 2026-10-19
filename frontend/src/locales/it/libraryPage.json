@@ -14,26 +14,8 @@
     "other": "{n} albi messi in coda."
   },
   "scanAlreadyRunning": "Una scansione delle cartelle è già in corso.",
-  "scanFailed": "Scansione non riuscita",
   "loadSeriesFailed": "Impossibile caricare la serie: {error}",
-  "planRenameFailed": "Impossibile pianificare la rinomina: {error}",
-  "nothingToDoCollide": {
-    "one": "Niente da fare — {count} file andrebbe in conflitto.",
-    "other": "Niente da fare — {count} file andrebbero in conflitto."
-  },
-  "filesMatchPattern": "I file corrispondono già allo schema.",
-  "renameTitle": {
-    "one": "Rinominare {count} file?",
-    "other": "Rinominare {count} file?"
-  },
-  "renameMessage": "I file di “{title}” vengono spostati/rinominati secondo gli schemi di cartelle e file{collisions}.",
-  "renameCollisions": " ({count} andrebbero in conflitto e vengono saltati)",
   "renameFiles": "Rinomina file",
-  "renamed": {
-    "one": "{count} file rinominato{skipped}.",
-    "other": "{count} file rinominati{skipped}."
-  },
-  "renamedSkipped": ", {count} saltati",
   "menuOpen": "Apri",
   "follow": "Segui",
   "unfollow": "Non seguire più",

@@ -94,7 +94,7 @@
   "railMaintNote": "Replis et processus",
   "backLibrary": "Bibliothèque",
   "librariesTitle": "Bibliothèques",
-  "librariesSub": "Répartissez la collection en bibliothèques nommées — chacune apparaît dans la barre latérale. Le <b>type</b> d'une bibliothèque définit le comportement de ses séries (manga = recherche par chapitres, lecture de droite à gauche) ; ses dossiers sont là où ses comics sont classés et analysés. Déplacez des séries depuis le menu ⋯ d'une série.",
+  "librariesSub": "Répartissez la collection en bibliothèques nommées — chacune apparaît dans la barre latérale. Le <b>type</b> d'une bibliothèque définit le comportement de ses séries (manga = recherche par chapitres, lecture de droite à gauche) ; ses dossiers sont là où ses comics sont classés et analysés. Déplacez des séries depuis le menu … d'une série.",
   "libraryName": "Nom de la bibliothèque",
   "libraryTypeTitle": "Type de bibliothèque — définit le comportement de ses séries",
   "matureTitle": "Masquer cette bibliothèque (et tout son contenu) aux rôles sans la permission « Voir le contenu adulte »",
@@ -145,7 +145,7 @@
   "monitorAll": "Tous les numéros",
   "monitorNew": "Nouveaux numéros seulement",
   "monitorOff": "Désactivée",
-  "monitorNote": "La règle de surveillance qu'une série reçoit en entrant dans la bibliothèque — ajoutée à la main, depuis Découvrir, Sorties, les listes de lecture, les demandes ou un import. <b>Tous les numéros</b> garde le parcours complet ; <b>Nouveaux numéros seulement</b> recherche les numéros à partir du plus récent et laisse le fonds de catalogue tranquille ; <b>Désactivée</b> ne récupère rien tant que vous ne la surveillez pas ou ne choisissez pas des numéros vous-même. Toute série peut être modifiée plus tard depuis son menu ⋯.",
+  "monitorNote": "La règle de surveillance qu'une série reçoit en entrant dans la bibliothèque — ajoutée à la main, depuis Découvrir, Sorties, les listes de lecture, les demandes ou un import. <b>Tous les numéros</b> garde le parcours complet ; <b>Nouveaux numéros seulement</b> recherche les numéros à partir du plus récent et laisse le fonds de catalogue tranquille ; <b>Désactivée</b> ne récupère rien tant que vous ne la surveillez pas ou ne choisissez pas des numéros vous-même. Toute série peut être modifiée plus tard depuis son menu ….",
   "onlyRequested": "Seulement les numéros demandés",
   "onlyRequestedNote": "Quand une série est ajoutée pour des numéros précis — une entrée de liste de lecture, une sortie, un import CBL — elle arrive sans surveillance avec seulement ces numéros recherchés, donc eux seuls sont téléchargés (maintenant et si une récupération échoue plus tard). L'ajout depuis la Bibliothèque ou Découvrir applique toujours la règle ci-dessus. Nécessite « Télécharger à l'ajout ».",
   "downloadFormat": "Format de téléchargement",
@@ -254,5 +254,6 @@
   "libMetaDefault": "Utiliser la liste par défaut",
   "libMetaCustom": "Choisir pour cette bibliothèque",
   "libMetaNote": "Les séries de cette bibliothèque sont recherchées dans les sources cochées ici, dans cet ordre. Décochez-les toutes pour revenir à la liste par défaut.",
-  "metaDefaultForLibraries": "Cette liste est celle par défaut ; une bibliothèque peut choisir la sienne dans Paramètres → Bibliothèque."
+  "metaDefaultForLibraries": "Cette liste est celle par défaut ; une bibliothèque peut choisir la sienne dans Paramètres → Bibliothèque.",
+  "saveNeedsLoad": "Les paramètres n'ont pas pu être chargés — réessayez avant d'enregistrer."
 }

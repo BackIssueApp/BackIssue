@@ -1,7 +1,6 @@
 {
   "title": "Statystyki",
   "summary": "serie: {series} · zeszyty: {issues} · {size}",
-  "couldNotLoad": "Nie udało się wczytać statystyk — czy aplikacja działa?",
   "complete": "Kompletne",
   "youOwn": "Masz <b>{owned}</b> z <b>{total}</b> znanych zeszytów.",
   "incomplete": "Niekompletne",
@@ -17,7 +16,7 @@
   "allValid": "wszystkie poprawne",
   "biggestGaps": "Największe luki",
   "issuesMissing": "brakujące zeszyty",
-  "allComplete": "Każda dopasowana seria jest kompletna. 🎉",
+  "allComplete": "Każda dopasowana seria jest kompletna.",
   "formatMix": "Formaty",
   "formatOther": "Inne",
   "metadata": "Metadane",

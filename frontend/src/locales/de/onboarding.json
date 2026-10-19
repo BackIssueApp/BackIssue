@@ -71,5 +71,8 @@
   "saving": "Wird gespeichert…",
   "installedRestarting": "Plugins installiert – BackIssue startet neu, um sie zu aktivieren…",
   "allSet": "Alles eingerichtet – füge mit „+ Hinzufügen“ eine Reihe hinzu oder importiere eine vorhandene Bibliothek über die Seitenleiste.",
-  "saveFailed": "Einrichtung konnte nicht gespeichert werden – prüfe, ob die App erreichbar ist, und versuch es erneut."
+  "saveFailedReason": "Einrichtung konnte nicht gespeichert werden: {error}",
+  "libraryFailed": "Bibliothek „{name}“: {error}",
+  "pluginFailed": "Plugin „{name}“: {error}",
+  "stepsFailed": "Einige Einrichtungsschritte sind fehlgeschlagen — behebe sie und schließe erneut ab, oder überspringe: {list}"
 }

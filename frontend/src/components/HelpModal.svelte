@@ -48,7 +48,7 @@
 
 {#if open}
   <div class="modal" onclick={(e) => { if (e.target === e.currentTarget) close(); }} role="presentation">
-    <div class="modal__panel help-panel" use:trapFocus role="dialog" aria-label={t('common.help')}>
+    <div class="modal__panel help-panel" use:trapFocus role="dialog" aria-modal="true" aria-label={t('common.help')}>
       <div class="modal__head"><h3>{t('helpModal.title', { page: t(`helpModal.${entry.key}.title`) })}</h3>
         <button class="modal__x" aria-label={t('common.close')} onclick={close}><Icon name="close" /></button></div>
       <div class="modal__body help-body">

@@ -71,5 +71,8 @@
   "saving": "Opslaan…",
   "installedRestarting": "Plugins geïnstalleerd — BackIssue herstart om ze te activeren…",
   "allSet": "Je bent klaar — voeg een reeks toe met “+ Toevoegen”, of importeer een bestaande bibliotheek via de zijbalk.",
-  "saveFailed": "Kon de installatie niet opslaan — controleer of de app bereikbaar is en probeer het opnieuw."
+  "saveFailedReason": "Kon de installatie niet opslaan: {error}",
+  "libraryFailed": "bibliotheek ‘{name}’: {error}",
+  "pluginFailed": "plug-in ‘{name}’: {error}",
+  "stepsFailed": "Sommige installatiestappen zijn mislukt — los ze op en rond opnieuw af, of sla over: {list}"
 }

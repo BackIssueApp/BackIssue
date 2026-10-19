@@ -25,7 +25,6 @@
   "characters": "キャラクター",
   "teams": "チーム",
   "variantFallback": "バリアント",
-  "choiceOwned": "{label}（所有）",
   "fileMoved": "ファイルをその号に移しました。この割り当ては再スキャン後も保持されます。",
   "assignmentCleared": "割り当てを解除しました。ファイルは再び号数でリンクされます。",
   "savedFields": {

@@ -25,7 +25,6 @@
   "characters": "Personages",
   "teams": "Teams",
   "variantFallback": "variant",
-  "choiceOwned": "{label} (in bezit)",
   "fileMoved": "Bestand verplaatst naar dat nummer — de toewijzing wordt onthouden bij nieuwe scans.",
   "assignmentCleared": "Toewijzing gewist — het bestand wordt weer op nummer gekoppeld.",
   "savedFields": {

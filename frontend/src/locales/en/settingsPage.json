@@ -94,7 +94,7 @@
   "railMaintNote": "Fallbacks & workers",
   "backLibrary": "Library",
   "librariesTitle": "Libraries",
-  "librariesSub": "Split the collection into named libraries — each shows as its own entry in the sidebar. A library's <b>type</b> sets how its series behave (manga = chapter-style search, right-to-left reading); its folders are where its comics are filed and scanned. Move series from a volume's ⋯ menu.",
+  "librariesSub": "Split the collection into named libraries — each shows as its own entry in the sidebar. A library's <b>type</b> sets how its series behave (manga = chapter-style search, right-to-left reading); its folders are where its comics are filed and scanned. Move series from a volume's … menu.",
   "libraryName": "Library name",
   "libraryTypeTitle": "Library type — sets how its series behave",
   "matureTitle": "Hide this library (and everything in it) from roles without the “View mature content” permission",
@@ -145,7 +145,7 @@
   "monitorAll": "All issues",
   "monitorNew": "New issues only",
   "monitorOff": "Off",
-  "monitorNote": "The monitoring policy a series gets when it enters the library — added by hand, from Discover, Releases, reading lists, requests, or an import. <b>All issues</b> keeps the run complete; <b>New issues only</b> wants issues from the newest one onward and leaves the back catalogue alone; <b>Off</b> fetches nothing until you monitor it or pick issues yourself. Any series can be changed later from its ⋯ menu.",
+  "monitorNote": "The monitoring policy a series gets when it enters the library — added by hand, from Discover, Releases, reading lists, requests, or an import. <b>All issues</b> keeps the run complete; <b>New issues only</b> wants issues from the newest one onward and leaves the back catalogue alone; <b>Off</b> fetches nothing until you monitor it or pick issues yourself. Any series can be changed later from its … menu.",
   "onlyRequested": "Only the issues that were asked for",
   "onlyRequestedNote": "When a series is added because of specific issues — an entry on a reading list, a release, a CBL import — it arrives with monitoring off and just those issues wanted, so only they are downloaded (now and if a grab fails later). Adding from the Library or Discover still gets the policy above. Needs \"Download on add\".",
   "downloadFormat": "Download format",
@@ -254,5 +254,6 @@
   "libMetaDefault": "Use the default list",
   "libMetaCustom": "Choose for this library",
   "libMetaNote": "This library's series are looked up through the sources ticked here, in this order. Turn them all off to go back to the default list.",
-  "metaDefaultForLibraries": "This list is the default; a library can choose its own under Settings → Library."
+  "metaDefaultForLibraries": "This list is the default; a library can choose its own under Settings → Library.",
+  "saveNeedsLoad": "Settings didn’t load — retry before saving."
 }

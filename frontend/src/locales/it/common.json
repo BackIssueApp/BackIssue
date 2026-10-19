@@ -67,5 +67,7 @@
   "nIssues": { "one": "{count} albo", "other": "{count} albi" },
   "nFiles": { "one": "{count} file", "other": "{count} file" },
   "nSeries": { "one": "{count} serie", "other": "{count} serie" },
-  "nSelected": { "one": "{count} selezionato", "other": "{count} selezionati" }
+  "nSelected": { "one": "{count} selezionato", "other": "{count} selezionati" },
+  "loadFailed": "Impossibile caricare.",
+  "loadFailedStale": "Impossibile aggiornare — vengono mostrati gli ultimi dati caricati."
 }

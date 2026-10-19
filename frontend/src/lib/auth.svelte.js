@@ -3,9 +3,9 @@
 //               screen, and the server refuses the rest of the API until then.
 //   user      — the signed-in account { id, username, role, permissions }.
 // The server resolves the role to a permission list ('*' = everything);
-// components use can()/isTrusted/isAdmin to hide affordances the server
+// components use can()/isTrusted to hide affordances the server
 // would 403 anyway — the middleware is the real enforcement.
-import { apiGet, apiPost } from './api.js';
+import { apiGet, apiPost, onSessionLost } from './api.js';
 import { currentLang, setLanguage, matchLanguage } from './i18n.svelte.js';
 
 export const auth = $state({
@@ -22,7 +22,6 @@ export const can = (perm) => {
 };
 // Legacy aliases, mapped onto the permissions the old tiers implied.
 export const isTrusted = () => can('library.manage');
-export const isAdmin = () => can('users.manage');
 
 export async function loadMe() {
   try {
@@ -69,3 +68,4 @@ export async function logout() {
 export function sessionLost() {
   if (auth.ready && auth.user) auth.user = null;
 }
+onSessionLost(sessionLost);

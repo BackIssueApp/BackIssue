@@ -2054,7 +2054,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
   });
   app.post('/api/collection/add-cv', async (req, res) => {
     const comicvineId = Number(req.body?.comicvineId);
-    if (!comicvineId) return res.status(400).json({ error: 'comicvineId required' });
+    if (!comicvineId) return res.status(400).json({ error: 'a metadata record id is required' });
     // The issues that prompted this add, when the caller knows them (a list
     // row, a release, a CBL entry) — with the "only requested" setting on,
     // download-on-add is scoped to these instead of the whole volume.
@@ -2122,7 +2122,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
   });
   app.post('/api/collection/:id/cv', async (req, res) => {
     const comicvineId = Number(req.body?.comicvineId);
-    if (!comicvineId) return res.status(400).json({ error: 'comicvineId required' });
+    if (!comicvineId) return res.status(400).json({ error: 'a metadata record id is required' });
     try { res.json(await cvSetManual(Number(req.params.id), comicvineId)); }
     catch (e) { res.status(502).json({ error: String(e?.message || e) }); }
   });

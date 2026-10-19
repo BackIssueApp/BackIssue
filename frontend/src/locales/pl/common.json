@@ -92,5 +92,7 @@
     "few": "{count} zaznaczone",
     "many": "{count} zaznaczonych",
     "other": "{count} zaznaczonego"
-  }
+  },
+  "loadFailed": "Nie udało się wczytać.",
+  "loadFailedStale": "Nie udało się odświeżyć — wyświetlane są ostatnio wczytane dane."
 }

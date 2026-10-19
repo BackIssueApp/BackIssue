@@ -71,5 +71,8 @@
   "saving": "Enregistrement…",
   "installedRestarting": "Extensions installées — redémarrage de BackIssue pour les activer…",
   "allSet": "Vous êtes prêt — ajoutez une série avec « + Ajouter », ou importez une bibliothèque existante depuis la barre latérale.",
-  "saveFailed": "Impossible d'enregistrer la configuration — vérifiez que l'application est joignable et réessayez."
+  "saveFailedReason": "Impossible d'enregistrer la configuration : {error}",
+  "libraryFailed": "bibliothèque « {name} » : {error}",
+  "pluginFailed": "plugin « {name} » : {error}",
+  "stepsFailed": "Certaines étapes de la configuration ont échoué — corrigez-les et terminez à nouveau, ou passez : {list}"
 }

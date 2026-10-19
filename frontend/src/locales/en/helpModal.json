@@ -41,7 +41,7 @@
     "s1h": "What this is",
     "s1p": "What’s downloading now and what’s waiting. The active item shows a progress bar with speed and source.",
     "s2h": "Controls",
-    "s2p": "Pause/resume the queue, clear queued items, or retry/clear failed ones (library-management rights). The × on a row cancels that download and removes it from the client.",
+    "s2p": "Pause/resume the queue, clear queued items, or retry/clear failed ones (library-management rights). The close button on a row cancels that download and removes it from the client.",
     "s3h": "After a restart",
     "s3p": "A queue that was mid-download resumes automatically when the app starts."
   },

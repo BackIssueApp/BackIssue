@@ -91,7 +91,7 @@
 
 {#if open_}
   <div id="dialog-modal" class="modal" onclick={(e) => { if (e.target === e.currentTarget) settleDialog(null); }}>
-    <div class="modal__panel" use:trapFocus role="dialog" aria-label={m.title || t('dialogModal.confirm')}>
+    <div class="modal__panel" use:trapFocus role="dialog" aria-modal="true" aria-label={m.title || t('dialogModal.confirm')}>
       <div class="modal__head" style="display:flex;justify-content:space-between;align-items:center;">
         <h3 style="margin:0;">{m.title}</h3>
         <button class="modal__x" aria-label={t('common.close')} onclick={() => settleDialog(null)}><Icon name="close" /></button>

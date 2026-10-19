@@ -41,7 +41,7 @@
     "s1h": "De quoi s'agit-il",
     "s1p": "Ce qui se télécharge maintenant et ce qui attend. L'élément actif affiche une barre de progression avec la vitesse et la source.",
     "s2h": "Commandes",
-    "s2p": "Mettez la file en pause ou reprenez-la, retirez les éléments en attente, ou réessayez/retirez ceux en échec (droits de gestion de bibliothèque). Le × d'une ligne annule ce téléchargement et le retire du client.",
+    "s2p": "Mettez la file en pause ou reprenez-la, retirez les éléments en attente, ou réessayez/retirez ceux en échec (droits de gestion de bibliothèque). Le bouton de fermeture d'une ligne annule ce téléchargement et le retire du client.",
     "s3h": "Après un redémarrage",
     "s3p": "Une file interrompue en plein téléchargement reprend automatiquement au démarrage de l'application."
   },

@@ -1,25 +1,6 @@
 {
-  "fileAssigned": "Ficheiro atribuído à edição — mantém-se lá nas análises seguintes.",
-  "choiceOwned": "{label} (na sua posse)",
   "thisSeries": "esta série",
-  "planRenameFailed": "Não foi possível planear a renomeação: {error}",
-  "nothingToDoCollide": {
-    "one": "Nada a fazer — {count} ficheiro entraria em conflito.",
-    "other": "Nada a fazer — {count} ficheiros entrariam em conflito."
-  },
-  "filesMatchPattern": "Os ficheiros já correspondem ao padrão.",
-  "renameTitle": {
-    "one": "Mudar o nome a {count} ficheiro?",
-    "other": "Mudar o nome a {count} ficheiros?"
-  },
-  "renameMessage": "Os ficheiros de \"{title}\" são movidos/renomeados para corresponder aos seus padrões de pastas e ficheiros{collisions}.",
-  "renameCollisions": " ({count} entrariam em conflito e são ignorados)",
   "renameFiles": "Mudar o nome aos ficheiros",
-  "renamed": {
-    "one": "{count} ficheiro renomeado{skipped}.",
-    "other": "{count} ficheiros renomeados{skipped}."
-  },
-  "renamedSkipped": ", {count} ignorados",
   "nIssuesLabel": "{n} edições",
   "nItems": {
     "one": "{n} item",
@@ -39,7 +20,7 @@
   },
   "summaryBase": "{issues} edições · {owned} na sua posse",
   "summaryMissing": " · {n} em falta",
-  "summaryCorrupt": " · ⚠ {n} corrompidas",
+  "summaryCorrupt": " · {n} corrompidas",
   "summaryUntagged": " · {n} sem etiquetas",
   "refreshing": "A atualizar os metadados…",
   "refreshFailed": "A atualização falhou: {error}",
@@ -115,7 +96,6 @@
   "alreadyOnList": "Já está nessa lista.",
   "scanning": "A analisar {progress}…",
   "scanningElsewhere": "A analisar noutro sítio…",
-  "scanFailed": "A análise falhou",
   "scanError": "Erro na análise: {error}",
   "scanComplete": "Análise da pasta concluída{pruned}.",
   "scanPruned": {
@@ -124,7 +104,6 @@
   },
   "tagging": "A etiquetar {progress}…",
   "taggingElsewhere": "A etiquetar noutro sítio…",
-  "taggingFailed": "A etiquetagem falhou",
   "taggingError": "Erro na etiquetagem: {error}",
   "tagged": "{tagged} de {total} ficheiros etiquetados{problems}.",
   "taggedProblems": {
@@ -161,7 +140,7 @@
   "unknownPublisher": "Editora desconhecida",
   "nextShipTitle": "Da lista semanal de lançamentos",
   "nextShip": "Próxima: #{number} · {date}",
-  "monitorTagTitle": "O que a automação de downloads obtém para esta série — altere em ⋯",
+  "monitorTagTitle": "O que a automação de downloads obtém para esta série — altere em …",
   "seriesTypeTitle": "Tipo de série (dos metadados enriquecidos)",
   "genresTitle": "Géneros (dos metadados enriquecidos)",
   "openSourcePage": "Abrir a página de origem",
@@ -291,5 +270,6 @@
   "assignAria": "Atribuir {name} a uma edição",
   "assignTo": "Atribuir à edição…",
   "assign": "Atribuir",
-  "showAll": "Mostrar todos ({n})"
+  "showAll": "Mostrar todos ({n})",
+  "selectIssue": "Selecionar a edição #{number}"
 }

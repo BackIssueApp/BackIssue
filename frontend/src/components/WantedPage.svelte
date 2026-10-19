@@ -2,10 +2,11 @@
   import { untrack } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { goBack, navigate, route, setQuery } from '../lib/router.svelte.js';
-  import { apiGet, apiPost } from '../lib/api.js';
+  import { apiGetOk, apiPost, errorText } from '../lib/api.js';
   import { subscribe } from '../lib/events.svelte.js';
   import { notify } from '../lib/toasts.svelte.js';
-  import { fmt } from '../lib/util.js';
+  import { fmt, latestGuard } from '../lib/util.js';
+  import LoadError from './LoadError.svelte';
   import { t } from '../lib/i18n.svelte.js';
   import { rail } from '../lib/store.svelte.js';
   import Badge from './Badge.svelte';
@@ -26,6 +27,7 @@
   let items = $state([]);
   let total = $state(0);
   let loaded = $state(false);
+  let loadError = $state('');
   let collapsed = $state({}); // series_id → true when the user collapses it
   const gaps = $derived(scope === 'gaps');
   // Comics, plus a tab per plugin that has its own wanted list (books,
@@ -52,14 +54,27 @@
     { key: 'fewest', label: 'sortFewest' },
   ];
 
+  // Last request wins: the 4s refresh, Load more and a filter change can all
+  // be in flight at once, and an append must never land on a replaced list.
+  const wantedSeq = latestGuard();
+  let appending = false; // a Load more in flight: the background refresh waits
   async function renderWanted({ append = false } = {}) {
+    const isLatest = wantedSeq();
+    if (append) appending = true;
+    try { await fetchWanted(append, isLatest); } finally { if (append) appending = false; }
+  }
+  async function fetchWanted(append, isLatest) {
     const offset = append ? items.length : 0;
     const qs = `limit=200&offset=${offset}&scope=${scope}&sort=${sort}` + (followed ? '&followed=1' : '') + (hideUnreleased ? '&hideUnreleased=1' : '') + (q ? `&q=${encodeURIComponent(q)}` : '');
     let w;
-    try { w = await apiGet('/api/wanted?' + qs); } catch { return; }
-    items = append ? items.concat(w.items) : w.items;
-    total = w.total;
+    try { w = await apiGetOk('/api/wanted?' + qs); }
+    catch (e) { if (isLatest()) loadError = errorText(e); return; } // keep the last good list
+    if (!isLatest()) return;
+    const rows = Array.isArray(w?.items) ? w.items : [];
+    items = append ? items.concat(rows) : rows;
+    total = w.total ?? items.length;
     loaded = true;
+    loadError = '';
     if (!append) { selected.clear(); lastToggled = null; }
   }
 
@@ -67,7 +82,7 @@
   // views are shareable and Back/Forward restore them. The URL is the source
   // of truth: handlers only patch the query; this effect syncs state + refetches.
   $effect(() => {
-    if (!active) { items = []; loaded = false; return; }
+    if (!active) { wantedSeq(); items = []; loaded = false; loadError = ''; return; }
     if (pluginTab) return; // a plugin's tab draws its own list
     const p = new URLSearchParams(route.search);
     untrack(() => {
@@ -80,7 +95,7 @@
     });
     // refresh in place (status counts move when downloads land) unless the
     // user has paged deeper or is mid-selection
-    return subscribe('status', () => { if (items.length <= 200 && !selected.size) renderWanted(); }, 4000);
+    return subscribe('status', () => { if (items.length <= 200 && !selected.size && !appending) renderWanted(); }, 4000);
   });
 
   let searchTimer;
@@ -105,12 +120,20 @@
   }
 
   const IN_FLIGHT = ['queued', 'downloading', 'grabbed', 'tagging'];
+  // Queue one series' rows; the error text when the server refused or was
+  // unreachable, else ''.
+  async function queueRows(seriesId, cvIssueIds) {
+    let r;
+    try { r = await apiPost(`/api/collection/${seriesId}/download`, { cvIssueIds }); } catch (e) { r = { error: errorText(e) }; }
+    return r?.error || '';
+  }
   async function download(it) {
     it._busy = true;
-    await apiPost(`/api/collection/${it.series_id}/download`, { cvIssueIds: [it.cv_issue_id] });
+    const err = await queueRows(it.series_id, [it.cv_issue_id]);
+    it._busy = false;
+    if (err) return notify(t('store.downloadFailed', { error: err }), 'error');
     it.queue_status = 'queued';
     it.wanted = 1; it.why = it.why || 'pick';
-    it._busy = false;
   }
 
   /* ---- Wants: pick / skip, singly or for a selection ---- */
@@ -171,11 +194,16 @@
     const rows = selectedRows.filter((it) => !IN_FLIGHT.includes(it.queue_status));
     if (!rows.length) return notify(t('wantedPage.alreadyOnWay'), 'info');
     const bySeries = new Map();
-    for (const it of rows) { if (!bySeries.has(it.series_id)) bySeries.set(it.series_id, []); bySeries.get(it.series_id).push(it.cv_issue_id); }
-    for (const [sid, ids] of bySeries) await apiPost(`/api/collection/${sid}/download`, { cvIssueIds: ids });
-    for (const it of rows) { it.queue_status = 'queued'; it.wanted = 1; }
-    selected.clear();
-    notify(t('wantedPage.queuedN', { count: rows.length }), 'ok');
+    for (const it of rows) { if (!bySeries.has(it.series_id)) bySeries.set(it.series_id, []); bySeries.get(it.series_id).push(it); }
+    let queued = 0, firstErr = '';
+    for (const [sid, list] of bySeries) {
+      const err = await queueRows(sid, list.map((x) => x.cv_issue_id));
+      if (err) { firstErr ||= err; continue; } // failed rows keep their state (and stay selected)
+      for (const it of list) { it.queue_status = 'queued'; it.wanted = 1; selected.delete(it.cv_issue_id); }
+      queued += list.length;
+    }
+    if (queued) notify(t('wantedPage.queuedN', { count: queued }), 'ok');
+    if (firstErr) notify(t('store.downloadFailed', { error: firstErr }), 'error');
   }
 
   // Group the flat, pre-sorted item list into per-series cards (in order of
@@ -292,7 +320,10 @@
       <div class="wx__inner wx__plugin" bind:this={pluginBox}></div>
     {:else}
     <div id="wanted-list" class="wx__inner">
-      {#if loaded && !items.length}
+      {#if loadError}
+        <LoadError compact={items.length > 0} error={loadError} onretry={() => renderWanted()} />
+      {/if}
+      {#if loaded && !items.length && !loadError}
         <div class="wx__empty">
           <div class="wx__empty-art"><Icon name="check" size={26} /></div>
           {#if emptyLibrary}

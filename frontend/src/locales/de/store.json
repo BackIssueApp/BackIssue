@@ -4,5 +4,30 @@
   "downloadFailed": "Download konnte nicht eingereiht werden: {error}",
   "downloadFailedUnreachable": "Download konnte nicht eingereiht werden – ist die App erreichbar?",
   "redownloadFailed": "Erneuter Download fehlgeschlagen: {error}",
-  "redownloadFailedUnreachable": "Erneuter Download fehlgeschlagen – ist die App erreichbar?"
+  "redownloadFailedUnreachable": "Erneuter Download fehlgeschlagen – ist die App erreichbar?",
+  "untitledSeries": "Reihe ohne Titel",
+  "scanFailed": "Scan fehlgeschlagen: {error}",
+  "tagFailed": "Tagging fehlgeschlagen: {error}",
+  "matchFailed": "Zuordnung konnte nicht starten: {error}",
+  "thisSeries": "diese Reihe",
+  "planRenameFailed": "Die Umbenennung konnte nicht geplant werden: {error}",
+  "nothingToDoCollide": {
+    "one": "Nichts zu tun — {count} Datei würde kollidieren.",
+    "other": "Nichts zu tun — {count} Dateien würden kollidieren."
+  },
+  "filesMatchPattern": "Die Dateien entsprechen bereits dem Muster.",
+  "renameTitle": {
+    "one": "{count} Datei umbenennen?",
+    "other": "{count} Dateien umbenennen?"
+  },
+  "renameMessage": "Die Dateien von \"{title}\" werden verschoben/umbenannt, damit sie den Ordner- und Dateimustern entsprechen{collisions}.",
+  "renameCollisions": " ({count} würden kollidieren und werden übersprungen)",
+  "renameFiles": "Dateien umbenennen",
+  "renamed": {
+    "one": "{count} Datei umbenannt{skipped}.",
+    "other": "{count} Dateien umbenannt{skipped}."
+  },
+  "renamedSkipped": ", {count} übersprungen",
+  "fileAssigned": "Datei dem Heft zugewiesen — die Zuweisung bleibt über Rescans erhalten.",
+  "choiceOwned": "{label} (vorhanden)"
 }

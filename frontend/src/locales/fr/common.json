@@ -67,5 +67,7 @@
   "nIssues": { "one": "{count} numéro", "other": "{count} numéros" },
   "nFiles": { "one": "{count} fichier", "other": "{count} fichiers" },
   "nSeries": { "one": "{count} série", "other": "{count} séries" },
-  "nSelected": { "one": "{count} sélectionné", "other": "{count} sélectionnés" }
+  "nSelected": { "one": "{count} sélectionné", "other": "{count} sélectionnés" },
+  "loadFailed": "Impossible de charger ce contenu.",
+  "loadFailedStale": "Actualisation impossible — affichage des dernières données chargées."
 }

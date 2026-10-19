@@ -32,7 +32,7 @@
 
 {#if open}
   <div class="modal" onclick={(e) => { if (e.target === e.currentTarget) open = false; }} role="presentation">
-    <div class="modal__panel" use:trapFocus role="dialog" aria-label={t('accountModal.dialogLabel')}>
+    <div class="modal__panel" use:trapFocus role="dialog" aria-modal="true" aria-label={t('accountModal.dialogLabel')}>
       <div class="modal__head"><h3>{t('accountModal.title', { username: auth.user?.username })}</h3>
         <button class="modal__x" aria-label={t('common.close')} onclick={() => { open = false; }}><Icon name="close" /></button></div>
       <form class="modal__body" onsubmit={(e) => { e.preventDefault(); submit(); }}>

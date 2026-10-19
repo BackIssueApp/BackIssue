@@ -82,5 +82,7 @@
   "nSelected": {
     "one": "{count} selecionado",
     "other": "{count} selecionados"
-  }
+  },
+  "loadFailed": "Não foi possível carregar.",
+  "loadFailedStale": "Não foi possível atualizar — mostrando os últimos dados carregados."
 }

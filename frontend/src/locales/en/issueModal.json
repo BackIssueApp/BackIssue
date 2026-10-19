@@ -25,7 +25,6 @@
   "characters": "Characters",
   "teams": "Teams",
   "variantFallback": "variant",
-  "choiceOwned": "{label} (owned)",
   "fileMoved": "File moved to that issue — the assignment is remembered through rescans.",
   "assignmentCleared": "Assignment cleared — the file links by its number again.",
   "savedFields": {

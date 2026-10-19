@@ -41,7 +41,7 @@
     "s1h": "Che cos'è",
     "s1p": "Cosa si sta scaricando ora e cosa è in attesa. L'elemento attivo mostra una barra di avanzamento con velocità e fonte.",
     "s2h": "Controlli",
-    "s2p": "Metti in pausa/riprendi la coda, svuota gli elementi in coda, oppure riprova/cancella quelli falliti (diritti di gestione della biblioteca). La × su una riga annulla quel download e lo rimuove dal client.",
+    "s2p": "Metti in pausa/riprendi la coda, svuota gli elementi in coda, oppure riprova/cancella quelli falliti (diritti di gestione della biblioteca). Il pulsante di chiusura su una riga annulla quel download e lo rimuove dal client.",
     "s3h": "Dopo un riavvio",
     "s3p": "Una coda interrotta a metà download riprende automaticamente all'avvio dell'app."
   },

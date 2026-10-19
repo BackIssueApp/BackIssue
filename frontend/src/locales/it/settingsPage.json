@@ -94,7 +94,7 @@
   "railMaintNote": "Riserve e worker",
   "backLibrary": "Biblioteca",
   "librariesTitle": "Biblioteche",
-  "librariesSub": "Dividi la collezione in biblioteche con un nome — ognuna compare come voce a sé nella barra laterale. Il <b>tipo</b> di una biblioteca stabilisce come si comportano le sue serie (manga = ricerca per capitoli, lettura da destra a sinistra); le sue cartelle sono dove i fumetti vengono archiviati e scansionati. Sposta le serie dal menu ⋯ di una serie.",
+  "librariesSub": "Dividi la collezione in biblioteche con un nome — ognuna compare come voce a sé nella barra laterale. Il <b>tipo</b> di una biblioteca stabilisce come si comportano le sue serie (manga = ricerca per capitoli, lettura da destra a sinistra); le sue cartelle sono dove i fumetti vengono archiviati e scansionati. Sposta le serie dal menu … di una serie.",
   "libraryName": "Nome della biblioteca",
   "libraryTypeTitle": "Tipo di biblioteca — stabilisce come si comportano le sue serie",
   "matureTitle": "Nascondi questa biblioteca (e tutto il suo contenuto) ai ruoli senza il permesso “Visualizza contenuti per adulti”",
@@ -145,7 +145,7 @@
   "monitorAll": "Tutti gli albi",
   "monitorNew": "Solo nuovi albi",
   "monitorOff": "Disattivato",
-  "monitorNote": "Il criterio di monitoraggio che una serie riceve quando entra in biblioteca — aggiunta a mano, da Scopri, Uscite, liste di lettura, richieste o un'importazione. <b>Tutti gli albi</b> mantiene la run completa; <b>Solo nuovi albi</b> ricerca gli albi dall'ultimo in poi e lascia stare il catalogo arretrato; <b>Disattivato</b> non recupera nulla finché non la monitori o scegli gli albi tu. Ogni serie si può cambiare in seguito dal suo menu ⋯.",
+  "monitorNote": "Il criterio di monitoraggio che una serie riceve quando entra in biblioteca — aggiunta a mano, da Scopri, Uscite, liste di lettura, richieste o un'importazione. <b>Tutti gli albi</b> mantiene la run completa; <b>Solo nuovi albi</b> ricerca gli albi dall'ultimo in poi e lascia stare il catalogo arretrato; <b>Disattivato</b> non recupera nulla finché non la monitori o scegli gli albi tu. Ogni serie si può cambiare in seguito dal suo menu ….",
   "onlyRequested": "Solo gli albi che sono stati richiesti",
   "onlyRequestedNote": "Quando una serie viene aggiunta per via di albi specifici — una voce in una lista di lettura, un'uscita, un'importazione CBL — arriva con il monitoraggio disattivato e solo quegli albi ricercati, così vengono scaricati solo quelli (ora e se un recupero fallisce in seguito). L'aggiunta dalla Biblioteca o da Scopri riceve comunque il criterio qui sopra. Richiede \"Scarica all'aggiunta\".",
   "downloadFormat": "Formato di download",
@@ -254,5 +254,6 @@
   "libMetaDefault": "Usa l'elenco predefinito",
   "libMetaCustom": "Scegli per questa biblioteca",
   "libMetaNote": "Le serie di questa biblioteca vengono cercate nelle fonti selezionate qui, in quest'ordine. Deselezionale tutte per tornare all'elenco predefinito.",
-  "metaDefaultForLibraries": "Questo elenco è quello predefinito; una biblioteca può sceglierne uno proprio in Impostazioni → Biblioteca."
+  "metaDefaultForLibraries": "Questo elenco è quello predefinito; una biblioteca può sceglierne uno proprio in Impostazioni → Biblioteca.",
+  "saveNeedsLoad": "Le impostazioni non sono state caricate — riprova prima di salvare."
 }

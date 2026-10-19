@@ -49,6 +49,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   from the same address within 15 minutes, further attempts wait, whichever username they try.
 - **`GET /api/series` is paged.** It returns up to 100 series by default (`?limit=` up to 500, plus
   `?offset=`). It used to return the entire catalog in one response.
+- **Faster first load.** Wanted, Queue, Releases, History, Stats, Import, Plugins, Users, Lists and
+  the setup wizard now load when first opened (and are fetched in the background once the app is
+  idle), so the app downloads about a quarter less before it can show anything.
 
 ### Fixed
 
@@ -104,6 +107,31 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   .part file older than a day, including other programs' partial downloads in a shared folder.
 - **Converting CBR to CBZ keeps the .cbr unless every page made it across.**
 - **Two downloads of the same book or audiobook at once no longer overwrite each other.**
+- **Metadata errors and links speak for BackIssue.** Error messages about the metadata service no
+  longer name an outside catalog, and the link to a record's page at its source shows only to people
+  who manage settings (and only for a safe web address).
+- **A server hiccup no longer breaks or empties pages.** When the server restarts or a proxy answers
+  with an error, Wanted, System, Stats, Queue, History, Plugins, Users, Lists and the Library keep
+  what they last showed and say the load failed, with a Retry, instead of crashing or showing an
+  empty library. Header counts and sidebar libraries no longer drop to zero on a failed poll.
+- **Settings can't be saved over with blanks.** If Settings fail to load, the page says so and Save
+  stays off until a good load, so a save can no longer wipe your indexers and metadata sources.
+- **Setup reports what failed.** The first-run wizard stays open and lists any library or plugin it
+  could not create, instead of saying you're all set.
+- **Restart app waits for the app to really come back**, even behind a reverse proxy.
+- **Scan, tag and match buttons no longer stick on "running"** when the server refuses to start one;
+  the button resets and the reason is shown.
+- **Downloads report what actually queued.** Downloading from Wanted and "download missing" on a
+  reading list only mark and count the issues the server accepted, and say when it refused.
+- **Fast clicking shows the right thing.** Switching series, stepping through issues, changing a
+  search or filter, or switching reading lists while an earlier request is still loading can no
+  longer show the older result.
+- Status, series type and age rating tags, log levels and cover prices now appear in your language;
+  a series with no title reads "Untitled series".
+- Icons replace the remaining text symbols (the series menu, help button, seeders, warnings), row
+  actions in History and Lists are always visible on touch screens, and dialogs, issue checkboxes
+  and the search box are better labelled for screen readers.
+- Searching the logs for "amp" or "lt" no longer garbles lines.
 
 ## [0.9.2] — 2026-10-18
 

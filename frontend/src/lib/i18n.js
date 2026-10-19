@@ -155,7 +155,6 @@ export function addMessages(catalogs) {
       target[ns] = { ...extra, ...(target[ns] || {}) };
       changed = true;
       generation++;
-      generation++;
     }
   }
   if (changed) onChange();

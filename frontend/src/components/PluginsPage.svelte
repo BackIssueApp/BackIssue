@@ -4,7 +4,8 @@
   // immediately but apply on the next server restart (plugins register
   // routes/jobs/sources at boot and can't be hot-unloaded).
   import { navigate } from '../lib/router.svelte.js';
-  import { apiGet, apiPost } from '../lib/api.js';
+  import { apiGet, apiGetOk, apiPost, errorText } from '../lib/api.js';
+  import LoadError from './LoadError.svelte';
   import { notify } from '../lib/toasts.svelte.js';
   import { confirmDialog } from './DialogModal.svelte';
   import Icon from '../lib/Icon.svelte';
@@ -34,14 +35,17 @@
   let srcCatalogError = $state('');
   let srcFilter = $state('all');         // all | comics | manga
 
+  let loadError = $state('');
   async function refresh() {
     try {
-      const r = await apiGet('/api/plugins');
+      const r = await apiGetOk('/api/plugins');
       plugins = r.plugins || [];
       restartRequired = !!r.restartRequired;
       pending = r.pending || [];
       loaded = true;
-    } catch { /* keep last */ }
+      loadError = '';
+      return true;
+    } catch (e) { loadError = errorText(e); return false; } // keep the last good list
   }
 
   async function loadCatalog() {
@@ -349,12 +353,15 @@
     const deadline = Date.now() + 90_000;
     await new Promise((r) => setTimeout(r, 2500)); // let the old process die first
     while (Date.now() < deadline) {
+      // Behind a reverse proxy a restarting app answers 502 (an HTML page),
+      // not a dropped connection: only a real status payload means it's back.
       try {
-        await apiGet('/api/status');
-        await refresh();
-        restarting = false;
-        notify(t('pluginsPage.restarted'), 'ok');
-        return;
+        const s = await apiGetOk('/api/status');
+        if (s?.version && (await refresh())) {
+          restarting = false;
+          notify(t('pluginsPage.restarted'), 'ok');
+          return;
+        }
       } catch { /* still coming up */ }
       await new Promise((r) => setTimeout(r, 1000));
     }
@@ -419,6 +426,9 @@
   <!-- body -->
   <div class="plx__scroll">
     <div class="plx__inner">
+      {#if loadError}
+        <LoadError compact={loaded} error={loadError} onretry={refresh} />
+      {/if}
       {#if isEmpty}
         <div class="plx__empty">
           <div class="plx__empty-art"><Icon name="puzzle" size={26} /></div>

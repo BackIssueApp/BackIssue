@@ -38,7 +38,7 @@
   "chipGaps": "Todos los huecos",
   "chipGapsTitle": "Todos los números que faltan de todas las series de la biblioteca, buscados o no",
   "chipFollowing": "Siguiendo",
-  "chipFollowingTitle": "Series que sigues (la ☆ en la página de la serie)",
+  "chipFollowingTitle": "Series que sigues (la estrella en la página de la serie)",
   "chipHideUnreleased": "Ocultar no publicados",
   "chipHideUnreleasedTitle": "Oculta los números cuya fecha de portada conocida está en el futuro (la mayoría de los números en caché no tienen fecha — solo se oculta lo que sabemos)",
   "sortOrder": "Orden",

@@ -1,13 +1,19 @@
 <script module>
   import { openModal, closeModal, modals } from '../lib/modals.svelte.js';
   import { patchIssueMeta } from '../lib/store.svelte.js';
+  import { apiGetOk } from '../lib/api.js';
+  import { latestGuard } from '../lib/util.js';
 
   // `tab` lives here, not in the component, so opening an issue can decide
   // whether to keep it: stepping to the next issue stays on the tab you were
   // reading, opening a new issue from the series page starts at Overview.
   const m = $state({ cvIssueId: null, number: null, info: null, loading: false, failed: false, tab: 'overview' });
 
+  // Last open wins: stepping prev/next quickly must not leave one issue's
+  // header showing another's data (or patch the grid with a stale record).
+  const openSeq = latestGuard();
   export async function openIssueInfo(cvIssueId, number, { keepTab = false } = {}) {
+    const isLatest = openSeq();
     m.cvIssueId = cvIssueId;
     m.number = number;
     m.info = null;
@@ -15,19 +21,25 @@
     m.failed = false;
     if (!keepTab) m.tab = 'overview';
     openModal('issue');
-    try {
-      m.info = await (await fetch('/api/issue/' + cvIssueId)).json();
+    // A 404 is an issue with no record ("no information"); anything else that
+    // fails is a failed load, never shown as an empty record.
+    let info, status = 0;
+    try { info = await apiGetOk('/api/issue/' + cvIssueId); } catch (e) { info = null; status = e?.status || 0; }
+    if (!isLatest()) return;
+    if (!info) { if (status !== 404) m.failed = true; }
+    else {
+      m.info = info;
       // The fetch just cached this issue's detail server-side — reflect the
       // cover/title on the open series grid immediately, no refresh needed.
-      patchIssueMeta(cvIssueId, m.info);
+      patchIssueMeta(cvIssueId, info);
     }
-    catch { m.failed = true; }
     m.loading = false;
   }
 </script>
 
 <script>
-  import { detail, flags, downloadCvIssues, redownloadCvIssues, reloadDetail } from '../lib/store.svelte.js';
+  import { detail, flags, downloadCvIssues, redownloadCvIssues, reloadDetail, assignFileToIssue, issueChoice } from '../lib/store.svelte.js';
+  import { metaValue } from '../lib/metaValues.js';
   import { issueActions, issueActionsTick } from '../lib/plugins.svelte.js';
   import { sanitizeHtml, safeUrl } from '../lib/util.js';
   import { openSourceSearch } from './SourceSearchModal.svelte';
@@ -37,9 +49,15 @@
   import { can, isTrusted } from '../lib/auth.svelte.js';
   import Icon from '../lib/Icon.svelte';
   import { openFeaturing } from './FeaturingModal.svelte';
-  import { t, st } from '../lib/i18n.svelte.js';
+  import { t, st, currentLang } from '../lib/i18n.svelte.js';
 
   const open = $derived(modals.stack.includes('issue'));
+  function fmtPrice(p) {
+    const s = String(p);
+    if (!/^[\d.]+$/.test(s)) return s;
+    try { return new Intl.NumberFormat(currentLang(), { style: 'currency', currency: 'USD' }).format(Number(s)); }
+    catch { return s; }
+  }
   const info = $derived(m.info && !m.info.error ? m.info : null);
   const dates = $derived(info
     ? [info.store_date && { label: t('issueModal.inStores'), value: info.store_date },
@@ -89,10 +107,10 @@
 
   // Only facts that have a value — an empty grid cell says nothing.
   const facts = $derived([
-    [t('issueModal.factRating'), info?.metron_rating],
-    // A bare number is a dollar price; a source that prices in another
-    // currency sends it with the sign or code attached.
-    [t('issueModal.factCoverPrice'), info?.metron_price && (/^[\d.]+$/.test(String(info.metron_price)) ? '$' + info.metron_price : info.metron_price)],
+    [t('issueModal.factRating'), metaValue('rating', info?.metron_rating)],
+    // A bare number is a US dollar price (formatted the reader's way); a source
+    // that prices in another currency sends it with the sign or code attached.
+    [t('issueModal.factCoverPrice'), info?.metron_price && fmtPrice(info.metron_price)],
     [t('issueModal.factFoc'), info?.metron_foc_date],
     [t('issueModal.factUpc'), info?.metron_upc],
     [t('issueModal.factIsbn'), info?.metron_isbn],
@@ -125,17 +143,11 @@
   // page's unmatched-file picker uses; the choice sticks through rescans.
   let movePick = $state({});
   const otherIssues = $derived(siblings.filter((i) => i.cv_issue_id !== m.cvIssueId));
-  const issueChoice = (i) => {
-    const label = `#${i.number}${i.title && i.title !== '#' + i.number ? ' · ' + i.title : ''}`;
-    return i.owned ? t('issueModal.choiceOwned', { label }) : label;
-  };
   const folderOf = (p) => String(p || '').replace(/[\\/][^\\/]+$/, '');
   async function setAssignment(f, cvIssueId) {
     const sid = f.series_id ?? detail.series?.id;
     if (!sid) return;
-    const r = await apiPost(`/api/collection/${sid}/assign-file`, { path: f.path, cvIssueId }).catch((e) => ({ error: String(e) }));
-    if (r?.error) return notify(r.error, 'error');
-    notify(cvIssueId ? t('issueModal.fileMoved') : t('issueModal.assignmentCleared'), 'ok');
+    if (!(await assignFileToIssue(sid, f.path, cvIssueId, cvIssueId ? t('issueModal.fileMoved') : t('issueModal.assignmentCleared')))) return;
     delete movePick[f.path];
     await openIssueInfo(m.cvIssueId, m.number, { keepTab: true });
     reloadDetail();
@@ -199,7 +211,7 @@
 
 {#if open}
   <div id="issue-modal" class="modal" onclick={(e) => { if (e.target === e.currentTarget) closeModal('issue'); }}>
-    <div class="modal__panel modal__panel--wide ix" use:trapFocus role="dialog" aria-label={t('issueModal.dialogLabel')}>
+    <div class="modal__panel modal__panel--wide ix" use:trapFocus role="dialog" aria-modal="true" aria-label={t('issueModal.dialogLabel')}>
       <div class="modal__head ix__head">
         <h3 id="issue-modal-title" class="ix__title">
           <span class="ix__series">{detail.series?.title || t('issueModal.issueFallback')}</span>

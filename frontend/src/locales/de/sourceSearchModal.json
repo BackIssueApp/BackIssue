@@ -13,5 +13,9 @@
   "failed": "Download fehlgeschlagen: {error}",
   "unknownError": "unbekannter Fehler",
   "sending": "Wird gesendet…",
-  "download": "Herunterladen"
+  "download": "Herunterladen",
+  "seedersTitle": {
+    "one": "{count} Seeder",
+    "other": "{count} Seeder"
+  }
 }

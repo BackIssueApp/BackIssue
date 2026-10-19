@@ -5,6 +5,8 @@
   // server half resolves them into the series the real grid then shows.
   import { libraryFilterFor } from '../lib/plugins.svelte.js';
   import { apiGet } from '../lib/api.js';
+  import { trapFocus } from '../lib/dom.js';
+  import { latestGuard } from '../lib/util.js';
   import { t } from '../lib/i18n.svelte.js';
   import Icon from '../lib/Icon.svelte';
 
@@ -16,12 +18,18 @@
   let search = $state({}); // per-group search text (groups with search:true)
   const provider = $derived(type ? libraryFilterFor(type) : null);
 
+  // Every facet click refires this; only the latest selection's counts land.
+  const groupsSeq = latestGuard();
   async function loadGroups() {
+    const isLatest = groupsSeq();
     if (!provider) { groups = []; return; }
     loading = true;
+    let next;
     try {
-      groups = (await provider.groups($state.snapshot(local), { get: apiGet, type, libraryId, search: $state.snapshot(search) })) || [];
-    } catch { groups = []; }
+      next = (await provider.groups($state.snapshot(local), { get: apiGet, type, libraryId, search: $state.snapshot(search) })) || [];
+    } catch { next = []; }
+    if (!isLatest()) return;
+    groups = next;
     loading = false;
   }
 
@@ -57,7 +65,7 @@
 
 {#if open}
   <div class="modal" onclick={(e) => { if (e.target === e.currentTarget) onclose?.(); }}>
-    <div class="modal__panel filt" role="dialog" aria-label={t('filtersModal.title')}>
+    <div class="modal__panel filt" use:trapFocus role="dialog" aria-modal="true" aria-label={t('filtersModal.title')}>
       <div class="modal__head"><h3>{t('filtersModal.title')}</h3>
         <button class="modal__x" aria-label={t('common.close')} onclick={() => onclose?.()}><Icon name="close" /></button>
       </div>

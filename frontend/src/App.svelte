@@ -1,7 +1,7 @@
 <script>
   import { untrack } from 'svelte';
   import { route, navigate, goBack, OVERLAY_PATHS, activeDrawer } from './lib/router.svelte.js';
-  import { rail, railSelect, detail, loadCollection, openVolume, clearDetail, loadFlags, startOpsTracking, librarySort, PLACEHOLDER_TITLE } from './lib/store.svelte.js';
+  import { rail, railSelect, detail, flags, loadCollection, openVolume, clearDetail, loadFlags, startOpsTracking, librarySort, PLACEHOLDER_TITLE } from './lib/store.svelte.js';
   import Icon from './lib/Icon.svelte';
   import { startStatusPolling } from './lib/status.svelte.js';
   import { startEvents } from './lib/events.svelte.js';
@@ -13,22 +13,17 @@
   import Sidebar from './components/Sidebar.svelte';
   import LibraryPage from './components/LibraryPage.svelte';
   import SeriesDetail from './components/SeriesDetail.svelte';
+  // Settings, System (the tools grid) and Profile hold plugin mount points,
+  // so they load with the app; the other section pages are their own chunks
+  // (LazyPage), fetched on first open.
   import SettingsPage from './components/SettingsPage.svelte';
   import SystemPage from './components/SystemPage.svelte';
-  import WantedPage from './components/WantedPage.svelte';
-  import HistoryPage from './components/HistoryPage.svelte';
-  import StatsPage from './components/StatsPage.svelte';
-  import ImportPage from './components/ImportPage.svelte';
-  import PluginsPage from './components/PluginsPage.svelte';
-  import UsersPage from './components/UsersPage.svelte';
-  import ListsPage from './components/ListsPage.svelte';
   import ProfilePage from './components/ProfilePage.svelte';
+  import LazyPage from './components/LazyPage.svelte';
   import LoginPage from './components/LoginPage.svelte';
   import AccountModal from './components/AccountModal.svelte';
   import HelpModal from './components/HelpModal.svelte';
   import { auth, loadMe, can } from './lib/auth.svelte.js';
-  import QueuePage from './components/QueuePage.svelte';
-  import ReleasesDrawer from './components/ReleasesDrawer.svelte';
   import AddModal from './components/AddModal.svelte';
   import CvPickerModal from './components/CvPickerModal.svelte';
   import IssueModal from './components/IssueModal.svelte';
@@ -38,12 +33,25 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
   import PackSearchModal from './components/PackSearchModal.svelte';
   import IndexerModal from './components/IndexerModal.svelte';
   import DialogModal from './components/DialogModal.svelte';
-  import Onboarding from './components/Onboarding.svelte';
   import Toasts from './components/Toasts.svelte';
   import ContextMenu from './components/ContextMenu.svelte';
 
-  // Section pages are always mounted (plugin slots inject into them) —
-  // a body class picks which one is visible (app.css hides .home under it).
+  const PAGES = {
+    wanted: () => import('./components/WantedPage.svelte'),
+    history: () => import('./components/HistoryPage.svelte'),
+    stats: () => import('./components/StatsPage.svelte'),
+    import: () => import('./components/ImportPage.svelte'),
+    plugins: () => import('./components/PluginsPage.svelte'),
+    queue: () => import('./components/QueuePage.svelte'),
+    releases: () => import('./components/ReleasesDrawer.svelte'),
+    users: () => import('./components/UsersPage.svelte'),
+    lists: () => import('./components/ListsPage.svelte'),
+  };
+  const loadOnboarding = () => import('./components/Onboarding.svelte');
+  const onboardingOpen = $derived(flags.needsOnboarding || new URLSearchParams(route.search).has('onboarding'));
+
+  // Section pages stay mounted once shown (plugin slots inject into the eager
+  // ones) — a body class picks which one is visible (app.css hides .home under it).
   const PAGE_CLASSES = {
     '/settings': 'settings', '/system': 'systempage',
     '/wanted': 'wanted', '/history': 'history', '/stats': 'stats', '/import': 'import',
@@ -168,6 +176,10 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
     if (can('library.manage')) startOpsTracking();
     if (can('settings.manage')) loadFlags();
     loadClientPlugins();
+    // Warm the section-page chunks once the app is idle, so the first click
+    // on one doesn't wait on the network (fetch only; nothing mounts).
+    const warm = () => { for (const load of Object.values(PAGES)) load().catch(() => {}); };
+    if ('requestIdleCallback' in window) requestIdleCallback(warm, { timeout: 5000 }); else setTimeout(warm, 3000);
     // The rail effect above loads the collection as soon as auth resolves
     // (it watches `authed` too), so a second call here fetched page 1 and
     // the chip counts twice on every reload — ~200 KB and two round trips
@@ -224,16 +236,16 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
 
       <SettingsPage active={page === '/settings'} />
       <SystemPage active={page === '/system'} />
-      <WantedPage active={page === '/wanted'} />
-      <HistoryPage active={page === '/history'} />
-      <StatsPage active={page === '/stats'} />
-      <ImportPage active={page === '/import'} />
-      <PluginsPage active={page === '/plugins'} />
+      <LazyPage load={PAGES.wanted} active={page === '/wanted'} />
+      <LazyPage load={PAGES.history} active={page === '/history'} />
+      <LazyPage load={PAGES.stats} active={page === '/stats'} />
+      <LazyPage load={PAGES.import} active={page === '/import'} />
+      <LazyPage load={PAGES.plugins} active={page === '/plugins'} />
 
-      <QueuePage active={page === '/queue'} />
-      <ReleasesDrawer active={page === '/releases'} />
-      <UsersPage active={page === '/users'} />
-      <ListsPage active={page === '/lists'} />
+      <LazyPage load={PAGES.queue} active={page === '/queue'} />
+      <LazyPage load={PAGES.releases} active={page === '/releases'} />
+      <LazyPage load={PAGES.users} active={page === '/users'} />
+      <LazyPage load={PAGES.lists} active={page === '/lists'} />
       <ProfilePage active={page === '/profile'} />
     </main>
   </div>
@@ -251,7 +263,7 @@ import EditMetadataModal from './components/EditMetadataModal.svelte';
 <PackSearchModal />
 <IndexerModal />
 <DialogModal />
-<Onboarding />
+<LazyPage load={loadOnboarding} active={onboardingOpen} />
 
 <Toasts />
 <ContextMenu />

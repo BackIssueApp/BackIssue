@@ -1,25 +1,6 @@
 {
-  "fileAssigned": "Datei dem Heft zugewiesen — die Zuweisung bleibt über Rescans erhalten.",
-  "choiceOwned": "{label} (vorhanden)",
   "thisSeries": "diese Reihe",
-  "planRenameFailed": "Die Umbenennung konnte nicht geplant werden: {error}",
-  "nothingToDoCollide": {
-    "one": "Nichts zu tun — {count} Datei würde kollidieren.",
-    "other": "Nichts zu tun — {count} Dateien würden kollidieren."
-  },
-  "filesMatchPattern": "Die Dateien entsprechen bereits dem Muster.",
-  "renameTitle": {
-    "one": "{count} Datei umbenennen?",
-    "other": "{count} Dateien umbenennen?"
-  },
-  "renameMessage": "Die Dateien von \"{title}\" werden verschoben/umbenannt, damit sie den Ordner- und Dateimustern entsprechen{collisions}.",
-  "renameCollisions": " ({count} würden kollidieren und werden übersprungen)",
   "renameFiles": "Dateien umbenennen",
-  "renamed": {
-    "one": "{count} Datei umbenannt{skipped}.",
-    "other": "{count} Dateien umbenannt{skipped}."
-  },
-  "renamedSkipped": ", {count} übersprungen",
   "nIssuesLabel": "{n} Hefte",
   "nItems": {
     "one": "{n} Element",
@@ -39,7 +20,7 @@
   },
   "summaryBase": "{issues} Hefte · {owned} vorhanden",
   "summaryMissing": " · {n} fehlen",
-  "summaryCorrupt": " · ⚠ {n} beschädigt",
+  "summaryCorrupt": " · {n} beschädigt",
   "summaryUntagged": " · {n} ohne Tags",
   "refreshing": "Metadaten werden aktualisiert…",
   "refreshFailed": "Aktualisierung fehlgeschlagen: {error}",
@@ -115,7 +96,6 @@
   "alreadyOnList": "Bereits auf dieser Liste.",
   "scanning": "Scan läuft {progress}…",
   "scanningElsewhere": "Scan läuft an anderer Stelle…",
-  "scanFailed": "Scan fehlgeschlagen",
   "scanError": "Scanfehler: {error}",
   "scanComplete": "Ordnerscan abgeschlossen{pruned}.",
   "scanPruned": {
@@ -124,7 +104,6 @@
   },
   "tagging": "Tagging läuft {progress}…",
   "taggingElsewhere": "Tagging läuft an anderer Stelle…",
-  "taggingFailed": "Tagging fehlgeschlagen",
   "taggingError": "Tagging-Fehler: {error}",
   "tagged": "{tagged} von {total} Dateien getaggt{problems}.",
   "taggedProblems": {
@@ -161,7 +140,7 @@
   "unknownPublisher": "Unbekannter Verlag",
   "nextShipTitle": "Aus der wöchentlichen Neuerscheinungsliste",
   "nextShip": "Nächstes: #{number} · {date}",
-  "monitorTagTitle": "Was die Download-Automatik für diese Reihe holt — unter ⋯ änderbar",
+  "monitorTagTitle": "Was die Download-Automatik für diese Reihe holt — unter … änderbar",
   "seriesTypeTitle": "Reihentyp (aus angereicherten Metadaten)",
   "genresTitle": "Genres (aus angereicherten Metadaten)",
   "openSourcePage": "Quellseite öffnen",
@@ -291,5 +270,6 @@
   "assignAria": "{name} einem Heft zuweisen",
   "assignTo": "Heft zuweisen…",
   "assign": "Zuweisen",
-  "showAll": "Alle {n} anzeigen"
+  "showAll": "Alle {n} anzeigen",
+  "selectIssue": "Heft #{number} auswählen"
 }

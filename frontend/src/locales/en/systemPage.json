@@ -97,5 +97,11 @@
   "nothingMatches": "Nothing matches “{query}”.",
   "copied": "copied",
   "copyLine": "Copy line",
-  "logsCleared": "Logs cleared."
+  "logsCleared": "Logs cleared.",
+  "logLevel": {
+    "error": "error",
+    "warn": "warning",
+    "info": "info",
+    "debug": "debug"
+  }
 }

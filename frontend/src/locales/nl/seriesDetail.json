@@ -1,25 +1,6 @@
 {
-  "fileAssigned": "Bestand aan het nummer gekoppeld — het blijft daar ook na nieuwe scans.",
-  "choiceOwned": "{label} (in bezit)",
   "thisSeries": "deze reeks",
-  "planRenameFailed": "Kon het hernoemen niet voorbereiden: {error}",
-  "nothingToDoCollide": {
-    "one": "Niets te doen — {count} bestand zou botsen.",
-    "other": "Niets te doen — {count} bestanden zouden botsen."
-  },
-  "filesMatchPattern": "De bestanden voldoen al aan het patroon.",
-  "renameTitle": {
-    "one": "{count} bestand hernoemen?",
-    "other": "{count} bestanden hernoemen?"
-  },
-  "renameMessage": "De bestanden van \"{title}\" worden verplaatst/hernoemd volgens je map- en bestandspatronen{collisions}.",
-  "renameCollisions": " ({count} zouden botsen en worden overgeslagen)",
   "renameFiles": "Bestanden hernoemen",
-  "renamed": {
-    "one": "{count} bestand hernoemd{skipped}.",
-    "other": "{count} bestanden hernoemd{skipped}."
-  },
-  "renamedSkipped": ", {count} overgeslagen",
   "nIssuesLabel": "{n} nummers",
   "nItems": {
     "one": "{n} item",
@@ -39,7 +20,7 @@
   },
   "summaryBase": "{issues} nummers · {owned} in bezit",
   "summaryMissing": " · {n} ontbrekend",
-  "summaryCorrupt": " · ⚠ {n} beschadigd",
+  "summaryCorrupt": " · {n} beschadigd",
   "summaryUntagged": " · {n} ongetagd",
   "refreshing": "Metadata vernieuwen…",
   "refreshFailed": "Vernieuwen mislukt: {error}",
@@ -115,7 +96,6 @@
   "alreadyOnList": "Staat al op die lijst.",
   "scanning": "Scannen {progress}…",
   "scanningElsewhere": "Elders aan het scannen…",
-  "scanFailed": "Scan mislukt",
   "scanError": "Scanfout: {error}",
   "scanComplete": "Mapscan voltooid{pruned}.",
   "scanPruned": {
@@ -124,7 +104,6 @@
   },
   "tagging": "Taggen {progress}…",
   "taggingElsewhere": "Elders aan het taggen…",
-  "taggingFailed": "Taggen mislukt",
   "taggingError": "Tagfout: {error}",
   "tagged": "{tagged} van {total} bestanden getagd{problems}.",
   "taggedProblems": {
@@ -161,7 +140,7 @@
   "unknownPublisher": "Onbekende uitgever",
   "nextShipTitle": "Uit de wekelijkse lijst met nieuwe uitgaven",
   "nextShip": "Volgende: #{number} · {date}",
-  "monitorTagTitle": "Wat de downloadautomatisering voor deze reeks ophaalt — wijzig het onder ⋯",
+  "monitorTagTitle": "Wat de downloadautomatisering voor deze reeks ophaalt — wijzig het onder …",
   "seriesTypeTitle": "Reekstype (uit verrijkte metadata)",
   "genresTitle": "Genres (uit verrijkte metadata)",
   "openSourcePage": "De bronpagina openen",
@@ -291,5 +270,6 @@
   "assignAria": "{name} aan een nummer koppelen",
   "assignTo": "Koppelen aan nummer…",
   "assign": "Koppelen",
-  "showAll": "Alle {n} tonen"
+  "showAll": "Alle {n} tonen",
+  "selectIssue": "Nummer #{number} selecteren"
 }

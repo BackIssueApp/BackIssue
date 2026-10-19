@@ -14,26 +14,8 @@
     "other": "Queued {n} issues."
   },
   "scanAlreadyRunning": "A folder scan is already running.",
-  "scanFailed": "Scan failed",
   "loadSeriesFailed": "Could not load that series: {error}",
-  "planRenameFailed": "Could not plan the rename: {error}",
-  "nothingToDoCollide": {
-    "one": "Nothing to do — {count} file would collide.",
-    "other": "Nothing to do — {count} files would collide."
-  },
-  "filesMatchPattern": "Files already match the pattern.",
-  "renameTitle": {
-    "one": "Rename {count} file?",
-    "other": "Rename {count} files?"
-  },
-  "renameMessage": "Files for “{title}” are moved/renamed to match your folder and file patterns{collisions}.",
-  "renameCollisions": " ({count} would collide and are skipped)",
   "renameFiles": "Rename files",
-  "renamed": {
-    "one": "Renamed {count} file{skipped}.",
-    "other": "Renamed {count} files{skipped}."
-  },
-  "renamedSkipped": ", {count} skipped",
   "menuOpen": "Open",
   "follow": "Follow",
   "unfollow": "Unfollow",

@@ -228,3 +228,44 @@ export function fmtDay(value) {
   const sameYear = d.getFullYear() === new Date().getFullYear();
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) });
 }
+
+/** Last-request-wins guard for async loaders. Make one per loader; call it
+ *  before the await and check the returned function after:
+ *    const seq = latestGuard();            // module/component level
+ *    const isLatest = seq();               // each call
+ *    const r = await apiGet(…); if (!isLatest()) return;
+ *  A slower, older response is then dropped instead of overwriting a newer one. */
+export function latestGuard() {
+  let n = 0;
+  return () => { const mine = ++n; return () => mine === n; };
+}
+
+/** Columns and row stride of a rendered grid/list, from its item elements
+ *  (columns = items sharing the first one's top; stride = the gap to the
+ *  next row). null until two items exist; stride null when it reads as 0. */
+export function measureGrid(items) {
+  if (!items || items.length < 2) return null;
+  const top0 = items[0].offsetTop;
+  let c = 1;
+  while (c < items.length && items[c].offsetTop === top0) c++;
+  const next = items[c] || items[1];
+  const d = next.offsetTop - top0;
+  return { cols: Math.max(1, c), stride: d > 10 ? d : null };
+}
+
+/** HTML for `text` with every case-insensitive match of `q` wrapped in
+ *  <mark class={cls}>. Splits the raw text and escapes each piece, so a search
+ *  for "amp" never lands inside an escaped entity. */
+export function highlightHtml(text, q, cls = '') {
+  const raw = String(text ?? '');
+  if (!q) return escapeHtml(raw);
+  const rx = new RegExp(String(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig');
+  const open = cls ? `<mark class="${escapeHtml(cls)}">` : '<mark>';
+  let out = '', last = 0, m;
+  while ((m = rx.exec(raw))) {
+    if (!m[0].length) { rx.lastIndex++; continue; }
+    out += escapeHtml(raw.slice(last, m.index)) + open + escapeHtml(m[0]) + '</mark>';
+    last = m.index + m[0].length;
+  }
+  return out + escapeHtml(raw.slice(last));
+}

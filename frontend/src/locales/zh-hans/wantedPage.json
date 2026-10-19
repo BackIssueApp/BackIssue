@@ -50,7 +50,7 @@
   "chipGaps": "所有缺口",
   "chipGapsTitle": "书库中每个系列的所有缺失期数，无论是否需要",
   "chipFollowing": "已关注",
-  "chipFollowingTitle": "你关注的系列（系列页面上的 ☆）",
+  "chipFollowingTitle": "你关注的系列（系列页面上的星标）",
   "chipHideUnreleased": "隐藏未发售",
   "chipHideUnreleasedTitle": "隐藏已知封面日期在未来的期刊（大多数缓存的期刊没有日期——这只会隐藏已知的）",
   "sortOrder": "排序方式",

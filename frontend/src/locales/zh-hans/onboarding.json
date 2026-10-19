@@ -75,5 +75,8 @@
   "saving": "保存中…",
   "installedRestarting": "插件已安装——正在重启 BackIssue 以激活它们…",
   "allSet": "设置完成——用“+ 添加”添加一个系列，或从侧边栏导入已有书库。",
-  "saveFailed": "无法保存设置——请确认应用可以访问后重试。"
+  "saveFailedReason": "无法保存设置：{error}",
+  "libraryFailed": "书库“{name}”：{error}",
+  "pluginFailed": "插件“{name}”：{error}",
+  "stepsFailed": "部分设置步骤失败——请修正后再次完成，或跳过：{list}"
 }
