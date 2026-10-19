@@ -22,6 +22,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   **Update all** beside the Installed heading. It updates each one in turn, keeps going past a
   failure, and the updates apply on the next restart, like a single update.
 
+### Changed
+
+- **Faster first load.** Wanted, Queue, Releases, History, Stats, Import, Plugins, Users, Lists and
+  the setup wizard now load when first opened (and are fetched in the background once the app is
+  idle), so the app downloads about a quarter less before it can show anything.
+
 ### Fixed
 
 - **A finished download no longer deletes a different issue with the same number.** Replacing the old
