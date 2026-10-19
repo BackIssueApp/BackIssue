@@ -1397,7 +1397,11 @@ function membershipWhere({ guard, selfTypesLen, includeRestricted = true, librar
 const COLL_ORDERS = {
   title: 'ORDER BY title',
   added: 'ORDER BY id DESC',
-  missing: 'ORDER BY (cv_total - cv_owned) DESC, title',
+  // +title: the tie-break must not steer the planner onto idx_series_title.
+  // Without planner statistics it walked all of `series` through that index
+  // (a random lookup per row) for an order the index can't give anyway: 4x
+  // slower than a plain scan on a 320k-row catalog. Same order (no collation).
+  missing: 'ORDER BY (cv_total - cv_owned) DESC, +title',
   // Publication year, newest first — books/audiobooks carry it; nulls sort last.
   year: 'ORDER BY CAST(year AS INTEGER) DESC, title',
   'year-asc': 'ORDER BY (year IS NULL), CAST(year AS INTEGER) ASC, title',

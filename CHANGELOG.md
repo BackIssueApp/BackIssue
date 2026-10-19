@@ -34,6 +34,7 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
     blocking every Library load and search for about a second.
   - Creator, character and team pages answer from an index instead of reading every issue's
     credits. Existing libraries build the index in the background after the update.
+  - Sorting the Library by **Missing** is about 3.5× faster on a large catalog.
   - The Wanted page, the Stats page and the mobile apps' library list run cheaper queries and reuse
     their last answer until the library changes.
   - Signing in no longer pauses the server while the password is checked, and the "last seen" time
