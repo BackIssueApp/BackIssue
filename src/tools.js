@@ -207,8 +207,10 @@ export async function verifyLibrary(db, onProgress = () => {}, { corruptOnly = f
 // everything.
 // Temp files our own writers create (atomic-write .part, tagger .tag-*) can be
 // stranded by a crash mid-write. Sweep ones old enough that no writer can still
-// own them. Uses the shared recursive walker.
-const TEMP_FILE_RE = /(\.part$|^\.tag-)/;
+// own them. Uses the shared recursive walker. Only OUR names: a library tree
+// can be shared with a browser, JDownloader or aria2, whose own .part files
+// are someone else's partial downloads.
+export const TEMP_FILE_RE = /(\.(?:cbz|cbr|pdf|xml)\.part$|^\.tag-\d+-)/i;
 const TEMP_MAX_AGE_MS = 24 * 3600 * 1000;
 async function sweepTempFiles(dir) {
   let swept = 0;

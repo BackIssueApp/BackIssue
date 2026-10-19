@@ -64,6 +64,18 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 - **An indexer, download client or metadata request that stops answering no longer stalls
   downloads.** Requests now give up after 30 seconds (60 for metadata) instead of waiting up to five
   minutes, so one unresponsive indexer or client can't hold up searches, the queue or imports.
+- **qBittorrent downloads are imported only once they have finished moving.** A torrent still being
+  moved out of an incomplete-downloads folder, or re-checked, counted as done and the import failed.
+- **Half issues are found on usenet, torrents and RSS.** A release named like "Wizard 1/2" was read
+  as issue 2, so ½ issues never matched.
+- **The download-client folder mapping matches whole folders only.** A mapping for /data/torrents no
+  longer also rewrites paths under /data/torrents-old.
+- **A scheduled task that hits an error no longer stops the app,** and a search that fails is shown as
+  failed on the Jobs page instead of running forever.
+- **The library scan's temp-file cleanup only removes BackIssue's own files.** It used to delete any
+  .part file older than a day, including other programs' partial downloads in a shared folder.
+- **Converting CBR to CBZ keeps the .cbr unless every page made it across.**
+- **Two downloads of the same book or audiobook at once no longer overwrite each other.**
 
 ## [0.9.2] — 2026-10-18
 

@@ -119,3 +119,17 @@ test('watchdog: a hung run is released after the stall threshold so the schedule
   await flush();                                    // pattern is past due → re-fires
   assert.equal(starts.length, 2, 'schedule resumed after the hung run was released');
 });
+
+test('a task whose check throws is skipped; the tick survives and other tasks still run', async () => {
+  let t = at(2026, 7, 1, 10, 0);
+  const runs = [];
+  const s = createScheduler({ now: () => t });
+  let broken = false;
+  s.register({ key: 'bad', label: 'Bad', cron: () => { if (broken) throw new Error('SQLITE_BUSY'); return '0 9 * * *'; }, run: async () => {} });
+  s.register({ key: 'ok', label: 'Ok', cron: () => '0 9 * * *', run: async () => { runs.push(t); } });
+  broken = true;
+  t = at(2026, 7, 2, 9, 0);
+  assert.doesNotThrow(() => s.tick());
+  await flush();
+  assert.equal(runs.length, 1, 'the healthy task ran');
+});

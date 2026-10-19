@@ -842,22 +842,26 @@ async function refreshAllVolumes(op) {
 // the indexers.
 async function runWantedSearch() {
   const job = startJob('wanted-search', 'Search wanted issues');
-  settlePicks(); // anything that arrived by other means (scans, packs) retires its pick
-  const batch = Math.max(1, Number(config.wantedSearchBatch) || 25);
-  const { items, total } = listWantedIssues(db, { hideUnreleased: true, limit: 500 });
-  const ids = [];
-  for (const it of items) {
-    if (ids.length >= batch) break;
-    if (it.queue_status) continue; // queued/downloading/failed/… — leave it be
-    ids.push(ensureCvIssueRow(db, { seriesId: it.series_id, cvIssueId: it.cv_issue_id, number: it.issue_number, title: it.issue_name }));
-  }
-  queueIssues(db, ids);
-  if (ids.length && !state.queue.running) {
-    Promise.resolve(runDownloads()).catch((e) => { state.queue.error = String(e); });
-  }
-  logInfo(`Wanted search: queued ${ids.length} of ${total} missing issue(s)`, 'download');
-  job.finish({ queued: ids.length, wanted: total });
-  return { queued: ids.length, wanted: total };
+  // A throw (database, indexer lookup) fails the job instead of leaving it
+  // "running" on the Jobs page until the next restart.
+  try {
+    settlePicks(); // anything that arrived by other means (scans, packs) retires its pick
+    const batch = Math.max(1, Number(config.wantedSearchBatch) || 25);
+    const { items, total } = listWantedIssues(db, { hideUnreleased: true, limit: 500 });
+    const ids = [];
+    for (const it of items) {
+      if (ids.length >= batch) break;
+      if (it.queue_status) continue; // queued/downloading/failed/… — leave it be
+      ids.push(ensureCvIssueRow(db, { seriesId: it.series_id, cvIssueId: it.cv_issue_id, number: it.issue_number, title: it.issue_name }));
+    }
+    queueIssues(db, ids);
+    if (ids.length && !state.queue.running) {
+      Promise.resolve(runDownloads()).catch((e) => { state.queue.error = String(e); });
+    }
+    logInfo(`Wanted search: queued ${ids.length} of ${total} missing issue(s)`, 'download');
+    job.finish({ queued: ids.length, wanted: total });
+    return { queued: ids.length, wanted: total };
+  } catch (e) { job.fail(e); throw e; }
 }
 
 // Scheduled new-releases lane: queue wanted issues that hit the shelves in
@@ -868,30 +872,32 @@ async function runWantedSearch() {
 // retried (the nightly backfill's skip-failed rule takes over).
 async function runRecentSearch() {
   const job = startJob('recent-search', 'Search new releases');
-  const days = Math.max(1, Number(config.recentSearchDays) || 14);
-  const { items, total } = listWantedIssues(db, { releasedWithinDays: days, limit: 200 });
-  const fresh = [], failed = [];
-  for (const it of items) {
-    // 'pending' is PARKED (a cancelled or interrupted queue entry), not
-    // in-flight — inside the new-releases window it gets picked back up:
-    // wanted means "keep after it". Only genuinely moving statuses
-    // (queued/downloading/grabbed/saving/done) are left alone.
-    const bucket = it.queue_status === 'failed' ? failed
-      : (!it.queue_status || it.queue_status === 'pending') ? fresh
-      : null;
-    if (bucket) bucket.push(ensureCvIssueRow(db, { seriesId: it.series_id, cvIssueId: it.cv_issue_id, number: it.issue_number, title: it.issue_name }));
-  }
-  // Failed rows keep no files (they never downloaded) — just reset them to
-  // pending so queueIssues picks them up alongside the fresh ones.
-  clearIssuesForRedownload(db, failed);
-  const ids = [...fresh, ...failed];
-  queueIssues(db, ids);
-  if (ids.length && !state.queue.running) {
-    Promise.resolve(runDownloads()).catch((e) => { state.queue.error = String(e); });
-  }
-  logInfo(`New releases: queued ${fresh.length} new, retried ${failed.length} failed (of ${total} recent missing)`, 'download');
-  job.finish({ queued: fresh.length, retried: failed.length, recent: total });
-  return { queued: fresh.length, retried: failed.length, recent: total };
+  try {
+    const days = Math.max(1, Number(config.recentSearchDays) || 14);
+    const { items, total } = listWantedIssues(db, { releasedWithinDays: days, limit: 200 });
+    const fresh = [], failed = [];
+    for (const it of items) {
+      // 'pending' is PARKED (a cancelled or interrupted queue entry), not
+      // in-flight — inside the new-releases window it gets picked back up:
+      // wanted means "keep after it". Only genuinely moving statuses
+      // (queued/downloading/grabbed/saving/done) are left alone.
+      const bucket = it.queue_status === 'failed' ? failed
+        : (!it.queue_status || it.queue_status === 'pending') ? fresh
+        : null;
+      if (bucket) bucket.push(ensureCvIssueRow(db, { seriesId: it.series_id, cvIssueId: it.cv_issue_id, number: it.issue_number, title: it.issue_name }));
+    }
+    // Failed rows keep no files (they never downloaded) — just reset them to
+    // pending so queueIssues picks them up alongside the fresh ones.
+    clearIssuesForRedownload(db, failed);
+    const ids = [...fresh, ...failed];
+    queueIssues(db, ids);
+    if (ids.length && !state.queue.running) {
+      Promise.resolve(runDownloads()).catch((e) => { state.queue.error = String(e); });
+    }
+    logInfo(`New releases: queued ${fresh.length} new, retried ${failed.length} failed (of ${total} recent missing)`, 'download');
+    job.finish({ queued: fresh.length, retried: failed.length, recent: total });
+    return { queued: fresh.length, retried: failed.length, recent: total };
+  } catch (e) { job.fail(e); throw e; }
 }
 
 // RSS watch: poll the indexers' latest-uploads feed (empty-query search) and
@@ -901,39 +907,41 @@ async function runRecentSearch() {
 // downloads exactly that release — no re-search. See src/rsswatch.js.
 async function runRssWatch() {
   const job = startJob('rss-watch', 'Watch indexer RSS');
-  const feeds = [];
-  if (config.torrentEnabled) {
-    const ixs = await resolveIndexers(config, 'torznab');
-    if (ixs.length) feeds.push(searchTorznab(ixs, '', { limit: 100 })
-      .then((r) => r.map((x) => ({ ...x, source: 'torrent' })))
-      .catch((e) => { logWarn(`RSS watch: torznab feed failed — ${e?.message || e}`, 'download'); return []; }));
-  }
-  if (config.usenetEnabled) {
-    const ixs = await resolveIndexers(config, 'newznab');
-    if (ixs.length) feeds.push(searchNewznab(ixs, '', { limit: 100 })
-      .then((r) => r.map((x) => ({ ...x, source: 'usenet' })))
-      .catch((e) => { logWarn(`RSS watch: newznab feed failed — ${e?.message || e}`, 'download'); return []; }));
-  }
-  if (!feeds.length) { job.finish({ skipped: 'no indexers' }); return { skipped: true }; }
-  const items = (await Promise.all(feeds)).flat();
-  const fresh = unseenItems(db, items);
-  const matches = fresh.length ? matchFeedItems(fresh, buildWantedIndex(db)) : [];
-  const ids = [];
-  for (const { item, wanted } of matches) {
-    const id = ensureCvIssueRow(db, { seriesId: wanted.series_id, cvIssueId: wanted.cv_issue_id, number: wanted.issue_number, title: wanted.issue_name });
-    if (manualPins.size >= 500) manualPins.delete(manualPins.keys().next().value);
-    manualPins.set(id, { source: item.source, candidate: item });
-    ids.push(id);
-    logInfo(`RSS match: "${item.title}" → ${wanted.series_title} #${wanted.issue_number} (${item.source})`, 'download');
-  }
-  queueIssues(db, ids);
-  markSeen(db, items); // every fetched item was considered — never re-process
-  if (ids.length && !state.queue.running) {
-    Promise.resolve(runDownloads()).catch((e) => { state.queue.error = String(e); });
-  }
-  if (fresh.length || ids.length) logInfo(`RSS watch: ${items.length} item(s), ${fresh.length} new, matched ${ids.length}`, 'download');
-  job.finish({ items: items.length, fresh: fresh.length, queued: ids.length });
-  return { items: items.length, fresh: fresh.length, queued: ids.length };
+  try {
+    const feeds = [];
+    if (config.torrentEnabled) {
+      const ixs = await resolveIndexers(config, 'torznab');
+      if (ixs.length) feeds.push(searchTorznab(ixs, '', { limit: 100 })
+        .then((r) => r.map((x) => ({ ...x, source: 'torrent' })))
+        .catch((e) => { logWarn(`RSS watch: torznab feed failed — ${e?.message || e}`, 'download'); return []; }));
+    }
+    if (config.usenetEnabled) {
+      const ixs = await resolveIndexers(config, 'newznab');
+      if (ixs.length) feeds.push(searchNewznab(ixs, '', { limit: 100 })
+        .then((r) => r.map((x) => ({ ...x, source: 'usenet' })))
+        .catch((e) => { logWarn(`RSS watch: newznab feed failed — ${e?.message || e}`, 'download'); return []; }));
+    }
+    if (!feeds.length) { job.finish({ skipped: 'no indexers' }); return { skipped: true }; }
+    const items = (await Promise.all(feeds)).flat();
+    const fresh = unseenItems(db, items);
+    const matches = fresh.length ? matchFeedItems(fresh, buildWantedIndex(db)) : [];
+    const ids = [];
+    for (const { item, wanted } of matches) {
+      const id = ensureCvIssueRow(db, { seriesId: wanted.series_id, cvIssueId: wanted.cv_issue_id, number: wanted.issue_number, title: wanted.issue_name });
+      if (manualPins.size >= 500) manualPins.delete(manualPins.keys().next().value);
+      manualPins.set(id, { source: item.source, candidate: item });
+      ids.push(id);
+      logInfo(`RSS match: "${item.title}" → ${wanted.series_title} #${wanted.issue_number} (${item.source})`, 'download');
+    }
+    queueIssues(db, ids);
+    markSeen(db, items); // every fetched item was considered — never re-process
+    if (ids.length && !state.queue.running) {
+      Promise.resolve(runDownloads()).catch((e) => { state.queue.error = String(e); });
+    }
+    if (fresh.length || ids.length) logInfo(`RSS watch: ${items.length} item(s), ${fresh.length} new, matched ${ids.length}`, 'download');
+    job.finish({ items: items.length, fresh: fresh.length, queued: ids.length });
+    return { items: items.length, fresh: fresh.length, queued: ids.length };
+  } catch (e) { job.fail(e); throw e; }
 }
 
 // Cancel an in-flight grab: remove the download from its client (with files —

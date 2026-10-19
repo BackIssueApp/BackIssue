@@ -17,6 +17,7 @@
 // from usenet" and be marked fulfilled when the file lands.
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import config from './config.js';
 import { recordGrab, activeMediaGrabs, grabPayload } from './db.js';
 import { safeName } from './downloader.js';
@@ -153,9 +154,12 @@ export async function fileMedia(db, { type, libraryId, path: root, hint = {}, so
 }
 
 // Where an immediate source's download is written before filing. The handler
-// moves it into the library; a failure leaves it here for a look.
+// moves it into the library; a failure leaves it here for a look. Each
+// download gets its own folder: two grabs of the same title at once would
+// otherwise write the same name, one over the other while it is being moved.
+// The file keeps its clean name, since a handler may file it by that name.
 async function stash(fetched, { title, type }) {
-  const dir = path.join(config.downloadsDir, '.media');
+  const dir = path.join(config.downloadsDir, '.media', `${Date.now()}-${randomUUID().slice(0, 8)}`);
   await fs.mkdir(dir, { recursive: true });
   const ext = sniffMediaExt(fetched.buffer, fetched.url) || (type === 'audiobook' ? '.m4b' : '.epub');
   const file = path.join(dir, safeName(fetched.name || title || 'download') + ext);
@@ -251,6 +255,7 @@ export async function queueMediaDownload({ db, type, libraryId, title, author = 
         }
         update(liveId, { phase: 'done', page: null, pages: null });
         await fileMedia(db, { type, libraryId, path: file, hint, source: src.id, ref, title });
+        await fs.rmdir(path.dirname(file)).catch(() => {}); // its own folder, once the handler moved the file out
       } finally { untrack(liveId); }
     })();
     return { status: 'downloading', source: src.id, release };

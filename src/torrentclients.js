@@ -48,7 +48,11 @@ function mapState(t, config) {
   const base = { name: t.name, seeders: Number.isFinite(s) ? s : -1 };
   const state = String(t.state || '');
   if (/^(error|missingFiles)$/.test(state)) return { ...base, state: 'failed', progress: 0, path: null, error: state };
-  if ((Number(t.progress) || 0) >= 1) return { ...base, state: 'done', progress: 100, path: mapPath(t.content_path || t.save_path, config) };
+  // Moving (out of an "incomplete" folder) or re-checking: the bytes are all
+  // there but content_path isn't settled yet — importing now reads a missing
+  // or half-moved folder. Wait for it.
+  const settling = /^moving$|^checking/.test(state);
+  if ((Number(t.progress) || 0) >= 1 && !settling) return { ...base, state: 'done', progress: 100, path: mapPath(t.content_path || t.save_path, config) };
   return { ...base, state: 'downloading', progress: Math.round((Number(t.progress) || 0) * 100), path: null };
 }
 

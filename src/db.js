@@ -333,10 +333,15 @@ function migrate(db) {
   // reading lists, requests and notifications can build on them. `followed`
   // is kept in sync (monitor != 'none') for plugins and the mobile apps.
   if (!cols.includes('monitor')) {
-    db.exec("ALTER TABLE series ADD COLUMN monitor TEXT NOT NULL DEFAULT 'none'");
-    // Existing installs: the old on/off flag maps 1:1 — automation never
-    // searched unfollowed series, so nothing that was fetched stops.
-    db.exec("UPDATE series SET monitor = CASE WHEN followed=1 THEN 'all' ELSE 'none' END");
+    // One transaction: the column's presence is what marks this migration
+    // done, so a crash between the ALTER and the backfill must not leave the
+    // column without the backfill (every followed series would read 'none').
+    db.transaction(() => {
+      db.exec("ALTER TABLE series ADD COLUMN monitor TEXT NOT NULL DEFAULT 'none'");
+      // Existing installs: the old on/off flag maps 1:1 — automation never
+      // searched unfollowed series, so nothing that was fetched stops.
+      db.exec("UPDATE series SET monitor = CASE WHEN followed=1 THEN 'all' ELSE 'none' END");
+    })();
   }
   if (!cols.includes('monitor_from')) db.exec('ALTER TABLE series ADD COLUMN monitor_from TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_series_monitor ON series(monitor)');
