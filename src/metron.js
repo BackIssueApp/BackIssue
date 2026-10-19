@@ -204,7 +204,7 @@ export function shapeIssueRow(r) {
 export function makeMetronClient(config, { fetchImpl, username, password, politeMs, base, timeoutMs } = {}) {
   const user = String(username ?? config?.metronUser ?? '').trim();
   const pass = String(password ?? config?.metronPass ?? '');
-  if (!user || !pass) throw new Error('Metron needs a username and password');
+  if (!user || !pass) throw new Error('The metadata service needs a username and password');
   const auth = 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64');
   const root = String(base || process.env.METRON_BASE_OVERRIDE || BASE).trim().replace(/\/+$/, '');
   const pace = politeMs !== undefined ? politeMs : POLITE_MS;
@@ -231,7 +231,7 @@ export function makeMetronClient(config, { fetchImpl, username, password, polite
       const why = code === 'UND_ERR_CONNECT_TIMEOUT' || code === 'TimeoutError' || code === 'AbortError'
         ? 'timed out; the host may be blocking this server'
         : (e?.cause?.code || e?.cause?.message || e?.message || e);
-      throw new Error(`Could not reach Metron (${why})`);
+      throw new Error(`Could not reach the metadata service (${why})`);
     }
     if (resp.status === 429 || resp.status === 503) {
       if (attempt < 2) {
@@ -239,14 +239,14 @@ export function makeMetronClient(config, { fetchImpl, username, password, polite
         await sleep(Math.min(Math.max(after * 1000, 2000), 30000));
         return call(pathAndQuery, attempt + 1);
       }
-      throw rateLimitError(`Metron rate limit reached (HTTP ${resp.status})`);
+      throw rateLimitError(`Metadata service rate limit reached (HTTP ${resp.status})`);
     }
-    if (resp.status === 401 || resp.status === 403) throw new Error('Metron rejected the username or password');
+    if (resp.status === 401 || resp.status === 403) throw new Error('The metadata service rejected the username or password');
     if (resp.status === 404) return null;
-    if (!resp.ok) throw new Error(`Metron HTTP ${resp.status}`);
+    if (!resp.ok) throw new Error(`metadata service HTTP ${resp.status}`);
     // A 200 that is not JSON is the anti-bot challenge page or a block.
     const ct = String(resp.headers?.get?.('content-type') || '');
-    if (ct && !/json/i.test(ct)) throw new Error(`Metron answered with a web page instead of data (HTTP ${resp.status})`);
+    if (ct && !/json/i.test(ct)) throw new Error(`The metadata service answered with a web page instead of data (HTTP ${resp.status})`);
     return resp.json();
   }
 
@@ -296,18 +296,18 @@ export function makeMetronClient(config, { fetchImpl, username, password, polite
   // Metron's minted ids and the cache step reconciles them by number.
   async function volume(id, { catalog } = {}) {
     const mid = await metronSeriesId(id, catalog);
-    if (!mid) throw new Error(fromMetron(id, catalog) ? 'Metron has no series with that id' : 'This series is not on Metron, so it cannot be refreshed from there');
+    if (!mid) throw new Error(fromMetron(id, catalog) ? 'The metadata service has no series with that id' : 'This series is not in that metadata source, so it cannot be refreshed from there');
     const d = await call(`/series/${mid}/`);
-    if (!d) throw new Error('Metron has no series with that id');
+    if (!d) throw new Error('The metadata service has no series with that id');
     const stubs = await pages(`/series/${mid}/issue_list/`);
     return { ...shapeSeries(d, stubs), id: Number(id) };
   }
 
   async function issue(id, { catalog } = {}) {
     const mid = await metronIssueId(id, catalog);
-    if (!mid) throw new Error(fromMetron(id, catalog) ? 'Metron has no issue with that id' : 'This issue is not on Metron');
+    if (!mid) throw new Error(fromMetron(id, catalog) ? 'The metadata service has no issue with that id' : 'This issue is not in that metadata source');
     const d = await call(`/issue/${mid}/`);
-    if (!d) throw new Error('Metron has no issue with that id');
+    if (!d) throw new Error('The metadata service has no issue with that id');
     return { ...shapeIssue(d), id: Number(id) };
   }
 

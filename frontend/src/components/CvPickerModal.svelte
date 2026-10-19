@@ -20,8 +20,12 @@
     if (title) doSearch(title);
   }
 
+  // Debounced, and last query wins: a broad, slow search ("batman") must not
+  // land over the results for the newer one ("batman beyond").
+  const searchSeq = latestGuard();
   async function doSearch(q) {
-    if (q.trim().length < 2) { m.results = null; m.pinned = null; return; }
+    const isLatest = searchSeq();
+    if (q.trim().length < 2) { m.results = null; m.pinned = null; m.searching = false; m.note = ''; return; }
 
     // A pasted CV URL or bare volume id resolves that exact volume. A URL means
     // precisely one volume — skip the name search. Bare digits also fall through
@@ -32,9 +36,10 @@
     let pinned = null;
     if (refId) {
       try {
-        const v = await (await fetch('/api/cv/volume/' + refId)).json();
+        const v = await apiGet('/api/cv/volume/' + refId);
         if (v && !v.error) pinned = v;
       } catch { /* fall through to search */ }
+      if (!isLatest()) return;
       if (isUrl) {
         m.searching = false; m.note = pinned ? '' : t('cvPickerModal.noVolumeWithId');
         m.pinned = pinned; m.results = [];
@@ -43,9 +48,12 @@
     }
 
     let list = [];
-    try { list = await (await fetch('/api/cv/search?q=' + encodeURIComponent(q) + (m.seriesId ? '&seriesId=' + m.seriesId : ''))).json(); }
-    catch { if (!pinned) { m.searching = false; m.note = t('cvPickerModal.searchFailed'); return; } }
-    if (list.error) list = [];
+    try { list = await apiGet('/api/cv/search?q=' + encodeURIComponent(q) + (m.seriesId ? '&seriesId=' + m.seriesId : '')); }
+    catch { list = { error: t('cvPickerModal.searchFailed') }; }
+    if (!isLatest()) return;
+    // A failed search says so (with the reason) instead of "no volumes".
+    if (list?.error && !pinned) { m.searching = false; m.results = []; m.note = list.error; return; }
+    if (list?.error) list = [];
     // Everything the server returned, no cutoff: ComicVine lists same-name
     // volumes oldest-first, so a cap hides exactly the newest series.
     const rows = rankCvResults((Array.isArray(list) ? list : []).filter((v) => v.id !== refId), m.files);
@@ -55,14 +63,16 @@
     m.note = (!rows.length && !pinned) ? t('cvPickerModal.noVolumes') : '';
   }
 
-  import { parseCvVolumeRef, isExactCvRef, rankCvResults } from '../lib/util.js';
+  import { parseCvVolumeRef, isExactCvRef, rankCvResults, latestGuard } from '../lib/util.js';
+  import { apiGet } from '../lib/api.js';
 </script>
 
 <script>
   import { apiPost } from '../lib/api.js';
   import { loadCollection, detail, reloadDetail } from '../lib/store.svelte.js';
   import { notify } from '../lib/toasts.svelte.js';
-  import { fmt, stripTags } from '../lib/util.js';
+  import { fmt, stripTags, safeUrl } from '../lib/util.js';
+  import { can } from '../lib/auth.svelte.js';
   import { trapFocus } from '../lib/dom.js';
   import Icon from '../lib/Icon.svelte';
 
@@ -97,8 +107,9 @@
     if (d <= Math.max(2, m.files * 0.1)) return 'near';
     return null;
   }
-  // Only a ComicVine record has a ComicVine page to fall back to.
-  const cvUrl = (v) => v.site_detail_url || ((v.meta_source || 'comicvine') === 'comicvine' ? 'https://comicvine.gamespot.com/volume/4050-' + v.id + '/' : null);
+  // The record's page at its metadata source — only for those who manage
+  // settings, where sources are named anyway; everyone else sees no link.
+  const cvUrl = (v) => (can('settings.manage') ? safeUrl(v.site_detail_url) : '');
 </script>
 
 {#snippet cvpRow(v, pinned)}
@@ -128,7 +139,7 @@
 
 {#if open}
   <div id="cv-modal" class="modal" onclick={(e) => { if (e.target === e.currentTarget) closeModal('cv'); }}>
-    <div class="modal__panel" use:trapFocus role="dialog" aria-label={t('cvPickerModal.title')}>
+    <div class="modal__panel" use:trapFocus role="dialog" aria-modal="true" aria-label={t('cvPickerModal.title')}>
       <div class="modal__head" style="display:flex;justify-content:space-between;align-items:center;">
         <h3 style="margin:0;">{t('cvPickerModal.title')}</h3>
         <button id="cv-modal-x" class="modal__x" aria-label={t('common.close')} onclick={() => closeModal('cv')}><Icon name="close" /></button>

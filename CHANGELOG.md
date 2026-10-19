@@ -33,6 +33,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 - **An unreadable settings.json is kept, not silently replaced.** BackIssue starts on defaults, saves
   the original beside it as settings.json.unreadable-<time>, and logs where; settings are now
   written in one step so a crash mid-save can no longer leave a broken file.
+- **Metadata errors and links speak for BackIssue.** Error messages about the metadata service no
+  longer name an outside catalog, and the link to a record's page at its source shows only to people
+  who manage settings (and only for a safe web address).
 
 ## [0.9.2] — 2026-10-18
 

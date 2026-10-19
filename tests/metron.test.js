@@ -146,7 +146,7 @@ test('volume walks every issue_list page and unmints the id on the way out', asy
   assert.equal(v.issues[2].id, mintId(102));
   assert.equal(v.image_url, 'a');
   assert.ok(fetchImpl.calls.some((x) => x.url.endsWith('/series/7/')));
-  await assert.rejects(c.volume(7), /not on Metron/); // a raw ComicVine-range id is looked up by cv_id, never mistaken for a Metron id
+  await assert.rejects(c.volume(7), /not in that metadata source/); // a raw ComicVine-range id is looked up by cv_id, never mistaken for a Metron id
 });
 
 test('a ComicVine-keyed series resolves through cv_id and keeps the id it was asked for', async () => {
@@ -172,7 +172,7 @@ test('a ComicVine-keyed issue resolves through cv_id; one Metron lacks is a clea
   const i = await c.issue(555);
   assert.equal(i.id, 555);
   assert.equal(i.name, 'Chapter One');
-  await assert.rejects(c.issue(556), /not on Metron/);
+  await assert.rejects(c.issue(556), /not in that metadata source/);
   assert.deepEqual((await c.issuesByIds([555, 556])).map((x) => x.id), [555]);
 });
 
@@ -194,7 +194,7 @@ test('a host that never answers times out with a reason, after one retry', async
   const keepAlive = setInterval(() => {}, 10);
   const t0 = Date.now();
   try {
-    await assert.rejects(c.test(), /Could not reach Metron \(timed out/);
+    await assert.rejects(c.test(), /Could not reach the metadata service \(timed out/);
   } finally { clearInterval(keepAlive); }
   assert.equal(calls, 2);
   assert.ok(Date.now() - t0 < 2000);
@@ -203,7 +203,7 @@ test('a host that never answers times out with a reason, after one retry', async
 test('a connection refused is reported with its code, not "fetch failed"', async () => {
   const refuse = () => Promise.reject(Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } }));
   const c = makeMetronClient(cfg, { fetchImpl: refuse, politeMs: 0 });
-  await assert.rejects(c.test(), /Could not reach Metron \(ECONNREFUSED\)/);
+  await assert.rejects(c.test(), /Could not reach the metadata service \(ECONNREFUSED\)/);
 });
 
 test('a persistent 429 surfaces as rateLimited after the waits', async () => {
