@@ -1844,20 +1844,20 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
   });
   // Rename/move THIS series' files to the configured folder/file patterns.
   // { dryRun:true } returns the planned moves; otherwise it performs them.
-  app.post('/api/collection/:id/refile', (req, res) => {
+  app.post('/api/collection/:id/refile', async (req, res) => {
     const row = getSeriesById(db, Number(req.params.id));
     if (!row) return res.status(404).json({ error: 'no such series' });
     if (!canRefile(row)) return res.status(400).json({ error: 'match this series to a metadata record first — its files can’t be organized without publisher/title/year' });
     try {
-      if ((req.body || {}).dryRun) return res.json({ plan: planSeries(db, row) });
-      res.json(refileSeries(db, row));
+      if ((req.body || {}).dryRun) return res.json({ plan: await planSeries(db, row) });
+      res.json(await refileSeries(db, row));
     } catch (e) { res.status(500).json({ error: String(e?.message || e) }); }
   });
   // Library-wide reorganize (a manual maintenance tool — never automatic).
   // Execution is a background job: the POST starts it, the status endpoint
   // reports progress, and it also appears on the Jobs page.
-  app.get('/api/library/refile-plan', (req, res) => {
-    try { res.json(planLibrary(db)); } catch (e) { res.status(500).json({ error: String(e?.message || e) }); }
+  app.get('/api/library/refile-plan', async (req, res) => {
+    try { res.json(await planLibrary(db)); } catch (e) { res.status(500).json({ error: String(e?.message || e) }); }
   });
   app.post('/api/library/refile', (req, res) => {
     const r = runLibraryRefile();

@@ -53,6 +53,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 - **Plugin dependency installs can no longer hang startup or break a plugin for good.** The install
   at startup gives up after five minutes, an install that was cut short is retried on the next
   start, and a plugin update whose dependencies fail to install keeps the version you had.
+- **Reorganize library no longer re-downloads what it moved, and keeps the app responsive.** Moved
+  issues kept pointing at their old location, so asking for one again downloaded it again. Series in
+  a library with its own folder pattern are now laid out by that pattern, and a file that differs
+  only in letter case from the new name is no longer overwritten. Moves between drives copy to a
+  temporary file first, so an interrupted move can't leave a half-copied comic, and planning or
+  running a reorganize on network storage no longer freezes the app.
 
 ## [0.9.2] — 2026-10-18
 
