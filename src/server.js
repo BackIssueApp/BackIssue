@@ -1599,16 +1599,19 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
   };
   const countsFor = (opts) => {
     const key = JSON.stringify([opts.userId, opts.includeRestricted, opts.library ?? null, opts.search || '',
-      opts.filter || 'all', opts.restrictIds || null, opts.collectionsOnly || false]);
+      opts.filter || 'all', opts.restrictIds || null, opts.excludeIds || null, opts.collectionsOnly || false]);
     return swrGet(countsCache, key, () => computeCounts(opts));
   };
-  // A facet selection's matching series ids, from the first collection filter
-  // that claims it (an array); later resolvers aren't run.
+  // A facet selection's answer, from the first collection filter that claims
+  // it; later resolvers aren't run. A resolver returns the matching series ids
+  // (an array), or { excludeIds } = "the whole scope except these" — far
+  // smaller for "unread" in a big library than listing every match.
   const facetIds = (selection, ctx) => {
     for (const f of registeredCollectionFilters()) {
       let r = null;
-      try { r = f.resolve(selection, ctx); } catch { /* resolver failed: not ours */ }
-      if (Array.isArray(r)) return r;
+      try { r = f.resolve(selection, { ...ctx, canExclude: true }); } catch { /* resolver failed: not ours */ }
+      if (Array.isArray(r)) return { restrictIds: r };
+      if (r && Array.isArray(r.excludeIds)) return { excludeIds: r.excludeIds };
     }
     return null;
   };
@@ -1617,7 +1620,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
   const jumpCache = new Map();
   const jumpFor = (opts) => {
     const key = JSON.stringify([opts.letter ? String(opts.letter).toUpperCase().slice(0, 1) : '*', opts.userId, opts.includeRestricted,
-      opts.library ?? null, opts.search || '', opts.filter || 'all', opts.restrictIds || null, opts.collectionsOnly || false]);
+      opts.library ?? null, opts.search || '', opts.filter || 'all', opts.restrictIds || null, opts.excludeIds || null, opts.collectionsOnly || false]);
     const compute = async () => {
       const { sql, params } = opts.letter ? collectionJumpQuery(opts) : collectionBucketsQuery(opts);
       const off = workerGetRow(sql, params);
@@ -1651,7 +1654,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
     if (req.query.facet) {
       try {
         const ids = facetIds(JSON.parse(req.query.facet), { db, userId: req.user.id, includeRestricted: opts.includeRestricted, library: opts.library });
-        if (ids) opts.restrictIds = ids;
+        if (ids) Object.assign(opts, ids);
       } catch { /* malformed facet param → ignore */ }
     }
     // Paginated shape ({ rows, total, counts }): filter/sort/search are pushed
@@ -1685,7 +1688,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
     // add pagination + ebook support. The web SPA always passes limit (above).
     // The whole list is rebuilt only when the database has changed since the
     // last build for this user and scope; repeat loads reuse the JSON.
-    const key = JSON.stringify([opts.userId, opts.includeRestricted, opts.library, opts.filter || '', opts.search || '', opts.sort || '', opts.restrictIds || null, opts.collectionsOnly]);
+    const key = JSON.stringify([opts.userId, opts.includeRestricted, opts.library, opts.filter || '', opts.search || '', opts.sort || '', opts.restrictIds || null, opts.excludeIds || null, opts.collectionsOnly]);
     const version = dbVersion(db);
     let hit = mobileListCache.get(key);
     if (!hit || hit.version !== version) {
@@ -1710,7 +1713,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
     if (req.query.facet) {
       try {
         const ids = facetIds(JSON.parse(req.query.facet), { db, userId: req.user.id, includeRestricted: opts.includeRestricted, library: opts.library });
-        if (ids) opts.restrictIds = ids;
+        if (ids) Object.assign(opts, ids);
       } catch { /* malformed facet param → ignore */ }
     }
     try {
@@ -1734,7 +1737,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
     if (req.query.facet) {
       try {
         const ids = facetIds(JSON.parse(req.query.facet), { db, userId: req.user.id, includeRestricted: opts.includeRestricted, library: opts.library });
-        if (ids) opts.restrictIds = ids;
+        if (ids) Object.assign(opts, ids);
       } catch { /* malformed facet param → ignore */ }
     }
     try {

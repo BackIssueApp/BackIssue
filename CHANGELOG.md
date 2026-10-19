@@ -18,6 +18,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Library filters can match "everything except".** A plugin's collection filter may return
+  `{ excludeIds }` when core passes `ctx.canExclude`, so "unread" in a large ebook or audiobook
+  library sends the few books you've started instead of every other book.
 - **Update all plugins at once.** When installed plugins have updates, the Plugins page shows
   **Update all** beside the Installed heading. It updates each one in turn, keeps going past a
   failure, and the updates apply on the next restart, like a single update.
@@ -35,6 +38,7 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   - Creator, character and team pages answer from an index instead of reading every issue's
     credits. Existing libraries build the index in the background after the update.
   - Sorting the Library by **Missing** is about 3.5× faster on a large catalog.
+  - Looking up books by author (OPDS "by author") uses an index instead of reading every series.
   - The Wanted page, the Stats page and the mobile apps' library list run cheaper queries and reuse
     their last answer until the library changes.
   - Signing in no longer pauses the server while the password is checked, and the "last seen" time

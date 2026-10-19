@@ -343,8 +343,11 @@ export const pluginApi = {
   // A Library faceted-filter resolver. `resolve(selection, ctx)` turns the opaque
   // facet selection the Filters modal produced into an array of matching series
   // ids; core ANDs those into /api/collection so the real grid is narrowed.
-  // ctx = { db, userId, includeRestricted, library, type }. Return null/[] to
-  // apply no restriction (e.g. the selection is empty or not for this plugin).
+  // ctx = { db, userId, includeRestricted, library, type }. Return null to
+  // apply no restriction (e.g. the selection is empty or not for this plugin);
+  // [] matches nothing. When ctx.canExclude is set (cores that support it), a
+  // resolver may instead return { excludeIds: [...] }: everything in scope
+  // except those series — e.g. "unread" as the few books someone has started.
   registerCollectionFilter(filter) {
     if (!filter?.id || typeof filter.resolve !== 'function') return;
     if (collectionFilters.some((f) => f.id === filter.id)) return; // idempotent
