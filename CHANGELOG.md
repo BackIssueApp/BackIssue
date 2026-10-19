@@ -33,6 +33,18 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 - **An unreadable settings.json is kept, not silently replaced.** BackIssue starts on defaults, saves
   the original beside it as settings.json.unreadable-<time>, and logs where; settings are now
   written in one step so a crash mid-save can no longer leave a broken file.
+- **One failing download no longer stalls the queue.** An unexpected error while preparing or
+  recording a download now fails just that issue; before, it could leave the issue stuck as
+  downloading and stop the queue from starting again until a restart, or start the same issue twice.
+- **Downloads are written under a temporary name and renamed when complete.** A crash mid-write no
+  longer leaves a truncated comic under the real name, and recovery after a restart now looks in the
+  comic's own folder and only counts a file that opens as finished.
+- **Re-download keeps the current copy until the new one arrives.** The old file used to be deleted
+  first, so a re-download that found nothing lost the copy you had. It is now replaced only once a
+  readable new copy is in place, which takes the old file's name. Re-downloading an issue that is
+  already downloading no longer starts a second download.
+- **A download that fails after its file is saved is not downloaded again.** Retrying used to save a
+  second copy beside the first.
 
 ## [0.9.2] — 2026-10-18
 

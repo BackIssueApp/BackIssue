@@ -2,7 +2,6 @@ import express from 'express';
 import compression from 'compression';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import fsp from 'node:fs/promises';
 import fssync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
@@ -27,7 +26,6 @@ import * as lists from './lists.js';
 import * as cbl from './cbl.js';
 import * as notifications from './notifications.js';
 import { createEventHub } from './events.js';
-import { sidecarPath } from './archive.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // The UI is a built Svelte app — `npm run build` writes it to frontend/dist.
@@ -1132,32 +1130,23 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
     res.json({ queued: ids.length });
   });
 
-  // Re-download CV issues: delete their current file(s) on disk (e.g. a corrupt
-  // copy) so the fresh grab isn't dedupe-suffixed, then queue them.
+  // Re-download CV issues (e.g. a possibly corrupt copy). The current file(s)
+  // stay put until a replacement exists: once the fresh grab is indexed as a
+  // VALID file for the same issue, the import's supersede step removes the old
+  // copy and the new one takes its name. A grab that never arrives (no source
+  // had it, a client stalled) costs nothing.
   app.post('/api/collection/:id/redownload', async (req, res) => {
     const seriesId = Number(req.params.id);
     const cvIssueIds = Array.isArray(req.body.cvIssueIds) ? req.body.cvIssueIds.map(Number) : [];
     const ids = [];
     for (const cvid of cvIssueIds) {
-      for (const f of db.prepare('SELECT path FROM library_files WHERE cv_issue_id=?').all(cvid)) {
-        try { await fsp.unlink(f.path); } catch { /* already gone */ }
-        const side = sidecarPath(f.path);
-        if (side !== f.path) await fsp.unlink(side).catch(() => {});
-      }
-      db.prepare('DELETE FROM library_files WHERE cv_issue_id=?').run(cvid);
       const ci = getCvIssue(db, cvid);
       if (!ci) continue;
       ids.push(ensureCvIssueRow(db, { seriesId, cvIssueId: cvid, number: ci.issue_number, title: ci.name }));
     }
     // A previously downloaded row is 'done' — and queueIssues refuses to queue
-    // done rows, which would strand the issue with its files already deleted.
-    // Reset status/file_path first (and delete that file too: a downloader-
-    // written file may not have a library_files row yet).
-    for (const p of clearIssuesForRedownload(db, ids)) {
-      try { await fsp.unlink(p); } catch { /* already gone */ }
-      const side = sidecarPath(p);
-      if (side !== p) await fsp.unlink(side).catch(() => {});
-    }
+    // done rows. Reset status/file_path first (in-flight rows are left alone).
+    clearIssuesForRedownload(db, ids);
     queueIssues(db, ids);
     startDownloads(ids);
     res.json({ queued: ids.length });
@@ -2073,7 +2062,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
 
   app.post('/api/redownload', async (req, res) => {
     const ids = Array.isArray(req.body.issueIds) ? req.body.issueIds.map(Number) : [];
-    await prepareRedownload(ids); // delete old files + reset status to pending
+    await prepareRedownload(ids); // reset status to pending (old files stay until replaced)
     queueIssues(db, ids);
     startDownloads(ids);
     res.json({ queued: ids.length });

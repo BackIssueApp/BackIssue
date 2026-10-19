@@ -162,8 +162,9 @@ process.on('unhandledRejection', (reason) => {
 });
 process.on('warning', (w) => { if (/memory|heap/i.test(w?.message || '')) { try { logWarn(`Process warning: ${w.message}`, 'app'); } catch { /* ignore */ } } });
 // Recover issues left in 'downloading' by a previous crash/force-close so they
-// don't sit stuck on the "saving" badge until the next queue run.
-reconcileDownloading(db);
+// don't sit stuck on the "saving" badge. Boot only: a live queue's
+// 'downloading' rows are in-flight work, not leftovers.
+try { await reconcileDownloading(db); } catch (e) { console.warn('download recovery failed', e?.message || e); }
 initRssTables(db);
 // Per-volume is now the ownership model: attribute any orphaned files, CV-link
 // matched series, and drop index rows for comics you don't track.
@@ -1184,7 +1185,9 @@ const manualPins = new Map();
 
 async function runDownloads() {
   state.queue.running = true;
-  await runQueue({
+  // The flag always comes down, even when the run throws — otherwise no kick
+  // site would ever start the queue again until a restart.
+  try { await runQueue({
     db,
     isPaused: () => state.queue.paused,
     pinnedFor: (id) => manualPins.get(id) || null,
@@ -1224,10 +1227,11 @@ async function runDownloads() {
       else if (p.event === 'done') { logInfo(`Downloaded: ${p.issue?.title || 'issue ' + p.issue?.id}${p.source ? ' (' + p.source + ')' : ''}`, 'download'); settlePicks(p.issue?.series_id ?? null); }
       else if (p.event === 'grabbed') logInfo(`Grabbed via ${p.source || 'usenet'}: ${p.issue?.title || 'issue ' + p.issue?.id}`, 'download');
     },
-  });
-  state.queue.running = false;
-  state.queue.current = null;
-  state.queue.live = {}; // queue drained — clear any lingering per-issue bars
+  }); } finally {
+    state.queue.running = false;
+    state.queue.current = null;
+    state.queue.live = {}; // queue drained — clear any lingering per-issue bars
+  }
 }
 
 // Surface tag outcomes from a download on the Logs page (category 'tag').
@@ -1238,15 +1242,11 @@ function recordProgressTagLog(p) {
   else logWarn(`Tag skipped: ${what}${reason}`, 'tag');
 }
 
-// Delete the existing files for these issues and reset them so a re-download
-// writes the correct name in place (instead of a (chapterId) duplicate).
+// Reset these issues so a re-download runs. The existing files stay until a
+// valid replacement is indexed (the import's supersede step removes them and
+// the new file takes the clean name), so a grab that never lands loses nothing.
 async function prepareRedownload(issueIds) {
-  const paths = clearIssuesForRedownload(db, issueIds);
-  for (const p of paths) {
-    try { await fsp.rm(p, { force: true }); } catch { /* already gone */ }
-    const side = sidecarPath(p);
-    if (side !== p) await fsp.rm(side, { force: true }).catch(() => {});
-  }
+  clearIssuesForRedownload(db, issueIds);
 }
 
 // The support package (System → Tools): built the same way whether it is

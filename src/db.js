@@ -2395,14 +2395,16 @@ export function cancelIssue(db, id) {
 }
 
 // Reset the given issues for re-download (even if 'done'): return their current
-// file paths (so the caller can delete the old files), then clear status to
-// 'pending' and forget the file path so the download writes the correct name.
+// file paths, then clear status to 'pending' and forget the file path. Issues
+// already in flight (downloading/tagging/grabbed) are left alone — resetting
+// them would start a second concurrent download while the first still imports.
+const IN_FLIGHT = "('downloading','tagging','grabbed')";
 export function clearIssuesForRedownload(db, ids) {
   if (!ids || !ids.length) return [];
   const ph = ids.map(() => '?').join(',');
-  const paths = db.prepare(`SELECT file_path FROM issues WHERE id IN (${ph})`)
+  const paths = db.prepare(`SELECT file_path FROM issues WHERE id IN (${ph}) AND status NOT IN ${IN_FLIGHT}`)
     .all(...ids).map((r) => r.file_path).filter(Boolean);
-  db.prepare(`UPDATE issues SET status='pending', file_path=NULL, error=NULL WHERE id IN (${ph})`).run(...ids);
+  db.prepare(`UPDATE issues SET status='pending', file_path=NULL, error=NULL WHERE id IN (${ph}) AND status NOT IN ${IN_FLIGHT}`).run(...ids);
   return paths;
 }
 
