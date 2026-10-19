@@ -13,6 +13,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 - **Sign-in and permission checks now apply to every spelling of a path.** The server matched
   routes without regard to letter case or a trailing slash, but its access checks did not, so
   some requests could skip them. Update promptly.
+- **Issue descriptions keep only plain formatting.** Forms, embedded SVG and unknown attributes are
+  removed before a description is shown, so description HTML can no longer run script when clicked.
 
 ### Added
 

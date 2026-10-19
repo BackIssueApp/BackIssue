@@ -3,7 +3,7 @@ import '../src/lib/i18n.svelte.js';
 import { describe, test, expect, beforeEach } from 'vitest';
 import { librarySort, setLibrarySort } from '../src/lib/store.svelte.js';
 import {
-  fmt, pad3, initials, humanBytes, spct, fmtIn, fmtAgo,
+  fmt, initials, humanBytes, spct, fmtIn, fmtAgo,
   parseCvVolumeRef, parseIndexerString, serializeIndexers,
   rankCvResults, issueMatchesFilter, sanitizeHtml, stripTags,
   weekOfYear, shiftWeek, windowRange, offsetWindow,
@@ -15,11 +15,6 @@ describe('formatting', () => {
   test('fmt localizes and tolerates nullish', () => {
     expect(fmt(1234567)).toBe('1,234,567');
     expect(fmt(null)).toBe('0');
-  });
-  test('pad3 pads plain numbers only', () => {
-    expect(pad3(7)).toBe('007');
-    expect(pad3('12.5')).toBe('12.5'); // decimals stay as-is
-    expect(pad3(null)).toBe('');
   });
   test('initials skips parentheticals', () => {
     expect(initials('Batman (2016)')).toBe('B');
@@ -130,6 +125,16 @@ describe('sanitizeHtml', () => {
     const clean = sanitizeHtml(dirty);
     expect(clean).not.toMatch(/script|onerror|javascript:/);
     expect(clean).toContain('<b>there</b>');
+  });
+  test('drops forms, SVG animation, base and unknown attributes', () => {
+    const dirty = '<form action="javascript:a()"><button formaction="javascript:b()">go</button></form>'
+      + '<svg><a><animate attributeName="href" values="javascript:c()"/><text>x</text></a></svg>'
+      + '<base href="https://evil.example/"><p style="x" data-x="1" class="y">kept <custom>text</custom></p>'
+      + '<a href="https://example.com/wiki" target="_top">ok</a>';
+    const clean = sanitizeHtml(dirty);
+    expect(clean).not.toMatch(/javascript|form|svg|animate|base|style|data-x|class|target/i);
+    expect(clean).toContain('<p>kept text</p>');
+    expect(clean).toContain('<a href="https://example.com/wiki">ok</a>');
   });
   test('stripTags flattens to text', () => {
     expect(stripTags('<p>A  <i>b</i>\nc</p>')).toBe('A b c');

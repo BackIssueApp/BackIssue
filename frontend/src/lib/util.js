@@ -119,18 +119,32 @@ export function safeUrl(url) {
   return SAFE_SCHEMES.has(scheme) ? s : '';
 }
 
-// Minimal sanitizer for ComicVine's HTML description: strip active content.
+// Sanitizer for description HTML (from the metadata service, or edited by a
+// library manager). An allowlist: formatting tags keep a few inert
+// attributes; any other element is unwrapped to its text, and elements whose
+// content is code or a separate document are dropped whole. A blocklist kept
+// missing things (form action, formaction, SVG animate, base href).
+const KEEP_TAGS = new Set(['P', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'SMALL', 'SUB', 'SUP', 'SPAN', 'DIV',
+  'A', 'UL', 'OL', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'HR', 'IMG', 'FIGURE', 'FIGCAPTION',
+  'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TH', 'TD', 'CAPTION', 'DL', 'DT', 'DD', 'CITE', 'Q', 'CODE', 'PRE']);
+const DROP_TAGS = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'FRAME', 'OBJECT', 'EMBED', 'LINK', 'META', 'BASE',
+  'SVG', 'MATH', 'TEMPLATE', 'NOSCRIPT', 'FORM', 'INPUT', 'BUTTON', 'TEXTAREA', 'SELECT', 'AUDIO', 'VIDEO', 'TITLE']);
+const KEEP_ATTRS = { A: ['href', 'title'], IMG: ['src', 'alt', 'title', 'width', 'height'], TD: ['colspan', 'rowspan'], TH: ['colspan', 'rowspan'] };
 export function sanitizeHtml(html) {
   const tpl = document.createElement('template');
   tpl.innerHTML = String(html || '');
-  tpl.content.querySelectorAll('script,style,iframe,object,embed,link,meta').forEach((el) => el.remove());
-  tpl.content.querySelectorAll('*').forEach((el) => {
+  // Deepest first, so unwrapping a parent never revisits moved children.
+  for (const el of [...tpl.content.querySelectorAll('*')].reverse()) {
+    const tag = el.tagName.toUpperCase();
+    if (DROP_TAGS.has(tag)) { el.remove(); continue; }
+    if (!KEEP_TAGS.has(tag)) { el.replaceWith(...el.childNodes); continue; }
+    const allowed = KEEP_ATTRS[tag] || [];
     for (const a of [...el.attributes]) {
-      if (/^on/i.test(a.name)) { el.removeAttribute(a.name); continue; }
+      if (!allowed.includes(a.name.toLowerCase())) el.removeAttribute(a.name);
       // href/src must resolve to an allowed scheme (control-char-safe check).
-      if (/^(href|src|xlink:href)$/i.test(a.name) && !safeUrl(a.value)) el.removeAttribute(a.name);
+      else if ((a.name === 'href' || a.name === 'src') && !safeUrl(a.value)) el.removeAttribute(a.name);
     }
-  });
+  }
   return tpl.innerHTML;
 }
 
