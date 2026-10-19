@@ -5,7 +5,7 @@ import yauzl from 'yauzl';
 import { load } from 'cheerio';
 import { createExtractorFromData } from 'node-unrar-js';
 import JSZip from 'jszip';
-import { runRar } from './rarWorker.js';
+import { onRarWorker } from './rarWorker.js';
 
 // Must stay in step with the reader plugin's own page test (its pages.js) — it
 // is the thing that decides whether a page is readable, and core calling a page
@@ -155,7 +155,7 @@ async function readRarInfo(path) {
   }
   return withRarSlot(async () => {
     try {
-      const { names, hasCi, ciXml } = await (runRar('info', { path }) ?? rarEntriesInline(path));
+      const { names, hasCi, ciXml } = await onRarWorker('info', { path }, () => rarEntriesInline(path));
       const pageCount = names.filter(isImageName).length;
       const comicInfo = ciXml ? parseComicInfo(ciXml) : null;
       const empty = noPagesError(names, path);
@@ -309,9 +309,8 @@ export async function cbrBufferToCbz(buffer) {
   return withRarSlot(async () => {
     // The bytes are copied to the worker, not transferred: the caller keeps
     // its buffer (it may fall back to filing the original).
-    const off = runRar('toCbz', { data: toArrayBuffer(buffer) });
-    if (!off) return rarToCbzInline(buffer);
-    return Buffer.from(await off);
+    const out = await onRarWorker('toCbz', { data: toArrayBuffer(buffer) }, () => rarToCbzInline(buffer));
+    return Buffer.isBuffer(out) ? out : Buffer.from(out);
   });
 }
 
@@ -327,10 +326,10 @@ function assertRarSize(size) {
 export async function listRarEntries(path) {
   assertRarSize((await fs.stat(path)).size);
   return withRarSlot(async () => {
-    const off = runRar('list', { path });
-    if (off) return off;
-    const ex = await createExtractorFromData({ data: toArrayBuffer(await fs.readFile(path)) });
-    return [...ex.getFileList().fileHeaders].filter((h) => !h.flags?.directory).map((h) => h.name);
+    return onRarWorker('list', { path }, async () => {
+      const ex = await createExtractorFromData({ data: toArrayBuffer(await fs.readFile(path)) });
+      return [...ex.getFileList().fileHeaders].filter((h) => !h.flags?.directory).map((h) => h.name);
+    });
   });
 }
 
@@ -341,14 +340,17 @@ export async function extractRarEntries(path, names = null) {
   assertRarSize((await fs.stat(path)).size);
   const files = names ? [...names] : null;
   return withRarSlot(async () => {
-    const off = runRar('extract', { path, files });
-    if (off) return new Map((await off).map(([name, bytes]) => [name, Buffer.from(bytes)]));
-    const ex = await createExtractorFromData({ data: toArrayBuffer(await fs.readFile(path)) });
-    const out = new Map();
-    for (const f of ex.extract(files ? { files } : {}).files) {
-      if (f.extraction && !f.fileHeader.flags?.directory) out.set(f.fileHeader.name, Buffer.from(f.extraction));
-    }
-    return out;
+    const entries = await onRarWorker('extract', { path, files }, async () => {
+      const ex = await createExtractorFromData({ data: toArrayBuffer(await fs.readFile(path)) });
+      const out = [];
+      for (const f of ex.extract(files ? { files } : {}).files) {
+        if (f.extraction && !f.fileHeader.flags?.directory) out.push([f.fileHeader.name, f.extraction]);
+      }
+      return out;
+    });
+    // Worker results arrive as ArrayBuffers, inline ones as Uint8Arrays: wrap either without copying.
+    const toBuf = (b) => (b instanceof ArrayBuffer ? Buffer.from(b) : Buffer.from(b.buffer, b.byteOffset, b.byteLength));
+    return new Map(entries.map(([name, bytes]) => [name, toBuf(bytes)]));
   });
 }
 
@@ -490,7 +492,7 @@ export async function verifyArchive(path) {
       // subset (extract({ files })) can spuriously fail on solid RARs and flag a
       // perfectly good file as corrupt. getFileList already proved the structure;
       // this confirms the entries actually inflate.
-      const { extracted } = await (runRar('verify', { path }) ?? rarVerifyInline(path));
+      const { extracted } = await onRarWorker('verify', { path }, () => rarVerifyInline(path));
       return extracted > 0 ? { ok: true } : { ok: false, error: 'no readable entries' };
     } catch (e) { return { ok: false, error: String(e?.message || e) }; }
     });

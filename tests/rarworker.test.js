@@ -58,3 +58,32 @@ test('listRarEntries / extractRarEntries: names as stored, chosen entries or all
   assert.ok(all.get(pages[0]).equals(one.get(pages[0])), 'the same bytes either way');
   await assert.rejects(listRarEntries('tests/fixtures/no-such.cbr'));
 });
+
+test('with worker threads unavailable, every RAR call decodes inline with the same results', async () => {
+  const { setRarWorkersEnabled } = await import('../src/rarWorker.js');
+  const { listRarEntries, extractRarEntries, readArchiveInfo: info, cbrBufferToCbz: toCbz } = await import('../src/archive.js');
+  const viaWorker = { names: await listRarEntries(FIXTURE), all: await extractRarEntries(FIXTURE), info: await info(FIXTURE) };
+  setRarWorkersEnabled(false);
+  try {
+    assert.deepEqual(await listRarEntries(FIXTURE), viaWorker.names);
+    const all = await extractRarEntries(FIXTURE);
+    for (const [n, b] of viaWorker.all) assert.ok(all.get(n).equals(b), n);
+    assert.deepEqual(await info(FIXTURE), viaWorker.info);
+    assert.equal((await toCbz(fs.readFileSync(FIXTURE))).subarray(0, 2).toString('latin1'), 'PK');
+  } finally { setRarWorkersEnabled(true); }
+});
+
+test('a worker that cannot start falls back to inline decoding instead of failing the archive', async () => {
+  // Node refuses this flag in a worker, so the thread dies before it is online.
+  const { closeRarWorkers } = await import('../src/rarWorker.js');
+  await closeRarWorkers();
+  const saved = process.execArgv.slice();
+  process.execArgv.push('--input-type=module');
+  try {
+    const { listRarEntries } = await import('../src/archive.js');
+    assert.ok((await listRarEntries(FIXTURE)).length >= 2);
+  } finally {
+    process.execArgv.length = 0; process.execArgv.push(...saved);
+    (await import('../src/rarWorker.js')).setRarWorkersEnabled(true);
+  }
+});

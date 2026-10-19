@@ -8,6 +8,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **CBR files are never marked corrupt because the background reader couldn't start.** If its
+  threads fail to start on a system, BackIssue now reads archives the old way instead.
+
 ## [0.9.3] — 2026-10-19
 
 ### Security

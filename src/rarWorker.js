@@ -16,6 +16,8 @@ let disabled = false;
 function spawn() {
   const w = new Worker(threadFile);
   w.jobs = new Map(); // id → { resolve, reject }
+  w.online = false;
+  w.on('online', () => { w.online = true; });
   w.on('message', (m) => {
     const job = w.jobs.get(m.id);
     if (!job) return;
@@ -26,6 +28,16 @@ function spawn() {
     all.delete(w);
     const i = idle.indexOf(w);
     if (i >= 0) idle.splice(i, 1);
+    // A worker that never came online can't start in this process at all (a
+    // missing file, a Node flag workers reject): stop using them, and let the
+    // caller redo the job inline rather than call the archive unreadable.
+    if (!w.online) {
+      disabled = true;
+      console.warn('archive reader threads unavailable, decoding inline:', e?.message || e || 'exited');
+      for (const job of w.jobs.values()) job.reject(Object.assign(new Error('archive reader unavailable'), { code: 'RAR_WORKER_UNAVAILABLE' }));
+      w.jobs.clear();
+      return;
+    }
     if (w.jobs.size) console.warn('archive reader stopped:', e?.message || e || 'exited');
     for (const job of w.jobs.values()) job.reject(new Error('the archive could not be read'));
     w.jobs.clear();
@@ -37,7 +49,9 @@ function spawn() {
 }
 
 /** Run `op` on a worker; resolves with its result. Returns null when workers
- *  are unavailable (the caller then does the work inline). */
+ *  are unavailable, and rejects with code RAR_WORKER_UNAVAILABLE when they
+ *  turn out not to start; either way the caller then does the work inline
+ *  (see onRarWorker). */
 export function runRar(op, args, transfer = []) {
   if (disabled) return null;
   let w = idle.pop();
@@ -55,6 +69,17 @@ export function runRar(op, args, transfer = []) {
     if (!w.jobs.size) { w.unref(); idle.push(w); }
   });
 }
+
+/** `op` on a worker, or `inline()` when workers are unavailable. */
+export async function onRarWorker(op, args, inline, transfer = []) {
+  const off = runRar(op, args, transfer);
+  if (!off) return inline();
+  try { return await off; }
+  catch (e) { if (e?.code === 'RAR_WORKER_UNAVAILABLE') return inline(); throw e; }
+}
+
+/** Workers off (tests: exercise the inline path) or back on. */
+export function setRarWorkersEnabled(on) { disabled = !on; }
 
 /** Stop every worker (tests). */
 export async function closeRarWorkers() {
