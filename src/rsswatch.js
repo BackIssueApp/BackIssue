@@ -35,7 +35,7 @@ export function markSeen(db, items) {
 // normalized series alias → issue number, so each feed item is one parse + one
 // map lookup instead of a scan over tens of thousands of wanted rows.
 export function buildWantedIndex(db) {
-  const { items } = listWantedIssues(db, { limit: 100000 });
+  const { items } = listWantedIssues(db, { limit: 100000, withTotal: false });
   const bySeries = new Map(); // series_id → { names, numbers: Map(normNumber → wanted) }
   const index = new Map();    // normalized alias → [series entries]
   for (const it of items) {

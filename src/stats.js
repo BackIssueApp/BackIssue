@@ -6,7 +6,9 @@ import { enabledMetadataProviders } from './metadata.js';
 import { SELF_DESCRIBED_TYPES } from './db.js';
 
 // A series counts toward the collection if followed or backed by a valid file.
-const IN_COLLECTION = `(s.followed=1 OR EXISTS(SELECT 1 FROM library_files lf WHERE lf.series_id=s.id AND lf.valid=1))`;
+// The IN-list form lets SQLite walk just those series; a correlated EXISTS
+// probed every row of a catalog that can hold hundreds of thousands.
+const IN_COLLECTION = `(s.followed=1 OR s.id IN (SELECT series_id FROM library_files WHERE valid=1))`;
 
 // SQL fragment: is s a self-described (plugin-typed) series? Those carry their
 // own metadata — they're "resolved", never lumped in with unmatched comics.

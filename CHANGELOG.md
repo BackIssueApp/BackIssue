@@ -34,6 +34,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
     blocking every Library load and search for about a second.
   - Creator, character and team pages answer from an index instead of reading every issue's
     credits. Existing libraries build the index in the background after the update.
+  - The Wanted page, the Stats page and the mobile apps' library list run cheaper queries and reuse
+    their last answer until the library changes.
+  - Signing in no longer pauses the server while the password is checked, and the "last seen" time
+    of a session or API key is recorded at most once a minute instead of on every request.
+- **Repeated failed sign-ins from one address are throttled across usernames.** After 30 failures
+  from the same address within 15 minutes, further attempts wait, whichever username they try.
 - **`GET /api/series` is paged.** It returns up to 100 series by default (`?limit=` up to 500, plus
   `?offset=`). It used to return the entire catalog in one response.
 

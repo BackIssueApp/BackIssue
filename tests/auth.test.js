@@ -327,6 +327,22 @@ test('login throttling: five failures lock the key; Basic honors the lock', asyn
   } finally { clearAuthThrottle(); s.close(); }
 });
 
+test('login throttling: one address spraying many usernames is locked too', async () => {
+  const { clearAuthThrottle } = await import('../src/users.js');
+  clearAuthThrottle();
+  const { s, base } = await appWithAdmin();
+  try {
+    const attempt = (username) => fetch(`${base}/api/auth/login`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username, password: 'wrong-wrong' }),
+    });
+    // A different username each time never trips the per-username key...
+    for (let i = 0; i < 30; i++) assert.equal((await attempt(`nobody${i}`)).status, 401);
+    // ...but the address as a whole is now locked.
+    assert.equal((await attempt('nobody-else')).status, 429);
+  } finally { clearAuthThrottle(); s.close(); }
+});
+
 test('setDisabled actually disables (regression: missing id bind), and kills sessions', async () => {
   const { openDb } = await import('../src/db.js');
   const users = await import('../src/users.js');

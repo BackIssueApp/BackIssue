@@ -14,7 +14,7 @@ import { seriesFolderFromPattern, fileStemFromPattern } from './naming.js';
 import { normalizeNumber } from './matcher.js';
 import { parseIssueFromFilename } from './scanner.js';
 import { linkFilesToCv } from './cvmatch.js';
-import { getLibraryFile, linkFileCvIssue, setFileIssueOverride, clearFileIssueOverride, issuesFeaturing } from './db.js';
+import { getLibraryFile, linkFileCvIssue, setFileIssueOverride, clearFileIssueOverride, issuesFeaturing, dbVersion } from './db.js';
 import { testIndexer } from './newznab.js';
 import { testClient } from './nzbclients.js';
 import { testTorznabIndexer } from './torznab.js';
@@ -148,6 +148,9 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
   // Brute-force throttle key: source ip + claimed username. Applied to login,
   // register, AND failed Basic attempts — Basic hits the same password check.
   const authKey = (req, username) => `${req.ip || '?'}|${String(username || '').toLowerCase()}`;
+  // Failed logins from one address, across all usernames, before it is locked.
+  // Generous: behind a proxy without trustProxy every client shares one address.
+  const IP_LOCK_AFTER = 30;
 
   const resolveUser = (req) => {
     const token = readCookie(req);
@@ -522,9 +525,12 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
   app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body || {};
     const key = authKey(req, username);
-    const wait = users.authBlockedFor(key);
+    // A second, per-address bucket: the (address, username) one alone let one
+    // address try any number of usernames a few times each.
+    const ipKey = `${req.ip || '?'}|*`;
+    const wait = Math.max(users.authBlockedFor(key), users.authBlockedFor(ipKey));
     if (wait) return res.status(429).json({ error: `too many attempts — try again in ${wait}s` });
-    const u = users.verifyCredentials(db, username, password);
+    const u = await users.verifyCredentialsAsync(db, username, password);
     if (u) {
       // Password login can be disabled (SSO-only), but admins keep a password
       // escape hatch so a broken IdP can't lock everyone out.
@@ -554,6 +560,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
       }
     }
     users.authFailed(key);
+    users.authFailed(ipKey, { after: IP_LOCK_AFTER, forgetAfterMs: 15 * 60_000 });
     return res.status(401).json({ error: 'Wrong username or password.' });
   });
   app.post('/api/auth/logout', (req, res) => {
@@ -561,7 +568,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
     clearSessionCookie(res);
     res.json({ ok: true });
   });
-  app.post('/api/auth/password', (req, res) => {
+  app.post('/api/auth/password', async (req, res) => {
     if (!req.user || req.user.id === 0) return res.status(403).json({ error: 'sign in with a real account first' });
     // External-login accounts have no local password to change, and setting one
     // would defeat the provider's access control — say so plainly.
@@ -569,7 +576,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
       return res.status(403).json({ error: 'this account signs in through an external service — its password is managed there' });
     }
     const { current, next: nextPw } = req.body || {};
-    if (!users.verifyCredentials(db, req.user.username, current)) {
+    if (!await users.verifyCredentialsAsync(db, req.user.username, current)) {
       return res.status(400).json({ error: 'current password is wrong' });
     }
     try {
@@ -1225,10 +1232,22 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
   // at 320k series) — cache per visibility for a minute; it's a dashboard, not
   // a live feed, and recomputing it per visit blocked the event loop.
   const statsCache = new Map(); // includeRestricted → { at, data }
+  // Stale-while-revalidate: an expired entry is still served at once, and the
+  // recompute runs after the response has gone out.
   app.get('/api/stats', (req, res) => {
     const inclR = canRestricted(req);
     const hit = statsCache.get(inclR);
-    if (hit && Date.now() - hit.at < 60_000) return res.json(hit.data);
+    if (hit) {
+      res.json(hit.data);
+      if (Date.now() - hit.at >= 60_000 && !hit.refreshing) {
+        hit.refreshing = true;
+        setImmediate(() => {
+          try { statsCache.set(inclR, { at: Date.now(), data: stats({ includeRestricted: inclR }) }); }
+          catch { hit.refreshing = false; }
+        });
+      }
+      return;
+    }
     const data = stats({ includeRestricted: inclR });
     statsCache.set(inclR, { at: Date.now(), data });
     res.json(data);
@@ -1653,8 +1672,19 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
     // ebook catalog (150k self-described entries) and OOM on the full set, so
     // restrict it to the native comic/manga libraries until the mobile clients
     // add pagination + ebook support. The web SPA always passes limit (above).
-    res.json(collectionSeries(db, { ...opts, excludeSelfDescribed: true }));
+    // The whole list is rebuilt only when the database has changed since the
+    // last build for this user and scope; repeat loads reuse the JSON.
+    const key = JSON.stringify([opts.userId, opts.includeRestricted, opts.library, opts.filter || '', opts.search || '', opts.sort || '', opts.restrictIds || null, opts.collectionsOnly]);
+    const version = dbVersion(db);
+    let hit = mobileListCache.get(key);
+    if (!hit || hit.version !== version) {
+      hit = { version, body: JSON.stringify(collectionSeries(db, { ...opts, excludeSelfDescribed: true })) };
+      if (mobileListCache.size > 50) mobileListCache.clear();
+      mobileListCache.set(key, hit);
+    }
+    res.type('application/json').send(hit.body);
   });
+  const mobileListCache = new Map();
   // Per-filter counts for the library filter chips (independent of the active
   // filter, so switching chips doesn't change the badges). Accepts the same
   // facet/collections scope as /api/collection so the SPA can fetch counts in

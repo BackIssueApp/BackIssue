@@ -298,6 +298,8 @@ function migrate(db) {
     if (!have.includes('meta_source')) db.exec(`ALTER TABLE ${table} ADD COLUMN meta_source TEXT`);
     if (!have.includes('meta_ref')) db.exec(`ALTER TABLE ${table} ADD COLUMN meta_ref TEXT`);
   }
+  // Stats counts the detailed rows of a cache that can run to hundreds of MB.
+  db.exec('CREATE INDEX IF NOT EXISTS idx_cvissues_detail ON cv_issues(has_detail) WHERE has_detail=1');
   migratePeopleIndex(db);
   backfillBuiltinCatalogs(db);
   // Pack grabs (per-series or 0-day) carry a series_id (null = whole-collection
@@ -341,6 +343,10 @@ function migrate(db) {
   }
   if (!cols.includes('monitor_from')) db.exec('ALTER TABLE series ADD COLUMN monitor_from TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_series_monitor ON series(monitor)');
+  // The monitored few among a huge catalog: with planner stats, the plain index
+  // above (two or three distinct values) loses to a full series scan; this
+  // partial one keeps the wanted_issues gate on an index walk.
+  db.exec("CREATE INDEX IF NOT EXISTS idx_series_monitored ON series(monitor) WHERE monitor IN ('all','new')");
   db.exec(`CREATE TABLE IF NOT EXISTS issue_picks (
     cv_issue_id INTEGER PRIMARY KEY,
     series_id INTEGER NOT NULL,
@@ -966,7 +972,30 @@ export function recordImport(db, { seriesId = null, seriesTitle = null, issueTit
 // `queue_status` carries the in-flight state (queued/grabbed/failed…) when the
 // issue has already been sent for download, so the page can show a badge
 // instead of a Download button. `sort`: series | newest | oldest | most | fewest.
-export function listWantedIssues(db, { limit = 200, offset = 0, scope = 'wanted', sort = 'series', followedOnly = false, userFollowedOnly = false, hideUnreleased = false, releasedWithinDays = 0, search = '', includeRestricted = true, userId = 0 } = {}) {
+// The full-set COUNT behind the Wanted badge and pager is the expensive half of
+// a page, and the page re-polls every few seconds. The count is reused until
+// the database changes at all (a write on this connection or another one), so
+// it is never stale; a quiet library answers the poll from memory.
+const wantedTotals = new WeakMap(); // db → Map(key → { version, n })
+// Changes whenever anything is written to the database, by this connection or
+// another one: a cache keyed on it can never serve a stale answer.
+export function dbVersion(db) {
+  return `${db.pragma('data_version', { simple: true })}:${db.prepare('SELECT total_changes() AS t').get().t}`;
+}
+function wantedTotal(db, sql, args) {
+  let cache = wantedTotals.get(db);
+  if (!cache) { cache = new Map(); wantedTotals.set(db, cache); }
+  const version = dbVersion(db);
+  const key = sql + JSON.stringify(args);
+  const hit = cache.get(key);
+  if (hit && hit.version === version) return hit.n;
+  const n = db.prepare(sql).get(args).n;
+  if (cache.size > 100) cache.clear();
+  cache.set(key, { version, n });
+  return n;
+}
+
+export function listWantedIssues(db, { limit = 200, offset = 0, scope = 'wanted', sort = 'series', followedOnly = false, userFollowedOnly = false, hideUnreleased = false, releasedWithinDays = 0, search = '', includeRestricted = true, userId = 0, withTotal = true } = {}) {
   // Two DISTINCT "follow" systems meet here:
   //  - the monitoring policy (series.monitor, legacy `followed`) is GLOBAL —
   //    it is what the automation lanes and the RSS/announce watchers fetch, and
@@ -1034,7 +1063,7 @@ export function listWantedIssues(db, { limit = 200, offset = 0, scope = 'wanted'
   // when the Following filter put it in the WHERE.
   const totalArgs = { ...args };
   if (!from.includes('@uid')) delete totalArgs.uid;
-  const total = db.prepare(`${cte}SELECT COUNT(*) n ${from}`).get(totalArgs).n;
+  const total = withTotal ? wantedTotal(db, `${cte}SELECT COUNT(*) n ${from}`, totalArgs) : null;
   const items = db.prepare(`${cte}SELECT s.id series_id, COALESCE(cv.name, s.title) series_title, s.monitor, s.monitor_from,
       EXISTS(SELECT 1 FROM user_follows uf WHERE uf.series_id = s.id AND uf.user_id = @uid) followed,
       cv.image_url series_cover,

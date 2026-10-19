@@ -12,6 +12,7 @@
 // an HttpOnly cookie. HTTP Basic is still accepted and verified against the
 // users table so scripts and tools keep working.
 import crypto from 'node:crypto';
+import { promisify } from 'node:util';
 
 export const ROLES = ['viewer', 'trusted', 'admin'];
 
@@ -62,6 +63,27 @@ export function verifyPassword(password, stored) {
     return false;
   }
 }
+
+// The async form runs scrypt on the libuv pool, so a login (or a spray of them)
+// never holds the event loop for the ~50–100 ms each hash costs.
+const scryptAsync = promisify(crypto.scrypt);
+export async function verifyPasswordAsync(password, stored) {
+  try {
+    const [algo, N, r, p, saltHex, hashHex] = String(stored).split('$');
+    if (algo !== 'scrypt') return false;
+    const hash = await scryptAsync(String(password), Buffer.from(saltHex, 'hex'), hashHex.length / 2, {
+      N: Number(N), r: Number(r), p: Number(p), maxmem: SCRYPT.maxmem,
+    });
+    return crypto.timingSafeEqual(hash, Buffer.from(hashHex, 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+// A real hash to verify against when the username doesn't exist, so a miss
+// costs the same as a wrong password. Made once, not per attempt.
+let padHash = null;
+const timingPad = () => (padHash ||= hashPassword('timing-pad'));
 
 const tokenHash = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
@@ -370,8 +392,15 @@ export function destroyOtherSessions(db, userId, keepToken) {
 /** Credentials → user row (with hash timing regardless of user existence). */
 export function verifyCredentials(db, username, password) {
   const row = db.prepare('SELECT * FROM users WHERE username=?').get(String(username || ''));
-  const stored = row?.password_hash || hashPassword('timing-pad');
-  const ok = verifyPassword(password, stored);
+  const ok = verifyPassword(password, row?.password_hash || timingPad());
+  return credentialUser(row, ok);
+}
+export async function verifyCredentialsAsync(db, username, password) {
+  const row = db.prepare('SELECT * FROM users WHERE username=?').get(String(username || ''));
+  const ok = await verifyPasswordAsync(password, row?.password_hash || timingPad());
+  return credentialUser(row, ok);
+}
+function credentialUser(row, ok) {
   if (!ok || !row || row.disabled) return null;
   // Same shape as sessionUser: hide_mature and lang ride every request's user,
   // so password Basic (OPDS apps) honors the account's mature-content switch.
@@ -437,8 +466,21 @@ export function apiKeyUser(db, key) {
       JOIN users u ON u.id = k.user_id
      WHERE k.key_hash = ?`).get(tokenHash(key));
   if (!row || row.disabled) return null;
-  db.prepare("UPDATE api_keys SET last_used=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE user_id=?").run(row.id);
+  if (dueStamp(`k:${tokenHash(key)}`)) db.prepare("UPDATE api_keys SET last_used=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE user_id=?").run(row.id);
   return row;
+}
+
+// last_seen / last_used are "about when", shown to people: stamping them on
+// every request (each cover and page image) cost a write transaction apiece.
+// Once a minute per token is plenty.
+const STAMP_EVERY_MS = 60_000;
+const lastStamped = new Map(); // token key → ms
+function dueStamp(key) {
+  const now = Date.now();
+  if (now - (lastStamped.get(key) || 0) < STAMP_EVERY_MS) return false;
+  if (lastStamped.size > 10_000) lastStamped.clear();
+  lastStamped.set(key, now);
+  return true;
 }
 
 /** What the profile UI shows: the key's prefix + timestamps, never the key. */
@@ -472,8 +514,8 @@ export function sessionUser(db, token) {
      WHERE s.token_hash=? AND s.expires_at > strftime('%Y-%m-%dT%H:%M:%SZ','now')`)
     .get(tokenHash(token));
   if (!row || row.disabled) return null;
-  db.prepare("UPDATE sessions SET last_seen=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE token_hash=?")
-    .run(tokenHash(token));
+  const h = tokenHash(token);
+  if (dueStamp(`s:${h}`)) db.prepare("UPDATE sessions SET last_seen=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE token_hash=?").run(h);
   return row;
 }
 
@@ -504,11 +546,16 @@ export function authBlockedFor(key) {
   const left = Math.ceil((e.until - Date.now()) / 1000);
   return left > 0 ? left : 0;
 }
-export function authFailed(key) {
-  const e = AUTH_FAILS.get(key) || { n: 0, until: 0 };
+// `after`: failures before the lock starts. `forgetAfterMs`: a bucket that has
+// been quiet this long starts over (used for the per-address bucket, which a
+// success never clears).
+export function authFailed(key, { after = LOCK_AFTER, forgetAfterMs = null } = {}) {
+  let e = AUTH_FAILS.get(key) || { n: 0, until: 0, last: 0 };
+  if (forgetAfterMs && Date.now() - (e.last || 0) > forgetAfterMs) e = { n: 0, until: 0, last: 0 };
   e.n++;
-  if (e.n >= LOCK_AFTER) {
-    e.until = Date.now() + Math.min(LOCK_MAX_MS, LOCK_BASE_MS * 2 ** (e.n - LOCK_AFTER));
+  e.last = Date.now();
+  if (e.n >= after) {
+    e.until = Date.now() + Math.min(LOCK_MAX_MS, LOCK_BASE_MS * 2 ** (e.n - after));
   }
   AUTH_FAILS.set(key, e);
   if (AUTH_FAILS.size > 10_000) AUTH_FAILS.clear(); // memory backstop under a spray
