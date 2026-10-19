@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.9.3] — 2026-10-19
+
 ### Security
 
 - **Sign-in and permission checks now apply to every spelling of a path.** The server matched
@@ -15,15 +17,17 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   some requests could skip them. Update promptly.
 - **Issue descriptions keep only plain formatting.** Forms, embedded SVG and unknown attributes are
   removed before a description is shown, so description HTML can no longer run script when clicked.
+- **Repeated failed sign-ins from one address are throttled across usernames.** After 30 failures
+  from the same address within 15 minutes, further attempts wait, whichever username they try.
 
 ### Added
 
-- **Library filters can match "everything except".** A plugin's collection filter may return
-  `{ excludeIds }` when core passes `ctx.canExclude`, so "unread" in a large ebook or audiobook
-  library sends the few books you've started instead of every other book.
 - **Update all plugins at once.** When installed plugins have updates, the Plugins page shows
   **Update all** beside the Installed heading. It updates each one in turn, keeps going past a
   failure, and the updates apply on the next restart, like a single update.
+- **Library filters can match "everything except".** A plugin's collection filter may return
+  `{ excludeIds }` when core passes `ctx.canExclude`, so "unread" in a large ebook or audiobook
+  library sends the few books you've started instead of every other book.
 
 ### Changed
 
@@ -50,18 +54,14 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
     starting the app skips two full scans of the metadata cache, "Download missing" on a large
     series records its issues in one step, and the database's write-ahead log no longer stays at
     its peak size after a big job.
-- **Repeated failed sign-ins from one address are throttled across usernames.** After 30 failures
-  from the same address within 15 minutes, further attempts wait, whichever username they try.
-- **`GET /api/series` is paged.** It returns up to 100 series by default (`?limit=` up to 500, plus
-  `?offset=`). It used to return the entire catalog in one response.
 - **Faster first load.** Wanted, Queue, Releases, History, Stats, Import, Plugins, Users, Lists and
   the setup wizard now load when first opened (and are fetched in the background once the app is
   idle), so the app downloads about a quarter less before it can show anything.
+- **`GET /api/series` is paged.** It returns up to 100 series by default (`?limit=` up to 500, plus
+  `?offset=`). It used to return the entire catalog in one response.
 
 ### Fixed
 
-- **"None of the enabled metadata sources can look this up" no longer names a source.** The server
-  log still records which source a failed lookup went to.
 - **A finished download no longer deletes a different issue with the same number.** Replacing the old
   copy of an issue matched on the issue number alone, so downloading Batman #1 could delete
   Batman Annual #1 from the same folder. A download that fails its archive check no longer
@@ -71,37 +71,43 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 - **An unreadable settings.json is kept, not silently replaced.** BackIssue starts on defaults, saves
   the original beside it as settings.json.unreadable-<time>, and logs where; settings are now
   written in one step so a crash mid-save can no longer leave a broken file.
-- **One failing download no longer stalls the queue.** An unexpected error while preparing or
-  recording a download now fails just that issue; before, it could leave the issue stuck as
-  downloading and stop the queue from starting again until a restart, or start the same issue twice.
-- **Downloads are written under a temporary name and renamed when complete.** A crash mid-write no
-  longer leaves a truncated comic under the real name, and recovery after a restart now looks in the
-  comic's own folder and only counts a file that opens as finished.
 - **Re-download keeps the current copy until the new one arrives.** The old file used to be deleted
   first, so a re-download that found nothing lost the copy you had. It is now replaced only once a
   readable new copy is in place, which takes the old file's name. Re-downloading an issue that is
   already downloading no longer starts a second download.
-- **A download that fails after its file is saved is not downloaded again.** Retrying used to save a
-  second copy beside the first.
+- **Downloads are written under a temporary name and renamed when complete.** A crash mid-write no
+  longer leaves a truncated comic under the real name, and recovery after a restart now looks in the
+  comic's own folder and only counts a file that opens as finished.
 - **A library scan that can't read a folder keeps that folder's comics.** A brief share or disk error
   on one subfolder used to drop all of its files from the library, so they showed as missing and
   could be downloaded again.
-- **BackIssue no longer stops itself after the computer wakes from sleep.** The freeze watchdog took
-  the time spent asleep for a hung server and shut the app down.
-- **Plugin dependency installs can no longer hang startup or break a plugin for good.** The install
-  at startup gives up after five minutes, an install that was cut short is retried on the next
-  start, and a plugin update whose dependencies fail to install keeps the version you had.
 - **Reorganize library no longer re-downloads what it moved, and keeps the app responsive.** Moved
   issues kept pointing at their old location, so asking for one again downloaded it again. Series in
   a library with its own folder pattern are now laid out by that pattern, and a file that differs
   only in letter case from the new name is no longer overwritten. Moves between drives copy to a
   temporary file first, so an interrupted move can't leave a half-copied comic, and planning or
   running a reorganize on network storage no longer freezes the app.
-- **A pack download cut off by a restart no longer shows as in progress forever.** Packs a download
-  site was fetching inside BackIssue are marked failed at startup, so you can grab them again.
+- **Settings can't be saved over with blanks.** If Settings fail to load, the page says so and Save
+  stays off until a good load, so a save can no longer wipe your indexers and metadata sources.
+- **One failing download no longer stalls the queue.** An unexpected error while preparing or
+  recording a download now fails just that issue; before, it could leave the issue stuck as
+  downloading and stop the queue from starting again until a restart, or start the same issue twice.
+- **A download that fails after its file is saved is not downloaded again.** Retrying used to save a
+  second copy beside the first.
+- **BackIssue no longer stops itself after the computer wakes from sleep.** The freeze watchdog took
+  the time spent asleep for a hung server and shut the app down.
 - **An indexer, download client or metadata request that stops answering no longer stalls
   downloads.** Requests now give up after 30 seconds (60 for metadata) instead of waiting up to five
   minutes, so one unresponsive indexer or client can't hold up searches, the queue or imports.
+- **A server hiccup no longer breaks or empties pages.** When the server restarts or a proxy answers
+  with an error, Wanted, System, Stats, Queue, History, Plugins, Users, Lists and the Library keep
+  what they last showed and say the load failed, with a Retry, instead of crashing or showing an
+  empty library. Header counts and sidebar libraries no longer drop to zero on a failed poll.
+- **Plugin dependency installs can no longer hang startup or break a plugin for good.** The install
+  at startup gives up after five minutes, an install that was cut short is retried on the next
+  start, and a plugin update whose dependencies fail to install keeps the version you had.
+- **A pack download cut off by a restart no longer shows as in progress forever.** Packs a download
+  site was fetching inside BackIssue are marked failed at startup, so you can grab them again.
 - **qBittorrent downloads are imported only once they have finished moving.** A torrent still being
   moved out of an incomplete-downloads folder, or re-checked, counted as done and the import failed.
 - **Half issues are found on usenet, torrents and RSS.** A release named like "Wizard 1/2" was read
@@ -114,15 +120,6 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   .part file older than a day, including other programs' partial downloads in a shared folder.
 - **Converting CBR to CBZ keeps the .cbr unless every page made it across.**
 - **Two downloads of the same book or audiobook at once no longer overwrite each other.**
-- **Metadata errors and links speak for BackIssue.** Error messages about the metadata service no
-  longer name an outside catalog, and the link to a record's page at its source shows only to people
-  who manage settings (and only for a safe web address).
-- **A server hiccup no longer breaks or empties pages.** When the server restarts or a proxy answers
-  with an error, Wanted, System, Stats, Queue, History, Plugins, Users, Lists and the Library keep
-  what they last showed and say the load failed, with a Retry, instead of crashing or showing an
-  empty library. Header counts and sidebar libraries no longer drop to zero on a failed poll.
-- **Settings can't be saved over with blanks.** If Settings fail to load, the page says so and Save
-  stays off until a good load, so a save can no longer wipe your indexers and metadata sources.
 - **Setup reports what failed.** The first-run wizard stays open and lists any library or plugin it
   could not create, instead of saying you're all set.
 - **Restart app waits for the app to really come back**, even behind a reverse proxy.
@@ -133,6 +130,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 - **Fast clicking shows the right thing.** Switching series, stepping through issues, changing a
   search or filter, or switching reading lists while an earlier request is still loading can no
   longer show the older result.
+- **Metadata errors and links speak for BackIssue.** Error messages about the metadata service no
+  longer name an outside catalog, and the link to a record's page at its source shows only to people
+  who manage settings (and only for a safe web address).
+- **"None of the enabled metadata sources can look this up" no longer names a source.** The server
+  log still records which source a failed lookup went to.
 - Status, series type and age rating tags, log levels and cover prices now appear in your language;
   a series with no title reads "Untitled series".
 - Icons replace the remaining text symbols (the series menu, help button, seeders, warnings), row
