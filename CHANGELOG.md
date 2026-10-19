@@ -59,6 +59,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   only in letter case from the new name is no longer overwritten. Moves between drives copy to a
   temporary file first, so an interrupted move can't leave a half-copied comic, and planning or
   running a reorganize on network storage no longer freezes the app.
+- **A pack download cut off by a restart no longer shows as in progress forever.** Packs a download
+  site was fetching inside BackIssue are marked failed at startup, so you can grab them again.
 
 ## [0.9.2] — 2026-10-18
 

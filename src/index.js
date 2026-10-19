@@ -1,4 +1,4 @@
-import { openDb, clearIssuesForRedownload, SELF_DESCRIBED_TYPES, recordedCatalog, backfillCatalogs, libraryOfRecord, librarySources } from './db.js';
+import { openDb, clearIssuesForRedownload, SELF_DESCRIBED_TYPES, recordedCatalog, backfillCatalogs, libraryOfRecord, librarySources, failInterruptedPackGrabs } from './db.js';
 import { runQueue, reconcileDownloading } from './downloader.js';
 import { processPack } from './pack.js';
 import { createApp } from './server.js';
@@ -29,7 +29,7 @@ import { tagFileFromCv, ensureCvIssueDetail, fetchAllIssueMetadata } from './met
 import { fetchWeeklyReleases, matchReleases, shiftWeek, currentWeek } from './releases.js';
 import { startJob, listJobs, clearFinishedJobs, attachJobsDb } from './jobs.js';
 import { createScheduler } from './scheduler.js';
-import { createDownloadMonitor } from './downloadmonitor.js';
+import { createDownloadMonitor, CLIENT_SOURCES } from './downloadmonitor.js';
 import { activeMedia as activeMediaList, emitMedia } from './mediadownload.js';
 import { tagAllUntagged, convertAllCbr, unwrapNestedArchives, removeAllDuplicates, verifyLibrary, relinkAllCv, scanEntireLibrary, backupDatabase, renameAllFiles, removeGhostSeries } from './tools.js';
 import { collectionStats } from './stats.js';
@@ -165,6 +165,9 @@ process.on('warning', (w) => { if (/memory|heap/i.test(w?.message || '')) { try 
 // don't sit stuck on the "saving" badge. Boot only: a live queue's
 // 'downloading' rows are in-flight work, not leftovers.
 try { await reconcileDownloading(db); } catch (e) { console.warn('download recovery failed', e?.message || e); }
+// In-app pack downloads don't survive a restart (client-backed ones do: the
+// monitor resumes those).
+try { const n = failInterruptedPackGrabs(db, CLIENT_SOURCES); if (n) logWarn(`${n} pack download(s) were interrupted by the restart — grab them again`, 'download'); } catch (e) { console.warn('pack grab recovery failed', e?.message || e); }
 initRssTables(db);
 // Per-volume is now the ownership model: attribute any orphaned files, CV-link
 // matched series, and drop index rows for comics you don't track.
@@ -1030,14 +1033,16 @@ function grabSourcePack({ source, seriesId, result } = {}) {
   if (!result || !series) return { error: 'unknown series or result' };
   const grabId = recordGrab(db, { source, downloadId: result.postUrl || result.downloadUrl || null, title: result.title, kind: 'pack', seriesId: sid });
   (async () => {
-    const { orderedSources } = await import('./sources/index.js');
-    const src = orderedSources(config).find((s) => s.id === source && typeof s.fetchPack === 'function');
-    if (!src) { setGrabStatus(db, grabId, 'failed', { error: `${source} cannot grab packs` }); return; }
-    const job = startJob('pack-import', `Import pack · ${result.title}`);
-    inAppPackProgress.set(grabId, { state: 'downloading', progress: 0 });
-    logInfo(`Grabbing ${source} pack: ${result.title}`, source);
-    let dir = null, keepDir = false;
+    let dir = null, keepDir = false, job = null;
+    // Everything — including the source lookup — sits inside the try, so any
+    // throw fails the grab instead of leaving it "active" forever.
     try {
+      const { orderedSources } = await import('./sources/index.js');
+      const src = orderedSources(config).find((s) => s.id === source && typeof s.fetchPack === 'function');
+      if (!src) { setGrabStatus(db, grabId, 'failed', { error: `${source} cannot grab packs` }); return; }
+      job = startJob('pack-import', `Import pack · ${result.title}`);
+      inAppPackProgress.set(grabId, { state: 'downloading', progress: 0 });
+      logInfo(`Grabbing ${source} pack: ${result.title}`, source);
       // seriesId lets a source target the grab (e.g. AirDC++ cherry-picks only
       // the MISSING issues out of a peer's folder instead of the whole thing).
       const ctx = { db, config, seriesId: sid, seriesTitle: series.title, seriesNames: seriesSearchNames(db, sid), seriesYear: series.year, issue: {} };
@@ -1060,8 +1065,8 @@ function grabSourcePack({ source, seriesId, result } = {}) {
       notifyRaw(db, { type: 'pack.done', category: 'import', level: summary.failed ? 'warn' : 'success', title: 'Pack imported', body: `${result.title} — ${summary.imported} new issue(s)`, params: { title: result.title, count: summary.imported, failed: summary.failed || 0 }, seriesId: sid ?? null });
       settlePicks(sid ?? null);
     } catch (e) {
-      setGrabStatus(db, grabId, 'failed', { error: String(e?.message || e) });
-      job.fail(e);
+      try { setGrabStatus(db, grabId, 'failed', { error: String(e?.message || e) }); } catch { /* db unavailable */ }
+      job?.fail(e);
       logError(`${source} pack failed: ${result.title} — ${String(e?.message || e)}`, source);
       notifyRaw(db, { type: 'pack.failed', category: 'failure', level: 'error', title: 'Pack failed', body: `${result.title} — ${String(e?.message || e)}`, params: { title: result.title, error: String(e?.message || e) }, seriesId: sid ?? null });
     } finally {

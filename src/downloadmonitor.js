@@ -126,6 +126,9 @@ async function handleMediaGrab({ db, grab, item, client, policy, source, onProgr
   }
 }
 
+// Sources whose grabs a download client holds — the monitor resumes them after a restart.
+export const CLIENT_SOURCES = ['usenet', 'torrent'];
+
 function sourcePolicy(source) {
   if (source === 'usenet') {
     return {

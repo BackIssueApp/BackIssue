@@ -988,6 +988,16 @@ export function listFailedGrabs(db, { limit = 200, offset = 0 } = {}) {
   return { rows, total };
 }
 
+// Pack grabs an in-app source was downloading itself live only in that
+// process: after a restart nothing resumes them, so they would sit "active"
+// forever. Grabs handed to a download client (`clientSources`) are left for
+// the monitor, which picks them back up. Returns how many were failed.
+export function failInterruptedPackGrabs(db, clientSources = []) {
+  const ph = clientSources.map(() => '?').join(',');
+  return db.prepare(`UPDATE grabs SET status='failed', error='app restarted mid-run'
+    WHERE status='active' AND kind='pack'${clientSources.length ? ` AND source NOT IN (${ph})` : ''}`).run(...clientSources).changes;
+}
+
 export function setGrabStatus(db, id, status, { error = null, importedAt = null } = {}) {
   db.prepare(`UPDATE grabs SET status=?, error=?, imported_at=COALESCE(?, imported_at) WHERE id=?`)
     .run(status, error, importedAt, id);
