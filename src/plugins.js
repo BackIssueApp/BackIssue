@@ -53,18 +53,35 @@ function linkCoreModules(dir) {
 // install them into the plugin folder once. Prebuilt-binary deps (sharp,
 // better-sqlite3) install without a compiler, so this works on the slim image.
 // Best-effort: a failure is logged and the plugin still loads (a dep it needs
-// will surface its own clear error).
-function ensurePluginDeps(dir, name) {
+// will surface its own clear error). A marker file written only after npm
+// succeeds tells a complete install from one an interrupted or failed npm left
+// half-written, which is retried on the next boot; the install is time-boxed
+// so an unreachable registry cannot hold boot forever.
+const DEPS_MARKER = '.backissue-deps-ok';
+const DEPS_TIMEOUT_MS = 5 * 60 * 1000;
+export function markDepsComplete(pluginDir) {
+  try { fs.writeFileSync(path.join(pluginDir, 'node_modules', DEPS_MARKER), new Date().toISOString()); }
+  catch { /* no node_modules: nothing was installed */ }
+}
+// Installed before the marker existed: every declared dependency resolves.
+function depsPresent(pluginDir, deps) {
+  return Object.keys(deps).every((d) => fs.existsSync(path.join(pluginDir, 'node_modules', d, 'package.json')));
+}
+export function ensurePluginDeps(dir, name, spawn = spawnSync) {
   try {
-    const pkgPath = path.join(dir, name, 'package.json');
+    const pdir = path.join(dir, name);
+    const pkgPath = path.join(pdir, 'package.json');
     if (!fs.existsSync(pkgPath)) return;
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
     if (!pkg.dependencies || !Object.keys(pkg.dependencies).length) return;
-    if (fs.existsSync(path.join(dir, name, 'node_modules'))) return; // already installed
+    if (fs.existsSync(path.join(pdir, 'node_modules', DEPS_MARKER))) return; // already installed
+    if (depsPresent(pdir, pkg.dependencies)) { markDepsComplete(pdir); return; }
     console.log(`Installing dependencies for plugin "${name}"…`);
-    const r = spawnSync('npm', ['install', '--omit=dev', '--no-audit', '--no-fund'],
-      { cwd: path.join(dir, name), stdio: 'inherit', shell: process.platform === 'win32' });
-    if (r.status !== 0) console.warn(`plugin "${name}": dependency install exited ${r.status}`);
+    const r = spawn('npm', ['install', '--omit=dev', '--no-audit', '--no-fund'],
+      { cwd: pdir, stdio: 'inherit', shell: process.platform === 'win32', timeout: DEPS_TIMEOUT_MS, killSignal: 'SIGKILL' });
+    if (r.status === 0) markDepsComplete(pdir);
+    else if (r.error?.code === 'ETIMEDOUT' || r.signal) console.warn(`plugin "${name}": dependency install did not finish within ${DEPS_TIMEOUT_MS / 60000} min (registry unreachable?), retrying next start`);
+    else console.warn(`plugin "${name}": dependency install exited ${r.status}${r.error ? ` (${r.error.message})` : ''}, retrying next start`);
   } catch (e) { console.warn(`plugin "${name}" dependency install failed:`, e?.message || e); }
 }
 

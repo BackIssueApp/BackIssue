@@ -50,6 +50,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   could be downloaded again.
 - **BackIssue no longer stops itself after the computer wakes from sleep.** The freeze watchdog took
   the time spent asleep for a hung server and shut the app down.
+- **Plugin dependency installs can no longer hang startup or break a plugin for good.** The install
+  at startup gives up after five minutes, an install that was cut short is retried on the next
+  start, and a plugin update whose dependencies fail to install keeps the version you had.
 
 ## [0.9.2] — 2026-10-18
 
