@@ -8,6 +8,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.9.2] — 2026-10-18
+
 ### Security
 
 - **A new server is locked until its admin account exists.** Before the first
@@ -17,15 +19,26 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   the API and plugin assets return `401` with `setupRequired: true` until the
   admin account is created.
 
-### Fixed
-
-- **The RSS watch and the 0-Day pack job use Prowlarr's indexers.** Both
-  read only the manually entered indexer lists, so with Prowlarr managing
-  your indexers they had nothing to poll or search. They now use the same
-  indexers as searches.
-
 ### Added
 
+- **Wanted books and audiobooks on the Wanted page.** Plugins can add their
+  own tab beside Comics (`registerWantedTab`); the Books and Audiobooks
+  plugins use it to list what's wanted, search again, and cancel.
+- **Order your libraries and choose the default.** Arrows on each library
+  under Settings → Library → Libraries set the order the sidebar lists them
+  in, and **Make default** picks the comic or manga library that new series
+  go to when you don't choose one. Before, the order was fixed by when each
+  library was created, and new series always went to the first comic library.
+- **API keys work as a password for reader apps.** Apps that only send a
+  username and password, such as OPDS readers, accept your Profile API key
+  in the password box, with your username or a blank one.
+- **Set a user's password from the Users page.** Admins can give a locked-out
+  user a new password. The box comes filled with a generated one to copy or
+  replace, and the user is signed out everywhere. Accounts linked to an
+  external sign-in are left out, since they have no local password.
+- **Sign-in buttons appear only once their provider is set up.** A plugin's
+  SSO button can stay hidden until it's configured, and a renamed button shows
+  without a restart.
 - **`GET /api/auth/providers` reports `apiKeyBasic: true`**, so clients know
   a personal API key works as the HTTP Basic password, the way in for reader
   apps when password login is off.
@@ -43,29 +56,12 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   library scan no longer looks it up. The unused webhook helper the
   Notifications Hub replaced is gone too.
 
-### Added
-
-- **Wanted books and audiobooks on the Wanted page.** Plugins can add their
-  own tab beside Comics (`registerWantedTab`); the Books and Audiobooks
-  plugins use it to list what's wanted, search again, and cancel.
-- **Order your libraries and choose the default.** Arrows on each library
-  under Settings → Library → Libraries set the order the sidebar lists them
-  in, and **Make default** picks the comic or manga library that new series
-  go to when you don't choose one. Before, the order was fixed by when each
-  library was created, and new series always went to the first comic library.
-- **Sign-in buttons appear only once their provider is set up.** A plugin's
-  SSO button can stay hidden until it's configured, and a renamed button shows
-  without a restart.
-- **Set a user's password from the Users page.** Admins can give a locked-out
-  user a new password. The box comes filled with a generated one to copy or
-  replace, and the user is signed out everywhere. Accounts linked to an
-  external sign-in are left out, since they have no local password.
-- **API keys work as a password for reader apps.** Apps that only send a
-  username and password, such as OPDS readers, accept your Profile API key
-  in the password box, with your username or a blank one.
-
 ### Fixed
 
+- **The RSS watch and the 0-Day pack job use Prowlarr's indexers.** Both
+  read only the manually entered indexer lists, so with Prowlarr managing
+  your indexers they had nothing to poll or search. They now use the same
+  indexers as searches.
 - **Error messages in your language.** About 160 messages the server can
   show, from download-client and indexer failures to account and library
   rules, were English whatever language you picked. They are now translated,
@@ -77,10 +73,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   username and password, or through an external sign-in such as billing. The
   switch now applies to every way an account signs in, and a change takes
   effect on the app's next request.
-- **Stats shows the metadata sources in use.** Its Metadata badge read the old
-  single-source setting, so with several sources it could say "No key" for a
-  working setup. It now reflects the ordered list and shows how many sources
-  are in use.
+- **Turning off password login covers reader apps too.** With password login
+  off, apps that send a username and password directly no longer let
+  non-admin users in with their password. Admins keep their password
+  fallback, accounts from an external login backend are unaffected, and
+  everyone else uses their API key.
 - **Only admins can create, edit or delete libraries.** A library decides which
   folders on disk the app scans and files into. Before, anyone allowed to
   manage the library could point one at any folder on the server. Moving
@@ -88,11 +85,6 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 - **Download all respects mature-content restrictions.** On the Wanted page,
   Download all queued issues from restricted series even for people who
   can't see them. It now queues only what that person's Wanted list shows.
-- **Turning off password login covers reader apps too.** With password login
-  off, apps that send a username and password directly no longer let
-  non-admin users in with their password. Admins keep their password
-  fallback, accounts from an external login backend are unaffected, and
-  everyone else uses their API key.
 - **Plugin task schedules save.** Changing the pattern or switching a plugin's
   task on or off under Jobs (Rebuild the browse index, Fill approved book
   requests, Sync remote audiobook catalog and others) now sticks. Before, the
@@ -104,6 +96,10 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   searches with the sources of the library it lands in, and matching an
   existing series searches with the sources of its library. Before, both used
   the app-wide list whenever a library had its own.
+- **Stats shows the metadata sources in use.** Its Metadata badge read the old
+  single-source setting, so with several sources it could say "No key" for a
+  working setup. It now reflects the ordered list and shows how many sources
+  are in use.
 
 ## [0.9.1] — 2026-10-17
 
