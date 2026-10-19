@@ -336,10 +336,15 @@ function migrate(db) {
   // reading lists, requests and notifications can build on them. `followed`
   // is kept in sync (monitor != 'none') for plugins and the mobile apps.
   if (!cols.includes('monitor')) {
-    db.exec("ALTER TABLE series ADD COLUMN monitor TEXT NOT NULL DEFAULT 'none'");
-    // Existing installs: the old on/off flag maps 1:1 — automation never
-    // searched unfollowed series, so nothing that was fetched stops.
-    db.exec("UPDATE series SET monitor = CASE WHEN followed=1 THEN 'all' ELSE 'none' END");
+    // One transaction: the column's presence is what marks this migration
+    // done, so a crash between the ALTER and the backfill must not leave the
+    // column without the backfill (every followed series would read 'none').
+    db.transaction(() => {
+      db.exec("ALTER TABLE series ADD COLUMN monitor TEXT NOT NULL DEFAULT 'none'");
+      // Existing installs: the old on/off flag maps 1:1 — automation never
+      // searched unfollowed series, so nothing that was fetched stops.
+      db.exec("UPDATE series SET monitor = CASE WHEN followed=1 THEN 'all' ELSE 'none' END");
+    })();
   }
   if (!cols.includes('monitor_from')) db.exec('ALTER TABLE series ADD COLUMN monitor_from TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_series_monitor ON series(monitor)');
@@ -1120,6 +1125,16 @@ export function listFailedGrabs(db, { limit = 200, offset = 0 } = {}) {
      ORDER BY g.id DESC LIMIT ? OFFSET ?`).all(limit, offset);
   const total = db.prepare("SELECT COUNT(*) n FROM grabs WHERE status='failed'").get().n;
   return { rows, total };
+}
+
+// Pack grabs an in-app source was downloading itself live only in that
+// process: after a restart nothing resumes them, so they would sit "active"
+// forever. Grabs handed to a download client (`clientSources`) are left for
+// the monitor, which picks them back up. Returns how many were failed.
+export function failInterruptedPackGrabs(db, clientSources = []) {
+  const ph = clientSources.map(() => '?').join(',');
+  return db.prepare(`UPDATE grabs SET status='failed', error='app restarted mid-run'
+    WHERE status='active' AND kind='pack'${clientSources.length ? ` AND source NOT IN (${ph})` : ''}`).run(...clientSources).changes;
 }
 
 export function setGrabStatus(db, id, status, { error = null, importedAt = null } = {}) {
@@ -2539,14 +2554,16 @@ export function cancelIssue(db, id) {
 }
 
 // Reset the given issues for re-download (even if 'done'): return their current
-// file paths (so the caller can delete the old files), then clear status to
-// 'pending' and forget the file path so the download writes the correct name.
+// file paths, then clear status to 'pending' and forget the file path. Issues
+// already in flight (downloading/tagging/grabbed) are left alone — resetting
+// them would start a second concurrent download while the first still imports.
+const IN_FLIGHT = "('downloading','tagging','grabbed')";
 export function clearIssuesForRedownload(db, ids) {
   if (!ids || !ids.length) return [];
   const ph = ids.map(() => '?').join(',');
-  const paths = db.prepare(`SELECT file_path FROM issues WHERE id IN (${ph})`)
+  const paths = db.prepare(`SELECT file_path FROM issues WHERE id IN (${ph}) AND status NOT IN ${IN_FLIGHT}`)
     .all(...ids).map((r) => r.file_path).filter(Boolean);
-  db.prepare(`UPDATE issues SET status='pending', file_path=NULL, error=NULL WHERE id IN (${ph})`).run(...ids);
+  db.prepare(`UPDATE issues SET status='pending', file_path=NULL, error=NULL WHERE id IN (${ph}) AND status NOT IN ${IN_FLIGHT}`).run(...ids);
   return paths;
 }
 

@@ -7,6 +7,10 @@
 import { remapClientPath } from './paths.js';
 import { buildClientUrl, normalizeUrlBase } from './clienturl.js';
 
+// A download client that stops answering must not stall the download monitor's
+// tick (every source imports in it) for the HTTP stack's 5-minute default.
+const CLIENT_TIMEOUT_MS = 30_000;
+
 // Build the client's base URL from host + port (+ ssl) + an optional URL base
 // (a reverse proxy serving SABnzbd/NZBGet under a subpath — very common in
 // Docker and on seedboxes). Falls back to a legacy nzbClientUrl if host isn't
@@ -38,7 +42,7 @@ function sabnzbd(config, { fetchImpl = fetch } = {}) {
   const key = config.nzbClientApiKey || '';
   const call = async (params) => {
     const p = new URLSearchParams({ output: 'json', apikey: key, ...params });
-    const res = await fetchImpl(`${base}/api?${p.toString()}`);
+    const res = await fetchImpl(`${base}/api?${p.toString()}`, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`sabnzbd HTTP ${res.status}`);
     return res.json();
   };
@@ -112,7 +116,7 @@ function nzbget(config, { fetchImpl = fetch } = {}) {
     headers.Authorization = `Basic ${auth}`;
   }
   const rpc = async (method, params = []) => {
-    const res = await fetchImpl(`${base}/jsonrpc`, { method: 'POST', headers, body: JSON.stringify({ method, params, id: 1 }) });
+    const res = await fetchImpl(`${base}/jsonrpc`, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS), method: 'POST', headers, body: JSON.stringify({ method, params, id: 1 }) });
     if (!res.ok) throw new Error(`nzbget HTTP ${res.status}`);
     const j = await res.json();
     if (j.error) throw new Error(`nzbget: ${j.error.message || JSON.stringify(j.error)}`);
@@ -181,7 +185,7 @@ export async function testClient(config, { fetchImpl = fetch } = {}) {
     if (kind === 'sabnzbd') {
       // mode=queue requires the API key, so it doubles as an auth check.
       const key = config.nzbClientApiKey || '';
-      const res = await fetchImpl(`${base}/api?mode=queue&limit=0&output=json&apikey=${encodeURIComponent(key)}`);
+      const res = await fetchImpl(`${base}/api?mode=queue&limit=0&output=json&apikey=${encodeURIComponent(key)}`, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS) });
       if (!res.ok) return { ok: false, message: `HTTP ${res.status} — check the URL.` };
       let j; try { j = await res.json(); } catch { return { ok: false, message: 'Response was not JSON — is this the SABnzbd URL?' }; }
       if (j.status === false || j.error) return { ok: false, message: `SABnzbd rejected the request${j.error ? `: ${j.error}` : ' (check the API key).'}` };
@@ -191,7 +195,7 @@ export async function testClient(config, { fetchImpl = fetch } = {}) {
     if (kind === 'nzbget') {
       const headers = { 'Content-Type': 'application/json' };
       if (config.nzbClientUser) headers.Authorization = 'Basic ' + Buffer.from(`${config.nzbClientUser}:${config.nzbClientPass || ''}`).toString('base64');
-      const res = await fetchImpl(`${base}/jsonrpc`, { method: 'POST', headers, body: JSON.stringify({ method: 'version', params: [], id: 1 }) });
+      const res = await fetchImpl(`${base}/jsonrpc`, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS), method: 'POST', headers, body: JSON.stringify({ method: 'version', params: [], id: 1 }) });
       if (res.status === 401) return { ok: false, message: 'Authentication failed — check the username/password.' };
       if (!res.ok) return { ok: false, message: `HTTP ${res.status} — check the URL.` };
       let j; try { j = await res.json(); } catch { return { ok: false, message: 'Response was not JSON — is this the NZBGet URL?' }; }

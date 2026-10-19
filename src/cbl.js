@@ -13,6 +13,9 @@
 // a reading order is the whole point, so it's never re-sorted by date.
 import { load } from 'cheerio';
 
+// Reading-list fetches give up rather than hang on a stalled connection.
+const FETCH_TIMEOUT_MS = 30_000;
+
 const REPO = 'DieselTech/CBL-ReadingLists';
 const RAW = `https://raw.githubusercontent.com/${REPO}/main/`;
 const CATALOG_TTL_MS = 6 * 3600 * 1000;
@@ -118,7 +121,7 @@ export async function cblCatalog({ fetchImpl = fetch } = {}) {
   if (catalog.promise) return catalog.promise;
   catalog.promise = (async () => {
     try {
-      const r = await fetchImpl(`https://api.github.com/repos/${REPO}/git/trees/main?recursive=1`, { headers: ghHeaders() });
+      const r = await fetchImpl(`https://api.github.com/repos/${REPO}/git/trees/main?recursive=1`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), headers: ghHeaders() });
       if (!r.ok) throw new Error(`GitHub returned HTTP ${r.status}`);
       const data = await r.json();
       const files = (data.tree || [])
@@ -143,7 +146,7 @@ export async function fetchCatalogCbl(path, { fetchImpl = fetch } = {}) {
   const files = await cblCatalog({ fetchImpl });
   if (!files.includes(path)) throw new Error('that list is not in the catalog');
   const url = RAW + path.split('/').map(encodeURIComponent).join('/');
-  const r = await fetchImpl(url, { headers: { 'user-agent': 'BackIssue' } });
+  const r = await fetchImpl(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), headers: { 'user-agent': 'BackIssue' } });
   if (!r.ok) throw new Error(`couldn't fetch the list (HTTP ${r.status})`);
   return r.text();
 }

@@ -280,10 +280,22 @@ export async function convertCbrToCbz(path) {
     return { cbzPath, renamed: true };
   }
   await assertRarConvertible(path); // stat check — don't read an oversized file into memory
+  const src = await readArchiveInfo(path);
   const out = await cbrBufferToCbz(await fs.readFile(path));
   const tmp = cbzPath + '.part';
-  await fs.writeFile(tmp, out);
-  await fs.rename(tmp, cbzPath);
+  try {
+    await fs.writeFile(tmp, out);
+    // Prove the copy before the original goes: every page the RAR held must
+    // be readable in the CBZ (the unwrap path checks the same way).
+    const check = await readArchiveInfo(tmp);
+    if (!check.ok || (src.ok && src.pageCount != null && check.pageCount !== src.pageCount)) {
+      throw Object.assign(new Error(`${check.pageCount ?? 0} of ${src.pageCount ?? '?'} pages converted`), { code: 'ESHORTCONVERT' });
+    }
+    await fs.rename(tmp, cbzPath);
+  } catch (e) {
+    await fs.rm(tmp, { force: true }).catch(() => {});
+    throw e;
+  }
   await fs.unlink(path);
   return { cbzPath };
 }

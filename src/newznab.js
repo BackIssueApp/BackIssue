@@ -4,6 +4,10 @@
 // by API key and often rate-limit or ban on IP churn.
 import { load } from 'cheerio';
 
+// An indexer that stops answering must not hold a search (and the queue worker
+// waiting on it) for the HTTP stack's 5-minute default.
+const INDEXER_TIMEOUT_MS = 30_000;
+
 // Parse the settings textarea into indexer descriptors. Blank lines and lines
 // starting with # are ignored. Fields are pipe-separated: name | url | apikey.
 export function parseIndexers(str) {
@@ -116,7 +120,7 @@ export async function testIndexer(indexer, { fetchImpl = fetch } = {}) {
   if (!indexer?.url) return { ok: false, message: 'A URL is required.' };
   const url = buildSearchUrl(indexer, 'batman', { cat: '7030', limit: 1 });
   let res;
-  try { res = await fetchImpl(url, { headers: { 'User-Agent': 'comic-metadata-client/1.0' } }); }
+  try { res = await fetchImpl(url, { signal: AbortSignal.timeout(INDEXER_TIMEOUT_MS), headers: { 'User-Agent': 'comic-metadata-client/1.0' } }); }
   catch (e) { return { ok: false, message: `Connection failed: ${e.message}` }; }
   if (!res.ok) return { ok: false, message: `HTTP ${res.status} — check the URL.` };
   const text = await res.text().catch(() => '');
@@ -150,7 +154,7 @@ export async function testIndexer(indexer, { fetchImpl = fetch } = {}) {
 
 export async function searchIndexer(indexer, query, { fetchImpl = fetch, cat = '7030', limit = 50 } = {}) {
   const url = buildSearchUrl(indexer, query, { cat, limit });
-  const res = await fetchImpl(url, { headers: { 'User-Agent': 'comic-metadata-client/1.0' } });
+  const res = await fetchImpl(url, { signal: AbortSignal.timeout(INDEXER_TIMEOUT_MS), headers: { 'User-Agent': 'comic-metadata-client/1.0' } });
   if (!res.ok) throw new Error(`${indexer.name}: HTTP ${res.status}`);
   return parseNewznab(await res.text(), indexer.name);
 }

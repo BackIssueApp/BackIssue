@@ -40,7 +40,7 @@ export async function fetchWeeklyReleases({ week, year } = {}, { fetchImpl } = {
   const base = String(config.releaseProviderUrl || 'https://data.backissue.app').replace(/\/+$/, '');
   const url = `${base}/newcomics.php?week=${encodeURIComponent(wk)}&year=${encodeURIComponent(yr)}`;
   const doFetch = fetchImpl || fetch;
-  const resp = await doFetch(url, { headers: { 'User-Agent': UA } });
+  const resp = await doFetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(60_000) });
   if (!resp.ok) throw new Error(`release provider HTTP ${resp.status}`);
   const data = await resp.json();
   if (!Array.isArray(data)) throw new Error('unexpected release-provider response (not a list)');

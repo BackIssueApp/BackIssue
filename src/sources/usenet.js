@@ -43,7 +43,9 @@ export function parseReleaseName(title) {
   // Capture an optional leading minus for the "-1" (Flashback) issues, but ONLY
   // when it's a standalone token — a "-" glued to a word char is a hyphenated
   // series name (X-23, Spider-Man), not a negative issue number.
-  const nums = cleaned.match(/(?<!\w)-?\d+(?:\.\d+)?/g);
+  // A fraction ("Wizard 1/2") is one number, the half issue — not issue 2 of
+  // a series called "Wizard 1/".
+  const nums = cleaned.match(/(?<!\w)-?\d+(?:\/\d+(?![\d/])|\.\d+)?/g);
   let number = null, series = cleaned;
   if (nums) {
     const last = nums[nums.length - 1];

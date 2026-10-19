@@ -11,6 +11,10 @@ import { magnetInfohash, torrentInfohash } from './torrenthash.js';
 import { remapClientPath } from './paths.js';
 import { buildClientUrl, normalizeUrlBase } from './clienturl.js';
 
+// A download client that stops answering must not stall the download monitor's
+// tick (every source imports in it) for the HTTP stack's 5-minute default.
+const CLIENT_TIMEOUT_MS = 30_000;
+
 export function qbBaseUrl(config) {
   return buildClientUrl({ host: config.qbHost, port: config.qbPort, ssl: config.qbSsl, urlBase: config.qbUrlBase });
 }
@@ -44,7 +48,11 @@ function mapState(t, config) {
   const base = { name: t.name, seeders: Number.isFinite(s) ? s : -1 };
   const state = String(t.state || '');
   if (/^(error|missingFiles)$/.test(state)) return { ...base, state: 'failed', progress: 0, path: null, error: state };
-  if ((Number(t.progress) || 0) >= 1) return { ...base, state: 'done', progress: 100, path: mapPath(t.content_path || t.save_path, config) };
+  // Moving (out of an "incomplete" folder) or re-checking: the bytes are all
+  // there but content_path isn't settled yet — importing now reads a missing
+  // or half-moved folder. Wait for it.
+  const settling = /^moving$|^checking/.test(state);
+  if ((Number(t.progress) || 0) >= 1 && !settling) return { ...base, state: 'done', progress: 100, path: mapPath(t.content_path || t.save_path, config) };
   return { ...base, state: 'downloading', progress: Math.round((Number(t.progress) || 0) * 100), path: null };
 }
 
@@ -59,7 +67,7 @@ async function fetchTorrentLink(link, fetchImpl) {
   let tres = null;
   if (!url.startsWith('magnet:')) {
     for (let hop = 0; hop < 5; hop++) {
-      tres = await fetchImpl(url, { redirect: 'manual', headers: { 'User-Agent': 'comic-metadata-client/1.0' } });
+      tres = await fetchImpl(url, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS), redirect: 'manual', headers: { 'User-Agent': 'comic-metadata-client/1.0' } });
       if (tres.status < 300 || tres.status >= 400) break; // final response — use it
       const loc = tres.headers.get('location');
       if (!loc) break;
@@ -69,7 +77,7 @@ async function fetchTorrentLink(link, fetchImpl) {
     }
   }
   if (url.startsWith('magnet:')) return { magnet: url };
-  if (!tres) tres = await fetchImpl(url, { headers: { 'User-Agent': 'comic-metadata-client/1.0' } });
+  if (!tres) tres = await fetchImpl(url, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS), headers: { 'User-Agent': 'comic-metadata-client/1.0' } });
   if (!tres.ok) throw new Error(`fetching .torrent failed: HTTP ${tres.status}`);
   return { buf: Buffer.from(await tres.arrayBuffer()) };
 }
@@ -113,7 +121,7 @@ export function makeQbClient(config, { fetchImpl = fetch } = {}) {
     // No Referer/Origin: qBittorrent's CSRF check only fires when they're present,
     // and behind a reverse proxy it compares against qB's internal host (not the
     // external domain), so sending them causes a 403. A server client sends neither.
-    const res = await fetchImpl(`${base}/api/v2/auth/login`, {
+    const res = await fetchImpl(`${base}/api/v2/auth/login`, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
       method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
     const text = await res.text().catch(() => '');
@@ -127,7 +135,7 @@ export function makeQbClient(config, { fetchImpl = fetch } = {}) {
     if (!loggedIn) await login();
     const h = { ...headers };
     if (cookie) h.Cookie = cookie;
-    const res = await fetchImpl(`${base}${path}`, { method, body, headers: h });
+    const res = await fetchImpl(`${base}${path}`, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS), method, body, headers: h });
     if (res.status === 403 && retry) { loggedIn = false; cookie = null; await login(); return req(path, { method, body, headers, raw, retry: false }); }
     if (res.status === 403) throw new Error('qBittorrent rejected the session (403) — disable "Enable Host header validation" in the Web UI (or whitelist this domain)');
     if (!res.ok) throw new Error(`qBittorrent HTTP ${res.status}`);
@@ -219,7 +227,7 @@ export function makeTransmissionClient(config, { fetchImpl = fetch } = {}) {
     const headers = { 'Content-Type': 'application/json' };
     if (sessionId) headers['X-Transmission-Session-Id'] = sessionId;
     if (config.trUser) headers.Authorization = 'Basic ' + Buffer.from(`${config.trUser}:${config.trPass || ''}`).toString('base64');
-    const res = await fetchImpl(url, { method: 'POST', headers, body: JSON.stringify({ method, arguments: args }) });
+    const res = await fetchImpl(url, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS), method: 'POST', headers, body: JSON.stringify({ method, arguments: args }) });
     if (res.status === 409 && retry) { sessionId = res.headers.get('x-transmission-session-id'); return rpc(method, args, { retry: false }); }
     if (res.status === 401) throw new Error('Transmission authentication failed — check the username/password');
     if (!res.ok) throw new Error(`Transmission HTTP ${res.status}`);
@@ -294,7 +302,7 @@ export function makeDelugeClient(config, { fetchImpl = fetch } = {}) {
   async function call(method, params = []) {
     const headers = { 'Content-Type': 'application/json' };
     if (cookie) headers.Cookie = cookie;
-    const res = await fetchImpl(url, { method: 'POST', headers, body: JSON.stringify({ method, params, id: ++seq }) });
+    const res = await fetchImpl(url, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS), method: 'POST', headers, body: JSON.stringify({ method, params, id: ++seq }) });
     if (!res.ok) throw new Error(`Deluge HTTP ${res.status}`);
     const j = await res.json();
     if (j.error) throw new Error(`Deluge: ${j.error.message || JSON.stringify(j.error)}`);
@@ -305,7 +313,7 @@ export function makeDelugeClient(config, { fetchImpl = fetch } = {}) {
   // to a daemon — it can be up with no connection, e.g. right after a restart,
   // in which case core.* calls fail. Attach to the first known host.
   async function connect() {
-    const res = await fetchImpl(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ method: 'auth.login', params: [config.delugePass || ''], id: ++seq }) });
+    const res = await fetchImpl(url, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS), method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ method: 'auth.login', params: [config.delugePass || ''], id: ++seq }) });
     if (!res.ok) throw new Error(`Deluge HTTP ${res.status}`);
     const j = await res.json().catch(() => ({}));
     if (j.error || j.result !== true) throw new Error('Deluge login failed — check the password');
@@ -382,7 +390,7 @@ async function testQb(config, { fetchImpl = fetch } = {}) {
     // 1. Log in.
     const body = new URLSearchParams({ username: config.qbUser || '', password: config.qbPass || '' });
     let lres;
-    try { lres = await fetchImpl(`${base}/api/v2/auth/login`, { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }); }
+    try { lres = await fetchImpl(`${base}/api/v2/auth/login`, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS), method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }); }
     catch (e) { return { ok: false, message: `Connection failed: ${e.message}` }; }
     if (lres.status === 403) return { ok: false, message: '403 on login — the Web UI blocked the request. In qBittorrent → Web UI, disable "Enable Host header validation" (or add this domain to the whitelist).' };
     if (!lres.ok) return { ok: false, message: `Login HTTP ${lres.status} — check the host/port and HTTPS setting.` };
@@ -397,7 +405,7 @@ async function testQb(config, { fetchImpl = fetch } = {}) {
     }
 
     // 2. Hit an authed endpoint with the session cookie.
-    const vres = await fetchImpl(`${base}/api/v2/app/version`, cookie ? { headers: { Cookie: cookie } } : {});
+    const vres = await fetchImpl(`${base}/api/v2/app/version`, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS), ...(cookie ? { headers: { Cookie: cookie } } : {}) });
     if (vres.status === 403) {
       return {
         ok: false,
@@ -425,12 +433,12 @@ async function testTransmission(config, { fetchImpl = fetch } = {}) {
     if (config.trUser) headers.Authorization = 'Basic ' + Buffer.from(`${config.trUser}:${config.trPass || ''}`).toString('base64');
     const body = JSON.stringify({ method: 'session-get' });
     let res;
-    try { res = await fetchImpl(url, { method: 'POST', headers, body }); }
+    try { res = await fetchImpl(url, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS), method: 'POST', headers, body }); }
     catch (e) { return { ok: false, message: `Connection failed: ${e.message}` }; }
     if (res.status === 409) {
       const sid = res.headers.get('x-transmission-session-id');
       if (!sid) return { ok: false, message: '409 without a session id — is this the Transmission RPC URL?' };
-      res = await fetchImpl(url, { method: 'POST', headers: { ...headers, 'X-Transmission-Session-Id': sid }, body });
+      res = await fetchImpl(url, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS), method: 'POST', headers: { ...headers, 'X-Transmission-Session-Id': sid }, body });
     }
     if (res.status === 401) return { ok: false, message: 'Authentication failed — check the username/password.' };
     if (!res.ok) return { ok: false, message: `HTTP ${res.status} — check the host/port and HTTPS setting.` };
@@ -457,7 +465,7 @@ async function testDeluge(config, { fetchImpl = fetch } = {}) {
     const call = async (method, params = []) => {
       const headers = { 'Content-Type': 'application/json' };
       if (cookie) headers.Cookie = cookie;
-      const res = await fetchImpl(url, { method: 'POST', headers, body: JSON.stringify({ method, params, id: ++seq }) });
+      const res = await fetchImpl(url, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS), method: 'POST', headers, body: JSON.stringify({ method, params, id: ++seq }) });
       if (!res.ok) throw new Error(`HTTP ${res.status} — check the host/port and HTTPS setting.`);
       let j; try { j = await res.json(); } catch { throw new Error('Response was not JSON — is this the Deluge web UI URL?'); }
       if (j.error) throw new Error(j.error.message || JSON.stringify(j.error));

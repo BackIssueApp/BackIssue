@@ -5,6 +5,10 @@
 import { load } from 'cheerio';
 import { parseIndexers, buildSearchUrl } from './newznab.js';
 
+// An indexer that stops answering must not hold a search (and the queue worker
+// waiting on it) for the HTTP stack's 5-minute default.
+const INDEXER_TIMEOUT_MS = 30_000;
+
 export { parseIndexers };
 
 // Torznab's canonical format is XML/RSS. Prowlarr always returns XML (it ignores
@@ -105,7 +109,7 @@ export function parseTorznabJson(json, indexerName) {
 // URL saved with a trailing /api (Prowlarr's "Copy Torznab Url" includes it).
 
 async function searchOne(indexer, query, { fetchImpl = fetch, cat = '7030', limit = 50 } = {}) {
-  const res = await fetchImpl(buildSearchUrl(indexer, query, { cat, limit }), { headers: { 'User-Agent': 'comic-metadata-client/1.0' } });
+  const res = await fetchImpl(buildSearchUrl(indexer, query, { cat, limit }), { signal: AbortSignal.timeout(INDEXER_TIMEOUT_MS), headers: { 'User-Agent': 'comic-metadata-client/1.0' } });
   if (!res.ok) throw new Error(`${indexer.name}: HTTP ${res.status}`);
   return parseTorznab(await res.text(), indexer.name);
 }
@@ -130,7 +134,7 @@ export async function testTorznabIndexer(indexer, { fetchImpl = fetch } = {}) {
   if (!indexer?.url) return { ok: false, message: 'A URL is required.' };
   const probe = async (cat) => {
     let res;
-    try { res = await fetchImpl(buildSearchUrl(indexer, 'batman', { cat, limit: 5 }), { headers: { 'User-Agent': 'comic-metadata-client/1.0' } }); }
+    try { res = await fetchImpl(buildSearchUrl(indexer, 'batman', { cat, limit: 5 }), { signal: AbortSignal.timeout(INDEXER_TIMEOUT_MS), headers: { 'User-Agent': 'comic-metadata-client/1.0' } }); }
     catch (e) { return { err: `Connection failed: ${e.message}` }; }
     if (!res.ok) return { err: `HTTP ${res.status} — check the URL.` };
     const text = await res.text().catch(() => '');

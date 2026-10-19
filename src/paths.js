@@ -13,8 +13,14 @@ export function parseRootFolders(text) {
 // qBittorrent, …). No prefix match (or no mapping configured) → unchanged.
 export function remapClientPath(p, remotePrefix, localPrefix) {
   if (!p) return null;
-  if (remotePrefix && localPrefix && p.startsWith(remotePrefix)) {
-    return (localPrefix.replace(/[\\/]+$/, '') + p.slice(remotePrefix.replace(/[\\/]+$/, '').length)).replace(/\\/g, '/');
+  if (remotePrefix && localPrefix) {
+    // Match on a folder boundary: "/data/torrents" covers "/data/torrents/x",
+    // never the sibling "/data/torrents-old/x".
+    const remote = remotePrefix.replace(/[\\/]+$/, '');
+    const next = p.charAt(remote.length);
+    if (p.startsWith(remote) && (next === '' || next === '/' || next === '\\' || remote === '')) {
+      return (localPrefix.replace(/[\\/]+$/, '') + p.slice(remote.length)).replace(/\\/g, '/');
+    }
   }
   return p;
 }

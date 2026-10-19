@@ -65,22 +65,28 @@ export function createScheduler({ db = null, now = () => Date.now() } = {}) {
   }
 
   // One pass: start anything due, and watchdog anything stuck. Called on an
-  // interval (and directly in tests).
+  // interval (and directly in tests). Each task is judged on its own: a throw
+  // (a busy database, a plugin's getter) skips that task this pass instead of
+  // escaping the interval as an uncaught exception, which stops the app.
   function tick() {
     for (const t of tasks) {
-      if (t.running) {
-        const ranFor = now() - t.runStartedAt;
-        if (ranFor > STALL_RELEASE_MS) {
-          logError(`Scheduled task "${t.label}" has been running for ${Math.round(ranFor / 3600000)}h — assuming it hung; releasing so the schedule can continue.`, 'app');
-          t.running = false;
-        } else if (ranFor > STALL_WARN_MS && !t.stallWarned) {
-          t.stallWarned = true;
-          logWarn(`Scheduled task "${t.label}" has been running for over ${Math.round(ranFor / 3600000)}h — it may be stuck.`, 'app');
-        }
-      }
-      const due = dueAt(t);
-      if (due != null && now() >= due && !t.running) runNow(t.key);
+      try { tickTask(t); }
+      catch (e) { console.warn(`scheduler: task "${t.key}" check failed:`, e?.message || e); }
     }
+  }
+  function tickTask(t) {
+    if (t.running) {
+      const ranFor = now() - t.runStartedAt;
+      if (ranFor > STALL_RELEASE_MS) {
+        logError(`Scheduled task "${t.label}" has been running for ${Math.round(ranFor / 3600000)}h — assuming it hung; releasing so the schedule can continue.`, 'app');
+        t.running = false;
+      } else if (ranFor > STALL_WARN_MS && !t.stallWarned) {
+        t.stallWarned = true;
+        logWarn(`Scheduled task "${t.label}" has been running for over ${Math.round(ranFor / 3600000)}h — it may be stuck.`, 'app');
+      }
+    }
+    const due = dueAt(t);
+    if (due != null && now() >= due && !t.running) runNow(t.key);
   }
 
   function list() {

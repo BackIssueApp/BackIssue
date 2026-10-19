@@ -54,6 +54,49 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 - **An unreadable settings.json is kept, not silently replaced.** BackIssue starts on defaults, saves
   the original beside it as settings.json.unreadable-<time>, and logs where; settings are now
   written in one step so a crash mid-save can no longer leave a broken file.
+- **One failing download no longer stalls the queue.** An unexpected error while preparing or
+  recording a download now fails just that issue; before, it could leave the issue stuck as
+  downloading and stop the queue from starting again until a restart, or start the same issue twice.
+- **Downloads are written under a temporary name and renamed when complete.** A crash mid-write no
+  longer leaves a truncated comic under the real name, and recovery after a restart now looks in the
+  comic's own folder and only counts a file that opens as finished.
+- **Re-download keeps the current copy until the new one arrives.** The old file used to be deleted
+  first, so a re-download that found nothing lost the copy you had. It is now replaced only once a
+  readable new copy is in place, which takes the old file's name. Re-downloading an issue that is
+  already downloading no longer starts a second download.
+- **A download that fails after its file is saved is not downloaded again.** Retrying used to save a
+  second copy beside the first.
+- **A library scan that can't read a folder keeps that folder's comics.** A brief share or disk error
+  on one subfolder used to drop all of its files from the library, so they showed as missing and
+  could be downloaded again.
+- **BackIssue no longer stops itself after the computer wakes from sleep.** The freeze watchdog took
+  the time spent asleep for a hung server and shut the app down.
+- **Plugin dependency installs can no longer hang startup or break a plugin for good.** The install
+  at startup gives up after five minutes, an install that was cut short is retried on the next
+  start, and a plugin update whose dependencies fail to install keeps the version you had.
+- **Reorganize library no longer re-downloads what it moved, and keeps the app responsive.** Moved
+  issues kept pointing at their old location, so asking for one again downloaded it again. Series in
+  a library with its own folder pattern are now laid out by that pattern, and a file that differs
+  only in letter case from the new name is no longer overwritten. Moves between drives copy to a
+  temporary file first, so an interrupted move can't leave a half-copied comic, and planning or
+  running a reorganize on network storage no longer freezes the app.
+- **A pack download cut off by a restart no longer shows as in progress forever.** Packs a download
+  site was fetching inside BackIssue are marked failed at startup, so you can grab them again.
+- **An indexer, download client or metadata request that stops answering no longer stalls
+  downloads.** Requests now give up after 30 seconds (60 for metadata) instead of waiting up to five
+  minutes, so one unresponsive indexer or client can't hold up searches, the queue or imports.
+- **qBittorrent downloads are imported only once they have finished moving.** A torrent still being
+  moved out of an incomplete-downloads folder, or re-checked, counted as done and the import failed.
+- **Half issues are found on usenet, torrents and RSS.** A release named like "Wizard 1/2" was read
+  as issue 2, so ½ issues never matched.
+- **The download-client folder mapping matches whole folders only.** A mapping for /data/torrents no
+  longer also rewrites paths under /data/torrents-old.
+- **A scheduled task that hits an error no longer stops the app,** and a search that fails is shown as
+  failed on the Jobs page instead of running forever.
+- **The library scan's temp-file cleanup only removes BackIssue's own files.** It used to delete any
+  .part file older than a day, including other programs' partial downloads in a shared folder.
+- **Converting CBR to CBZ keeps the .cbr unless every page made it across.**
+- **Two downloads of the same book or audiobook at once no longer overwrite each other.**
 
 ## [0.9.2] — 2026-10-18
 

@@ -11,7 +11,7 @@ import { fileStemFromPattern } from './naming.js';
 import { resolveSeriesDir } from './paths.js';
 import { indexDownloadedFile } from './library.js';
 import { tagCbzBuffer, taggingEnabled, xmlForIssue, writeSidecar, tagPlacementFor } from './metatagger.js';
-import { cbrBufferToCbz, unwrapNestedBuffer, isImageName } from './archive.js';
+import { cbrBufferToCbz, unwrapNestedBuffer, isImageName, readArchiveInfo, sidecarPath } from './archive.js';
 import { makeCvClient } from './cv.js';
 // NOTE: sources/index.js is imported lazily inside runQueue to avoid a module
 // cycle (a source that builds files imports from here).
@@ -102,10 +102,20 @@ export function seriesForSearch(title) {
   return s;
 }
 
-// Write a finished download to its destination (creating the folder).
+// Write a finished download to its destination (creating the folder). The
+// bytes go to "<dest>.part" first and are renamed into place, so a crash or a
+// scan mid-write never sees a truncated comic under the real name (a stranded
+// .part is swept by the library scan).
 export async function placeFile({ buffer, destPath }) {
   await fsp.mkdir(path.dirname(destPath), { recursive: true });
-  await fsp.writeFile(destPath, buffer);
+  const part = `${destPath}.part`;
+  try {
+    await fsp.writeFile(part, buffer);
+    await fsp.rename(part, destPath);
+  } catch (e) {
+    await fsp.rm(part, { force: true }).catch(() => {});
+    throw e;
+  }
   return { path: destPath };
 }
 
@@ -176,6 +186,11 @@ export async function finalizeComic({ buffer, srcPath, format = 'cbz', issue, se
   } else {
     dest = targetPath(seriesTitle, issue, format, seriesYear, seriesPath);
   }
+  // The pattern name may still hold the copy this download replaces (a
+  // re-download keeps the old file until the new one proves good), so file
+  // beside it; finishImport moves the new file onto the clean name once the
+  // old copy has been superseded.
+  const cleanPath = dest;
   if (existsSync(dest)) {
     const cid = trailingIdFromUrl(issue.url); // stable source id when present
     dest = cid ? dest.replace(/(\.(?:cbz|cbr|pdf))$/i, ` (${cid})$1`) : uniquePath(dest);
@@ -190,25 +205,39 @@ export async function finalizeComic({ buffer, srcPath, format = 'cbz', issue, se
     if (format === 'cbz' && comicInfoXml) { buf = await tagCbzBuffer(buf, comicInfoXml); tagged = true; }
     await placeFile({ buffer: buf, destPath: dest });
   }
-  return { path: dest, tagged };
+  return { path: dest, tagged, cleanPath };
 }
 
-// Recover issues left in 'downloading' by a previous crashed/killed run:
-// if the CBZ already exists on disk it's done (no duplicate re-download),
-// otherwise back to 'queued' — it was in-flight work, so it resumes with
-// the rest of the queue when the boot kick-off runs.
-export function reconcileDownloading(db) {
+// Recover issues left in 'downloading' by a previous crashed/killed run. Runs
+// once at boot (never while a queue is live — those rows are someone's
+// in-flight work). A readable comic at the issue's real destination means the
+// download finished (no duplicate re-download); otherwise back to 'queued' — it
+// resumes with the rest of the queue when the boot kick-off runs.
+export async function reconcileDownloading(db) {
   for (const status of ['downloading', 'tagging']) {
     for (const issue of listIssues(db, { status })) {
-      const sr = getSeriesById(db, issue.series_id);
-      const title = sr?.title || 'Unknown';
-      const cbz = targetPath(title, issue, 'cbz', sr?.year);
-      const pdf = targetPath(title, issue, 'pdf', sr?.year);
-      const existing = existsSync(cbz) ? cbz : existsSync(pdf) ? pdf : null;
+      const f = issueFiling(db, issue);
+      let existing = null;
+      for (const fmt of ['cbz', 'cbr', 'pdf']) {
+        const p = targetPath(f.seriesTitle, issue, fmt, f.seriesYear, f.seriesPath);
+        if (existsSync(p) && (await readArchiveInfo(p)).ok) { existing = p; break; }
+      }
       if (existing) setIssueStatus(db, issue.id, 'done', { filePath: existing });
       else setIssueStatus(db, issue.id, 'queued');
     }
   }
+}
+
+// Where an issue files: the display title/publisher/year and the target
+// folder. The synchronous part of buildIssueContext, shared with recovery.
+function issueFiling(db, issue) {
+  const series = getSeriesById(db, issue.series_id);
+  const cv = series?.cv_id ? getCvSeries(db, series.cv_id) : null;
+  const seriesTitle = cv?.name || series?.title || 'Unknown';
+  const publisher = cv?.publisher || series?.publisher;
+  const seriesYear = cv?.start_year || series?.year;
+  const seriesPath = series ? resolveSeriesDir(db, series) : undefined;
+  return { series, cv, seriesTitle, publisher, seriesYear, seriesPath };
 }
 
 // Build the ComicVine-derived context an issue needs for filing + tagging:
@@ -216,12 +245,7 @@ export function reconcileDownloading(db) {
 // Shared by the download worker and the background monitor. `cvClient` is a
 // lazy getter so a keyless/tagging-off run never constructs a client.
 export async function buildIssueContext(db, issue, cvClient) {
-  const series = getSeriesById(db, issue.series_id);
-  const cv = series?.cv_id ? getCvSeries(db, series.cv_id) : null;
-  const seriesTitle = cv?.name || series?.title || 'Unknown';
-  const publisher = cv?.publisher || series?.publisher;
-  const seriesYear = cv?.start_year || series?.year;
-  const seriesPath = series ? resolveSeriesDir(db, series) : undefined;
+  const { series, cv, seriesTitle, publisher, seriesYear, seriesPath } = issueFiling(db, issue);
   // Every name a source may find this volume under (title + CV/user aliases) —
   // used to search and match indexers that name it differently.
   const seriesNames = series ? seriesSearchNames(db, series.id) : [seriesTitle];
@@ -234,34 +258,61 @@ export async function buildIssueContext(db, issue, cvClient) {
   return { series, cv, seriesTitle, seriesNames, publisher, seriesYear, seriesPath, comicInfoXml, tagPlacement };
 }
 
+// A download that had to file beside an existing copy (a re-download) takes
+// the clean pattern name once indexing superseded that copy. Best effort: the
+// suffixed name is a valid place to stay.
+async function takeCleanName(db, result) {
+  const { path: from, cleanPath: to } = result;
+  if (!to || to === from || existsSync(to)) return;
+  try {
+    await fsp.rename(from, to);
+    const side = sidecarPath(from);
+    if (side !== from && existsSync(side)) await fsp.rename(side, sidecarPath(to)).catch(() => {});
+    result.path = to;
+    db.prepare('DELETE FROM library_files WHERE path=?').run(to); // a stale row: the file was gone
+    db.prepare('UPDATE library_files SET path=?, name=? WHERE path=?').run(to, path.basename(to), from);
+    db.prepare('UPDATE issues SET file_path=? WHERE file_path=?').run(to, from);
+  } catch (e) { console.warn('rename to clean name failed', from, e?.message || e); }
+}
+
 // Shared import tail: place the finished comic, mark the issue done, index it as
 // owned, and emit tag-log/done progress. Used by both the immediate download path
 // and the deferred (usenet) monitor.
 export async function finishImport(db, { issue, ic, fetched, source, onProgress = () => {} }) {
   const result = await finalizeComic({ ...fetched, issue, seriesTitle: ic.seriesTitle, seriesYear: ic.seriesYear, seriesPath: ic.seriesPath, comicInfoXml: ic.comicInfoXml, tagPlacement: ic.tagPlacement });
-  setIssueStatus(db, issue.id, 'done', { filePath: result.path });
   // A cvissue:<id> row IS a specific ComicVine issue — pass that identity through
   // so the index links this file authoritatively (a release's embedded ComicInfo
   // can carry a wrong number, which would mislead the number-based relink).
   const cvIssueId = Number((/^cvissue:(\d+)$/.exec(String(issue.url || '')) || [])[1]) || null;
-  try { await indexDownloadedFile(db, { path: result.path, seriesId: issue.series_id, issueId: issue.id, cvId: ic.series?.cv_id, cvIssueId }); }
-  catch (e) { console.warn('index downloaded file failed', result.path, e?.message || e); }
-  recordImport(db, { seriesId: issue.series_id, seriesTitle: ic.seriesTitle, issueTitle: issue.title, issueNumber: issue.issue_number, cvIssueId, source, path: result.path });
-  if (taggingEnabled()) {
-    onProgress({ event: 'tag-result', issue, series: ic.seriesTitle, source, result: {
-      outcome: result.tagged ? 'tagged' : 'no-match',
-      reason: result.tagged
-        ? (ic.tagPlacement === 'sidecar' ? 'metadata written to sidecar' : 'metadata embedded')
-        : (ic.series?.cv_id ? 'no matching issue at the metadata source' : 'series not matched to a metadata record'),
-      path: result.path,
-    } });
+  // The file is on disk from here on: a failure now must not send the caller
+  // round its retry loop, which would fetch and place a second copy.
+  try {
+    setIssueStatus(db, issue.id, 'done', { filePath: result.path });
+    try { await indexDownloadedFile(db, { path: result.path, seriesId: issue.series_id, issueId: issue.id, cvId: ic.series?.cv_id, cvIssueId }); }
+    catch (e) { console.warn('index downloaded file failed', result.path, e?.message || e); }
+    await takeCleanName(db, result);
+    recordImport(db, { seriesId: issue.series_id, seriesTitle: ic.seriesTitle, issueTitle: issue.title, issueNumber: issue.issue_number, cvIssueId, source, path: result.path });
+  } catch (e) {
+    if (e && typeof e === 'object') { e.noRetry = true; e.placedPath = result.path; }
+    throw e;
   }
-  onProgress({ event: 'done', issue, filePath: result.path, source });
+  // The import is complete: a progress listener failing can't undo it.
+  try {
+    if (taggingEnabled()) {
+      onProgress({ event: 'tag-result', issue, series: ic.seriesTitle, source, result: {
+        outcome: result.tagged ? 'tagged' : 'no-match',
+        reason: result.tagged
+          ? (ic.tagPlacement === 'sidecar' ? 'metadata written to sidecar' : 'metadata embedded')
+          : (ic.series?.cv_id ? 'no matching issue at the metadata source' : 'series not matched to a metadata record'),
+        path: result.path,
+      } });
+    }
+    onProgress({ event: 'done', issue, filePath: result.path, source });
+  } catch (e) { console.warn('import progress listener failed', e?.message || e); }
   return result;
 }
 
 export async function runQueue({ db, onProgress = () => {}, concurrency = config.downloadConcurrency, isPaused = () => false, pinnedFor = () => null, consumePin = () => {} }) {
-  reconcileDownloading(db);
   const { orderedSources } = await import('./sources/index.js');
   const { loadPlugins } = await import('./plugins.js');
   await loadPlugins(); // ensure external source plugins are registered
@@ -284,7 +335,11 @@ export async function runQueue({ db, onProgress = () => {}, concurrency = config
   const worker = async () => {
     for (;;) {
       if (isPaused()) { lastActivity = Date.now(); await sleep(400); continue; }
-      const issue = claimNextQueued(db);
+      let issue = null;
+      // A claim that throws (SQLITE_BUSY while something holds the write
+      // lock) is treated as an empty queue for this poll, not a dead worker.
+      try { issue = claimNextQueued(db); }
+      catch (e) { console.warn('queue claim failed:', e?.message || e); }
       if (!issue) {
         if (busy === 0 && Date.now() - lastActivity > IDLE_GRACE_MS) break;
         await sleep(250);
@@ -292,81 +347,96 @@ export async function runQueue({ db, onProgress = () => {}, concurrency = config
       }
       lastActivity = Date.now();
       busy++;
-      try {
-      const ic = await buildIssueContext(db, issue, cvClient);
-      const ctx = { db, config, issue, ...ic };
-      // A manual pick (from the multi-source search) pins a specific candidate
-      // from a specific source to this issue: try ONLY that source with that
-      // candidate — the user chose it, so don't silently fall through to others.
-      // Otherwise try each enabled source in priority order; first match wins.
-      const pin = pinnedFor(issue.id);
-      const trySources = pin ? sources.filter((s) => s.id === pin.source) : sources;
-      let lastErr;
-      let handled = false;
-      for (const src of trySources) {
-        let candidate;
-        if (pin && pin.source === src.id) candidate = pin.candidate;
-        else {
-          // Searching a source is the real (and sometimes slow) work at the
-          // start of a download — surface it so the queue row honestly says
-          // "Searching…" instead of nothing (or a misleading fallback label).
-          onProgress({ event: 'searching', issue, source: src.id, phase: 'searching' });
-          try { candidate = await src.find(ctx); }
-          catch (err) { lastErr = err; continue; }
-        }
-        if (!candidate) continue;
-
-        if (src.kind === 'deferred') {
-          // Hand off to an external client and record the grab; the background
-          // monitor imports it when the client finishes. The worker returns its
-          // slot immediately rather than blocking for the whole download.
-          try {
-            onProgress({ event: 'start', issue, source: src.id });
-            const g = await src.grab(candidate, ctx);
-            recordGrab(db, { issueId: issue.id, source: src.id, client: g.client, downloadId: g.downloadId, category: g.category, title: g.title, releaseGuid: g.releaseGuid });
-            setIssueStatus(db, issue.id, 'grabbed');
-            onProgress({ event: 'grabbed', issue, source: src.id, phase: 'grabbed' });
-            handled = true;
-          } catch (err) { lastErr = err; }
-          if (handled) break;
-          continue;
-        }
-
-        for (let attempt = 1; attempt <= 3 && !handled; attempt++) {
-          try {
-            onProgress({ event: 'start', issue, source: src.id });
-            const fetched = await src.fetch(candidate, ctx, (p) =>
-              onProgress({ event: 'page', issue, page: p.done, pages: p.total, source: src.id, phase: p.phase,
-                // Optional richer progress (byte-stream sources): unit tells the
-                // UI how to read page/pages, bps is speed, detail is a host label.
-                unit: p.unit, bps: p.bps, detail: p.detail }));
-            await finishImport(db, { issue, ic, fetched, source: src.id, onProgress });
-            handled = true;
-          } catch (err) {
-            lastErr = err;
-            // A source can mark an error fatal-for-this-issue (err.noRetry) when
-            // retrying can't help — e.g. AirDC++ has the file on disk but we
-            // can't locate it, so re-searching just loops. Stop the flicker.
-            if (err?.noRetry) break;
-            await sleep(config.actionDelayMs * attempt * 2);
-          }
-        }
-        if (handled) break;
-      }
-      if (!handled) {
-        // Distinguish a source erroring from simply finding nothing (lastErr stays
-        // undefined when every source's find() returned null) — otherwise the
-        // recorded error is the useless literal "undefined".
-        const reason = lastErr ? String(lastErr.message || lastErr)
-          : sources.length ? 'No enabled source had a match for this issue'
-          : 'No download sources are enabled';
-        // The queue row only shows the message — log the stack so a generic
-        // error (e.g. a driver-level throw) is traceable to its actual source.
-        if (lastErr?.stack) console.warn(`download failed for issue ${issue.id} (${issue.title}):`, lastErr.stack);
-        setIssueStatus(db, issue.id, 'failed', { error: reason });
-        onProgress({ event: 'failed', issue, error: reason });
-      }
+      // Every claimed issue ends failed or handled: an unexpected throw (a DB
+      // error building its context or recording the outcome) fails THIS issue
+      // instead of rejecting the worker, which would strand the issue as
+      // 'downloading' and leave the other workers running unsupervised.
+      try { await runIssue(issue); }
+      catch (err) {
+        const reason = String(err?.message || err);
+        console.warn(`download failed for issue ${issue.id} (${issue.title}):`, err?.stack || err);
+        try { setIssueStatus(db, issue.id, 'failed', { error: reason }); } catch (e) { console.warn('could not mark issue failed', issue.id, e?.message || e); }
+        try { onProgress({ event: 'failed', issue, error: reason }); } catch { /* progress is cosmetic */ }
       } finally { consumePin(issue.id); busy--; lastActivity = Date.now(); }
+    }
+  };
+
+  const runIssue = async (issue) => {
+    const ic = await buildIssueContext(db, issue, cvClient);
+    const ctx = { db, config, issue, ...ic };
+    // A manual pick (from the multi-source search) pins a specific candidate
+    // from a specific source to this issue: try ONLY that source with that
+    // candidate — the user chose it, so don't silently fall through to others.
+    // Otherwise try each enabled source in priority order; first match wins.
+    const pin = pinnedFor(issue.id);
+    const trySources = pin ? sources.filter((s) => s.id === pin.source) : sources;
+    let lastErr;
+    let handled = false;
+    for (const src of trySources) {
+      let candidate;
+      if (pin && pin.source === src.id) candidate = pin.candidate;
+      else {
+        // Searching a source is the real (and sometimes slow) work at the
+        // start of a download — surface it so the queue row honestly says
+        // "Searching…" instead of nothing (or a misleading fallback label).
+        onProgress({ event: 'searching', issue, source: src.id, phase: 'searching' });
+        try { candidate = await src.find(ctx); }
+        catch (err) { lastErr = err; continue; }
+      }
+      if (!candidate) continue;
+
+      if (src.kind === 'deferred') {
+        // Hand off to an external client and record the grab; the background
+        // monitor imports it when the client finishes. The worker returns its
+        // slot immediately rather than blocking for the whole download.
+        try {
+          onProgress({ event: 'start', issue, source: src.id });
+          const g = await src.grab(candidate, ctx);
+          recordGrab(db, { issueId: issue.id, source: src.id, client: g.client, downloadId: g.downloadId, category: g.category, title: g.title, releaseGuid: g.releaseGuid });
+          setIssueStatus(db, issue.id, 'grabbed');
+          onProgress({ event: 'grabbed', issue, source: src.id, phase: 'grabbed' });
+          handled = true;
+        } catch (err) { lastErr = err; }
+        if (handled) break;
+        continue;
+      }
+
+      for (let attempt = 1; attempt <= 3 && !handled; attempt++) {
+        try {
+          onProgress({ event: 'start', issue, source: src.id });
+          const fetched = await src.fetch(candidate, ctx, (p) =>
+            onProgress({ event: 'page', issue, page: p.done, pages: p.total, source: src.id, phase: p.phase,
+              // Optional richer progress (byte-stream sources): unit tells the
+              // UI how to read page/pages, bps is speed, detail is a host label.
+              unit: p.unit, bps: p.bps, detail: p.detail }));
+          await finishImport(db, { issue, ic, fetched, source: src.id, onProgress });
+          handled = true;
+        } catch (err) {
+          lastErr = err;
+          // The comic is already on disk (recording it failed): no retry and
+          // no next source, either would place a second copy.
+          if (err?.placedPath) throw err;
+          // A source can mark an error fatal-for-this-issue (err.noRetry) when
+          // retrying can't help — e.g. AirDC++ has the file on disk but we
+          // can't locate it, so re-searching just loops. Stop the flicker.
+          if (err?.noRetry) break;
+          await sleep(config.actionDelayMs * attempt * 2);
+        }
+      }
+      if (handled) break;
+    }
+    if (!handled) {
+      // Distinguish a source erroring from simply finding nothing (lastErr stays
+      // undefined when every source's find() returned null) — otherwise the
+      // recorded error is the useless literal "undefined".
+      const reason = lastErr ? String(lastErr.message || lastErr)
+        : sources.length ? 'No enabled source had a match for this issue'
+        : 'No download sources are enabled';
+      // The queue row only shows the message — log the stack so a generic
+      // error (e.g. a driver-level throw) is traceable to its actual source.
+      if (lastErr?.stack) console.warn(`download failed for issue ${issue.id} (${issue.title}):`, lastErr.stack);
+      setIssueStatus(db, issue.id, 'failed', { error: reason });
+      onProgress({ event: 'failed', issue, error: reason });
     }
   };
 

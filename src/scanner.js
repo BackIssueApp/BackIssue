@@ -183,13 +183,16 @@ function comicVineIds(ci) {
 }
 
 // Recursively collect comic archives under dir. Unreadable/permission-denied
-// folders are skipped, not fatal.
+// folders are skipped, not fatal — but listed on the result's `failedDirs`, so
+// a caller that prunes "files not seen" can leave those subtrees alone (a
+// transient share error is not a deletion).
 export async function findComicFiles(dir) {
   const out = [];
+  out.failedDirs = [];
   async function walk(d) {
     let entries;
     try { entries = await fs.readdir(d, { withFileTypes: true }); }
-    catch { return; }
+    catch { out.failedDirs.push(d); return; }
     for (const e of entries) {
       const p = path.join(d, e.name);
       if (e.isDirectory()) await walk(p);

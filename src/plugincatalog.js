@@ -14,7 +14,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import yauzl from 'yauzl';
 import config from './config.js';
-import { pluginsDir, sourcesDir } from './plugins.js';
+import { pluginsDir, sourcesDir, markDepsComplete } from './plugins.js';
 
 const UA = 'comic-metadata-client/1.0';
 const execFileP = promisify(execFile);
@@ -61,7 +61,7 @@ function safeId(id) {
 // Fetch the remote catalog: { plugins: [{ id, name, description, version,
 // download, sha256? }] }. Returns the validated plugin entries.
 export async function fetchCatalog({ fetchImpl = fetch, url = catalogUrl(), key = 'plugins' } = {}) {
-  const resp = await fetchImpl(url, { headers: { 'User-Agent': UA } });
+  const resp = await fetchImpl(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30_000) });
   if (!resp.ok) throw new Error(`catalog request failed (HTTP ${resp.status})`);
   const data = await resp.json();
   const list = Array.isArray(data?.[key]) ? data[key] : [];
@@ -130,7 +130,8 @@ export async function installPlugin(entry, { fetchImpl = fetch, npmInstall = def
   const dest = path.join(dir, id);
   const staging = path.join(dir, `.${id}.installing`);
 
-  const resp = await fetchImpl(entry.download, { headers: { 'User-Agent': UA } });
+  // Bundles can carry a few MB; the timeout covers the body too.
+  const resp = await fetchImpl(entry.download, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(2 * 60_000) });
   if (!resp.ok) throw new Error(`download failed (HTTP ${resp.status})`);
   const buf = Buffer.from(await resp.arrayBuffer());
 
@@ -148,13 +149,23 @@ export async function installPlugin(entry, { fetchImpl = fetch, npmInstall = def
     if (!fs.existsSync(path.join(src, 'index.js'))) {
       throw new Error(`bundle has no index.js — not a valid ${what}`);
     }
+    // Native/deep deps can't ship portably in the zip — install them for the
+    // host platform, IN STAGING, so a failed npm never costs a working
+    // install: an update keeps the old version, and only a fresh install is
+    // put in place anyway (visible on the Plugins page, retried at boot).
+    let depErr = null;
+    if (needsDeps(src)) {
+      try { await npmInstall(src); markDepsComplete(src); }
+      catch (e) { depErr = e; }
+    }
     // Swap into place last so a failure never leaves a half-written install.
     // The old install is RENAMED aside, not deleted: on Windows a loaded
     // native module (e.g. sharp's libvips DLL in the running process) makes
     // delete fail with EPERM, but rename succeeds. The .old dir is removed
     // here when possible, else by the boot sweep once nothing holds it.
-    const old = path.join(dir, `.${id}.old-${Date.now()}`);
     const hadOld = fs.existsSync(dest);
+    if (depErr && hadOld) throw depErr;
+    const old = path.join(dir, `.${id}.old-${Date.now()}`);
     if (hadOld) fs.renameSync(dest, old);
     try {
       fs.renameSync(src !== staging ? src : staging, dest);
@@ -166,16 +177,7 @@ export async function installPlugin(entry, { fetchImpl = fetch, npmInstall = def
       try { fs.rmSync(old, { recursive: true, force: true }); }
       catch { /* locked (loaded DLL) — swept at next boot */ }
     }
-    // Native/deep deps can't ship portably in the zip — install them for the
-    // host platform. A failure here is surfaced but leaves the files in place
-    // so the Plugins page shows the load error and the user can retry.
-    if (needsDeps(dest)) {
-      try {
-        await npmInstall(dest);
-      } catch (e) {
-        throw new Error(`installed, but dependency install failed: ${e?.message || e}`);
-      }
-    }
+    if (depErr) throw new Error(`installed, but dependency install failed: ${depErr?.message || depErr}`);
     return { id, version: entry.version || null };
   } finally {
     fs.rmSync(staging, { recursive: true, force: true });

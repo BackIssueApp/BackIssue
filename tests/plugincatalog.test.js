@@ -77,11 +77,13 @@ test('a failed download does not clobber an existing install', async () => {
 
 test('a bundle with dependencies triggers npm install; without deps it does not', async () => {
   const calls = [];
-  const npmInstall = async (dir) => { calls.push(dir); };
+  const npmInstall = async (dir) => { calls.push(dir); fs.mkdirSync(path.join(dir, 'node_modules', 'sharp'), { recursive: true }); };
 
   const withDeps = await bundle({ 'index.js': INDEX, 'package.json': JSON.stringify({ name: 'wd', dependencies: { sharp: '^0.35.0' } }) });
   await installPlugin({ id: 'withdeps', download: 'x' }, { fetchImpl: mockFetch(withDeps), npmInstall });
-  assert.deepEqual(calls, [path.join(TMP, 'withdeps')], 'npm install ran in the plugin folder');
+  assert.deepEqual(calls, [path.join(TMP, '.withdeps.installing')], 'npm install ran in staging, before the swap');
+  assert.ok(fs.existsSync(path.join(TMP, 'withdeps', 'node_modules', 'sharp')), 'installed deps moved in with the plugin');
+  assert.ok(fs.readdirSync(path.join(TMP, 'withdeps', 'node_modules')).some((f) => f.startsWith('.')), 'completion marker written');
 
   const noDeps = await bundle({ 'index.js': INDEX, 'package.json': JSON.stringify({ name: 'nd' }) });
   await installPlugin({ id: 'nodeps', download: 'x' }, { fetchImpl: mockFetch(noDeps), npmInstall });
@@ -96,6 +98,36 @@ test('a dependency-install failure surfaces but leaves files in place', async ()
     /dependency install failed/,
   );
   assert.ok(fs.existsSync(path.join(TMP, 'depfail', 'index.js')), 'files remain so it is visible/retryable');
+});
+
+test('an update whose dependency install fails keeps the old version', async () => {
+  const v1 = await bundle({ 'index.js': INDEX, 'v1.js': '//1' });
+  await installPlugin({ id: 'upd', download: 'x' }, { fetchImpl: mockFetch(v1) });
+  const v2 = await bundle({ 'index.js': INDEX, 'v2.js': '//2', 'package.json': JSON.stringify({ dependencies: { sharp: '^0.35.0' } }) });
+  await assert.rejects(
+    installPlugin({ id: 'upd', download: 'x' }, { fetchImpl: mockFetch(v2), npmInstall: async () => { throw new Error('registry down'); } }),
+    /registry down/,
+  );
+  assert.ok(fs.existsSync(path.join(TMP, 'upd', 'v1.js')), 'old version still installed');
+  assert.ok(!fs.existsSync(path.join(TMP, 'upd', 'v2.js')));
+});
+
+test('boot dependency install: time-boxed, retried until it completes, skipped once marked', async () => {
+  const { ensurePluginDeps } = await import('../src/plugins.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bi-plugdeps-'));
+  fs.mkdirSync(path.join(dir, 'p', 'node_modules', 'half'), { recursive: true }); // a partial install
+  fs.writeFileSync(path.join(dir, 'p', 'package.json'), JSON.stringify({ dependencies: { sharp: '1', half: '1' } }));
+  const calls = [];
+  const failing = (cmd, args, opts) => { calls.push(opts); return { status: null, signal: 'SIGKILL', error: Object.assign(new Error('timed out'), { code: 'ETIMEDOUT' }) }; };
+  ensurePluginDeps(dir, 'p', failing);
+  assert.equal(calls.length, 1, 'a partial node_modules is not taken as installed');
+  assert.ok(calls[0].timeout > 0, 'npm runs with a timeout');
+  ensurePluginDeps(dir, 'p', failing);
+  assert.equal(calls.length, 2, 'a failed install is retried');
+  const ok = (cmd, args, opts) => { calls.push(opts); return { status: 0 }; };
+  ensurePluginDeps(dir, 'p', ok);
+  ensurePluginDeps(dir, 'p', ok);
+  assert.equal(calls.length, 3, 'a completed install is not repeated');
 });
 
 test('uninstallPlugin removes the folder', async () => {
