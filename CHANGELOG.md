@@ -55,6 +55,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **"None of the enabled metadata sources can look this up" no longer names a source.** The server
+  log still records which source a failed lookup went to.
 - **A finished download no longer deletes a different issue with the same number.** Replacing the old
   copy of an issue matched on the issue number alone, so downloading Batman #1 could delete
   Batman Annual #1 from the same folder. A download that fails its archive check no longer

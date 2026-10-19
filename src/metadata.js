@@ -44,7 +44,7 @@ const SLUG = /^[a-z0-9][a-z0-9_-]{0,31}$/;
 // Catalog id blocks, for classifying ids the library has not recorded yet.
 // [name, test(id)] — first match wins. Built-ins first, then plugins'.
 const catalogBlocks = BUILTIN_CATALOG_RANGES.map(([name, lo, hi]) => [name, (id) => id >= lo && id < hi, true]);
-const CATALOG_LABELS = { comicvine: 'ComicVine', mangadex: 'the manga catalogue', metron: 'Metron' };
+const GENERIC_CATALOG_NAMES = { mangadex: 'the manga catalogue' };
 
 /** The catalog a fresh id was minted in, from the id blocks; null if none. */
 export function classifyId(id) {
@@ -274,7 +274,6 @@ export function mergeSearchResults(lists) {
   return out;
 }
 
-const catalogLabel = (c) => CATALOG_LABELS[c] || providers.find((p) => p.serves.includes(c) && !p.builtin)?.label || c;
 
 /** One client over the enabled providers: each lookup goes to the provider
  *  that serves the record's catalog; searches ask everyone and merge. */
@@ -307,7 +306,9 @@ export function makeCompositeClient(config, opts = {}) {
     const catalog = catalogOf(kind, id);
     const hit = providerFor(kind === 'arc' ? clients : setFor(libraryFor(kind, id)), catalog);
     if (!hit) {
-      const where = catalog ? ` (it comes from ${catalogLabel(catalog)})` : '';
+      // People without the admin console see this, and they never see source
+      // names: only a generic description of the catalog may appear.
+      const where = GENERIC_CATALOG_NAMES[catalog] ? ` (it comes from ${GENERIC_CATALOG_NAMES[catalog]})` : '';
       const hint = catalog === 'mangadex' ? ' Manga comes through the built-in metadata service; turn it on under Settings → Metadata.' : '';
       throw new Error(`None of the enabled metadata sources can look this up${where}.${hint}`);
     }
@@ -343,12 +344,18 @@ export function makeCompositeClient(config, opts = {}) {
     if (!lists.length && firstErr) throw firstErr;
     return mergeSearchResults(lists);
   }
+  // Error messages people see are source-neutral; the server log (admins
+  // only) records which source failed.
+  const logged = (method, h, call) => Promise.resolve().then(call).catch((e) => {
+    console.warn(`metadata ${method} failed on ${h.p.id}:`, e?.message || e);
+    throw e;
+  });
   const composite = {
     search: (q, o) => { const { libraryId, ...rest } = o || {}; return fanOut('search', libraryId ?? boundLibrary, q, rest); },
-    async volume(id) { const h = route('volume', id); return stamp(await h.c.volume(id, { catalog: h.catalog }), h, id); },
-    async issue(id) { const h = route('issue', id); return stamp(await h.c.issue(id, { catalog: h.catalog }), h, id); },
-    async findIssue(volumeId, number) { const h = route('volume', volumeId); return stamp(await h.c.findIssue(volumeId, number, { catalog: h.catalog }), h, null); },
-    async storyArcIssues(arcId) { const h = route('arc', arcId); return h.c.storyArcIssues(arcId, { catalog: h.catalog }); },
+    async volume(id) { const h = route('volume', id); return stamp(await logged('volume', h, () => h.c.volume(id, { catalog: h.catalog })), h, id); },
+    async issue(id) { const h = route('issue', id); return stamp(await logged('issue', h, () => h.c.issue(id, { catalog: h.catalog })), h, id); },
+    async findIssue(volumeId, number) { const h = route('volume', volumeId); return stamp(await logged('findIssue', h, () => h.c.findIssue(volumeId, number, { catalog: h.catalog })), h, null); },
+    async storyArcIssues(arcId) { const h = route('arc', arcId); return logged('storyArcIssues', h, () => h.c.storyArcIssues(arcId, { catalog: h.catalog })); },
     searchArcs: (q) => fanOut('searchArcs', boundLibrary, q),
     // The same client, for one library's list (searches and new adds made
     // on that library's behalf).
@@ -364,7 +371,7 @@ export function makeCompositeClient(config, opts = {}) {
       }
       const out = [];
       for (const { h, ids: group } of groups.values()) {
-        for (const r of await h.c.issuesByIds(group)) out.push(stamp(r, h, r?.id));
+        for (const r of await logged('issuesByIds', h, () => h.c.issuesByIds(group))) out.push(stamp(r, h, r?.id));
       }
       return out;
     },
