@@ -61,7 +61,7 @@ function safeId(id) {
 // Fetch the remote catalog: { plugins: [{ id, name, description, version,
 // download, sha256? }] }. Returns the validated plugin entries.
 export async function fetchCatalog({ fetchImpl = fetch, url = catalogUrl(), key = 'plugins' } = {}) {
-  const resp = await fetchImpl(url, { headers: { 'User-Agent': UA } });
+  const resp = await fetchImpl(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30_000) });
   if (!resp.ok) throw new Error(`catalog request failed (HTTP ${resp.status})`);
   const data = await resp.json();
   const list = Array.isArray(data?.[key]) ? data[key] : [];
@@ -130,7 +130,8 @@ export async function installPlugin(entry, { fetchImpl = fetch, npmInstall = def
   const dest = path.join(dir, id);
   const staging = path.join(dir, `.${id}.installing`);
 
-  const resp = await fetchImpl(entry.download, { headers: { 'User-Agent': UA } });
+  // Bundles can carry a few MB; the timeout covers the body too.
+  const resp = await fetchImpl(entry.download, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(2 * 60_000) });
   if (!resp.ok) throw new Error(`download failed (HTTP ${resp.status})`);
   const buf = Buffer.from(await resp.arrayBuffer());
 

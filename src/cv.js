@@ -19,6 +19,9 @@ const VOLUME_PREFIX = '4050';
 const ISSUE_PREFIX = '4000';
 const ARC_PREFIX = '4045';
 const POLITE_MS = 250;
+// Per request; a stalled connection otherwise waits out the HTTP stack's
+// 5-minute default on every retry.
+const METADATA_TIMEOUT_MS = 60_000;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -65,7 +68,7 @@ export async function ensureInstanceKey(config, base, doFetch) {
     const url = `${origin}/api/register`;
     // The image's release attestation rides along: the service uses it to
     // tier the instance key (official builds get the full service).
-    const resp = await doFetch(url, { method: 'POST', headers: { 'User-Agent': UA, ...attestHeaders() } });
+    const resp = await doFetch(url, { method: 'POST', headers: { 'User-Agent': UA, ...attestHeaders() }, signal: AbortSignal.timeout(METADATA_TIMEOUT_MS) });
     if (!resp.ok) {
       instanceKeyPromise = null; // allow retry on the next call
       throw new Error(`metadata service registration failed (HTTP ${resp.status} from ${url})`);
@@ -166,7 +169,8 @@ export function makeCvClient(config, opts = {}) {
     const url = `${base}${pathAndQuery}${sep}api_key=${encodeURIComponent(apiKey)}&format=json`;
     let resp;
     try {
-      resp = await doFetch(url, { headers: { 'User-Agent': UA, ...attestHeaders() } });
+      // A timed-out request is a fetch error like any other: retried below.
+      resp = await doFetch(url, { headers: { 'User-Agent': UA, ...attestHeaders() }, signal: AbortSignal.timeout(METADATA_TIMEOUT_MS) });
     } catch (e) {
       if (attempt < 3) { await sleep(500); return call(pathAndQuery, attempt + 1); }
       throw e;

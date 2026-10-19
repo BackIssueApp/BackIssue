@@ -61,6 +61,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   running a reorganize on network storage no longer freezes the app.
 - **A pack download cut off by a restart no longer shows as in progress forever.** Packs a download
   site was fetching inside BackIssue are marked failed at startup, so you can grab them again.
+- **An indexer, download client or metadata request that stops answering no longer stalls
+  downloads.** Requests now give up after 30 seconds (60 for metadata) instead of waiting up to five
+  minutes, so one unresponsive indexer or client can't hold up searches, the queue or imports.
 
 ## [0.9.2] — 2026-10-18
 
