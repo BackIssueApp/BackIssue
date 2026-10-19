@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import config from './config.js';
 import { findComicFiles, parseIssueFromFilename, COMIC_RE } from './scanner.js';
 import { readArchiveInfo, verifyArchive, sidecarPath } from './archive.js';
@@ -92,6 +93,19 @@ export async function removeExtraCopies(db, seriesId, { dryRun = false } = {}) {
   return { removed: removed.length, kept, deleted: removed };
 }
 
+// A folder the walk could not read (a share hiccup, EIO, a permission blip)
+// says nothing about its files: count every indexed file under it as seen so
+// the prune keeps them, rather than dropping the subtree and re-wanting it.
+function keepUnreadable(db, seen, dirs = []) {
+  if (!dirs.length) return;
+  const under = db.prepare('SELECT path FROM library_files WHERE substr(path, 1, ?) = ?');
+  for (const d of dirs) {
+    const prefix = d.replace(/[\\/]+$/, '') + path.sep;
+    for (const r of under.all(prefix.length, prefix)) seen.add(r.path);
+  }
+  console.warn(`Library scan: could not read ${dirs.length} folder(s), their files were kept: ${dirs.slice(0, 5).join(', ')}${dirs.length > 5 ? ', …' : ''}`);
+}
+
 // Walk the library, read each new/changed file's metadata + health into
 // library_files, skip unchanged files (mtime+size), and prune deleted ones.
 // `collect` (optional): accumulate seen paths there and SKIP pruning — the
@@ -104,6 +118,7 @@ export async function indexLibrary({ db, dir, deep = false, onProgress = () => {
   if (!dirOk) return { total: 0, error: `folder not found: ${dir}` };
   const files = await findComicFiles(dir);
   const seen = collect ?? new Set();
+  keepUnreadable(db, seen, files.failedDirs);
   let done = 0;
   await poolWithResource(
     files, config.libraryConcurrency || 8,

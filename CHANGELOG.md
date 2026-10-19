@@ -45,6 +45,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   already downloading no longer starts a second download.
 - **A download that fails after its file is saved is not downloaded again.** Retrying used to save a
   second copy beside the first.
+- **A library scan that can't read a folder keeps that folder's comics.** A brief share or disk error
+  on one subfolder used to drop all of its files from the library, so they showed as missing and
+  could be downloaded again.
 
 ## [0.9.2] — 2026-10-18
 
