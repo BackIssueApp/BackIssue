@@ -94,7 +94,7 @@
   "railMaintNote": "Terugval en workers",
   "backLibrary": "Bibliotheek",
   "librariesTitle": "Bibliotheken",
-  "librariesSub": "Verdeel de verzameling in benoemde bibliotheken — elke bibliotheek staat als eigen item in de zijbalk. Het <b>type</b> van een bibliotheek bepaalt hoe haar reeksen zich gedragen (manga = zoeken per hoofdstuk, rechts-naar-links lezen); haar mappen zijn waar de comics worden opgeborgen en gescand. Verplaats reeksen via het ⋯-menu van een reeks.",
+  "librariesSub": "Verdeel de verzameling in benoemde bibliotheken — elke bibliotheek staat als eigen item in de zijbalk. Het <b>type</b> van een bibliotheek bepaalt hoe haar reeksen zich gedragen (manga = zoeken per hoofdstuk, rechts-naar-links lezen); haar mappen zijn waar de comics worden opgeborgen en gescand. Verplaats reeksen via het …-menu van een reeks.",
   "libraryName": "Naam van de bibliotheek",
   "libraryTypeTitle": "Bibliotheektype — bepaalt hoe de reeksen zich gedragen",
   "matureTitle": "Deze bibliotheek (en alles erin) verbergen voor rollen zonder de machtiging “Inhoud voor volwassenen bekijken”",
@@ -145,7 +145,7 @@
   "monitorAll": "Alle nummers",
   "monitorNew": "Alleen nieuwe nummers",
   "monitorOff": "Uit",
-  "monitorNote": "Het bewakingsbeleid dat een reeks krijgt zodra ze in de bibliotheek komt — handmatig toegevoegd, via Ontdekken, Nieuwe uitgaven, leeslijsten, verzoeken of een import. <b>Alle nummers</b> houdt de reeks compleet; <b>Alleen nieuwe nummers</b> zoekt nummers vanaf het nieuwste en laat de oudere catalogus met rust; <b>Uit</b> haalt niets op tot je de reeks bewaakt of zelf nummers kiest. Elke reeks kun je later wijzigen via haar ⋯-menu.",
+  "monitorNote": "Het bewakingsbeleid dat een reeks krijgt zodra ze in de bibliotheek komt — handmatig toegevoegd, via Ontdekken, Nieuwe uitgaven, leeslijsten, verzoeken of een import. <b>Alle nummers</b> houdt de reeks compleet; <b>Alleen nieuwe nummers</b> zoekt nummers vanaf het nieuwste en laat de oudere catalogus met rust; <b>Uit</b> haalt niets op tot je de reeks bewaakt of zelf nummers kiest. Elke reeks kun je later wijzigen via haar …-menu.",
   "onlyRequested": "Alleen de nummers waarom is gevraagd",
   "onlyRequestedNote": "Wanneer een reeks wordt toegevoegd vanwege specifieke nummers — een item op een leeslijst, een nieuwe uitgave, een CBL-import — komt ze binnen met bewaken uit en alleen die nummers gezocht, zodat alleen die worden gedownload (nu, en als een download later mislukt). Toevoegen vanuit de Bibliotheek of Ontdekken krijgt nog steeds het beleid hierboven. Vereist \"Downloaden bij toevoegen\".",
   "downloadFormat": "Downloadformaat",
@@ -254,5 +254,6 @@
   "libMetaDefault": "Standaardlijst gebruiken",
   "libMetaCustom": "Kiezen voor deze bibliotheek",
   "libMetaNote": "Reeksen in deze bibliotheek worden opgezocht via de bronnen die je hier aanvinkt, in deze volgorde. Vink ze allemaal uit om terug te gaan naar de standaardlijst.",
-  "metaDefaultForLibraries": "Deze lijst is de standaard; een bibliotheek kan onder Instellingen → Bibliotheek een eigen lijst kiezen."
+  "metaDefaultForLibraries": "Deze lijst is de standaard; een bibliotheek kan onder Instellingen → Bibliotheek een eigen lijst kiezen.",
+  "saveNeedsLoad": "De instellingen zijn niet geladen — probeer het opnieuw voordat je opslaat."
 }

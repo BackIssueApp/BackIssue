@@ -94,7 +94,7 @@
   "railMaintNote": "Ausweichpfade & Worker",
   "backLibrary": "Bibliothek",
   "librariesTitle": "Bibliotheken",
-  "librariesSub": "Die Sammlung in benannte Bibliotheken aufteilen — jede erscheint als eigener Eintrag in der Seitenleiste. Der <b>Typ</b> einer Bibliothek bestimmt, wie sich ihre Reihen verhalten (Manga = Kapitelsuche, Lesen von rechts nach links); ihre Ordner sind der Ort, an dem ihre Comics abgelegt und gescannt werden. Reihen lassen sich über das ⋯-Menü einer Reihe verschieben.",
+  "librariesSub": "Die Sammlung in benannte Bibliotheken aufteilen — jede erscheint als eigener Eintrag in der Seitenleiste. Der <b>Typ</b> einer Bibliothek bestimmt, wie sich ihre Reihen verhalten (Manga = Kapitelsuche, Lesen von rechts nach links); ihre Ordner sind der Ort, an dem ihre Comics abgelegt und gescannt werden. Reihen lassen sich über das …-Menü einer Reihe verschieben.",
   "libraryName": "Name der Bibliothek",
   "libraryTypeTitle": "Bibliothekstyp — bestimmt, wie sich ihre Reihen verhalten",
   "matureTitle": "Diese Bibliothek (und alles darin) für Rollen ohne die Berechtigung „Inhalte ab 18 ansehen“ ausblenden",
@@ -145,7 +145,7 @@
   "monitorAll": "Alle Hefte",
   "monitorNew": "Nur neue Hefte",
   "monitorOff": "Aus",
-  "monitorNote": "Die Überwachungsregel, die eine Reihe beim Eintritt in die Bibliothek bekommt — von Hand hinzugefügt, aus Entdecken, Neuerscheinungen, Leselisten, Anfragen oder einem Import. <b>Alle Hefte</b> hält den Run vollständig; <b>Nur neue Hefte</b> sucht Hefte ab dem neuesten und lässt den Backkatalog in Ruhe; <b>Aus</b> holt nichts, bis die Reihe überwacht wird oder Hefte von Hand gewählt werden. Jede Reihe lässt sich später über ihr ⋯-Menü ändern.",
+  "monitorNote": "Die Überwachungsregel, die eine Reihe beim Eintritt in die Bibliothek bekommt — von Hand hinzugefügt, aus Entdecken, Neuerscheinungen, Leselisten, Anfragen oder einem Import. <b>Alle Hefte</b> hält den Run vollständig; <b>Nur neue Hefte</b> sucht Hefte ab dem neuesten und lässt den Backkatalog in Ruhe; <b>Aus</b> holt nichts, bis die Reihe überwacht wird oder Hefte von Hand gewählt werden. Jede Reihe lässt sich später über ihr …-Menü ändern.",
   "onlyRequested": "Nur die Hefte, nach denen gefragt wurde",
   "onlyRequestedNote": "Wird eine Reihe wegen bestimmter Hefte hinzugefügt — ein Eintrag auf einer Leseliste, eine Neuerscheinung, ein CBL-Import —, kommt sie mit ausgeschalteter Überwachung und nur diesen gesuchten Heften an, sodass nur sie heruntergeladen werden (jetzt und falls ein Download später fehlschlägt). Hinzufügen aus der Bibliothek oder Entdecken bekommt weiterhin die Regel oben. Braucht „Beim Hinzufügen herunterladen“.",
   "downloadFormat": "Downloadformat",
@@ -254,5 +254,6 @@
   "libMetaDefault": "Standardliste verwenden",
   "libMetaCustom": "Für diese Bibliothek wählen",
   "libMetaNote": "Reihen dieser Bibliothek werden über die hier angehakten Quellen in dieser Reihenfolge abgerufen. Alle abwählen, um zur Standardliste zurückzukehren.",
-  "metaDefaultForLibraries": "Diese Liste ist der Standard; eine Bibliothek kann unter Einstellungen → Bibliothek eine eigene wählen."
+  "metaDefaultForLibraries": "Diese Liste ist der Standard; eine Bibliothek kann unter Einstellungen → Bibliothek eine eigene wählen.",
+  "saveNeedsLoad": "Die Einstellungen wurden nicht geladen — lade sie erneut, bevor du speicherst."
 }

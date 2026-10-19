@@ -13,5 +13,9 @@
   "failed": "Le téléchargement a échoué : {error}",
   "unknownError": "erreur inconnue",
   "sending": "Envoi…",
-  "download": "Télécharger"
+  "download": "Télécharger",
+  "seedersTitle": {
+    "one": "{count} seeder",
+    "other": "{count} seeders"
+  }
 }

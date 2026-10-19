@@ -1,7 +1,6 @@
 {
   "title": "Stats",
   "summary": "{series} series · {issues} issues · {size}",
-  "couldNotLoad": "Could not load stats — is the app running?",
   "complete": "Complete",
   "youOwn": "You own <b>{owned}</b> of <b>{total}</b> known issues.",
   "incomplete": "Incomplete",
@@ -17,7 +16,7 @@
   "allValid": "all valid",
   "biggestGaps": "Biggest gaps",
   "issuesMissing": "issues missing",
-  "allComplete": "Every matched series is complete. 🎉",
+  "allComplete": "Every matched series is complete.",
   "formatMix": "Format mix",
   "formatOther": "Other",
   "metadata": "Metadata",

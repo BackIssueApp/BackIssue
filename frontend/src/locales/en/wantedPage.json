@@ -38,7 +38,7 @@
   "chipGaps": "All gaps",
   "chipGapsTitle": "Every missing issue of every series in the library, wanted or not",
   "chipFollowing": "Following",
-  "chipFollowingTitle": "Series you follow (the ☆ on a series page)",
+  "chipFollowingTitle": "Series you follow (the star on a series page)",
   "chipHideUnreleased": "Hide unreleased",
   "chipHideUnreleasedTitle": "Hides issues whose known cover date is in the future (most cached issues have no date — this only hides what we know)",
   "sortOrder": "Sort order",

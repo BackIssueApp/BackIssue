@@ -1,25 +1,6 @@
 {
-  "fileAssigned": "File assegnato all'albo — resta lì anche dopo le nuove scansioni.",
-  "choiceOwned": "{label} (posseduto)",
   "thisSeries": "questa serie",
-  "planRenameFailed": "Impossibile pianificare la rinomina: {error}",
-  "nothingToDoCollide": {
-    "one": "Niente da fare — {count} file andrebbe in conflitto.",
-    "other": "Niente da fare — {count} file andrebbero in conflitto."
-  },
-  "filesMatchPattern": "I file corrispondono già allo schema.",
-  "renameTitle": {
-    "one": "Rinominare {count} file?",
-    "other": "Rinominare {count} file?"
-  },
-  "renameMessage": "I file di \"{title}\" vengono spostati/rinominati secondo gli schemi di cartelle e file{collisions}.",
-  "renameCollisions": " ({count} andrebbero in conflitto e vengono saltati)",
   "renameFiles": "Rinomina file",
-  "renamed": {
-    "one": "{count} file rinominato{skipped}.",
-    "other": "{count} file rinominati{skipped}."
-  },
-  "renamedSkipped": ", {count} saltati",
   "nIssuesLabel": "{n} albi",
   "nItems": {
     "one": "{n} elemento",
@@ -39,7 +20,7 @@
   },
   "summaryBase": "{issues} albi · {owned} posseduti",
   "summaryMissing": " · {n} mancanti",
-  "summaryCorrupt": " · ⚠ {n} corrotti",
+  "summaryCorrupt": " · {n} corrotti",
   "summaryUntagged": " · {n} senza tag",
   "refreshing": "Aggiornamento dei metadati…",
   "refreshFailed": "Aggiornamento non riuscito: {error}",
@@ -115,7 +96,6 @@
   "alreadyOnList": "Già in quella lista.",
   "scanning": "Scansione {progress}…",
   "scanningElsewhere": "Scansione altrove…",
-  "scanFailed": "Scansione non riuscita",
   "scanError": "Errore di scansione: {error}",
   "scanComplete": "Scansione della cartella completata{pruned}.",
   "scanPruned": {
@@ -124,7 +104,6 @@
   },
   "tagging": "Tag {progress}…",
   "taggingElsewhere": "Tag in corso altrove…",
-  "taggingFailed": "Tag non riuscito",
   "taggingError": "Errore nel tag: {error}",
   "tagged": "Taggati {tagged} di {total} file{problems}.",
   "taggedProblems": {
@@ -161,7 +140,7 @@
   "unknownPublisher": "Editore sconosciuto",
   "nextShipTitle": "Dall'elenco delle uscite settimanali",
   "nextShip": "Prossimo: n. {number} · {date}",
-  "monitorTagTitle": "Cosa recupera l'automazione dei download per questa serie — cambialo da ⋯",
+  "monitorTagTitle": "Cosa recupera l'automazione dei download per questa serie — cambialo da …",
   "seriesTypeTitle": "Tipo di serie (dai metadati arricchiti)",
   "genresTitle": "Generi (dai metadati arricchiti)",
   "openSourcePage": "Apri la pagina della fonte",
@@ -291,5 +270,6 @@
   "assignAria": "Assegna {name} a un albo",
   "assignTo": "Assegna all'albo…",
   "assign": "Assegna",
-  "showAll": "Mostra tutti ({n})"
+  "showAll": "Mostra tutti ({n})",
+  "selectIssue": "Seleziona il numero #{number}"
 }

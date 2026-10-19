@@ -41,7 +41,7 @@
     "s1h": "Co to jest",
     "s1p": "Co się teraz pobiera, a co czeka. Aktywna pozycja ma pasek postępu z szybkością i źródłem.",
     "s2h": "Sterowanie",
-    "s2p": "Wstrzymuj i wznawiaj kolejkę, czyść pozycje w kolejce albo ponawiaj/czyść nieudane (uprawnienia do zarządzania biblioteką). × w wierszu anuluje pobieranie i usuwa je z klienta.",
+    "s2p": "Wstrzymuj i wznawiaj kolejkę, czyść pozycje w kolejce albo ponawiaj/czyść nieudane (uprawnienia do zarządzania biblioteką). Przycisk zamknięcia w wierszu anuluje pobieranie i usuwa je z klienta.",
     "s3h": "Po ponownym uruchomieniu",
     "s3p": "Kolejka przerwana w trakcie pobierania wznawia się automatycznie przy starcie aplikacji."
   },

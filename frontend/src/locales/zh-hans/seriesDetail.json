@@ -1,22 +1,6 @@
 {
-  "fileAssigned": "文件已分配到该期——重新扫描时会保留。",
-  "choiceOwned": "{label}（已拥有）",
   "thisSeries": "此系列",
-  "planRenameFailed": "无法规划重命名：{error}",
-  "nothingToDoCollide": {
-    "other": "无需操作——{count} 个文件会发生冲突。"
-  },
-  "filesMatchPattern": "文件已符合命名规则。",
-  "renameTitle": {
-    "other": "重命名 {count} 个文件？"
-  },
-  "renameMessage": "“{title}”的文件将被移动/重命名，以符合你的文件夹和文件命名规则{collisions}。",
-  "renameCollisions": "（{count} 个会冲突，将被跳过）",
   "renameFiles": "重命名文件",
-  "renamed": {
-    "other": "已重命名 {count} 个文件{skipped}。"
-  },
-  "renamedSkipped": "，跳过 {count} 个",
   "nIssuesLabel": "{n} 期",
   "nItems": {
     "other": "{n} 项"
@@ -34,7 +18,7 @@
   },
   "summaryBase": "{issues} 期 · 已拥有 {owned} 期",
   "summaryMissing": " · 缺失 {n} 期",
-  "summaryCorrupt": " · ⚠ {n} 个已损坏",
+  "summaryCorrupt": " · {n} 个已损坏",
   "summaryUntagged": " · {n} 个未标记",
   "refreshing": "正在刷新元数据…",
   "refreshFailed": "刷新失败：{error}",
@@ -105,7 +89,6 @@
   "alreadyOnList": "已在该列表中。",
   "scanning": "扫描中 {progress}…",
   "scanningElsewhere": "正在其他位置扫描…",
-  "scanFailed": "扫描失败",
   "scanError": "扫描错误：{error}",
   "scanComplete": "文件夹扫描完成{pruned}。",
   "scanPruned": {
@@ -113,7 +96,6 @@
   },
   "tagging": "标记中 {progress}…",
   "taggingElsewhere": "正在其他位置标记…",
-  "taggingFailed": "标记失败",
   "taggingError": "标记错误：{error}",
   "tagged": "已标记 {total} 个文件中的 {tagged} 个{problems}。",
   "taggedProblems": {
@@ -145,7 +127,7 @@
   "unknownPublisher": "未知出版商",
   "nextShipTitle": "来自每周新刊列表",
   "nextShip": "下一期：#{number} · {date}",
-  "monitorTagTitle": "自动下载会为此系列获取的内容——在 ⋯ 中更改",
+  "monitorTagTitle": "自动下载会为此系列获取的内容——在 … 中更改",
   "seriesTypeTitle": "系列类型（来自增强元数据）",
   "genresTitle": "类型（来自增强元数据）",
   "openSourcePage": "打开来源页面",
@@ -269,5 +251,6 @@
   "assignAria": "将 {name} 分配到某一期",
   "assignTo": "分配到期刊…",
   "assign": "分配",
-  "showAll": "显示全部 {n} 个"
+  "showAll": "显示全部 {n} 个",
+  "selectIssue": "选择第 #{number} 期"
 }

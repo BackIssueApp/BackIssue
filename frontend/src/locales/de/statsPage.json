@@ -1,7 +1,6 @@
 {
   "title": "Statistik",
   "summary": "{series} Reihen · {issues} Hefte · {size}",
-  "couldNotLoad": "Statistik konnte nicht geladen werden – läuft die App?",
   "complete": "Vollständig",
   "youOwn": "Du besitzt <b>{owned}</b> von <b>{total}</b> bekannten Heften.",
   "incomplete": "Unvollständig",
@@ -17,7 +16,7 @@
   "allValid": "alle in Ordnung",
   "biggestGaps": "Größte Lücken",
   "issuesMissing": "Hefte fehlen",
-  "allComplete": "Jede zugeordnete Reihe ist vollständig. 🎉",
+  "allComplete": "Jede zugeordnete Reihe ist vollständig.",
   "formatMix": "Formate",
   "formatOther": "Sonstige",
   "metadata": "Metadaten",

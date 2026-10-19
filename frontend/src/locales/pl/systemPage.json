@@ -117,5 +117,11 @@
   "nothingMatches": "Nic nie pasuje do „{query}”.",
   "copied": "skopiowano",
   "copyLine": "Kopiuj wiersz",
-  "logsCleared": "Dzienniki wyczyszczone."
+  "logsCleared": "Dzienniki wyczyszczone.",
+  "logLevel": {
+    "error": "błąd",
+    "warn": "ostrzeżenie",
+    "info": "informacja",
+    "debug": "debugowanie"
+  }
 }

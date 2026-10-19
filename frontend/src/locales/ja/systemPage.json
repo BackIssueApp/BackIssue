@@ -105,5 +105,11 @@
   "nothingMatches": "「{query}」に一致するものはありません。",
   "copied": "コピーしました",
   "copyLine": "行をコピー",
-  "logsCleared": "ログを消去しました。"
+  "logsCleared": "ログを消去しました。",
+  "logLevel": {
+    "error": "エラー",
+    "warn": "警告",
+    "info": "情報",
+    "debug": "デバッグ"
+  }
 }

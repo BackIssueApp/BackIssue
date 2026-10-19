@@ -13,6 +13,7 @@ export const ICON_PATHS = {
   check: '<path d="M20 6 9 17l-5-5"/>',
   'alert-triangle': '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/>',
+  'help-circle': '<circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>',
   download: '<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
   'download-active': '<path d="M12 3v13M8 12l4 4 4-4"/><path d="M5 21h14"/>',
   upload: '<path d="M12 21V9M7 8l5-5 5 5M5 21h14"/>',

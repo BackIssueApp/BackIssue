@@ -71,5 +71,8 @@
   "saving": "Saving…",
   "installedRestarting": "Plugins installed — restarting BackIssue to activate them…",
   "allSet": "You’re set up — add a series with “+ Add”, or import an existing library from the sidebar.",
-  "saveFailed": "Could not save setup — check the app is reachable and try again."
+  "saveFailedReason": "Could not save setup: {error}",
+  "libraryFailed": "library “{name}”: {error}",
+  "pluginFailed": "plugin “{name}”: {error}",
+  "stepsFailed": "Some setup steps failed — fix them and finish again, or skip: {list}"
 }

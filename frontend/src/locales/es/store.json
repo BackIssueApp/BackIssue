@@ -4,5 +4,30 @@
   "downloadFailed": "No se pudo poner la descarga en cola: {error}",
   "downloadFailedUnreachable": "No se pudo poner la descarga en cola — ¿está accesible la aplicación?",
   "redownloadFailed": "La nueva descarga falló: {error}",
-  "redownloadFailedUnreachable": "La nueva descarga falló — ¿está accesible la aplicación?"
+  "redownloadFailedUnreachable": "La nueva descarga falló — ¿está accesible la aplicación?",
+  "untitledSeries": "Serie sin título",
+  "scanFailed": "Error en el escaneo: {error}",
+  "tagFailed": "Error al etiquetar: {error}",
+  "matchFailed": "No se pudo iniciar el emparejado: {error}",
+  "thisSeries": "esta serie",
+  "planRenameFailed": "No se pudo planificar el renombrado: {error}",
+  "nothingToDoCollide": {
+    "one": "Nada que hacer — {count} archivo entraría en conflicto.",
+    "other": "Nada que hacer — {count} archivos entrarían en conflicto."
+  },
+  "filesMatchPattern": "Los archivos ya coinciden con el patrón.",
+  "renameTitle": {
+    "one": "¿Renombrar {count} archivo?",
+    "other": "¿Renombrar {count} archivos?"
+  },
+  "renameMessage": "Los archivos de \"{title}\" se mueven o renombran según tus patrones de carpeta y archivo{collisions}.",
+  "renameCollisions": " ({count} entrarían en conflicto y se omiten)",
+  "renameFiles": "Renombrar archivos",
+  "renamed": {
+    "one": "Se renombró {count} archivo{skipped}.",
+    "other": "Se renombraron {count} archivos{skipped}."
+  },
+  "renamedSkipped": ", {count} omitidos",
+  "fileAssigned": "Archivo asignado al número — se mantiene ahí aunque vuelvas a escanear.",
+  "choiceOwned": "{label} (en tu poder)"
 }

@@ -25,7 +25,6 @@
   "characters": "Figuren",
   "teams": "Teams",
   "variantFallback": "Variante",
-  "choiceOwned": "{label} (vorhanden)",
   "fileMoved": "Datei zu diesem Heft verschoben – die Zuweisung bleibt über Scans hinweg erhalten.",
   "assignmentCleared": "Zuweisung aufgehoben – die Datei wird wieder über ihre Nummer verknüpft.",
   "savedFields": {

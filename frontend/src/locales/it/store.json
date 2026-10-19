@@ -4,5 +4,30 @@
   "downloadFailed": "Impossibile mettere in coda il download: {error}",
   "downloadFailedUnreachable": "Impossibile mettere in coda il download — l'app è raggiungibile?",
   "redownloadFailed": "Nuovo download fallito: {error}",
-  "redownloadFailedUnreachable": "Nuovo download fallito — l'app è raggiungibile?"
+  "redownloadFailedUnreachable": "Nuovo download fallito — l'app è raggiungibile?",
+  "untitledSeries": "Serie senza titolo",
+  "scanFailed": "Scansione non riuscita: {error}",
+  "tagFailed": "Tag non riuscito: {error}",
+  "matchFailed": "Impossibile avviare l'abbinamento: {error}",
+  "thisSeries": "questa serie",
+  "planRenameFailed": "Impossibile pianificare la rinomina: {error}",
+  "nothingToDoCollide": {
+    "one": "Niente da fare — {count} file andrebbe in conflitto.",
+    "other": "Niente da fare — {count} file andrebbero in conflitto."
+  },
+  "filesMatchPattern": "I file corrispondono già allo schema.",
+  "renameTitle": {
+    "one": "Rinominare {count} file?",
+    "other": "Rinominare {count} file?"
+  },
+  "renameMessage": "I file di \"{title}\" vengono spostati/rinominati secondo gli schemi di cartelle e file{collisions}.",
+  "renameCollisions": " ({count} andrebbero in conflitto e vengono saltati)",
+  "renameFiles": "Rinomina file",
+  "renamed": {
+    "one": "{count} file rinominato{skipped}.",
+    "other": "{count} file rinominati{skipped}."
+  },
+  "renamedSkipped": ", {count} saltati",
+  "fileAssigned": "File assegnato all'albo — resta lì anche dopo le nuove scansioni.",
+  "choiceOwned": "{label} (posseduto)"
 }

@@ -50,7 +50,7 @@
   "chipGaps": "すべての欠号",
   "chipGapsTitle": "ライブラリ内のすべてのシリーズで不足しているすべての号（未入手指定の有無を問わず）",
   "chipFollowing": "フォロー中",
-  "chipFollowingTitle": "フォローしているシリーズ（シリーズページの ☆）",
+  "chipFollowingTitle": "フォローしているシリーズ（シリーズページの星）",
   "chipHideUnreleased": "未発売を隠す",
   "chipHideUnreleasedTitle": "判明している表紙日付が未来の号を隠します（キャッシュ済みの号の多くは日付がないため、隠れるのは日付が分かっているものだけです）",
   "sortOrder": "並び順",

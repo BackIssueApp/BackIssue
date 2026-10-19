@@ -25,7 +25,6 @@
   "characters": "Personajes",
   "teams": "Equipos",
   "variantFallback": "variante",
-  "choiceOwned": "{label} (en propiedad)",
   "fileMoved": "Archivo movido a ese número — la asignación se recuerda en los próximos escaneos.",
   "assignmentCleared": "Asignación anulada — el archivo vuelve a vincularse por su número.",
   "savedFields": {

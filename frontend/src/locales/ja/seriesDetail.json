@@ -1,22 +1,6 @@
 {
-  "fileAssigned": "ファイルをその号に割り当てました。再スキャン後もそのままです。",
-  "choiceOwned": "{label}（所有）",
   "thisSeries": "このシリーズ",
-  "planRenameFailed": "名前変更の計画を立てられませんでした：{error}",
-  "nothingToDoCollide": {
-    "other": "何もすることはありません。{count} ファイルの名前が衝突します。"
-  },
-  "filesMatchPattern": "ファイルはすでにパターンに一致しています。",
-  "renameTitle": {
-    "other": "{count} ファイルの名前を変更しますか？"
-  },
-  "renameMessage": "「{title}」のファイルを、フォルダーとファイル名のパターンに合わせて移動・名前変更します{collisions}。",
-  "renameCollisions": "（{count} 件は名前が衝突するためスキップします）",
   "renameFiles": "ファイル名を変更",
-  "renamed": {
-    "other": "{count} ファイルの名前を変更しました{skipped}。"
-  },
-  "renamedSkipped": "（{count} 件スキップ）",
   "nIssuesLabel": "{n} 号",
   "nItems": {
     "other": "{n} 件"
@@ -34,7 +18,7 @@
   },
   "summaryBase": "{issues} 号 · 所有 {owned}",
   "summaryMissing": " · 不足 {n}",
-  "summaryCorrupt": " · ⚠ 破損 {n}",
+  "summaryCorrupt": " · 破損 {n}",
   "summaryUntagged": " · タグなし {n}",
   "refreshing": "メタデータを更新中…",
   "refreshFailed": "更新に失敗しました：{error}",
@@ -105,7 +89,6 @@
   "alreadyOnList": "すでにそのリストにあります。",
   "scanning": "スキャン中 {progress}…",
   "scanningElsewhere": "ほかの場所でスキャン中…",
-  "scanFailed": "スキャンに失敗しました",
   "scanError": "スキャンエラー：{error}",
   "scanComplete": "フォルダーのスキャンが完了しました{pruned}。",
   "scanPruned": {
@@ -113,7 +96,6 @@
   },
   "tagging": "タグ付け中 {progress}…",
   "taggingElsewhere": "ほかの場所でタグ付け中…",
-  "taggingFailed": "タグ付けに失敗しました",
   "taggingError": "タグ付けエラー：{error}",
   "tagged": "{total} ファイル中 {tagged} ファイルをタグ付けしました{problems}。",
   "taggedProblems": {
@@ -145,7 +127,7 @@
   "unknownPublisher": "不明な出版社",
   "nextShipTitle": "週刊の新刊リストより",
   "nextShip": "次号：#{number} · {date}",
-  "monitorTagTitle": "このシリーズでダウンロードの自動化が取得するもの — ⋯ から変更できます",
+  "monitorTagTitle": "このシリーズでダウンロードの自動化が取得するもの — … から変更できます",
   "seriesTypeTitle": "シリーズの種類（拡張メタデータより）",
   "genresTitle": "ジャンル（拡張メタデータより）",
   "openSourcePage": "ソースページを開く",
@@ -269,5 +251,6 @@
   "assignAria": "{name} を号に割り当て",
   "assignTo": "号に割り当て…",
   "assign": "割り当て",
-  "showAll": "すべて表示（{n}）"
+  "showAll": "すべて表示（{n}）",
+  "selectIssue": "#{number} を選択"
 }

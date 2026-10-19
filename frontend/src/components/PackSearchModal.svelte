@@ -1,6 +1,6 @@
 <script module>
   import { openModal, closeModal, modals } from '../lib/modals.svelte.js';
-  import { detail } from '../lib/store.svelte.js';
+  import { detail, seriesTitle } from '../lib/store.svelte.js';
   import { apiPost } from '../lib/api.js';
   import { t } from '../lib/i18n.svelte.js';
 
@@ -8,7 +8,7 @@
 
   export function openPackSearch() {
     if (!detail.series) return;
-    m.title = t('packSearchModal.title', { series: detail.series.title || '' });
+    m.title = t('packSearchModal.title', { series: seriesTitle(detail.series) });
     m.query = '';
     m.results = null; m.errors = []; m.note = '';
     openModal('packs');
@@ -61,7 +61,7 @@
 
 {#if open}
   <div id="packs-modal" class="modal" onclick={(e) => { if (e.target === e.currentTarget) closeModal('packs'); }}>
-    <div class="modal__panel modal__panel--wide" use:trapFocus role="dialog" aria-label={t('packSearchModal.dialogLabel')}>
+    <div class="modal__panel modal__panel--wide" use:trapFocus role="dialog" aria-modal="true" aria-label={t('packSearchModal.dialogLabel')}>
       <div class="modal__head" style="display:flex;justify-content:space-between;align-items:center;">
         <h3 style="margin:0;">{m.title}</h3>
         <button class="modal__x" aria-label={t('common.close')} onclick={() => closeModal('packs')}><Icon name="close" /></button>

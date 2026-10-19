@@ -77,5 +77,7 @@
   },
   "nSelected": {
     "other": "{count} 件選択中"
-  }
+  },
+  "loadFailed": "読み込めませんでした。",
+  "loadFailedStale": "更新できませんでした — 最後に読み込んだデータを表示しています。"
 }

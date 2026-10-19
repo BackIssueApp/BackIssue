@@ -272,10 +272,10 @@ body {
 .topbar__burger { display: none; font-size: 16px; padding: 8px 12px; }
 .topbar__help {
   width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%;
-  border: 1px solid var(--line); background: none; color: var(--muted);
-  font: 600 13px var(--font-body); cursor: pointer; line-height: 1;
+  border: none; background: none; color: var(--muted);
+  cursor: pointer; display: inline-grid; place-items: center; padding: 0;
 }
-.topbar__help:hover { border-color: var(--accent); color: var(--accent); }
+.topbar__help:hover { color: var(--accent); }
 
 /* Notification bell + dropdown */
 .notif { position: relative; flex-shrink: 0; }
@@ -2016,6 +2016,7 @@ textarea.dialog-input { resize: vertical; font-family: var(--font-mono); }
    (plugin mounts + the generic set-* scan depend on it): visibility is CSS. */
 .setx-shell { height: 100%; min-height: 0; } /* display comes from body.settings .settings-page (flex column) */
 .setx-head { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+.setx-loaderr { padding: 12px 18px 0; }
 .setx-head__title { margin: 0; font: 400 22px/1 var(--font-display); letter-spacing: .02em; flex: 0 0 auto; }
 .setx-search { display: flex; align-items: center; gap: 7px; margin-left: auto; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; width: 220px; color: var(--muted); }
 .setx-search input { flex: 1; min-width: 0; background: none; border: none; color: var(--text); font: 400 13px var(--font-body); outline: none; }

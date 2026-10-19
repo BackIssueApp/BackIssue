@@ -2,9 +2,10 @@
   import Icon from '../lib/Icon.svelte';
   import { untrack } from 'svelte';
   import { goBack, navigate, route, setQuery } from '../lib/router.svelte.js';
-  import { apiGet, apiPost, apiDelete } from '../lib/api.js';
+  import { apiGetOk, apiPost, apiDelete, errorText } from '../lib/api.js';
   import { subscribe } from '../lib/events.svelte.js';
-  import { fmt } from '../lib/util.js';
+  import { fmt, latestGuard } from '../lib/util.js';
+  import LoadError from './LoadError.svelte';
   import { t, st, currentLang } from '../lib/i18n.svelte.js';
 
   let { active = false } = $props();
@@ -14,44 +15,36 @@
   let total = $state(0);
   let sources = $state([]);
   let loaded = $state(false);
+  let loadError = $state('');
   let findText = $state(''); // client-side filter over the loaded page
 
+  // Last request wins (a filter switch can land while the refresh is out).
+  // A failure keeps the last good page and says so.
+  const historySeq = latestGuard();
   async function renderHistory({ append = false } = {}) {
+    const isLatest = historySeq();
     const offset = append ? items.length : 0;
-    if (filter === 'failed') {
-      // Failed downloads — durable (the queue clears; this record doesn't).
-      let h;
-      try { h = await apiGet(`/api/history/failed?limit=200&offset=${offset}`); } catch { return; }
-      if (h.error) return;
-      items = append ? items.concat(h.rows) : h.rows;
-      total = h.total;
-      loaded = true;
-      return;
-    }
-    if (filter === 'blacklist') {
-      // Blacklisted releases — failed usenet posts skipped on future searches.
-      let h;
-      try { h = await apiGet(`/api/blacklist?limit=200&offset=${offset}`); } catch { return; }
-      if (h.error) return;
-      items = append ? items.concat(h.rows) : h.rows;
-      total = h.total;
-      loaded = true;
-      return;
-    }
-    const qs = `limit=200&offset=${offset}` + (filter !== 'all' ? `&source=${encodeURIComponent(filter)}` : '');
+    // Failed downloads — durable (the queue clears; this record doesn't).
+    // Blacklisted releases — failed usenet posts skipped on future searches.
+    const url = filter === 'failed' ? `/api/history/failed?limit=200&offset=${offset}`
+      : filter === 'blacklist' ? `/api/blacklist?limit=200&offset=${offset}`
+      : `/api/history?limit=200&offset=${offset}` + (filter !== 'all' ? `&source=${encodeURIComponent(filter)}` : '');
     let h;
-    try { h = await apiGet('/api/history?' + qs); } catch { return; }
-    if (h.error) return;
-    items = append ? items.concat(h.items) : h.items;
-    total = h.total;
+    try { h = await apiGetOk(url); }
+    catch (e) { if (isLatest()) { loadError = errorText(e); loaded = true; } return; }
+    if (!isLatest()) return;
+    const rows = (filter === 'failed' || filter === 'blacklist' ? h.rows : h.items) || [];
+    items = append ? items.concat(rows) : rows;
+    total = h.total ?? items.length;
     // Source filter chips — derived from the data, so any source (incl. plugins) shows.
-    sources = h.sources || [];
+    if (filter !== 'failed' && filter !== 'blacklist') sources = h.sources || [];
     loaded = true;
+    loadError = '';
   }
 
   // The source filter lives in the URL (?src=usenet) — shareable + Back/Forward.
   $effect(() => {
-    if (!active) { items = []; loaded = false; return; }
+    if (!active) { historySeq(); items = []; loaded = false; loadError = ''; return; }
     const p = new URLSearchParams(route.search);
     untrack(() => {
       filter = p.get('src') || 'all';
@@ -166,7 +159,10 @@
 
   <div class="histx__scroll">
     <div id="history-list" class="histx__inner">
-      {#if loaded && !filtered.length}
+      {#if loadError}
+        <LoadError compact={items.length > 0} error={loadError} onretry={() => renderHistory()} />
+      {/if}
+      {#if loaded && !filtered.length && !loadError}
         <div class="histx__empty">
           <div class="histx__empty-art"><Icon name={empty.icon} size={26} /></div>
           <div class="histx__empty-title">{empty.title}</div>
@@ -258,6 +254,7 @@
   .histx__time { font: 11px var(--font-mono); color: #6f6885; flex: none; }
   .histx__remove { opacity: .4; height: 28px; padding: 0 11px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 7px; font: 600 11.5px var(--font-body); cursor: pointer; flex: none; transition: opacity .12s; }
   .histx__row:hover .histx__remove { opacity: 1; }
+  @media (hover: none), (pointer: coarse) { .histx__remove { opacity: 1; } }
   .histx__remove:hover { color: var(--text); }
   .histx__src { font: 600 10px var(--font-body); text-transform: uppercase; letter-spacing: .04em; border: 1px solid; border-radius: 5px; padding: 2px 7px; flex: none; }
 

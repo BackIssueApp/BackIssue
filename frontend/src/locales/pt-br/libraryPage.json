@@ -14,26 +14,8 @@
     "other": "{n} edições postas na fila."
   },
   "scanAlreadyRunning": "Já está em andamento uma análise de pastas.",
-  "scanFailed": "A análise falhou",
   "loadSeriesFailed": "Não foi possível carregar essa série: {error}",
-  "planRenameFailed": "Não foi possível planear a renomeação: {error}",
-  "nothingToDoCollide": {
-    "one": "Nada a fazer — {count} arquivo entraria em conflito.",
-    "other": "Nada a fazer — {count} arquivos entrariam em conflito."
-  },
-  "filesMatchPattern": "Os arquivos já correspondem ao padrão.",
-  "renameTitle": {
-    "one": "Mudar o nome a {count} arquivo?",
-    "other": "Mudar o nome a {count} arquivos?"
-  },
-  "renameMessage": "Os arquivos de “{title}” são movidos/renomeados para corresponder aos seus padrões de pastas e arquivos{collisions}.",
-  "renameCollisions": " ({count} entrariam em conflito e são ignorados)",
   "renameFiles": "Mudar o nome aos arquivos",
-  "renamed": {
-    "one": "{count} arquivo renomeado{skipped}.",
-    "other": "{count} arquivos renomeados{skipped}."
-  },
-  "renamedSkipped": ", {count} ignorados",
   "menuOpen": "Abrir",
   "follow": "Seguir",
   "unfollow": "Deixar de seguir",

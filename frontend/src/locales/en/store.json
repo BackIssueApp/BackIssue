@@ -4,5 +4,30 @@
   "downloadFailed": "Download failed to queue: {error}",
   "downloadFailedUnreachable": "Download failed to queue — is the app reachable?",
   "redownloadFailed": "Re-download failed: {error}",
-  "redownloadFailedUnreachable": "Re-download failed — is the app reachable?"
+  "redownloadFailedUnreachable": "Re-download failed — is the app reachable?",
+  "untitledSeries": "Untitled series",
+  "scanFailed": "Scan failed: {error}",
+  "tagFailed": "Tagging failed: {error}",
+  "matchFailed": "Matching could not start: {error}",
+  "thisSeries": "this series",
+  "planRenameFailed": "Could not plan the rename: {error}",
+  "nothingToDoCollide": {
+    "one": "Nothing to do — {count} file would collide.",
+    "other": "Nothing to do — {count} files would collide."
+  },
+  "filesMatchPattern": "Files already match the pattern.",
+  "renameTitle": {
+    "one": "Rename {count} file?",
+    "other": "Rename {count} files?"
+  },
+  "renameMessage": "Files for \"{title}\" are moved/renamed to match your folder and file patterns{collisions}.",
+  "renameCollisions": " ({count} would collide and are skipped)",
+  "renameFiles": "Rename files",
+  "renamed": {
+    "one": "Renamed {count} file{skipped}.",
+    "other": "Renamed {count} files{skipped}."
+  },
+  "renamedSkipped": ", {count} skipped",
+  "fileAssigned": "File assigned to the issue — it stays there through rescans.",
+  "choiceOwned": "{label} (owned)"
 }

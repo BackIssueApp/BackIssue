@@ -4,5 +4,30 @@
   "downloadFailed": "Impossible de mettre le téléchargement en file d'attente : {error}",
   "downloadFailedUnreachable": "Impossible de mettre le téléchargement en file d'attente — l'application est-elle joignable ?",
   "redownloadFailed": "Le retéléchargement a échoué : {error}",
-  "redownloadFailedUnreachable": "Le retéléchargement a échoué — l'application est-elle joignable ?"
+  "redownloadFailedUnreachable": "Le retéléchargement a échoué — l'application est-elle joignable ?",
+  "untitledSeries": "Série sans titre",
+  "scanFailed": "Échec de l'analyse : {error}",
+  "tagFailed": "Échec de l'étiquetage : {error}",
+  "matchFailed": "Impossible de lancer l'association : {error}",
+  "thisSeries": "cette série",
+  "planRenameFailed": "Impossible de préparer le renommage : {error}",
+  "nothingToDoCollide": {
+    "one": "Rien à faire — {count} fichier entrerait en conflit.",
+    "other": "Rien à faire — {count} fichiers entreraient en conflit."
+  },
+  "filesMatchPattern": "Les fichiers respectent déjà le modèle.",
+  "renameTitle": {
+    "one": "Renommer {count} fichier ?",
+    "other": "Renommer {count} fichiers ?"
+  },
+  "renameMessage": "Les fichiers de « {title} » sont déplacés/renommés selon vos modèles de dossier et de fichier{collisions}.",
+  "renameCollisions": " ({count} entreraient en conflit et sont ignorés)",
+  "renameFiles": "Renommer les fichiers",
+  "renamed": {
+    "one": "{count} fichier renommé{skipped}.",
+    "other": "{count} fichiers renommés{skipped}."
+  },
+  "renamedSkipped": ", {count} ignoré(s)",
+  "fileAssigned": "Fichier attribué au numéro — il y reste lors des prochaines analyses.",
+  "choiceOwned": "{label} (possédé)"
 }

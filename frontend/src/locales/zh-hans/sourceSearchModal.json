@@ -13,5 +13,8 @@
   "failed": "下载失败：{error}",
   "unknownError": "未知错误",
   "sending": "发送中…",
-  "download": "下载"
+  "download": "下载",
+  "seedersTitle": {
+    "other": "{count} 个做种者"
+  }
 }

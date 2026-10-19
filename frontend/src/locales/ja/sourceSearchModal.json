@@ -13,5 +13,8 @@
   "failed": "ダウンロードに失敗しました：{error}",
   "unknownError": "不明なエラー",
   "sending": "送信中…",
-  "download": "ダウンロード"
+  "download": "ダウンロード",
+  "seedersTitle": {
+    "other": "シーダー {count}"
+  }
 }

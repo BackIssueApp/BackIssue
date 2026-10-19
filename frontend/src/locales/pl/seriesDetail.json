@@ -1,31 +1,6 @@
 {
-  "fileAssigned": "Plik przypisany do zeszytu — zostanie tam przy kolejnych skanowaniach.",
-  "choiceOwned": "{label} (posiadany)",
   "thisSeries": "ta seria",
-  "planRenameFailed": "Nie udało się zaplanować zmiany nazw: {error}",
-  "nothingToDoCollide": {
-    "one": "Nic do zrobienia — {count} plik spowodowałby kolizję.",
-    "few": "Nic do zrobienia — {count} pliki spowodowałyby kolizję.",
-    "many": "Nic do zrobienia — {count} plików spowodowałoby kolizję.",
-    "other": "Nic do zrobienia — {count} pliku spowodowałoby kolizję."
-  },
-  "filesMatchPattern": "Pliki już pasują do wzorca.",
-  "renameTitle": {
-    "one": "Zmienić nazwę {count} pliku?",
-    "few": "Zmienić nazwy {count} plików?",
-    "many": "Zmienić nazwy {count} plików?",
-    "other": "Zmienić nazwy {count} pliku?"
-  },
-  "renameMessage": "Pliki serii „{title}” zostaną przeniesione lub przemianowane zgodnie ze wzorcami folderów i plików{collisions}.",
-  "renameCollisions": " (kolizje: {count} — zostaną pominięte)",
   "renameFiles": "Zmień nazwy plików",
-  "renamed": {
-    "one": "Zmieniono nazwę {count} pliku{skipped}.",
-    "few": "Zmieniono nazwy {count} plików{skipped}.",
-    "many": "Zmieniono nazwy {count} plików{skipped}.",
-    "other": "Zmieniono nazwy {count} pliku{skipped}."
-  },
-  "renamedSkipped": ", pominięto: {count}",
   "nIssuesLabel": "zeszyty: {n}",
   "nItems": {
     "one": "{n} element",
@@ -49,7 +24,7 @@
   },
   "summaryBase": "zeszyty: {issues} · posiadane: {owned}",
   "summaryMissing": " · brakujące: {n}",
-  "summaryCorrupt": " · ⚠ uszkodzone: {n}",
+  "summaryCorrupt": " · uszkodzone: {n}",
   "summaryUntagged": " · bez tagów: {n}",
   "refreshing": "Odświeżanie metadanych…",
   "refreshFailed": "Odświeżanie nie powiodło się: {error}",
@@ -135,7 +110,6 @@
   "alreadyOnList": "Już jest na tej liście.",
   "scanning": "Skanowanie {progress}…",
   "scanningElsewhere": "Skanowanie gdzie indziej…",
-  "scanFailed": "Skanowanie nie powiodło się",
   "scanError": "Błąd skanowania: {error}",
   "scanComplete": "Skanowanie folderu zakończone{pruned}.",
   "scanPruned": {
@@ -146,7 +120,6 @@
   },
   "tagging": "Tagowanie {progress}…",
   "taggingElsewhere": "Tagowanie gdzie indziej…",
-  "taggingFailed": "Tagowanie nie powiodło się",
   "taggingError": "Błąd tagowania: {error}",
   "tagged": "Otagowano {tagged} z {total} plików{problems}.",
   "taggedProblems": {
@@ -193,7 +166,7 @@
   "unknownPublisher": "Nieznany wydawca",
   "nextShipTitle": "Z cotygodniowej listy premier",
   "nextShip": "Następny: #{number} · {date}",
-  "monitorTagTitle": "Co automatyczne pobieranie pobiera dla tej serii — zmień to w ⋯",
+  "monitorTagTitle": "Co automatyczne pobieranie pobiera dla tej serii — zmień to w …",
   "seriesTypeTitle": "Typ serii (ze wzbogaconych metadanych)",
   "genresTitle": "Gatunki (ze wzbogaconych metadanych)",
   "openSourcePage": "Otwórz stronę źródła",
@@ -335,5 +308,6 @@
   "assignAria": "Przypisz {name} do zeszytu",
   "assignTo": "Przypisz do zeszytu…",
   "assign": "Przypisz",
-  "showAll": "Pokaż wszystkie ({n})"
+  "showAll": "Pokaż wszystkie ({n})",
+  "selectIssue": "Zaznacz zeszyt #{number}"
 }

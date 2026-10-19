@@ -119,7 +119,7 @@
 
 {#if open}
   <div class="modal" onclick={(e) => { if (e.target === e.currentTarget) closeModal('editmeta'); }}>
-    <div class="modal__panel editmeta__panel" use:trapFocus role="dialog" aria-label={t('editMetadataModal.title', { name: m.cv?.name || t('editMetadataModal.seriesFallback') })}>
+    <div class="modal__panel editmeta__panel" use:trapFocus role="dialog" aria-modal="true" aria-label={t('editMetadataModal.title', { name: m.cv?.name || t('editMetadataModal.seriesFallback') })}>
       <div class="modal__head" style="display:flex;justify-content:space-between;align-items:center;">
         <h3 style="margin:0;">{t('editMetadataModal.title', { name: m.cv?.name || t('editMetadataModal.seriesFallback') })}</h3>
         <button class="modal__x" aria-label={t('common.close')} onclick={() => closeModal('editmeta')}><Icon name="close" /></button>

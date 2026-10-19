@@ -4,7 +4,8 @@
   // custom roles assembled from the permission catalog (core + plugins).
   import { goBack } from '../lib/router.svelte.js';
   import Icon from '../lib/Icon.svelte';
-  import { apiGet, apiPost, apiPatch, apiDelete } from '../lib/api.js';
+  import { apiGet, apiGetOk, apiPost, apiPatch, apiDelete, errorText } from '../lib/api.js';
+  import LoadError from './LoadError.svelte';
   import { auth } from '../lib/auth.svelte.js';
   import { notify } from '../lib/toasts.svelte.js';
   import { confirmDialog, inputDialog } from './DialogModal.svelte';
@@ -33,17 +34,21 @@
     return [...groups.entries()];
   });
 
+  let loadError = $state('');
   async function refresh() {
     try {
+      // Settings are a separate permission: their absence only hides the
+      // registration toggle's state, it never fails the page.
       const [u, r, p, s] = await Promise.all([
-        apiGet('/api/users'), apiGet('/api/roles'), apiGet('/api/permissions'), apiGet('/api/settings'),
+        apiGetOk('/api/users'), apiGetOk('/api/roles'), apiGetOk('/api/permissions'), apiGet('/api/settings').catch(() => null),
       ]);
       users = u.users || [];
       roles = r.roles || [];
       perms = p.permissions || [];
-      allowRegistration = !!s.allowRegistration;
+      if (s && !s.error) allowRegistration = !!s.allowRegistration;
       loaded = true;
-    } catch { /* keep last */ }
+      loadError = '';
+    } catch (e) { loadError = errorText(e); } // keep the last good lists
   }
   $effect(() => { if (active) refresh(); });
 
@@ -168,6 +173,7 @@
 
   <div class="usx__scroll">
     <div class="usx__inner">
+      {#if loadError}<LoadError compact={loaded} error={loadError} onretry={refresh} />{/if}
       {#if tab === 'accounts'}
         <div class="usx__table">
           <div class="usx__thead">

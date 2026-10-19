@@ -66,7 +66,7 @@
 
 {#if open}
   <div id="indexer-modal" class="modal" onclick={(e) => { if (e.target === e.currentTarget) closeModal('indexer'); }}>
-    <div class="modal__panel" use:trapFocus role="dialog" aria-label={t('indexerModal.dialogLabel')}>
+    <div class="modal__panel" use:trapFocus role="dialog" aria-modal="true" aria-label={t('indexerModal.dialogLabel')}>
       <div class="modal__head" style="display:flex;justify-content:space-between;align-items:center;">
         <h3 id="indexer-modal-title" style="margin:0;">{t(m.editIndex >= 0 ? 'indexerModal.editTitle' : 'indexerModal.addTitle', { kind: t(MODES[m.mode].label) })}</h3>
         <button id="indexer-modal-x" class="modal__x" aria-label={t('common.close')} onclick={() => closeModal('indexer')}><Icon name="close" /></button>

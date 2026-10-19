@@ -105,5 +105,11 @@
   "nothingMatches": "没有与“{query}”匹配的内容。",
   "copied": "已复制",
   "copyLine": "复制此行",
-  "logsCleared": "日志已清除。"
+  "logsCleared": "日志已清除。",
+  "logLevel": {
+    "error": "错误",
+    "warn": "警告",
+    "info": "信息",
+    "debug": "调试"
+  }
 }

@@ -1,25 +1,6 @@
 {
-  "fileAssigned": "Archivo asignado al número — se mantiene ahí aunque vuelvas a escanear.",
-  "choiceOwned": "{label} (en tu poder)",
   "thisSeries": "esta serie",
-  "planRenameFailed": "No se pudo planificar el renombrado: {error}",
-  "nothingToDoCollide": {
-    "one": "Nada que hacer — {count} archivo entraría en conflicto.",
-    "other": "Nada que hacer — {count} archivos entrarían en conflicto."
-  },
-  "filesMatchPattern": "Los archivos ya coinciden con el patrón.",
-  "renameTitle": {
-    "one": "¿Renombrar {count} archivo?",
-    "other": "¿Renombrar {count} archivos?"
-  },
-  "renameMessage": "Los archivos de \"{title}\" se mueven o renombran según tus patrones de carpeta y archivo{collisions}.",
-  "renameCollisions": " ({count} entrarían en conflicto y se omiten)",
   "renameFiles": "Renombrar archivos",
-  "renamed": {
-    "one": "Se renombró {count} archivo{skipped}.",
-    "other": "Se renombraron {count} archivos{skipped}."
-  },
-  "renamedSkipped": ", {count} omitidos",
   "nIssuesLabel": "{n} números",
   "nItems": {
     "one": "{n} elemento",
@@ -39,7 +20,7 @@
   },
   "summaryBase": "{issues} números · {owned} en tu poder",
   "summaryMissing": " · {n} faltan",
-  "summaryCorrupt": " · ⚠ {n} dañados",
+  "summaryCorrupt": " · {n} dañados",
   "summaryUntagged": " · {n} sin etiquetas",
   "refreshing": "Actualizando metadatos…",
   "refreshFailed": "Error al actualizar: {error}",
@@ -115,7 +96,6 @@
   "alreadyOnList": "Ya están en esa lista.",
   "scanning": "Escaneando {progress}…",
   "scanningElsewhere": "Escaneando en otro sitio…",
-  "scanFailed": "Error en el escaneo",
   "scanError": "Error de escaneo: {error}",
   "scanComplete": "Escaneo de carpeta completado{pruned}.",
   "scanPruned": {
@@ -124,7 +104,6 @@
   },
   "tagging": "Etiquetando {progress}…",
   "taggingElsewhere": "Etiquetando en otro sitio…",
-  "taggingFailed": "Error al etiquetar",
   "taggingError": "Error de etiquetado: {error}",
   "tagged": "Etiquetados {tagged} de {total} archivos{problems}.",
   "taggedProblems": {
@@ -161,7 +140,7 @@
   "unknownPublisher": "Editorial desconocida",
   "nextShipTitle": "De la lista semanal de novedades",
   "nextShip": "Siguiente: #{number} · {date}",
-  "monitorTagTitle": "Lo que la automatización de descargas obtiene para esta serie — cámbialo en ⋯",
+  "monitorTagTitle": "Lo que la automatización de descargas obtiene para esta serie — cámbialo en …",
   "seriesTypeTitle": "Tipo de serie (de los metadatos enriquecidos)",
   "genresTitle": "Géneros (de los metadatos enriquecidos)",
   "openSourcePage": "Abrir la página de origen",
@@ -291,5 +270,6 @@
   "assignAria": "Asignar {name} a un número",
   "assignTo": "Asignar a un número…",
   "assign": "Asignar",
-  "showAll": "Mostrar los {n}"
+  "showAll": "Mostrar los {n}",
+  "selectIssue": "Seleccionar el número #{number}"
 }

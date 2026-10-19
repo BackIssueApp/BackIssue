@@ -41,7 +41,7 @@
     "s1h": "Wat dit is",
     "s1p": "Wat nu wordt gedownload en wat nog wacht. Het actieve item toont een voortgangsbalk met snelheid en bron.",
     "s2h": "Bediening",
-    "s2p": "Pauzeer of hervat de wachtrij, wis wachtende items, of probeer mislukte opnieuw of wis ze (bibliotheekbeheerrechten). De × op een rij annuleert die download en verwijdert hem uit de client.",
+    "s2p": "Pauzeer of hervat de wachtrij, wis wachtende items, of probeer mislukte opnieuw of wis ze (bibliotheekbeheerrechten). De sluitknop op een rij annuleert die download en verwijdert hem uit de client.",
     "s3h": "Na een herstart",
     "s3p": "Een wachtrij die midden in een download zat, gaat automatisch verder zodra de app start."
   },

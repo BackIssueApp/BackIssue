@@ -98,7 +98,7 @@
   "railMaintNote": "Lokalizacje zapasowe i wątki",
   "backLibrary": "Biblioteka",
   "librariesTitle": "Biblioteki",
-  "librariesSub": "Podziel kolekcję na nazwane biblioteki — każda ma własną pozycję na pasku bocznym. <b>Typ</b> biblioteki decyduje o zachowaniu jej serii (manga = wyszukiwanie po rozdziałach, czytanie od prawej do lewej); jej foldery to miejsca, gdzie komiksy są umieszczane i skanowane. Serie przenosisz z menu ⋯ tomu.",
+  "librariesSub": "Podziel kolekcję na nazwane biblioteki — każda ma własną pozycję na pasku bocznym. <b>Typ</b> biblioteki decyduje o zachowaniu jej serii (manga = wyszukiwanie po rozdziałach, czytanie od prawej do lewej); jej foldery to miejsca, gdzie komiksy są umieszczane i skanowane. Serie przenosisz z menu … tomu.",
   "libraryName": "Nazwa biblioteki",
   "libraryTypeTitle": "Typ biblioteki — decyduje o zachowaniu jej serii",
   "matureTitle": "Ukryj tę bibliotekę (i całą jej zawartość) przed rolami bez uprawnienia „Treści dla dorosłych”",
@@ -149,7 +149,7 @@
   "monitorAll": "Wszystkie zeszyty",
   "monitorNew": "Tylko nowe zeszyty",
   "monitorOff": "Wyłączone",
-  "monitorNote": "Zasady monitorowania, które seria dostaje po trafieniu do biblioteki — dodana ręcznie, z Odkrywaj, Premier, list lektur, próśb lub importu. <b>Wszystkie zeszyty</b> utrzymuje serię w komplecie; <b>Tylko nowe zeszyty</b> szuka zeszytów od najnowszego i pomija wcześniejsze; <b>Wyłączone</b> nic nie pobiera, dopóki nie włączysz monitorowania albo nie wybierzesz zeszytów sam. Każdą serię można później zmienić z jej menu ⋯.",
+  "monitorNote": "Zasady monitorowania, które seria dostaje po trafieniu do biblioteki — dodana ręcznie, z Odkrywaj, Premier, list lektur, próśb lub importu. <b>Wszystkie zeszyty</b> utrzymuje serię w komplecie; <b>Tylko nowe zeszyty</b> szuka zeszytów od najnowszego i pomija wcześniejsze; <b>Wyłączone</b> nic nie pobiera, dopóki nie włączysz monitorowania albo nie wybierzesz zeszytów sam. Każdą serię można później zmienić z jej menu ….",
   "onlyRequested": "Tylko zeszyty, o które poproszono",
   "onlyRequestedNote": "Gdy seria jest dodawana z powodu konkretnych zeszytów — pozycji na liście lektur, premiery, importu CBL — trafia do biblioteki z wyłączonym monitorowaniem i tylko tymi zeszytami jako poszukiwanymi, więc pobierane są tylko one (teraz i gdy pobranie później się nie powiedzie). Dodanie z Biblioteki lub Odkrywaj nadal stosuje powyższe zasady. Wymaga „Pobieraj po dodaniu”.",
   "downloadFormat": "Format pobierania",
@@ -258,5 +258,6 @@
   "libMetaDefault": "Użyj listy domyślnej",
   "libMetaCustom": "Wybierz dla tej biblioteki",
   "libMetaNote": "Serie z tej biblioteki są wyszukiwane w zaznaczonych tu źródłach, w tej kolejności. Odznacz wszystkie, aby wrócić do listy domyślnej.",
-  "metaDefaultForLibraries": "Ta lista jest domyślna; biblioteka może wybrać własną w Ustawienia → Biblioteka."
+  "metaDefaultForLibraries": "Ta lista jest domyślna; biblioteka może wybrać własną w Ustawienia → Biblioteka.",
+  "saveNeedsLoad": "Ustawienia się nie wczytały — spróbuj ponownie przed zapisaniem."
 }

@@ -67,5 +67,7 @@
   "nIssues": { "one": "{count} Heft", "other": "{count} Hefte" },
   "nFiles": { "one": "{count} Datei", "other": "{count} Dateien" },
   "nSeries": { "one": "{count} Reihe", "other": "{count} Reihen" },
-  "nSelected": { "one": "{count} ausgewählt", "other": "{count} ausgewählt" }
+  "nSelected": { "one": "{count} ausgewählt", "other": "{count} ausgewählt" },
+  "loadFailed": "Konnte nicht geladen werden.",
+  "loadFailedStale": "Aktualisierung fehlgeschlagen — die zuletzt geladenen Daten werden angezeigt."
 }

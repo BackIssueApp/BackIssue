@@ -14,26 +14,8 @@
     "other": "{n} Hefte eingereiht."
   },
   "scanAlreadyRunning": "Ein Ordnerscan läuft bereits.",
-  "scanFailed": "Scan fehlgeschlagen",
   "loadSeriesFailed": "Diese Reihe konnte nicht geladen werden: {error}",
-  "planRenameFailed": "Die Umbenennung konnte nicht geplant werden: {error}",
-  "nothingToDoCollide": {
-    "one": "Nichts zu tun — {count} Datei würde kollidieren.",
-    "other": "Nichts zu tun — {count} Dateien würden kollidieren."
-  },
-  "filesMatchPattern": "Die Dateien entsprechen bereits dem Muster.",
-  "renameTitle": {
-    "one": "{count} Datei umbenennen?",
-    "other": "{count} Dateien umbenennen?"
-  },
-  "renameMessage": "Die Dateien von „{title}“ werden verschoben/umbenannt, damit sie den Ordner- und Dateimustern entsprechen{collisions}.",
-  "renameCollisions": " ({count} würden kollidieren und werden übersprungen)",
   "renameFiles": "Dateien umbenennen",
-  "renamed": {
-    "one": "{count} Datei umbenannt{skipped}.",
-    "other": "{count} Dateien umbenannt{skipped}."
-  },
-  "renamedSkipped": ", {count} übersprungen",
   "menuOpen": "Öffnen",
   "follow": "Folgen",
   "unfollow": "Nicht mehr folgen",

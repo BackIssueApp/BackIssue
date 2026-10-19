@@ -94,7 +94,7 @@
   "railMaintNote": "Alternativas e trabalhadores",
   "backLibrary": "Biblioteca",
   "librariesTitle": "Bibliotecas",
-  "librariesSub": "Divida a coleção em bibliotecas com nome — cada uma aparece como entrada própria na barra lateral. O <b>tipo</b> de uma biblioteca define como as suas séries se comportam (manga = pesquisa por capítulos, leitura da direita para a esquerda); as suas pastas são onde os quadrinhos são arquivadas e analisadas. Mova séries a partir do menu ⋯ de um volume.",
+  "librariesSub": "Divida a coleção em bibliotecas com nome — cada uma aparece como entrada própria na barra lateral. O <b>tipo</b> de uma biblioteca define como as suas séries se comportam (manga = pesquisa por capítulos, leitura da direita para a esquerda); as suas pastas são onde os quadrinhos são arquivadas e analisadas. Mova séries a partir do menu … de um volume.",
   "libraryName": "Nome da biblioteca",
   "libraryTypeTitle": "Tipo de biblioteca — define como as suas séries se comportam",
   "matureTitle": "Ocultar esta biblioteca (e tudo o que contém) às funções sem a permissão “Ver conteúdo para adultos”",
@@ -145,7 +145,7 @@
   "monitorAll": "Todas as edições",
   "monitorNew": "Só edições novas",
   "monitorOff": "Desligado",
-  "monitorNote": "A política de monitoração que uma série recebe quando entra na biblioteca — adicionada à mão, a partir de Descobrir, Lançamentos, listas de leitura, pedidos ou uma importação. <b>Todas as edições</b> mantém o percurso completo; <b>Só edições novas</b> procura as edições a partir da mais recente e deixa o catálogo antigo como está; <b>Desligado</b> não obtém nada até a monitorar ou escolher edições. Qualquer série pode ser alterada depois no seu menu ⋯.",
+  "monitorNote": "A política de monitoração que uma série recebe quando entra na biblioteca — adicionada à mão, a partir de Descobrir, Lançamentos, listas de leitura, pedidos ou uma importação. <b>Todas as edições</b> mantém o percurso completo; <b>Só edições novas</b> procura as edições a partir da mais recente e deixa o catálogo antigo como está; <b>Desligado</b> não obtém nada até a monitorar ou escolher edições. Qualquer série pode ser alterada depois no seu menu ….",
   "onlyRequested": "Só as edições que foram pedidas",
   "onlyRequestedNote": "Quando uma série é adicionada por causa de edições específicas — uma entrada em uma lista de leitura, um lançamento, uma importação CBL — chega com a monitoração desligada e só essas edições procuradas, por isso só elas são baixadas (agora e se uma captura falhar mais tarde). Adicionar a partir da Biblioteca ou de Descobrir continua recebendo a política acima. Requer \"Baixar ao adicionar\".",
   "downloadFormat": "Formato de download",
@@ -254,5 +254,6 @@
   "libMetaDefault": "Usar a lista padrão",
   "libMetaCustom": "Escolher para esta biblioteca",
   "libMetaNote": "As séries desta biblioteca são buscadas nas fontes marcadas aqui, nesta ordem. Desmarque todas para voltar à lista padrão.",
-  "metaDefaultForLibraries": "Esta lista é a padrão; cada biblioteca pode escolher a sua em Configurações → Biblioteca."
+  "metaDefaultForLibraries": "Esta lista é a padrão; cada biblioteca pode escolher a sua em Configurações → Biblioteca.",
+  "saveNeedsLoad": "As configurações não foram carregadas — tente de novo antes de salvar."
 }

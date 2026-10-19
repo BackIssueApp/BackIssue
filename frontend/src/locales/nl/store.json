@@ -4,5 +4,30 @@
   "downloadFailed": "Download kon niet in de wachtrij: {error}",
   "downloadFailedUnreachable": "Download kon niet in de wachtrij — is de app bereikbaar?",
   "redownloadFailed": "Opnieuw downloaden mislukt: {error}",
-  "redownloadFailedUnreachable": "Opnieuw downloaden mislukt — is de app bereikbaar?"
+  "redownloadFailedUnreachable": "Opnieuw downloaden mislukt — is de app bereikbaar?",
+  "untitledSeries": "Reeks zonder titel",
+  "scanFailed": "Scan mislukt: {error}",
+  "tagFailed": "Taggen mislukt: {error}",
+  "matchFailed": "Koppelen kon niet starten: {error}",
+  "thisSeries": "deze reeks",
+  "planRenameFailed": "Kon het hernoemen niet voorbereiden: {error}",
+  "nothingToDoCollide": {
+    "one": "Niets te doen — {count} bestand zou botsen.",
+    "other": "Niets te doen — {count} bestanden zouden botsen."
+  },
+  "filesMatchPattern": "De bestanden voldoen al aan het patroon.",
+  "renameTitle": {
+    "one": "{count} bestand hernoemen?",
+    "other": "{count} bestanden hernoemen?"
+  },
+  "renameMessage": "De bestanden van \"{title}\" worden verplaatst/hernoemd volgens je map- en bestandspatronen{collisions}.",
+  "renameCollisions": " ({count} zouden botsen en worden overgeslagen)",
+  "renameFiles": "Bestanden hernoemen",
+  "renamed": {
+    "one": "{count} bestand hernoemd{skipped}.",
+    "other": "{count} bestanden hernoemd{skipped}."
+  },
+  "renamedSkipped": ", {count} overgeslagen",
+  "fileAssigned": "Bestand aan het nummer gekoppeld — het blijft daar ook na nieuwe scans.",
+  "choiceOwned": "{label} (in bezit)"
 }

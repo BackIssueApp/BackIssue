@@ -38,7 +38,7 @@
   "chipGaps": "Tutte le lacune",
   "chipGapsTitle": "Ogni albo mancante di ogni serie nella biblioteca, ricercato o no",
   "chipFollowing": "Seguite",
-  "chipFollowingTitle": "Serie che segui (la ☆ nella pagina della serie)",
+  "chipFollowingTitle": "Serie che segui (la stella nella pagina della serie)",
   "chipHideUnreleased": "Nascondi non usciti",
   "chipHideUnreleasedTitle": "Nasconde gli albi la cui data di copertina nota è nel futuro (molti albi in cache non hanno data — nasconde solo ciò che sappiamo)",
   "sortOrder": "Ordinamento",

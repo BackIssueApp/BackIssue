@@ -81,5 +81,8 @@
   "saving": "Zapisywanie…",
   "installedRestarting": "Wtyczki zainstalowane — ponowne uruchamianie BackIssue, aby je włączyć…",
   "allSet": "Gotowe — dodaj serię przyciskiem „+ Dodaj” albo zaimportuj istniejącą bibliotekę z paska bocznego.",
-  "saveFailed": "Nie udało się zapisać konfiguracji — sprawdź, czy aplikacja jest dostępna, i spróbuj ponownie."
+  "saveFailedReason": "Nie udało się zapisać konfiguracji: {error}",
+  "libraryFailed": "biblioteka „{name}”: {error}",
+  "pluginFailed": "wtyczka „{name}”: {error}",
+  "stepsFailed": "Niektóre kroki konfiguracji się nie powiodły — popraw je i zakończ ponownie albo pomiń: {list}"
 }

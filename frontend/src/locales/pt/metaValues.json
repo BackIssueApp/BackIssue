@@ -1,0 +1,29 @@
+{
+  "status": {
+    "ongoing": "Em curso",
+    "completed": "Concluída",
+    "cancelled": "Cancelada",
+    "hiatus": "Em pausa"
+  },
+  "seriesType": {
+    "annualSeries": "Série de anuais",
+    "cancelledSeries": "Série cancelada",
+    "digitalChapters": "Capítulos digitais",
+    "graphicNovel": "Romance gráfico",
+    "hardCover": "Capa dura",
+    "limitedSeries": "Série limitada",
+    "magazine": "Revista",
+    "omnibus": "Omnibus",
+    "oneShot": "Edição única",
+    "tradePaperback": "Encadernado"
+  },
+  "rating": {
+    "unknown": "Desconhecida",
+    "everyone": "Para todos",
+    "teen": "Adolescentes",
+    "teenPlus": "Adolescentes+",
+    "mature": "Maduro",
+    "explicit": "Explícito",
+    "adult": "Adulto"
+  }
+}

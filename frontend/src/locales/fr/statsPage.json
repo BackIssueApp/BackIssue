@@ -1,7 +1,6 @@
 {
   "title": "Statistiques",
   "summary": "{series} séries · {issues} numéros · {size}",
-  "couldNotLoad": "Impossible de charger les statistiques — l'application est-elle lancée ?",
   "complete": "Complètes",
   "youOwn": "Vous possédez <b>{owned}</b> des <b>{total}</b> numéros connus.",
   "incomplete": "Incomplètes",
@@ -17,7 +16,7 @@
   "allValid": "tous valides",
   "biggestGaps": "Plus grandes lacunes",
   "issuesMissing": "numéros manquants",
-  "allComplete": "Toutes les séries associées sont complètes. 🎉",
+  "allComplete": "Toutes les séries associées sont complètes.",
   "formatMix": "Répartition des formats",
   "formatOther": "Autre",
   "metadata": "Métadonnées",

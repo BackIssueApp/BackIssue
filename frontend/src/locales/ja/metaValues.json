@@ -1,0 +1,29 @@
+{
+  "status": {
+    "ongoing": "連載中",
+    "completed": "完結",
+    "cancelled": "打ち切り",
+    "hiatus": "休止中"
+  },
+  "seriesType": {
+    "annualSeries": "年刊シリーズ",
+    "cancelledSeries": "打ち切りシリーズ",
+    "digitalChapters": "デジタル連載",
+    "graphicNovel": "グラフィックノベル",
+    "hardCover": "ハードカバー",
+    "limitedSeries": "リミテッドシリーズ",
+    "magazine": "雑誌",
+    "omnibus": "オムニバス",
+    "oneShot": "読み切り",
+    "tradePaperback": "単行本"
+  },
+  "rating": {
+    "unknown": "不明",
+    "everyone": "全年齢",
+    "teen": "ティーン",
+    "teenPlus": "ティーンプラス",
+    "mature": "成人向け",
+    "explicit": "露骨な表現",
+    "adult": "アダルト"
+  }
+}

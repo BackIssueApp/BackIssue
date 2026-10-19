@@ -5,7 +5,7 @@
   import { goBack } from '../lib/router.svelte.js';
   import { auth, logout, can } from '../lib/auth.svelte.js';
   import { openAccountModal } from './AccountModal.svelte';
-  import { apiGet, apiPost } from '../lib/api.js';
+  import { apiGetOk, apiPost } from '../lib/api.js';
   import { notify } from '../lib/toasts.svelte.js';
   import { confirmDialog } from './DialogModal.svelte';
   import { loadCollection } from '../lib/store.svelte.js';
@@ -36,9 +36,9 @@
   const fmtDate = (s) => (s ? new Date(s).toLocaleDateString(currentLang(), { year: 'numeric', month: 'short', day: 'numeric' }) : '—');
 
   async function load() {
-    try { const r = await apiGet('/api/auth/profile'); profile = r.user; email = profile?.email || ''; hideMature = !!profile?.hide_mature; }
+    try { const r = await apiGetOk('/api/auth/profile'); profile = r.user; email = profile?.email || ''; hideMature = !!profile?.hide_mature; }
     catch { profile = null; }
-    try { apiKey = (await apiGet('/api/auth/apikey')).key; } catch { apiKey = null; }
+    try { apiKey = (await apiGetOk('/api/auth/apikey')).key; } catch { apiKey = null; }
     langChoice = (!auth.openMode && profile?.lang) || storedLanguage() || '';
   }
 

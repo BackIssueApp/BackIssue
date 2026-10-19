@@ -157,7 +157,7 @@
 
 {#if open}
   <div id="featuring-modal" class="modal" onclick={(e) => { if (e.target === e.currentTarget) close(); }}>
-    <div class="modal__panel fx" use:trapFocus role="dialog" aria-label="{kindLabel} {m.name}">
+    <div class="modal__panel fx" use:trapFocus role="dialog" aria-modal="true" aria-label="{kindLabel} {m.name}">
       <div class="fx__head">
         <div class="fx__top">
           <span class="fx__icon fx__icon--{m.kind}"><Icon name={KIND_ICON[m.kind] || 'tag'} size={20} /></span>

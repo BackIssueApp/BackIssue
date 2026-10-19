@@ -1,7 +1,6 @@
 {
   "title": "Statistieken",
   "summary": "{series} reeksen · {issues} nummers · {size}",
-  "couldNotLoad": "Statistieken konden niet worden geladen — draait de app?",
   "complete": "Compleet",
   "youOwn": "Je hebt <b>{owned}</b> van <b>{total}</b> bekende nummers.",
   "incomplete": "Onvolledig",
@@ -17,7 +16,7 @@
   "allValid": "alles in orde",
   "biggestGaps": "Grootste hiaten",
   "issuesMissing": "nummers ontbreken",
-  "allComplete": "Elke gekoppelde reeks is compleet. 🎉",
+  "allComplete": "Elke gekoppelde reeks is compleet.",
   "formatMix": "Formaatverdeling",
   "formatOther": "Overig",
   "metadata": "Metadata",

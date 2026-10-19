@@ -13,23 +13,8 @@
     "other": "已将 {n} 期加入队列。"
   },
   "scanAlreadyRunning": "文件夹扫描已在运行。",
-  "scanFailed": "扫描失败",
   "loadSeriesFailed": "无法加载该系列：{error}",
-  "planRenameFailed": "无法规划重命名：{error}",
-  "nothingToDoCollide": {
-    "other": "无需操作——{count} 个文件会发生冲突。"
-  },
-  "filesMatchPattern": "文件已符合命名规则。",
-  "renameTitle": {
-    "other": "重命名 {count} 个文件？"
-  },
-  "renameMessage": "“{title}”的文件将被移动/重命名，以符合你的文件夹和文件命名规则{collisions}。",
-  "renameCollisions": "（{count} 个会冲突，将被跳过）",
   "renameFiles": "重命名文件",
-  "renamed": {
-    "other": "已重命名 {count} 个文件{skipped}。"
-  },
-  "renamedSkipped": "，跳过 {count} 个",
   "menuOpen": "打开",
   "follow": "关注",
   "unfollow": "取消关注",

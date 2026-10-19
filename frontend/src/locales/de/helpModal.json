@@ -41,7 +41,7 @@
     "s1h": "Worum es geht",
     "s1p": "Was gerade lädt und was wartet. Der aktive Eintrag zeigt einen Fortschrittsbalken mit Geschwindigkeit und Quelle.",
     "s2h": "Steuerung",
-    "s2p": "Warteschlange pausieren/fortsetzen, wartende Einträge entfernen oder fehlgeschlagene wiederholen/entfernen (Bibliotheksrechte). Das × in einer Zeile bricht den Download ab und entfernt ihn aus dem Client.",
+    "s2p": "Warteschlange pausieren/fortsetzen, wartende Einträge entfernen oder fehlgeschlagene wiederholen/entfernen (Bibliotheksrechte). Die Schließen-Schaltfläche in einer Zeile bricht den Download ab und entfernt ihn aus dem Client.",
     "s3h": "Nach einem Neustart",
     "s3p": "Eine Warteschlange, die mitten im Download war, wird beim Start der App automatisch fortgesetzt."
   },

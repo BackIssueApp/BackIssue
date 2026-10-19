@@ -14,26 +14,8 @@
     "other": "{n} nummers in de wachtrij gezet."
   },
   "scanAlreadyRunning": "Er loopt al een mapscan.",
-  "scanFailed": "Scan mislukt",
   "loadSeriesFailed": "Kon die reeks niet laden: {error}",
-  "planRenameFailed": "Kon het hernoemen niet voorbereiden: {error}",
-  "nothingToDoCollide": {
-    "one": "Niets te doen — {count} bestand zou botsen.",
-    "other": "Niets te doen — {count} bestanden zouden botsen."
-  },
-  "filesMatchPattern": "De bestanden voldoen al aan het patroon.",
-  "renameTitle": {
-    "one": "{count} bestand hernoemen?",
-    "other": "{count} bestanden hernoemen?"
-  },
-  "renameMessage": "De bestanden van “{title}” worden verplaatst/hernoemd volgens je map- en bestandspatronen{collisions}.",
-  "renameCollisions": " ({count} zouden botsen en worden overgeslagen)",
   "renameFiles": "Bestanden hernoemen",
-  "renamed": {
-    "one": "{count} bestand hernoemd{skipped}.",
-    "other": "{count} bestanden hernoemd{skipped}."
-  },
-  "renamedSkipped": ", {count} overgeslagen",
   "menuOpen": "Openen",
   "follow": "Volgen",
   "unfollow": "Ontvolgen",

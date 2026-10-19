@@ -13,5 +13,9 @@
   "failed": "O download falhou: {error}",
   "unknownError": "erro desconhecido",
   "sending": "A enviar…",
-  "download": "Download"
+  "download": "Download",
+  "seedersTitle": {
+    "one": "{count} seeder",
+    "other": "{count} seeders"
+  }
 }

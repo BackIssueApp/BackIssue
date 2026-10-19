@@ -1,0 +1,29 @@
+{
+  "status": {
+    "ongoing": "Lopend",
+    "completed": "Afgerond",
+    "cancelled": "Stopgezet",
+    "hiatus": "Gepauzeerd"
+  },
+  "seriesType": {
+    "annualSeries": "Jaarlijkse reeks",
+    "cancelledSeries": "Stopgezette reeks",
+    "digitalChapters": "Digitale hoofdstukken",
+    "graphicNovel": "Graphic novel",
+    "hardCover": "Hardcover",
+    "limitedSeries": "Gelimiteerde reeks",
+    "magazine": "Tijdschrift",
+    "omnibus": "Omnibus",
+    "oneShot": "One-shot",
+    "tradePaperback": "Bundeling"
+  },
+  "rating": {
+    "unknown": "Onbekend",
+    "everyone": "Alle leeftijden",
+    "teen": "Tieners",
+    "teenPlus": "Tieners+",
+    "mature": "Volwassen",
+    "explicit": "Expliciet",
+    "adult": "Alleen volwassenen"
+  }
+}

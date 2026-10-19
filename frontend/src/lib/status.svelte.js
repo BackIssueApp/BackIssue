@@ -1,7 +1,7 @@
 // The /api/status poll: header pills, queue button count, retry/clear-failed
 // visibility, app version — and the trigger that live-updates issue badges
 // while the queue runs.
-import { apiGet } from './api.js';
+import { apiGetOk } from './api.js';
 import { subscribe } from './events.svelte.js';
 import { BackIssue } from './plugins.svelte.js';
 import { detail, loadCollection, reloadDetail, refreshIssueStatuses } from './store.svelte.js';
@@ -11,7 +11,8 @@ export const status = $state({ counts: {}, packsActive: 0, mediaActive: 0, versi
 let wasDownloading = false;
 export async function pollStatus() {
   let s;
-  try { s = await apiGet('/api/status'); } catch { return; }
+  // A failed poll (server restarting, proxy 502) keeps the last good counts.
+  try { s = await apiGetOk('/api/status'); } catch { return; }
   status.counts = s.counts || {};
   status.packsActive = s.packsActive || 0;
   status.mediaActive = s.mediaActive || 0;

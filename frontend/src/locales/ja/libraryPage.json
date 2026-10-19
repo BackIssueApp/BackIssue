@@ -13,23 +13,8 @@
     "other": "{n} 号をキューに追加しました。"
   },
   "scanAlreadyRunning": "フォルダーのスキャンはすでに実行中です。",
-  "scanFailed": "スキャンに失敗しました",
   "loadSeriesFailed": "そのシリーズを読み込めませんでした：{error}",
-  "planRenameFailed": "名前変更の計画を立てられませんでした：{error}",
-  "nothingToDoCollide": {
-    "other": "何もすることはありません。{count} ファイルの名前が衝突します。"
-  },
-  "filesMatchPattern": "ファイルはすでにパターンに一致しています。",
-  "renameTitle": {
-    "other": "{count} ファイルの名前を変更しますか？"
-  },
-  "renameMessage": "「{title}」のファイルを、フォルダーとファイル名のパターンに合わせて移動・名前変更します{collisions}。",
-  "renameCollisions": "（{count} 件は名前が衝突するためスキップします）",
   "renameFiles": "ファイル名を変更",
-  "renamed": {
-    "other": "{count} ファイルの名前を変更しました{skipped}。"
-  },
-  "renamedSkipped": "（{count} 件スキップ）",
   "menuOpen": "開く",
   "follow": "フォロー",
   "unfollow": "フォロー解除",

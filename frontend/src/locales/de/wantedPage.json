@@ -38,7 +38,7 @@
   "chipGaps": "Alle Lücken",
   "chipGapsTitle": "Jedes fehlende Heft jeder Reihe in der Bibliothek, gesucht oder nicht",
   "chipFollowing": "Verfolgt",
-  "chipFollowingTitle": "Reihen, denen du folgst (der ☆ auf einer Reihenseite)",
+  "chipFollowingTitle": "Reihen, denen du folgst (der Stern auf einer Reihenseite)",
   "chipHideUnreleased": "Unveröffentlichte ausblenden",
   "chipHideUnreleasedTitle": "Blendet Hefte aus, deren bekanntes Cover-Datum in der Zukunft liegt (die meisten zwischengespeicherten Hefte haben kein Datum – nur Bekanntes wird ausgeblendet)",
   "sortOrder": "Sortierung",

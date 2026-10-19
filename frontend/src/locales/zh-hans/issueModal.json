@@ -25,7 +25,6 @@
   "characters": "角色",
   "teams": "团队",
   "variantFallback": "变体封面",
-  "choiceOwned": "{label}（已拥有）",
   "fileMoved": "文件已移到该期——重新扫描时会保留此分配。",
   "assignmentCleared": "分配已清除——文件重新按期号关联。",
   "savedFields": {

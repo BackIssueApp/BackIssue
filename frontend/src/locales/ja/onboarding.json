@@ -75,5 +75,8 @@
   "saving": "保存中…",
   "installedRestarting": "プラグインをインストールしました。有効にするため BackIssue を再起動しています…",
   "allSet": "セットアップが完了しました。「＋ 追加」でシリーズを追加するか、サイドバーから既存のライブラリをインポートしてください。",
-  "saveFailed": "セットアップを保存できませんでした。アプリに接続できるか確認して、もう一度お試しください。"
+  "saveFailedReason": "セットアップを保存できませんでした：{error}",
+  "libraryFailed": "ライブラリ「{name}」：{error}",
+  "pluginFailed": "プラグイン「{name}」：{error}",
+  "stepsFailed": "一部のセットアップ手順に失敗しました。修正してもう一度完了するか、スキップしてください：{list}"
 }

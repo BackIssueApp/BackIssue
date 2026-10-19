@@ -1,7 +1,6 @@
 {
   "title": "Statistiche",
   "summary": "{series} serie · {issues} albi · {size}",
-  "couldNotLoad": "Impossibile caricare le statistiche — l'app è in esecuzione?",
   "complete": "Complete",
   "youOwn": "Possiedi <b>{owned}</b> di <b>{total}</b> albi conosciuti.",
   "incomplete": "Incomplete",
@@ -17,7 +16,7 @@
   "allValid": "tutti validi",
   "biggestGaps": "Lacune maggiori",
   "issuesMissing": "albi mancanti",
-  "allComplete": "Ogni serie abbinata è completa. 🎉",
+  "allComplete": "Ogni serie abbinata è completa.",
   "formatMix": "Formati",
   "formatOther": "Altro",
   "metadata": "Metadati",

@@ -2,7 +2,8 @@
   // The download queue as a FULL PAGE (was a slim drawer): stat strip, state
   // filters, and per-row failure reasons — same /api/queue data, same actions.
   import { navigate } from '../lib/router.svelte.js';
-  import { apiGet, apiPost } from '../lib/api.js';
+  import { apiGetOk, apiPost, errorText } from '../lib/api.js';
+  import LoadError from './LoadError.svelte';
   import { subscribe } from '../lib/events.svelte.js';
   import { status } from '../lib/status.svelte.js';
   import { detail, refreshIssueStatuses } from '../lib/store.svelte.js';
@@ -18,10 +19,12 @@
   let { active = false } = $props();
 
   let q = $state(null);
+  let loadError = $state('');
   let filter = $state('all'); // all | active | queued | failed
 
+  // A failed poll keeps the last good queue (and says so) — never an empty one.
   async function renderQueue() {
-    try { q = await apiGet('/api/queue'); } catch { /* keep last */ }
+    try { q = await apiGetOk('/api/queue'); loadError = ''; } catch (e) { loadError = errorText(e); }
   }
 
   $effect(() => {
@@ -107,8 +110,12 @@
 
   /* ---- Actions (same endpoints + gates as the old drawer) ---- */
   async function togglePause() {
-    const cur = await apiGet('/api/queue');
-    await apiPost(cur.paused ? '/api/queue/resume' : '/api/queue/pause');
+    let r;
+    try {
+      const cur = await apiGetOk('/api/queue');
+      r = await apiPost(cur.paused ? '/api/queue/resume' : '/api/queue/pause');
+    } catch (e) { r = { error: errorText(e) }; }
+    if (r?.error) notify(r.error, 'error');
     renderQueue();
   }
   async function clearQueued() {
@@ -222,6 +229,9 @@
     <!-- Scrolling list -->
     <div class="qx__scroll">
       <div class="qx__list">
+        {#if loadError}
+          <LoadError compact={!!q} error={loadError} onretry={renderQueue} />
+        {/if}
         {#if q && !visibleItems.length && !visiblePacks.length && !visibleMedia.length}
           <div class="qx__empty">
             <span class="qx__emptychip"><Icon name="download" size={20} /></span>

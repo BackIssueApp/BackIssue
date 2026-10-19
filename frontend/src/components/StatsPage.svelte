@@ -1,19 +1,22 @@
 <script>
   import Icon from '../lib/Icon.svelte';
   import { goBack, navigate } from '../lib/router.svelte.js';
-  import { apiGet } from '../lib/api.js';
+  import { apiGetOk, errorText, ApiError } from '../lib/api.js';
+  import LoadError from './LoadError.svelte';
   import { fmt, humanBytes, spct } from '../lib/util.js';
   import { t, th } from '../lib/i18n.svelte.js';
 
   let { active = false } = $props();
 
   let s = $state(null);
-  let failed = $state(false);
+  let failed = $state(''); // why the last load failed; the last good stats stay up
 
   async function renderStats() {
-    failed = false;
-    try { s = await apiGet('/api/stats'); }
-    catch { failed = true; }
+    try {
+      const r = await apiGetOk('/api/stats');
+      if (!r?.files || !r?.collection) throw new ApiError(t('errors.badResponse'));
+      s = r; failed = '';
+    } catch (e) { failed = errorText(e); }
   }
 
   $effect(() => { if (active) renderStats(); });
@@ -53,12 +56,13 @@
   </div>
 
   <div class="statx__scroll" id="stats-body">
-    {#if failed}
-      <div class="statx__note">{t('statsPage.couldNotLoad')}</div>
+    {#if failed && !s}
+      <LoadError error={failed} onretry={renderStats} />
     {:else if !s}
       <div class="statx__note">{t('common.loading')}</div>
     {:else}
       <div class="statx__inner">
+        {#if failed}<LoadError compact error={failed} onretry={renderStats} />{/if}
 
         <!-- HERO: completion ring + KPI tiles -->
         <div class="statx__hero">

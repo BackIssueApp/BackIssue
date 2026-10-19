@@ -14,26 +14,8 @@
     "other": "{n} numéros mis en file d'attente."
   },
   "scanAlreadyRunning": "Une analyse de dossier est déjà en cours.",
-  "scanFailed": "Échec de l'analyse",
   "loadSeriesFailed": "Impossible de charger cette série : {error}",
-  "planRenameFailed": "Impossible de préparer le renommage : {error}",
-  "nothingToDoCollide": {
-    "one": "Rien à faire — {count} fichier entrerait en conflit.",
-    "other": "Rien à faire — {count} fichiers entreraient en conflit."
-  },
-  "filesMatchPattern": "Les fichiers respectent déjà le modèle.",
-  "renameTitle": {
-    "one": "Renommer {count} fichier ?",
-    "other": "Renommer {count} fichiers ?"
-  },
-  "renameMessage": "Les fichiers de « {title} » sont déplacés/renommés selon vos modèles de dossier et de fichier{collisions}.",
-  "renameCollisions": " ({count} entreraient en conflit et sont ignorés)",
   "renameFiles": "Renommer les fichiers",
-  "renamed": {
-    "one": "{count} fichier renommé{skipped}.",
-    "other": "{count} fichiers renommés{skipped}."
-  },
-  "renamedSkipped": ", {count} ignoré(s)",
   "menuOpen": "Ouvrir",
   "follow": "Suivre",
   "unfollow": "Ne plus suivre",

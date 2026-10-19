@@ -109,5 +109,11 @@
   "nothingMatches": "Nada corresponde a “{query}”.",
   "copied": "copiado",
   "copyLine": "Copiar linha",
-  "logsCleared": "Registros limpos."
+  "logsCleared": "Registros limpos.",
+  "logLevel": {
+    "error": "erro",
+    "warn": "aviso",
+    "info": "info",
+    "debug": "depuração"
+  }
 }

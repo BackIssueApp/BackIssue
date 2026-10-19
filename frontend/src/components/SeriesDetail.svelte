@@ -1,12 +1,13 @@
 <script>
   import { goBack, navigate } from '../lib/router.svelte.js';
-  import { detail, detailSelected, flags, ops, loadCollection, reloadDetail, clearDetail, issueState, downloadCvIssues, redownloadCvIssues, redownloadIssues, watchDetailSweep, refreshIssueStatuses } from '../lib/store.svelte.js';
+  import { detail, detailSelected, flags, ops, loadCollection, reloadDetail, clearDetail, issueState, downloadCvIssues, redownloadCvIssues, redownloadIssues, watchDetailSweep, refreshIssueStatuses, startOp, refileSeries, assignFileToIssue, issueChoice, seriesTitle } from '../lib/store.svelte.js';
   import { plugins, issueActions, seriesActions, issueActionsTick, issueCoverUrl, seriesViews, renderSeriesView } from '../lib/plugins.svelte.js';
   import { contextMenu, openContextMenu } from './ContextMenu.svelte';
   import { isTrusted, can } from '../lib/auth.svelte.js';
   import { apiGet, apiPost } from '../lib/api.js';
   import { notify } from '../lib/toasts.svelte.js';
-  import { fmt, humanBytes, issueMatchesFilter, windowRange, fmtDay } from '../lib/util.js';
+  import { fmt, humanBytes, issueMatchesFilter, windowRange, fmtDay, measureGrid, safeUrl } from '../lib/util.js';
+  import { metaValue } from '../lib/metaValues.js';
 
   // List-view file columns come from the issue's best readable copy.
   const bestFile = (i) => (i.files || []).find((f) => f.valid) || null;
@@ -33,16 +34,10 @@
   async function assignFile(f) {
     const cvIssueId = Number(assignPick[f.path]);
     if (!cvIssueId) return;
-    const r = await apiPost(`/api/collection/${s.id}/assign-file`, { path: f.path, cvIssueId }).catch((e) => ({ error: String(e) }));
-    if (r?.error) return notify(r.error, 'error');
-    notify(t('seriesDetail.fileAssigned'), 'ok');
+    if (!(await assignFileToIssue(s.id, f.path, cvIssueId))) return;
     delete assignPick[f.path];
     reloadDetail();
   }
-  const issueChoice = (i) => {
-    const label = `#${i.number}${i.title && i.title !== '#' + i.number ? ' · ' + i.title : ''}`;
-    return i.owned ? t('seriesDetail.choiceOwned', { label }) : label;
-  };
   // Unlinked files whose number is beyond anything this volume has: the
   // strongest sign the series is matched to the WRONG ComicVine volume.
   const unlinkedBeyond = $derived.by(() => {
@@ -87,31 +82,13 @@
     return () => host.replaceChildren();
   });
 
-  // Rename this series' files to the configured folder/file pattern. Dry-runs
-  // first to show the count, then executes on confirm.
+  // Rename this series' files to the configured folder/file pattern
+  // (dry-run, confirm, execute — shared with the Library's card menu).
   let refileBusy = $state(false);
   async function refileFiles() {
-    const sid = detail.series?.id, title = detail.series?.title || t('seriesDetail.thisSeries');
+    const sid = detail.series?.id;
     if (!sid) return;
-    let plan;
-    try { plan = (await apiPost(`/api/collection/${sid}/refile`, { dryRun: true })).plan || []; }
-    catch (e) { return notify(t('seriesDetail.planRenameFailed', { error: e?.message || e }), 'error'); }
-    const moves = plan.filter((p) => p.status === 'move').length;
-    const collisions = plan.filter((p) => p.status === 'skip:collision').length;
-    if (!moves) return notify(collisions ? t('seriesDetail.nothingToDoCollide', { count: collisions }) : t('seriesDetail.filesMatchPattern'), 'info');
-    if (!(await confirmDialog({
-      title: t('seriesDetail.renameTitle', { count: moves }),
-      message: t('seriesDetail.renameMessage', { title, collisions: collisions ? t('seriesDetail.renameCollisions', { count: collisions }) : '' }),
-      confirmLabel: t('seriesDetail.renameFiles'),
-    }))) return;
-    refileBusy = true;
-    let r;
-    try { r = await apiPost(`/api/collection/${sid}/refile`, {}); }
-    catch (e) { r = { error: String(e?.message || e) }; }
-    refileBusy = false;
-    if (r.error) return notify(r.error, 'error');
-    notify(t('seriesDetail.renamed', { count: r.moved, skipped: r.skipped ? t('seriesDetail.renamedSkipped', { count: r.skipped }) : '' }), 'ok');
-    reloadDetail();
+    if (await refileSeries(sid, seriesTitle(detail.series), confirmDialog, (b) => { refileBusy = b; })) reloadDetail();
   }
   const isUnmatched = $derived(!!det && det.source === 'unmatched');
   const issues = $derived(hasIssues ? det.issues : []);
@@ -152,7 +129,7 @@
   /* ---- Issue filter + find + view ---- */
   let currentFilter = $state('all');
   let findText = $state('');
-  // Cover grid ⊞ / dense list ≣ — a device preference.
+  // Cover grid / dense list — a device preference.
   let issueView = $state(localStorage.getItem('issueView') || 'grid');
   function setIssueView(v) { issueView = v; localStorage.setItem('issueView', v); }
   const gridMode = $derived(issueView === 'grid');
@@ -218,18 +195,8 @@
   }
   function measure() {
     if (scroller) viewH = scroller.clientHeight || viewH;
-    const items = listEl?.querySelectorAll(gridMode ? '.icard' : '.issue');
-    if (items && items.length >= 2) {
-      // Columns = how many items share the first item's top; row stride = the
-      // vertical gap to the first item on the next row.
-      const top0 = items[0].offsetTop;
-      let c = 1;
-      while (c < items.length && items[c].offsetTop === top0) c++;
-      cols = Math.max(1, c);
-      const next = items[c] || items[1];
-      const d = next.offsetTop - top0;
-      if (d > 10) stride = d;
-    }
+    const m = measureGrid(listEl?.querySelectorAll(gridMode ? '.icard' : '.issue'));
+    if (m) { cols = m.cols; if (m.stride) stride = m.stride; }
   }
   $effect(() => { void visibleIssues; void listEl; void gridMode; measure(); });
   // Columns/row-height change with viewport width — re-measure on resize.
@@ -497,7 +464,7 @@
 
   async function deleteSeries() {
     if (!s) return;
-    const name = s.title || t('seriesDetail.thisSeries');
+    const name = seriesTitle(s) || t('seriesDetail.thisSeries');
     // Keeping files is the safe default; deleting them is its own explicit button.
     const choice = await choiceDialog({
       title: t('seriesDetail.removeTitle', { name }),
@@ -552,11 +519,9 @@
   const scanBusy = $derived(!!ops.scan.running);
   const scanMine = $derived(!!ops.scan.running && s && Number(ops.scan.seriesId) === s.id);
   const scanText = $derived(scanMine ? t('seriesDetail.scanning', { progress: fmt(ops.scan.done || 0) + (ops.scan.total ? '/' + fmt(ops.scan.total) : '') }) : t('seriesDetail.scanningElsewhere'));
-  async function scanFolder() {
-    if (!s || ops.scan.running) return;
-    ops.scan = { running: true, seriesId: s.id, done: 0, total: 0 }; // optimistic until the next SSE tick
-    try { await apiPost('/api/collection/' + s.id + '/scan'); }
-    catch { notify(t('seriesDetail.scanFailed'), 'error'); ops.scan = { running: false }; }
+  function scanFolder() {
+    if (!s) return;
+    startOp('scan', '/api/collection/' + s.id + '/scan', undefined, { seriesId: s.id, failKey: 'store.scanFailed' });
   }
   // When the op for the OPEN series finishes, refresh + surface errors.
   let sawScan = false;
@@ -574,13 +539,11 @@
   const tagBusy = $derived(!!ops.tag.running);
   const tagMine = $derived(!!ops.tag.running && s && Number(ops.tag.seriesId) === s.id);
   const tagText = $derived(tagMine ? t('seriesDetail.tagging', { progress: fmt(ops.tag.done || 0) + '/' + fmt(ops.tag.total || 0) }) : t('seriesDetail.taggingElsewhere'));
-  async function tagFiles() {
-    if (!s || ops.tag.running) return;
-    ops.tag = { running: true, seriesId: s.id, done: 0, total: 0 };
+  function tagFiles() {
+    if (!s) return;
     // When some issues are untagged, tag ONLY those; when all are tagged, the
     // button re-tags everything (a deliberate refresh).
-    try { await apiPost('/api/collection/' + s.id + '/tag', { onlyUntagged: untaggedOwned > 0 }); }
-    catch { notify(t('seriesDetail.taggingFailed'), 'error'); ops.tag = { running: false }; }
+    startOp('tag', '/api/collection/' + s.id + '/tag', { onlyUntagged: untaggedOwned > 0 }, { seriesId: s.id, failKey: 'store.tagFailed' });
   }
   let sawTag = false;
   $effect(() => {
@@ -626,9 +589,10 @@
     : (det.issues || []).reduce((n, i) => n + ((i.files && i.files.length) || 0), 0)
       + (isCv ? (det.unlinkedFiles || []).length : ((det.files && det.files.length) || 0)));
 
-  const cvUrl = $derived(det?.cv
-    ? (det.cv.site_detail_url || ((det.cv.meta_source || 'comicvine') === 'comicvine' ? 'https://comicvine.gamespot.com/volume/4050-' + (det.cv.meta_ref || det.cv.comicvine_id) + '/' : null))
-    : '');
+  // The record's page at its metadata source. Only for those who manage
+  // settings (where sources are named anyway); for everyone else the series
+  // is simply BackIssue's, so the chip is plain text.
+  const cvUrl = $derived(det?.cv && can('settings.manage') ? safeUrl(det.cv.site_detail_url) : '');
 
   const corruptReason = (i) => (i.files || []).map((f) => f.error).find(Boolean);
 </script>
@@ -658,9 +622,9 @@
     <div id="detail-body">
       <button id="detail-back" class="btn btn--ghost detail-back" onclick={goBack}><Icon name="arrow-left" /> {t('common.library')}</button>
       <header class="series-header">
-        <Cover coverUrl={s.cover_url} title={s.title} />
+        <Cover coverUrl={s.cover_url} title={seriesTitle(s)} />
         <div class="series-meta">
-          <h2 id="series-title">{s.title}</h2>
+          <h2 id="series-title">{seriesTitle(s)}</h2>
           <div class="series-tags">
             <span class="tag" id="series-pub">{s.publisher || t('seriesDetail.unknownPublisher')}{det?.cv?.metron_imprint ? ` · ${det.cv.metron_imprint}` : ''}</span>
             <span class="tag tag--mono" id="series-issuecount">{issueCountLabel}</span>
@@ -673,7 +637,7 @@
               </span>
             {/if}
             {#if det?.cv?.metron_series_type && !/single issue|ongoing/i.test(det.cv.metron_series_type)}
-              <span class="tag" title={t('seriesDetail.seriesTypeTitle')}>{det.cv.metron_series_type}</span>
+              <span class="tag" title={t('seriesDetail.seriesTypeTitle')}>{metaValue('seriesType', det.cv.metron_series_type)}</span>
             {/if}
             {#if det?.cv?.metron_genres?.length}
               <span class="tag" title={t('seriesDetail.genresTitle')}>{det.cv.metron_genres.slice(0, 3).join(' · ')}</span>
@@ -681,14 +645,19 @@
           </div>
           <div class="series-cv" id="series-cv">
             {#if det?.cv}
-              <a class="cv-chip" href={cvUrl} target="_blank" rel="noreferrer" title={t('seriesDetail.openSourcePage')}><Icon name="diamond" /> {det.cv.name || t('seriesDetail.sourcePage')}
-                {#if det.cv.start_year}<span class="cv-year">({det.cv.start_year}{det.cv.metron_year_end && det.cv.metron_year_end !== det.cv.start_year ? `–${det.cv.metron_year_end}` : ''})</span>{/if} {#if cvUrl}<Icon name="external-link" />{/if}</a>
+              {#snippet chipBody()}<Icon name="diamond" /> {det.cv.name || t('seriesDetail.sourcePage')}
+                {#if det.cv.start_year}<span class="cv-year">({det.cv.start_year}{det.cv.metron_year_end && det.cv.metron_year_end !== det.cv.start_year ? `–${det.cv.metron_year_end}` : ''})</span>{/if}{/snippet}
+              {#if cvUrl}
+                <a class="cv-chip" href={cvUrl} target="_blank" rel="noreferrer" title={t('seriesDetail.openSourcePage')}>{@render chipBody()} <Icon name="external-link" /></a>
+              {:else}
+                <span class="cv-chip">{@render chipBody()}</span>
+              {/if}
               <span class="cv-total">{t('seriesDetail.issuesKnown', { n: fmt(det.cv.count_of_issues || det.cv.issue_count || 0) })}{det.series?.cv_locked ? t('seriesDetail.pinned') : ''}</span>
               {#if det.cv.metron_status && det.cv.metron_status !== 'Ongoing'}
-                <span class="tag" title={t('seriesDetail.pubStatusTitle')}>{det.cv.metron_status}</span>
+                <span class="tag" title={t('seriesDetail.pubStatusTitle')}>{metaValue('status', det.cv.metron_status)}</span>
               {/if}
               {#if det.cv.metron_rating}
-                <span class="tag" class:tag--warn={['Mature','Explicit','Adult'].includes(det.cv.metron_rating)} title={t('seriesDetail.ratingTitle')}>{det.cv.metron_rating}</span>
+                <span class="tag" class:tag--warn={['Mature','Explicit','Adult'].includes(det.cv.metron_rating)} title={t('seriesDetail.ratingTitle')}>{metaValue('rating', det.cv.metron_rating)}</span>
               {/if}
             {:else if det && det.source === 'unmatched'}
               <span class="cv-none">{t('seriesDetail.noMatch')}</span>
@@ -765,7 +734,7 @@
             {#if !isUnmatched && (isTrusted() || can('downloads.grab'))}
               <div class="series-more">
                 <button id="series-more-btn" class="btn btn--ghost" aria-label={t('seriesDetail.moreActions')} aria-haspopup="menu" aria-expanded={moreOpen}
-                  onclick={(e) => { e.stopPropagation(); moreOpen = !moreOpen; }}>⋯</button>
+                  onclick={(e) => { e.stopPropagation(); moreOpen = !moreOpen; }}><Icon name="more-horizontal" /></button>
                 {#if moreOpen}
                   <div class="series-more__menu" role="menu">
                     {#if !isLocal && can('library.manage')}
@@ -918,6 +887,7 @@
                     {#if cover}<img loading="lazy" alt="" referrerpolicy="no-referrer" src={cover}
                       onerror={(e) => e.currentTarget.remove()} />{/if}
                     <input class="icard__check" type="checkbox" checked={detailSelected.has(i.cv_issue_id)}
+                      aria-label={t('seriesDetail.selectIssue', { number: i.number ?? '' })}
                       onclick={(e) => { e.stopPropagation(); toggleIssue(i, range.start + vi, e.shiftKey); }} />
                     <span class="icard__state icard__state--{state}" title={state}></span>
                     <button class="icard__more" title={t('seriesDetail.actions')} aria-label={t('seriesDetail.actionsForIssue', { number: i.number ?? '' })}
@@ -967,6 +937,7 @@
                 onkeydown={(e) => { if (e.key === 'Enter') toggleIssue(i, range.start + vi, e.shiftKey); }}>
                 <input type="checkbox" value={i.cv_issue_id}
                   checked={detailSelected.has(i.cv_issue_id)}
+                  aria-label={t('seriesDetail.selectIssue', { number: i.number ?? '' })}
                   onclick={(e) => e.stopPropagation()}
                   onchange={() => toggleIssue(i, range.start + vi)} />
                 <span class="issue__num">{i.number || '—'}</span>
@@ -1053,7 +1024,7 @@
   .sx-comp__seg--dl { background: var(--cyan); }
   .sx-comp__legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 9px; font-size: 11.5px; }
   .sx-comp__leg { display: inline-flex; align-items: center; gap: 6px; }
-  .sx-comp__leg::before { content: '●'; font-size: 9px; }
+  .sx-comp__leg::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
   .sx-comp__leg--saved { color: var(--green); }
   .sx-comp__leg--dl { color: var(--cyan); }
   .sx-comp__leg--miss { color: var(--amber); }
@@ -1061,7 +1032,7 @@
   .sx-comp__leg--untagged { color: var(--muted); }
   .sx-comp__leg--wanted { color: var(--accent); }
 
-  /* Monitoring policy tag in the header + the ⋯ menu section. */
+  /* Monitoring policy tag in the header + the overflow menu section. */
   .mon-tag { display: inline-flex; align-items: center; gap: 5px; }
   .mon-tag--all { color: var(--green); }
   .mon-tag--new { color: var(--cyan); }

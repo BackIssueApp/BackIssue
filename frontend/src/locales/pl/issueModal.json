@@ -25,7 +25,6 @@
   "characters": "Postacie",
   "teams": "Drużyny",
   "variantFallback": "wariant",
-  "choiceOwned": "{label} (posiadany)",
   "fileMoved": "Plik przeniesiono do tego zeszytu — przypisanie zostanie zapamiętane przy kolejnych skanowaniach.",
   "assignmentCleared": "Przypisanie usunięte — plik znów wiąże się po numerze.",
   "savedFields": {

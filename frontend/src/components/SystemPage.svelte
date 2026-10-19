@@ -7,14 +7,15 @@
   // plugins inject into is never torn down.
   import { untrack } from 'svelte';
   import { route, setQuery } from '../lib/router.svelte.js';
-  import { apiGet, apiPost } from '../lib/api.js';
+  import { apiGetOk, apiPost, errorText } from '../lib/api.js';
   import { subscribe } from '../lib/events.svelte.js';
   import { notify } from '../lib/toasts.svelte.js';
   import { confirmDialog } from './DialogModal.svelte';
   import { can } from '../lib/auth.svelte.js';
-  import { fmt, fmtAgo, fmtIn, escapeHtml } from '../lib/util.js';
-  import { t, th, currentLang, st as serverText } from '../lib/i18n.svelte.js';
+  import { fmt, fmtAgo, fmtIn, highlightHtml } from '../lib/util.js';
+  import { t, th, hasMessage, currentLang, st as serverText } from '../lib/i18n.svelte.js';
   import Icon from '../lib/Icon.svelte';
+  import LoadError from './LoadError.svelte';
 
   let { active = false } = $props();
 
@@ -57,11 +58,18 @@
   let scheds = $state([]);
   let now = $state(Date.now());
   let jobsLoaded = $state(false);
+  let jobsError = $state('');
 
-  async function renderJobs() { try { jobs = await apiGet('/api/jobs'); jobsLoaded = true; } catch { /* keep last */ } }
+  // A failed poll (server restarting, proxy 502) keeps the last good list.
+  async function renderJobs() {
+    try {
+      const r = await apiGetOk('/api/jobs');
+      if (Array.isArray(r)) { jobs = r; jobsLoaded = true; jobsError = ''; }
+    } catch (e) { jobsError = errorText(e); }
+  }
   async function renderSchedules() {
     if (document.activeElement?.classList?.contains('sched__cron')) return; // don't yank the input mid-type
-    try { scheds = await apiGet('/api/schedules'); } catch { /* keep last */ }
+    try { const r = await apiGetOk('/api/schedules'); if (Array.isArray(r)) scheds = r; } catch { /* keep last */ }
   }
   $effect(() => {
     if (!active || page !== 'jobs' || !canJobs) return;
@@ -105,12 +113,12 @@
   let ghostsRemove = $state(false);      // unticked = preview only
   let dupesRemove = $state(false);       // extra good copies: unticked = preview only
 
-  async function renderTools() { try { st = await apiGet('/api/tools'); } catch { /* keep last */ } }
+  async function renderTools() { try { st = await apiGetOk('/api/tools'); } catch { /* keep last */ } }
   $effect(() => {
     if (!active || page !== 'tools' || !canJobs) return;
     renderTools();
     (async () => { // pick up a reorganize already running from before we arrived
-      try { const s = await apiGet('/api/library/refile-status'); if (s?.running) { refileStatus = s; refileBusy = true; startRefilePoll(); } } catch { /* fine */ }
+      try { const s = await apiGetOk('/api/library/refile-status'); if (s?.running) { refileStatus = s; refileBusy = true; startRefilePoll(); } } catch { /* fine */ }
     })();
     return subscribe('tools', renderTools, 1200);
   });
@@ -145,8 +153,8 @@
   let refileBusy = $state(false);
   async function previewRefile() {
     refileBusy = true;
-    try { refilePlan = await apiGet('/api/library/refile-plan'); }
-    catch (e) { notify(t('systemPage.previewFailed', { error: e?.message || e }), 'error'); }
+    try { refilePlan = await apiGetOk('/api/library/refile-plan'); }
+    catch (e) { notify(t('systemPage.previewFailed', { error: errorText(e) }), 'error'); }
     refileBusy = false;
   }
   let refileStatus = $state(null);
@@ -155,7 +163,7 @@
   function startRefilePoll() {
     stopRefilePoll();
     refilePoll = setInterval(async () => {
-      try { refileStatus = await apiGet('/api/library/refile-status'); } catch { return; }
+      try { refileStatus = await apiGetOk('/api/library/refile-status'); } catch { return; }
       if (!refileStatus?.running) {
         stopRefilePoll();
         refileBusy = false;
@@ -200,6 +208,9 @@
   let filter = $state('all');
   let category = $state('all');
   let logData = $state(null);
+  let logsError = $state('');
+  // A log line's level in the reader's language (unknown levels as sent).
+  const levelName = (l) => (hasMessage('systemPage.logLevel.' + l) ? t('systemPage.logLevel.' + l) : l);
   let findText = $state('');
   let tail_ = $state(true); // live-tail on by default
   let expanded = $state({});
@@ -214,7 +225,8 @@
   });
 
   async function renderLogs() {
-    try { logData = await apiGet(`/api/logs?level=${filter}&category=${encodeURIComponent(category)}`); } catch { /* keep last */ }
+    try { logData = await apiGetOk(`/api/logs?level=${filter}&category=${encodeURIComponent(category)}`); logsError = ''; }
+    catch (e) { logsError = errorText(e); } // keep the last good page
     // Live tail: hold to newest when on; when off, leave the scroll where it is.
     if (tail_ && logScrollEl) untrack(() => setTimeout(() => { if (logScrollEl) logScrollEl.scrollTop = logScrollEl.scrollHeight; }, 0));
   }
@@ -235,12 +247,7 @@
   const LEVELS = $derived([['all', t('systemPage.levelAll'), ''], ['error', t('systemPage.levelErrors'), 'var(--red)'], ['warn', t('systemPage.levelWarnings'), 'var(--amber)'], ['info', t('systemPage.levelInfo'), 'var(--cyan)']]);
   const levelCount = (id) => id === 'all' ? (logData?.logs?.length || 0) : (counts[id] || 0);
 
-  function highlight(text, q) {
-    const safe = escapeHtml(text);
-    if (!q) return safe;
-    const rx = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig');
-    return safe.replace(rx, '<mark class="sysx-mark">$1</mark>');
-  }
+  const highlight = (text, q) => highlightHtml(text, q, 'sysx-mark');
   const toggleRow = (id) => { expanded = { ...expanded, [id]: !expanded[id] }; };
   function copyRow(id, text) {
     try { navigator.clipboard?.writeText(text); } catch { /* clipboard may be blocked */ }
@@ -357,6 +364,9 @@
         </div>
 
         <div class="sysx__h sysx__h--gap">{t('systemPage.recentRuns')} <span class="sysx__h-count">{jobs.length ? t('systemPage.nShown', { count: fmt(jobs.length) }) : ''}</span></div>
+        {#if jobsError}
+          <LoadError compact={jobsLoaded} error={jobsError} onretry={renderJobs} />
+        {/if}
         {#if jobsLoaded && !jobs.length}
           <div class="sysx__empty-line">{t('systemPage.noJobs')}</div>
         {/if}
@@ -538,7 +548,10 @@
         <button class="sysx__iconbtn" title={t('systemPage.downloadLogs')} onclick={exportLogs}><Icon name="download" size={14} /></button>
       </div>
       <div class="sysx__logscroll" bind:this={logScrollEl}>
-        {#if logData && !logData.logs.length}
+        {#if logsError}
+          <LoadError compact={!!logData} error={logsError} onretry={renderLogs} />
+        {/if}
+        {#if logData && !logData.logs?.length}
           <div class="sysx__log-empty">{t('systemPage.nothingLogged')}</div>
         {:else if logData && !shownLogs.length}
           <div class="sysx__log-empty">{t('systemPage.nothingMatches', { query: findText })}</div>
@@ -554,7 +567,7 @@
           <div class="sysx__logrow sysx__logrow--{e.level}" class:has-detail={!!e.detail} onclick={() => { if (e.detail) toggleRow(lid); }} role={e.detail ? 'button' : undefined} tabindex={e.detail ? 0 : undefined} onkeydown={(ev) => { if (e.detail && ev.key === 'Enter') toggleRow(lid); }}>
             {#if e.detail}<span class="sysx__chev" class:is-open={exp}><Icon name="chevron-right" size={13} /></span>{:else}<span class="sysx__chev-sp"></span>{/if}
             <span class="sysx__logtime">{new Date(e.ts).toLocaleTimeString(currentLang())}</span>
-            <span class="sysx__loglevel">{e.level}</span>
+            <span class="sysx__loglevel">{levelName(e.level)}</span>
             {#if e.category}<span class="sysx__logcat">{e.category}</span>{/if}
             <span class="sysx__logmsg">{@html highlight(e.message, findText.trim().toLowerCase())}</span>
             {#if copiedId === lid}<span class="sysx__copied">{t('systemPage.copied')}</span>{/if}

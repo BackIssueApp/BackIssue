@@ -1,7 +1,8 @@
 <script>
   import { untrack, tick } from 'svelte';
   import { goBack, navigate, route } from '../lib/router.svelte.js';
-  import { apiGet, apiPost, apiDelete } from '../lib/api.js';
+  import { apiGet, apiPost, apiDelete, apiGetOk, errorText, ApiError } from '../lib/api.js';
+  import LoadError from './LoadError.svelte';
   import { flags } from '../lib/store.svelte.js';
   import { BackIssue, plugins, bridgeRefs } from '../lib/plugins.svelte.js';
   import { parseIndexerString, serializeIndexers } from '../lib/util.js';
@@ -347,9 +348,23 @@
     }
   }
 
+  // Save stays off until the form has been filled from a good load: saving a
+  // form that never loaded would send blanks over the real values (indexers,
+  // metadata sources, every field). The sources and providers lists count
+  // too — the form is built from them.
+  let settingsLoaded = $state(false);
+  let settingsError = $state('');
   async function openSettings() {
-    const [s, srcInfo, prov] = await Promise.all([apiGet('/api/settings'), apiGet('/api/sources').catch(() => ({})), apiGet('/api/metadata/providers').catch(() => [])]);
-    loadedSettings = s || {};
+    let s, srcInfo, prov;
+    try {
+      [s, srcInfo, prov] = await Promise.all([apiGetOk('/api/settings'), apiGetOk('/api/sources'), apiGetOk('/api/metadata/providers')]);
+      if (!s || typeof s !== 'object' || Array.isArray(s) || !Array.isArray(prov)) throw new ApiError(t('errors.badResponse'));
+    } catch (e) {
+      settingsError = errorText(e);
+      return; // a form filled by an earlier good load stays as it was
+    }
+    settingsError = '';
+    loadedSettings = s;
     // Toolkit source cards and provider fields must exist in the DOM before
     // the form is filled.
     kitCards = srcInfo?.cards || [];
@@ -369,6 +384,7 @@
     refreshOverview();
     dirty = false;               // everything above was programmatic
     dirtySections = new Set();
+    settingsLoaded = true;
   }
 
   /* ---- Overview (health) ---- */
@@ -497,6 +513,7 @@
   }
 
   async function save() {
+    if (!settingsLoaded) return;
     let r;
     try { r = await apiPost('/api/settings', collectSettingsFromForm()); }
     catch { return notify(t('settingsPage.saveFailedUnreachable'), 'error'); }
@@ -574,7 +591,7 @@
   // provisioned the key — refresh loadedSettings so the status line updates.
   const testMeta = async () => {
     await runTest('meta', '/api/metadata/test', () => ({}));
-    if (tests.meta?.ok) { try { loadedSettings = { ...loadedSettings, ...(await apiGet('/api/settings')) }; } catch { /* status refreshes next open */ } }
+    if (tests.meta?.ok) { try { loadedSettings = { ...loadedSettings, ...(await apiGetOk('/api/settings')) }; } catch { /* status refreshes next open */ } }
   };
 
   function movePriority(i, dir) {
@@ -632,8 +649,11 @@
       <input type="text" placeholder={t('settingsPage.searchPlaceholder')} autocomplete="off" spellcheck="false" bind:value={filterQuery} oninput={applyFilter} />
     </label>
     <button class="btn btn--ghost btn--sm setx-head__wizard" title={t('settingsPage.wizardTitle')} onclick={() => navigate('/?onboarding=1')}>{t('settingsPage.setupWizard')}</button>
-    <button id="settings-save" class="btn btn--primary" onclick={save}>{t('common.save')}</button>
+    <button id="settings-save" class="btn btn--primary" disabled={!settingsLoaded} title={settingsLoaded ? undefined : t('settingsPage.saveNeedsLoad')} onclick={save}>{t('common.save')}</button>
   </div>
+  {#if settingsError}
+    <div class="setx-loaderr"><LoadError compact stale={settingsLoaded} error={settingsError} onretry={openSettings} /></div>
+  {/if}
 
   <!-- Tab rail -->
   <nav class="setx-tabs" aria-label={t('settingsPage.tabsLabel')} use:hscroll>
@@ -1058,8 +1078,8 @@
               {#each sourceOrder as s, i (s.id)}
                 <div class="srcpri-row">
                   <span class="srcpri-rank">{i + 1}</span><span class="srcpri-name">{priorityLabel(s)}</span>
-                  <button class="srcpri-btn" type="button" disabled={i === 0} onclick={() => movePriority(i, -1)}><Icon name="arrow-up" /></button>
-                  <button class="srcpri-btn" type="button" disabled={i === sourceOrder.length - 1} onclick={() => movePriority(i, 1)}><Icon name="arrow-down" /></button>
+                  <button class="srcpri-btn" type="button" title={t('settingsPage.moveUp')} aria-label={t('settingsPage.moveUp')} disabled={i === 0} onclick={() => movePriority(i, -1)}><Icon name="arrow-up" /></button>
+                  <button class="srcpri-btn" type="button" title={t('settingsPage.moveDown')} aria-label={t('settingsPage.moveDown')} disabled={i === sourceOrder.length - 1} onclick={() => movePriority(i, 1)}><Icon name="arrow-down" /></button>
                 </div>
               {/each}
             </div>

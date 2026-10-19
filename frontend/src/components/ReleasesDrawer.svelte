@@ -1,7 +1,7 @@
 <script>
   import { SvelteSet } from 'svelte/reactivity';
   import { navigate } from '../lib/router.svelte.js';
-  import { apiGet, apiPost } from '../lib/api.js';
+  import { apiGet, apiGetOk, apiPost } from '../lib/api.js';
   import { pollInterval } from '../lib/poll.js';
   import { subscribe } from '../lib/events.svelte.js';
   import { loadCollection } from '../lib/store.svelte.js';
@@ -28,7 +28,7 @@
 
   async function pollReleases() {
     let next;
-    try { next = await apiGet('/api/releases'); } catch { return; }
+    try { next = await apiGetOk('/api/releases'); } catch { return; } // server restarting: poll again
     st = next;
     if (!next.running) {
       stopPolling();
@@ -47,7 +47,7 @@
   async function refreshOwnership() {
     if (st.running) return;
     let cur;
-    try { cur = await apiGet('/api/releases'); } catch { return; }
+    try { cur = await apiGetOk('/api/releases'); } catch { return; }
     if (!cur.running && cur.releases) {
       st = cur;
       for (const m of cur.releases) if (m.owned) queued.delete(relKey(m));
@@ -58,7 +58,7 @@
     if (!active) return;
     (async () => {
       let cur;
-      try { cur = await apiGet('/api/releases'); } catch { cur = { running: true }; }
+      try { cur = await apiGetOk('/api/releases'); } catch { cur = { running: true }; }
       if (!cur.running && !cur.releases) await apiPost('/api/releases/check'); // first open → run it
       st = cur.running || cur.releases ? cur : { running: true };
       startPolling();

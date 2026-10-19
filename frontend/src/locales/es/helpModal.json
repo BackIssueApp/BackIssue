@@ -41,7 +41,7 @@
     "s1h": "Qué es esto",
     "s1p": "Lo que se está descargando ahora y lo que espera. El elemento activo muestra una barra de progreso con velocidad y fuente.",
     "s2h": "Controles",
-    "s2p": "Pausa o reanuda la cola, vacía los elementos en cola, o reintenta o descarta los fallidos (permisos de gestión de biblioteca). La × de una fila cancela esa descarga y la elimina del cliente.",
+    "s2p": "Pausa o reanuda la cola, vacía los elementos en cola, o reintenta o descarta los fallidos (permisos de gestión de biblioteca). El botón de cerrar de una fila cancela esa descarga y la elimina del cliente.",
     "s3h": "Tras un reinicio",
     "s3p": "Una cola que estaba a medio descargar se reanuda automáticamente cuando la aplicación arranca."
   },

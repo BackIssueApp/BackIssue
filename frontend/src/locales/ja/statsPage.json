@@ -1,7 +1,6 @@
 {
   "title": "統計",
   "summary": "{series} シリーズ · {issues} 号 · {size}",
-  "couldNotLoad": "統計を読み込めませんでした。アプリは動作していますか？",
   "complete": "揃っている",
   "youOwn": "把握している <b>{total}</b> 号のうち <b>{owned}</b> 号を所有しています。",
   "incomplete": "欠けあり",
@@ -17,7 +16,7 @@
   "allValid": "すべて正常",
   "biggestGaps": "欠けが大きいシリーズ",
   "issuesMissing": "号が不足",
-  "allComplete": "照合済みのシリーズはすべて揃っています。🎉",
+  "allComplete": "照合済みのシリーズはすべて揃っています。",
   "formatMix": "形式の内訳",
   "formatOther": "その他",
   "metadata": "メタデータ",

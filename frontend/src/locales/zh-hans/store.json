@@ -4,5 +4,27 @@
   "downloadFailed": "下载加入队列失败：{error}",
   "downloadFailedUnreachable": "下载加入队列失败——应用是否可以访问？",
   "redownloadFailed": "重新下载失败：{error}",
-  "redownloadFailedUnreachable": "重新下载失败——应用是否可以访问？"
+  "redownloadFailedUnreachable": "重新下载失败——应用是否可以访问？",
+  "untitledSeries": "无标题系列",
+  "scanFailed": "扫描失败：{error}",
+  "tagFailed": "标记失败：{error}",
+  "matchFailed": "无法开始匹配：{error}",
+  "thisSeries": "此系列",
+  "planRenameFailed": "无法规划重命名：{error}",
+  "nothingToDoCollide": {
+    "other": "无需操作——{count} 个文件会发生冲突。"
+  },
+  "filesMatchPattern": "文件已符合命名规则。",
+  "renameTitle": {
+    "other": "重命名 {count} 个文件？"
+  },
+  "renameMessage": "“{title}”的文件将被移动/重命名，以符合你的文件夹和文件命名规则{collisions}。",
+  "renameCollisions": "（{count} 个会冲突，将被跳过）",
+  "renameFiles": "重命名文件",
+  "renamed": {
+    "other": "已重命名 {count} 个文件{skipped}。"
+  },
+  "renamedSkipped": "，跳过 {count} 个",
+  "fileAssigned": "文件已分配到该期——重新扫描时会保留。",
+  "choiceOwned": "{label}（已拥有）"
 }

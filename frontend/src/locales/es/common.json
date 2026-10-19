@@ -67,5 +67,7 @@
   "nIssues": { "one": "{count} número", "other": "{count} números" },
   "nFiles": { "one": "{count} archivo", "other": "{count} archivos" },
   "nSeries": { "one": "{count} serie", "other": "{count} series" },
-  "nSelected": { "one": "{count} seleccionado", "other": "{count} seleccionados" }
+  "nSelected": { "one": "{count} seleccionado", "other": "{count} seleccionados" },
+  "loadFailed": "No se pudo cargar.",
+  "loadFailedStale": "No se pudo actualizar — se muestran los últimos datos cargados."
 }

@@ -41,7 +41,7 @@
     "s1h": "O que é isto",
     "s1p": "O que está a ser descarregado agora e o que está à espera. O item ativo mostra uma barra de progresso com velocidade e fonte.",
     "s2h": "Controlos",
-    "s2p": "Pause/retome a fila, limpe os itens em espera ou repita/limpe os falhados (permissões de gestão da biblioteca). O × numa linha cancela esse download e remove-o do cliente.",
+    "s2p": "Pause/retome a fila, limpe os itens em espera ou repita/limpe os falhados (permissões de gestão da biblioteca). O botão de fechar numa linha cancela esse download e remove-o do cliente.",
     "s3h": "Depois de um reinício",
     "s3p": "Uma fila que estava a meio de um download retoma automaticamente quando a aplicação arranca."
   },

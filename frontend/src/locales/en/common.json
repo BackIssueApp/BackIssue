@@ -67,5 +67,7 @@
   "nIssues": { "one": "{count} issue", "other": "{count} issues" },
   "nFiles": { "one": "{count} file", "other": "{count} files" },
   "nSeries": { "one": "{count} series", "other": "{count} series" },
-  "nSelected": { "one": "{count} selected", "other": "{count} selected" }
+  "nSelected": { "one": "{count} selected", "other": "{count} selected" },
+  "loadFailed": "Couldn’t load this.",
+  "loadFailedStale": "Couldn’t refresh — showing the last loaded data."
 }

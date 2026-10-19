@@ -67,7 +67,7 @@
   <button class="btn btn--ghost topbar__burger" title={t('common.menu')} aria-label={t('header.openNav')} onclick={() => { ui.sidebarOpen = !ui.sidebarOpen; }}><Icon name="menu" /></button>
 
   <div class="search">
-    <input id="search" type="search" autocomplete="off" placeholder={t('header.searchPlaceholder')} bind:value={searchValue} oninput={onSearchInput} />
+    <input id="search" type="search" autocomplete="off" aria-label={t('common.search')} placeholder={t('header.searchPlaceholder')} bind:value={searchValue} oninput={onSearchInput} />
   </div>
 
   <div class="topbar__right">
@@ -77,7 +77,7 @@
     <!-- Plugin header widgets inject here (plain DOM — must stay mounted). -->
     <div id="header-plugin-slot"></div>
     <NotificationBell />
-    <button class="topbar__help" title={t('header.helpForPage')} aria-label={t('header.helpForPage')} onclick={openHelp}>?</button>
+    <button class="topbar__help" title={t('header.helpForPage')} aria-label={t('header.helpForPage')} onclick={openHelp}><Icon name="help-circle" size={18} /></button>
     {#if can('downloads.grab')}
       <!-- Download-pipeline stats: meaningless to a read-only viewer, so hidden
            unless the user can actually queue downloads. -->

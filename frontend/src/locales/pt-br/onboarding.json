@@ -77,5 +77,8 @@
   "saving": "Salvando…",
   "installedRestarting": "Plugins instalados — reiniciando o BackIssue para os ativar…",
   "allSet": "Está tudo configurado — adicione uma série com “+ Adicionar” ou importe uma biblioteca existente a partir da barra lateral.",
-  "saveFailed": "Não foi possível salvar a configuração — verifique se o aplicativo está acessível e tente de novo."
+  "saveFailedReason": "Não foi possível salvar a configuração: {error}",
+  "libraryFailed": "biblioteca “{name}”: {error}",
+  "pluginFailed": "plugin “{name}”: {error}",
+  "stepsFailed": "Alguns passos da configuração falharam — corrija-os e conclua de novo, ou pule: {list}"
 }

@@ -97,5 +97,11 @@
   "nothingMatches": "Nichts passt zu „{query}“.",
   "copied": "kopiert",
   "copyLine": "Zeile kopieren",
-  "logsCleared": "Protokolle geleert."
+  "logsCleared": "Protokolle geleert.",
+  "logLevel": {
+    "error": "Fehler",
+    "warn": "Warnung",
+    "info": "Info",
+    "debug": "Debug"
+  }
 }
