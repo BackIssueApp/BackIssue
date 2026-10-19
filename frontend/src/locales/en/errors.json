@@ -132,6 +132,7 @@
   "srvMetadataServiceRegistrationReturnedNo": "metadata service registration returned no key",
   "srvMonitorMustBeOneOf": "monitor must be one of {detail}",
   "srvNoComicArchiveOrPage": "no comic archive or page images found in {detail}",
+  "srvArchiveCouldNotBeRead": "the archive could not be read",
   "srvNoComicDataToFinalize": "no comic data to finalize",
   "srvNoDownloadLinkFoundOn": "no download link found on {detail}",
   "srvNoEditableFieldsInPatch": "no editable fields in patch",

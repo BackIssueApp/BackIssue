@@ -132,6 +132,7 @@
   "srvMetadataServiceRegistrationReturnedNo": "rejestracja w usłudze metadanych nie zwróciła klucza",
   "srvMonitorMustBeOneOf": "monitor musi być jednym z: {detail}",
   "srvNoComicArchiveOrPage": "nie znaleziono archiwum komiksu ani obrazów stron w {detail}",
+  "srvArchiveCouldNotBeRead": "nie udało się odczytać archiwum",
   "srvNoComicDataToFinalize": "brak danych komiksu do sfinalizowania",
   "srvNoDownloadLinkFoundOn": "nie znaleziono linku do pobrania na {detail}",
   "srvNoEditableFieldsInPatch": "brak pól do edycji w zmianie",

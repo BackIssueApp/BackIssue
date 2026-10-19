@@ -132,6 +132,7 @@
   "srvMetadataServiceRegistrationReturnedNo": "o registo no serviço de metadados não devolveu nenhuma chave",
   "srvMonitorMustBeOneOf": "monitor tem de ser um de {detail}",
   "srvNoComicArchiveOrPage": "nenhum arquivo de banda desenhada nem imagens de páginas encontrados em {detail}",
+  "srvArchiveCouldNotBeRead": "não foi possível ler o arquivo comprimido",
   "srvNoComicDataToFinalize": "sem dados de banda desenhada para finalizar",
   "srvNoDownloadLinkFoundOn": "nenhuma ligação de transferência encontrada em {detail}",
   "srvNoEditableFieldsInPatch": "nenhum campo editável na alteração",

@@ -11,6 +11,10 @@ export function initSchema(db) {
   //    server) retries for 5s instead of erroring SQLITE_BUSY immediately.
   db.pragma('synchronous = NORMAL');
   db.pragma('busy_timeout = 5000');
+  //  • journal_size_limit — after a big batch (a remote sync, a relink) the WAL
+  //    is truncated back to 64 MB at the next checkpoint instead of keeping
+  //    its peak size on disk for good.
+  db.pragma('journal_size_limit = 67108864');
   db.exec(`
     CREATE TABLE IF NOT EXISTS series (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -399,6 +403,10 @@ function backfillBuiltinCatalogs(db) {
   for (const table of ['cv_series', 'cv_issues']) {
     const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
     if (!cols.includes('meta_source')) continue;
+    // Rows still waiting for their catalog: normally none, so this partial
+    // index stays empty and the boot-time checks below cost nothing instead
+    // of a scan of the whole (hundreds of MB) cache.
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_${table}_nosource ON ${table}(comicvine_id) WHERE meta_source IS NULL`);
     const pending = db.prepare(`SELECT 1 FROM ${table} WHERE meta_source IS NULL LIMIT 1`).get();
     if (!pending) continue;
     db.transaction(() => {
@@ -1232,12 +1240,15 @@ export function libraryStats(db) {
 // ebook files during a comic scan, whose walker only sees .cbz/.cbr).
 export function pruneLibraryFiles(db, seen, only = null) {
   const keep = seen instanceof Set ? seen : new Set(seen);
-  let n = 0;
+  const gone = [];
   for (const row of db.prepare('SELECT path FROM library_files').all()) {
     if (only && !only.test(row.path)) continue;
-    if (!keep.has(row.path)) { db.prepare('DELETE FROM library_files WHERE path=?').run(row.path); n++; }
+    if (!keep.has(row.path)) gone.push(row.path);
   }
-  return n;
+  // One transaction, not one commit per deleted row.
+  const del = db.prepare('DELETE FROM library_files WHERE path=?');
+  db.transaction(() => { for (const p of gone) del.run(p); })();
+  return gone.length;
 }
 
 // --- Collection (radar) ---

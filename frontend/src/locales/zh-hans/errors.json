@@ -132,6 +132,7 @@
   "srvMetadataServiceRegistrationReturnedNo": "注册元数据服务未返回密钥",
   "srvMonitorMustBeOneOf": "monitor 必须是以下之一：{detail}",
   "srvNoComicArchiveOrPage": "在 {detail} 中找不到漫画压缩包或页面图片",
+  "srvArchiveCouldNotBeRead": "无法读取该压缩包",
   "srvNoComicDataToFinalize": "没有可完成处理的漫画数据",
   "srvNoDownloadLinkFoundOn": "在 {detail} 上找不到下载链接",
   "srvNoEditableFieldsInPatch": "修改中没有可编辑的字段",

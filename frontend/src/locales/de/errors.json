@@ -132,6 +132,7 @@
   "srvMetadataServiceRegistrationReturnedNo": "die Registrierung beim Metadatendienst lieferte keinen Schlüssel",
   "srvMonitorMustBeOneOf": "monitor muss einer dieser Werte sein: {detail}",
   "srvNoComicArchiveOrPage": "kein Comic-Archiv und keine Seitenbilder in {detail} gefunden",
+  "srvArchiveCouldNotBeRead": "das Archiv konnte nicht gelesen werden",
   "srvNoComicDataToFinalize": "keine Comicdaten zum Abschließen",
   "srvNoDownloadLinkFoundOn": "kein Downloadlink auf {detail} gefunden",
   "srvNoEditableFieldsInPatch": "keine bearbeitbaren Felder in der Änderung",

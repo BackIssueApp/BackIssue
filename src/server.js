@@ -910,10 +910,16 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
   // gated: the login page's shell stays plugin-free (the asset files under
   // /plugins are authenticated anyway); a session that signs in without a
   // full reload falls back to the client-side loader.
+  // index.html is re-read only when a rebuild changed it (one stat per load).
+  let shellFile = null;
   function shellHtml(req) {
     const file = path.join(publicDir, 'index.html');
-    if (!fssync.existsSync(file)) return null;
-    let html = fssync.readFileSync(file, 'utf8');
+    let st;
+    try { st = fssync.statSync(file); } catch { return null; }
+    if (!shellFile || shellFile.mtimeMs !== st.mtimeMs || shellFile.size !== st.size) {
+      shellFile = { mtimeMs: st.mtimeMs, size: st.size, html: fssync.readFileSync(file, 'utf8') };
+    }
+    let html = shellFile.html;
     // Before the first account exists the page is the create-account screen:
     // no plugin assets (they would be refused anyway).
     const u = anyUsers.get().e ? resolveUser(req) : null;
@@ -1084,6 +1090,21 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
   // Live updates: one SSE stream tells the UI which domains changed so it can
   // re-fetch just those endpoints — replaces its fixed polling loops. Each
   // signature mirrors what the matching GET endpoint serves.
+  // A probe whose answer comes only from the database is re-run only when the
+  // database has changed since its last run; otherwise the tick reuses it.
+  const onDbChange = (fn) => {
+    let seen = null, value;
+    return () => {
+      const v = dbVersion(db);
+      if (v !== seen) { value = fn(); seen = v; }
+      return value;
+    };
+  };
+  const queueRows = onDbChange(() => ({ q: listQueue(db), p: activePackGrabs(db) }));
+  const logsSig = onDbChange(() => {
+    const l = listLogs({ level: 'all', category: 'all', limit: 1 });
+    return { counts: l.counts, last: l.logs[0]?.ts };
+  });
   const hub = createEventHub({
     // Cached pieces (≤10s stale): the signature ticks often, and an uncached
     // 400k-row GROUP BY per tick is real load at this catalog size.
@@ -1091,17 +1112,13 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
     queue: () => ({
       // state.queue carries the in-flight download's page/pages — without it,
       // an immediate-source download never ticks the drawer.
-      q: listQueue(db), p: activePackGrabs(db), s: state.queue,
+      ...queueRows(), s: state.queue,
       live: queueProgress ? queueProgress() : null, pk: packProgress ? packProgress() : null,
       m: activeMedia ? activeMedia() : null,
     }),
     jobs: () => (listJobs ? listJobs() : null),
     schedules: () => (listSchedules ? listSchedules() : null),
-    logs: () => {
-      if (!listLogs) return null;
-      const l = listLogs({ level: 'all', category: 'all' });
-      return { counts: l.counts, n: l.logs.length, last: l.logs[0]?.ts };
-    },
+    logs: () => (listLogs ? logsSig() : null),
     tools: () => (toolsState ? toolsState() : null),
     import: () => (importState ? importState() : null),
     cv: () => state.cv,
@@ -1114,23 +1131,28 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
 
   // Download ComicVine issues of a collection series. We create a synthetic queue
   // row per CV issue and queue it; the worker resolves a download source on demand.
-  app.post('/api/collection/:id/download', (req, res) => {
+  app.post('/api/collection/:id/download', async (req, res) => {
     const seriesId = Number(req.params.id);
     const cvIssueIds = Array.isArray(req.body.cvIssueIds) ? req.body.cvIssueIds.map(Number) : [];
     const ids = [];
-    for (const cvid of cvIssueIds) {
-      const ci = getCvIssue(db, cvid);
-      if (!ci) continue;
-      ids.push(ensureCvIssueRow(db, { seriesId, cvIssueId: cvid, number: ci.issue_number, title: ci.name }));
-    }
+    db.transaction(() => { // "download all missing" can be hundreds of rows: one commit
+      for (const cvid of cvIssueIds) {
+        const ci = getCvIssue(db, cvid);
+        if (!ci) continue;
+        ids.push(ensureCvIssueRow(db, { seriesId, cvIssueId: cvid, number: ci.issue_number, title: ci.name }));
+      }
+    })();
     // A row can claim 'done' while its file is gone (deleted on disk, or an
     // earlier redownload that removed the file but failed to queue). The
     // queueIssues guard would silently skip those, stranding the issue as
     // undownloadable. Trust the disk: done + no file at file_path = stale.
-    const staleDone = ids.filter((id) => {
-      const row = db.prepare('SELECT status, file_path FROM issues WHERE id=?').get(id);
-      return row && row.status === 'done' && (!row.file_path || !fssync.existsSync(row.file_path));
-    });
+    // (Checked concurrently and off the event loop: the library is often a
+    // network mount.)
+    const doneRows = ids.map((id) => ({ id, row: db.prepare('SELECT status, file_path FROM issues WHERE id=?').get(id) }))
+      .filter(({ row }) => row && row.status === 'done');
+    const present = await Promise.all(doneRows.map(({ row }) => (row.file_path
+      ? fssync.promises.access(row.file_path).then(() => true, () => false) : false)));
+    const staleDone = doneRows.filter((_, i) => !present[i]).map(({ id }) => id);
     if (staleDone.length) clearIssuesForRedownload(db, staleDone);
     // Asking for an issue by hand is a want: automation keeps after it if this
     // grab fails, and the Wanted page can say why it's there. (No-op where the

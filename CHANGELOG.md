@@ -38,6 +38,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
     their last answer until the library changes.
   - Signing in no longer pauses the server while the password is checked, and the "last seen" time
     of a session or API key is recorded at most once a minute instead of on every request.
+  - Reading CBR archives during scans, imports and conversions happens on background threads, and
+    PDF page counts are read in pieces, so a large file no longer pauses the server. An archive
+    that crashes the reader now fails on its own instead of taking the server down with it.
+  - The live-update stream re-checks the queue, logs and import list only when something changed,
+    starting the app skips two full scans of the metadata cache, "Download missing" on a large
+    series records its issues in one step, and the database's write-ahead log no longer stays at
+    its peak size after a big job.
 - **Repeated failed sign-ins from one address are throttled across usernames.** After 30 failures
   from the same address within 15 minutes, further attempts wait, whichever username they try.
 - **`GET /api/series` is paged.** It returns up to 100 series by default (`?limit=` up to 500, plus

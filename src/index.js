@@ -1,4 +1,4 @@
-import { openDb, backfillPeopleIndex, clearIssuesForRedownload, SELF_DESCRIBED_TYPES, recordedCatalog, backfillCatalogs, libraryOfRecord, librarySources, failInterruptedPackGrabs } from './db.js';
+import { openDb, dbVersion, backfillPeopleIndex, clearIssuesForRedownload, SELF_DESCRIBED_TYPES, recordedCatalog, backfillCatalogs, libraryOfRecord, librarySources, failInterruptedPackGrabs } from './db.js';
 import { runQueue, reconcileDownloading } from './downloader.js';
 import { processPack } from './pack.js';
 import { createApp } from './server.js';
@@ -214,7 +214,15 @@ function runTool(tool, opts = {}) {
   })();
   return { started: true };
 }
-const countCorrupt = () => { try { return db.prepare('SELECT COUNT(*) c FROM library_files WHERE valid=0').get().c; } catch { return 0; } };
+// Polled by the live-update stream: re-counted only when the database changed.
+let corruptSeen = null, corruptCount = 0;
+const countCorrupt = () => {
+  try {
+    const v = dbVersion(db);
+    if (v !== corruptSeen) { corruptCount = db.prepare('SELECT COUNT(*) c FROM library_files WHERE valid=0').get().c; corruptSeen = v; }
+    return corruptCount;
+  } catch { return 0; }
+};
 const toolsState = () => ({ ...state.tools, corruptCount: countCorrupt(), catalog: Object.entries(TOOLS).map(([id, t]) => ({ id, label: t.label, desc: t.desc })) });
 
 // --- Reorganize library (move+rename to the configured patterns) ---
@@ -609,7 +617,12 @@ async function runImport() {
   return { started: true };
 }
 
-const importState = () => ({ ...state.import, candidates: listImportCandidates(db) });
+let candidatesSeen = null, candidates = [];
+const importState = () => {
+  const v = dbVersion(db);
+  if (v !== candidatesSeen) { candidates = listImportCandidates(db); candidatesSeen = v; }
+  return { ...state.import, candidates };
+};
 function matchImportCandidate(id, m) { setImportCandidateMatch(db, id, m); return getImportCandidate(db, id); }
 function confirmImportCandidate(id) { setImportCandidateStatus(db, id, 'ready'); return getImportCandidate(db, id); }
 function skipImportCandidate(id) { setImportCandidateStatus(db, id, 'skipped'); return getImportCandidate(db, id); }

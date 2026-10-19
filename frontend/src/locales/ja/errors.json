@@ -132,6 +132,7 @@
   "srvMetadataServiceRegistrationReturnedNo": "メタデータサービスへの登録でキーが返されませんでした",
   "srvMonitorMustBeOneOf": "monitor は次のいずれかである必要があります: {detail}",
   "srvNoComicArchiveOrPage": "{detail} にコミックのアーカイブもページ画像も見つかりません",
+  "srvArchiveCouldNotBeRead": "アーカイブを読み取れませんでした",
   "srvNoComicDataToFinalize": "仕上げるコミックのデータがありません",
   "srvNoDownloadLinkFoundOn": "{detail} にダウンロードリンクが見つかりません",
   "srvNoEditableFieldsInPatch": "変更に編集可能なフィールドがありません",

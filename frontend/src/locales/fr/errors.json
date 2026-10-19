@@ -132,6 +132,7 @@
   "srvMetadataServiceRegistrationReturnedNo": "l’inscription au service de métadonnées n’a renvoyé aucune clé",
   "srvMonitorMustBeOneOf": "monitor doit valoir {detail}",
   "srvNoComicArchiveOrPage": "aucune archive de comic ni image de page trouvée dans {detail}",
+  "srvArchiveCouldNotBeRead": "l’archive n’a pas pu être lue",
   "srvNoComicDataToFinalize": "aucune donnée de comic à finaliser",
   "srvNoDownloadLinkFoundOn": "aucun lien de téléchargement trouvé sur {detail}",
   "srvNoEditableFieldsInPatch": "aucun champ modifiable dans la modification",

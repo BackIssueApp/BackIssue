@@ -132,6 +132,7 @@
   "srvMetadataServiceRegistrationReturnedNo": "registratie bij de metadatadienst gaf geen sleutel terug",
   "srvMonitorMustBeOneOf": "monitor moet een van deze zijn: {detail}",
   "srvNoComicArchiveOrPage": "geen striparchief of paginabeelden gevonden in {detail}",
+  "srvArchiveCouldNotBeRead": "het archief kon niet worden gelezen",
   "srvNoComicDataToFinalize": "geen stripgegevens om af te ronden",
   "srvNoDownloadLinkFoundOn": "geen downloadlink gevonden op {detail}",
   "srvNoEditableFieldsInPatch": "geen bewerkbare velden in de wijziging",
