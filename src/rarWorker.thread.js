@@ -27,6 +27,21 @@ const OPS = {
     }
     return { result: { names, hasCi: ciNames.length > 0, ciXml } };
   },
+  // Every file entry's name, as stored in the archive (no decompression).
+  async list({ path }) {
+    const ex = await createExtractorFromData({ data: toArrayBuffer(fs.readFileSync(path)) });
+    return { result: [...ex.getFileList().fileHeaders].filter((h) => !h.flags?.directory).map((h) => h.name) };
+  },
+  // [name, bytes] for the named entries (names as stored), or every file entry
+  // when `files` is null. Bytes are transferred, not copied.
+  async extract({ path, files }) {
+    const ex = await createExtractorFromData({ data: toArrayBuffer(fs.readFileSync(path)) });
+    const entries = [];
+    for (const f of ex.extract(files ? { files } : {}).files) {
+      if (f.extraction && !f.fileHeader.flags?.directory) entries.push([f.fileHeader.name, toArrayBuffer(f.extraction)]);
+    }
+    return { result: entries, transfer: entries.map(([, b]) => b) };
+  },
   // How many entries inflate (all of them, in archive order: solid-archive safe).
   async verify({ path }) {
     const ex = await createExtractorFromData({ data: toArrayBuffer(fs.readFileSync(path)) });

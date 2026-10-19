@@ -44,3 +44,17 @@ test('PDF pages are counted across read chunks', async () => {
   fs.writeFileSync(p, parts.join(''), 'latin1');
   assert.equal((await readArchiveInfo(p)).pageCount, 4);
 });
+
+test('listRarEntries / extractRarEntries: names as stored, chosen entries or all', async () => {
+  const { listRarEntries, extractRarEntries } = await import('../src/archive.js');
+  const names = await listRarEntries(FIXTURE);
+  assert.ok(names.length >= 2);
+  const pages = names.filter((n) => /\.jpe?g$/i.test(n));
+  const one = await extractRarEntries(FIXTURE, [pages[0]]);
+  assert.deepEqual([...one.keys()], [pages[0]]);
+  assert.ok(one.get(pages[0]).length > 0);
+  const all = await extractRarEntries(FIXTURE);
+  assert.deepEqual([...all.keys()].sort(), [...names].sort());
+  assert.ok(all.get(pages[0]).equals(one.get(pages[0])), 'the same bytes either way');
+  await assert.rejects(listRarEntries('tests/fixtures/no-such.cbr'));
+});

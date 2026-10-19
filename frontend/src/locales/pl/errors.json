@@ -188,6 +188,7 @@
   "srvThisSourceNeedsTheBrowser": "to źródło wymaga obrazu z przeglądarką (lekki obraz jej nie zawiera)",
   "srvThisToolNeedsAMetadata": "to narzędzie wymaga źródła metadanych — skonfiguruj je w Ustawienia → Metadane",
   "srvTooLargeToConvertSafely": "za duży, by bezpiecznie go przekonwertować ({detail}",
+  "srvArchiveTooLargeToOpen": "archiwum jest za duże, by je otworzyć ({detail}",
   "srvTooManyAttemptsTryAgain": "zbyt wiele prób — spróbuj ponownie za {detail}",
   "srvUnexpectedReleaseProviderResponseNot": "nieoczekiwana odpowiedź dostawcy premier (to nie lista)",
   "srvUnknownGrab": "nieznane pobieranie",

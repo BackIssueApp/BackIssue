@@ -188,6 +188,7 @@
   "srvThisSourceNeedsTheBrowser": "このソースにはブラウザー入りのイメージが必要です（軽量イメージにはブラウザーがありません）",
   "srvThisToolNeedsAMetadata": "このツールにはメタデータソースが必要です。設定 → メタデータで設定してください",
   "srvTooLargeToConvertSafely": "大きすぎて安全に変換できません ({detail}",
+  "srvArchiveTooLargeToOpen": "アーカイブが大きすぎて開けません ({detail}",
   "srvTooManyAttemptsTryAgain": "試行回数が多すぎます。{detail} 後にもう一度お試しください",
   "srvUnexpectedReleaseProviderResponseNot": "リリース情報の提供元から予期しない応答がありました（リストではありません）",
   "srvUnknownGrab": "不明な取得",

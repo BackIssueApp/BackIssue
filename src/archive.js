@@ -315,6 +315,43 @@ export async function cbrBufferToCbz(buffer) {
   });
 }
 
+// RAR entry access for plugins (the reader's CBR pages), on the RAR worker
+// threads, inside the same slots and size ceiling as everything else here.
+// Names are as stored in the archive (backslashes and all) and unsorted: the
+// caller owns its page order. Throws for an archive over the ceiling.
+function assertRarSize(size) {
+  if (size > MAX_RAR_BYTES) throw new Error(`archive too large to open (${Math.round(size / 1024 / 1024)}MB > ${MAX_RAR_MB}MB ceiling — raise it with MAX_RAR_MB)`);
+}
+
+/** Names of every file entry in a RAR archive (nothing is decompressed). */
+export async function listRarEntries(path) {
+  assertRarSize((await fs.stat(path)).size);
+  return withRarSlot(async () => {
+    const off = runRar('list', { path });
+    if (off) return off;
+    const ex = await createExtractorFromData({ data: toArrayBuffer(await fs.readFile(path)) });
+    return [...ex.getFileList().fileHeaders].filter((h) => !h.flags?.directory).map((h) => h.name);
+  });
+}
+
+/** The named entries of a RAR archive (names as listRarEntries returns them),
+ *  or every file entry when `names` is null, as Map(name → Buffer). Only what
+ *  is asked for is decompressed (a solid archive still reads up to it). */
+export async function extractRarEntries(path, names = null) {
+  assertRarSize((await fs.stat(path)).size);
+  const files = names ? [...names] : null;
+  return withRarSlot(async () => {
+    const off = runRar('extract', { path, files });
+    if (off) return new Map((await off).map(([name, bytes]) => [name, Buffer.from(bytes)]));
+    const ex = await createExtractorFromData({ data: toArrayBuffer(await fs.readFile(path)) });
+    const out = new Map();
+    for (const f of ex.extract(files ? { files } : {}).files) {
+      if (f.extraction && !f.fileHeader.flags?.directory) out.set(f.fileHeader.name, Buffer.from(f.extraction));
+    }
+    return out;
+  });
+}
+
 // Convert a .cbr FILE into a .cbz (preserving all entries incl. ComicInfo.xml),
 // written atomically, then remove the .cbr. Never clobbers an existing .cbz.
 export async function convertCbrToCbz(path) {

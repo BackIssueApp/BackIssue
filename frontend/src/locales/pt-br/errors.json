@@ -188,6 +188,7 @@
   "srvThisSourceNeedsTheBrowser": "esta fonte precisa da imagem com navegador (a imagem leve não inclui navegador)",
   "srvThisToolNeedsAMetadata": "esta ferramenta precisa de uma fonte de metadados — configure uma em Configurações → Metadados",
   "srvTooLargeToConvertSafely": "grande demais para converter com segurança ({detail}",
+  "srvArchiveTooLargeToOpen": "arquivo compactado grande demais para abrir ({detail}",
   "srvTooManyAttemptsTryAgain": "tentativas demais — tente de novo em {detail}",
   "srvUnexpectedReleaseProviderResponseNot": "resposta inesperada do provedor de lançamentos (não é uma lista)",
   "srvUnknownGrab": "captura desconhecida",

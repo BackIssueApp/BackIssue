@@ -188,6 +188,7 @@
   "srvThisSourceNeedsTheBrowser": "this source needs the browser image (the lean image ships no browser)",
   "srvThisToolNeedsAMetadata": "this tool needs a metadata source — set one up under Settings → Metadata",
   "srvTooLargeToConvertSafely": "too large to convert safely ({detail}",
+  "srvArchiveTooLargeToOpen": "archive too large to open ({detail}",
   "srvTooManyAttemptsTryAgain": "too many attempts — try again in {detail}",
   "srvUnexpectedReleaseProviderResponseNot": "unexpected release-provider response (not a list)",
   "srvUnknownGrab": "unknown grab",

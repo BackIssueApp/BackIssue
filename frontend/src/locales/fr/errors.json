@@ -188,6 +188,7 @@
   "srvThisSourceNeedsTheBrowser": "cette source nécessite l’image avec navigateur (l’image allégée n’en contient pas)",
   "srvThisToolNeedsAMetadata": "cet outil nécessite une source de métadonnées — configurez-en une dans Paramètres → Métadonnées",
   "srvTooLargeToConvertSafely": "trop volumineux pour être converti sans risque ({detail}",
+  "srvArchiveTooLargeToOpen": "archive trop volumineuse pour être ouverte ({detail}",
   "srvTooManyAttemptsTryAgain": "trop de tentatives — réessayez dans {detail}",
   "srvUnexpectedReleaseProviderResponseNot": "réponse inattendue du fournisseur des sorties (pas une liste)",
   "srvUnknownGrab": "récupération inconnue",

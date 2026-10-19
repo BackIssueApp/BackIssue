@@ -188,6 +188,7 @@
   "srvThisSourceNeedsTheBrowser": "diese Quelle braucht das Browser-Image (das schlanke Image enthält keinen Browser)",
   "srvThisToolNeedsAMetadata": "dieses Werkzeug braucht eine Metadatenquelle — richte eine unter Einstellungen → Metadaten ein",
   "srvTooLargeToConvertSafely": "zu groß für eine sichere Umwandlung ({detail}",
+  "srvArchiveTooLargeToOpen": "Archiv zu groß zum Öffnen ({detail}",
   "srvTooManyAttemptsTryAgain": "zu viele Versuche — versuche es in {detail} erneut",
   "srvUnexpectedReleaseProviderResponseNot": "unerwartete Antwort des Release-Anbieters (keine Liste)",
   "srvUnknownGrab": "unbekannter Abruf",

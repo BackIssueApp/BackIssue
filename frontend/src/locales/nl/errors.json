@@ -188,6 +188,7 @@
   "srvThisSourceNeedsTheBrowser": "deze bron heeft de browserimage nodig (de lichte image bevat geen browser)",
   "srvThisToolNeedsAMetadata": "dit hulpmiddel heeft een metadatabron nodig — stel er een in onder Instellingen → Metadata",
   "srvTooLargeToConvertSafely": "te groot om veilig te converteren ({detail}",
+  "srvArchiveTooLargeToOpen": "archief te groot om te openen ({detail}",
   "srvTooManyAttemptsTryAgain": "te veel pogingen — probeer het over {detail} opnieuw",
   "srvUnexpectedReleaseProviderResponseNot": "onverwacht antwoord van de releaseleverancier (geen lijst)",
   "srvUnknownGrab": "onbekende download",

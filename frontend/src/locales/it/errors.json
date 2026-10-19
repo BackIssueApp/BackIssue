@@ -188,6 +188,7 @@
   "srvThisSourceNeedsTheBrowser": "questa fonte richiede l’immagine con browser (quella leggera non ne include uno)",
   "srvThisToolNeedsAMetadata": "questo strumento richiede una fonte di metadati: configurane una in Impostazioni → Metadati",
   "srvTooLargeToConvertSafely": "troppo grande per una conversione sicura ({detail}",
+  "srvArchiveTooLargeToOpen": "archivio troppo grande per essere aperto ({detail}",
   "srvTooManyAttemptsTryAgain": "troppi tentativi: riprova tra {detail}",
   "srvUnexpectedReleaseProviderResponseNot": "risposta inattesa dal fornitore delle uscite (non è un elenco)",
   "srvUnknownGrab": "prelievo sconosciuto",
