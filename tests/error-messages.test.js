@@ -18,7 +18,7 @@ const catalog = (lang) => JSON.parse(fs.readFileSync(path.join(LOCALES, lang, 'e
 // reach a response body (or carry nothing worth translating).
 const DEVELOPER_ONLY = new Set([
   'missing', 'Error', 'HTTP {detail}', 'page {detail}', 'no fixture for {detail}',
-  'attestation: master key required', 'attestation: version required', 'count worker gone',
+  'attestation: master key required', 'attestation: version required', 'count worker gone', 'archive reader unavailable',
   'downloadMedia needs a db', 'downloadMedia needs a title',
   'registerSource: a source needs an id', 'registerLibraryType: a type needs an id',
   'defineSource: a source needs an id (letters, digits, underscore)', 'defineSource({detail}',
