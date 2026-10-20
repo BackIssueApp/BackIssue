@@ -1235,19 +1235,22 @@ async function runDownloads() {
           delete live[id];
         } else {
           const prev = live[id] || {};
+          const fresh = p.event === 'start' || p.event === 'searching';
           live[id] = {
             title: p.issue.title,
             source: p.source || prev.source || null,
             // Deferred sources emit a lifecycle phase (grabbed/queued/…);
             // immediate ones stream pages, so fall back to tagging/saving.
             phase: p.phase || (p.event === 'tagging' ? 'tagging' : p.event === 'start' ? 'starting' : 'saving'),
-            page: p.event === 'page' ? p.page : (p.event === 'start' ? 0 : prev.page),
-            pages: p.event === 'page' ? p.pages : (p.event === 'start' ? 0 : prev.pages),
+            // A new source attempt (searching/start) clears the last attempt's
+            // counts, or a failed source's "page 31 / 32" lingers on the row.
+            page: p.event === 'page' ? p.page : (fresh ? 0 : prev.page),
+            pages: p.event === 'page' ? p.pages : (fresh ? 0 : prev.pages),
             // Byte-stream sources add: unit='bytes' (page/pages are byte counts),
             // bps (speed), detail (host label, e.g. "PixelDrain").
-            unit: p.event === 'page' ? (p.unit || null) : prev.unit,
-            bps: p.event === 'page' ? (p.bps ?? null) : (p.event === 'start' ? null : prev.bps),
-            detail: (p.detail != null ? p.detail : prev.detail) || null,
+            unit: p.event === 'page' ? (p.unit || null) : (fresh ? null : prev.unit),
+            bps: p.event === 'page' ? (p.bps ?? null) : (fresh ? null : prev.bps),
+            detail: (p.detail != null ? p.detail : (fresh ? null : prev.detail)) || null,
           };
         }
       }
