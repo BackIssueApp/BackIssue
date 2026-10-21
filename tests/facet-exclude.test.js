@@ -47,3 +47,21 @@ test('collectionPage honours excludeIds on the fast and the rollup path', () => 
   assert.deepEqual(page({ excludeIds: [ids[1]], sort: 'missing' }).sort(), [ids[0], ids[2]].sort());
   assert.equal(collectionPage(db, { userId: 1, keys: ['all'], limit: 50, offset: 0, excludeIds: [ids[0]] }).total, 2);
 });
+
+test('/api/collection?native=1 marks its reply so an app can tell the server honoured it', async () => {
+  const { db, ids } = seed();
+  const app = createApp({ db, openApiBeforeSetup: true });
+  const s = await new Promise((r) => { const x = app.listen(0, () => r(x)); });
+  try {
+    const base = `http://127.0.0.1:${s.address().port}`;
+    const r = await (await fetch(`${base}/api/collection?limit=2&offset=0&native=1`)).json();
+    assert.equal(r.native, true);
+    assert.equal(r.total, 3);
+    assert.deepEqual(r.rows.map((x) => x.id), ids.slice(0, 2));
+    const more = await (await fetch(`${base}/api/collection?limit=2&offset=2&native=1&counts=0`)).json();
+    assert.equal(more.native, true);
+    assert.deepEqual(more.rows.map((x) => x.id), [ids[2]]);
+    const plain = await (await fetch(`${base}/api/collection?limit=2&offset=0`)).json();
+    assert.equal('native' in plain, false, 'the web app\'s reply is unchanged');
+  } finally { s.close(); }
+});

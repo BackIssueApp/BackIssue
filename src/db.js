@@ -1443,13 +1443,13 @@ function chipPredicateSql(filter, { guardOuter, seriesTypeList, params }) {
 // thread: better-sqlite3 is synchronous, and this is the app's heaviest read —
 // at 320k series it blocks the event loop for ~0.5-1s, stalling every other
 // request (pages, covers) behind it.
-export function buildCollCountSql({ keys = [], filter = 'all', search = '', includeRestricted = true, userId = null, library = null, restrictIds = null, excludeIds = null, collectionsOnly = false, jumpLetter = null, buckets = false } = {}) {
+export function buildCollCountSql({ keys = [], filter = 'all', search = '', includeRestricted = true, userId = null, library = null, restrictIds = null, excludeIds = null, collectionsOnly = false, excludeSelfDescribed = false, jumpLetter = null, buckets = false } = {}) {
   const { selfTypes, params: selfParams, guard } = selfTypeGuard('s.');
   const { guard: guardOuter } = selfTypeGuard('');
   const seriesTypes = [...SERIES_TYPES];
   const stParams = {}; seriesTypes.forEach((t, i) => { stParams['ktype' + i] = t; });
   const seriesTypeList = seriesTypes.length ? seriesTypes.map((_, i) => '@ktype' + i).join(',') : `''`;
-  const mem = membershipWhere({ guard, selfTypesLen: selfTypes.length, includeRestricted, library, search, restrictIds, excludeIds, collectionsOnly });
+  const mem = membershipWhere({ guard, selfTypesLen: selfTypes.length, includeRestricted, library, search, restrictIds, excludeIds, collectionsOnly, excludeSelfDescribed });
   const params = { uid: userId ?? -1, ...selfParams, ...stParams, ...mem.params };
   const predCtx = { guardOuter, seriesTypeList, params };
   // A-Z jump: `__total` becomes the count of matching members that sort before
@@ -1672,7 +1672,7 @@ export function collectionPage(db, { keys = [], filter = 'all', limit = null, of
     const rows = filter && filter !== 'all' ? all.filter((r) => seriesMatchesFilter(r, filter)) : all;
     return { rows, counts, total: rows.length };
   }
-  const { search = '', sort = 'title', includeRestricted = true, userId = null, library = null, restrictIds = null, excludeIds = null, collectionsOnly = false } = opts;
+  const { search = '', sort = 'title', includeRestricted = true, userId = null, library = null, restrictIds = null, excludeIds = null, collectionsOnly = false, excludeSelfDescribed = false } = opts;
   const cap = Math.max(1, Math.min(500, Number(limit) || 200));
   const off = Math.max(0, Number(offset) || 0);
   // Chip counts + this filter's total, one lean pass — but ONLY when chips are
@@ -1680,7 +1680,7 @@ export function collectionPage(db, { keys = [], filter = 'all', limit = null, of
   // scan (the total/counts don't change between pages of the same filter, and the
   // client already holds them). total is null then; the client keeps page 1's.
   const { counts, total } = keys.length
-    ? collCountPass(db, { keys, filter, search, includeRestricted, userId, library, restrictIds, excludeIds, collectionsOnly })
+    ? collCountPass(db, { keys, filter, search, includeRestricted, userId, library, restrictIds, excludeIds, collectionsOnly, excludeSelfDescribed })
     : { counts: {}, total: null };
   // Select the page's ids in sort order (lean scan), then hydrate the full shape.
   const { selfTypes, params: selfParams, guard } = selfTypeGuard('s.');
@@ -1688,7 +1688,7 @@ export function collectionPage(db, { keys = [], filter = 'all', limit = null, of
   const seriesTypes = [...SERIES_TYPES];
   const stParams = {}; seriesTypes.forEach((t, i) => { stParams['ktype' + i] = t; });
   const seriesTypeList = seriesTypes.length ? seriesTypes.map((_, i) => '@ktype' + i).join(',') : `''`;
-  const mem = membershipWhere({ guard, selfTypesLen: selfTypes.length, includeRestricted, library, search, restrictIds, excludeIds, collectionsOnly });
+  const mem = membershipWhere({ guard, selfTypesLen: selfTypes.length, includeRestricted, library, search, restrictIds, excludeIds, collectionsOnly, excludeSelfDescribed });
   const idParams = { uid: userId ?? -1, ...selfParams, ...stParams, ...mem.params, lim: cap, off };
   const pred = chipPredicateSql(filter, { guardOuter, seriesTypeList, params: idParams });
   const orderBy = COLL_ORDERS[sort] || COLL_ORDERS.title;
@@ -1753,6 +1753,7 @@ export function collectionPage(db, { keys = [], filter = 'all', limit = null, of
         ${libTerm}
         ${restrictIds ? 'AND s.id IN (SELECT value FROM json_each(@restrictIds))' : ''}
         ${excludeIds ? 'AND s.id NOT IN (SELECT value FROM json_each(@excludeIds))' : ''}
+        ${excludeSelfDescribed && selfTypes.length ? `AND NOT (${guard})` : ''}
         ${search ? 'AND (s.title LIKE @q OR cv.name LIKE @q OR cv.publisher LIKE @q)' : ''}
         AND (${fastChipPred})
         ${FAST_ORDERS[sort]} LIMIT @lim OFFSET @off`).all(idParams)

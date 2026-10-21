@@ -1004,3 +1004,36 @@ test('listSeries pages through title order with issue counts', () => {
   assert.deepEqual(page2.map((s) => s.title), ['Cerebus']);
   assert.equal(listSeries(db, { search: 'bon', limit: 10 })[0].issue_count, 1);
 });
+
+test('collectionPage excludeSelfDescribed: the paged comics list the mobile apps use', async () => {
+  const m = await seedEbookType();
+  const db = openDb(':memory:');
+  const comic = (title) => {
+    const sid = upsertSeries(db, { title, url: 'cv:' + title.toLowerCase() });
+    db.prepare('UPDATE series SET followed=1 WHERE id=?').run(sid);
+    return sid;
+  };
+  const a = comic('Alpha'), b = comic('Beta'), c = comic('Gamma');
+  addRemoteBook(db, { title: 'Dune' });
+  addRemoteBook(db, { title: 'Emma' });
+
+  const all = m.collectionPage(db, { keys: ['all'], limit: 10, offset: 0 });
+  assert.ok(all.rows.some((r) => r.title === 'Dune'), 'without it, books are part of the page');
+  for (const sort of ['title', 'added']) {
+    const p1 = m.collectionPage(db, { keys: ['all'], limit: 2, offset: 0, sort, excludeSelfDescribed: true });
+    const p2 = m.collectionPage(db, { keys: [], limit: 2, offset: 2, sort, excludeSelfDescribed: true });
+    assert.equal(p1.total, 3, `${sort}: the total counts comics only`);
+    assert.deepEqual([...p1.rows, ...p2.rows].map((r) => r.id).sort(), [a, b, c].sort(), `${sort}: pages hold exactly the comics`);
+  }
+  // CTE path (a filter needing rollups) honours it too.
+  const missing = m.collectionPage(db, { keys: ['all'], filter: 'problems', limit: 10, offset: 0, excludeSelfDescribed: true });
+  assert.ok(missing.rows.every((r) => ![ 'Dune', 'Emma' ].includes(r.title)));
+
+  // Every field the apps read from the unpaged list is on a paged row.
+  const legacy = m.collectionSeries(db, { excludeSelfDescribed: true })[0];
+  const paged = m.collectionPage(db, { keys: [], limit: 1, offset: 0, excludeSelfDescribed: true }).rows[0];
+  for (const f of ['id', 'title', 'publisher', 'year', 'cover_url', 'followed', 'monitored', 'matched', 'total', 'owned', 'missing', 'untagged', 'corrupt', 'active', 'size']) {
+    assert.ok(f in paged, `paged row has ${f}`);
+    assert.equal(f in legacy, true, `legacy row has ${f}`);
+  }
+});

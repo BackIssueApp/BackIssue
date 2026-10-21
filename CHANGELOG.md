@@ -8,6 +8,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+
+- **The paged library list can be limited to comics.** `GET /api/collection` with `limit`/`offset`
+  accepts `native=1` to leave out books and audiobooks, and says so in its reply (`native: true`).
+  The mobile apps use it to page through large comic libraries instead of loading every series
+  at once.
+
 ## [0.9.4] — 2026-10-21
 
 ### Security

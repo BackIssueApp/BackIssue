@@ -1599,7 +1599,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
   };
   const countsFor = (opts) => {
     const key = JSON.stringify([opts.userId, opts.includeRestricted, opts.library ?? null, opts.search || '',
-      opts.filter || 'all', opts.restrictIds || null, opts.excludeIds || null, opts.collectionsOnly || false]);
+      opts.filter || 'all', opts.restrictIds || null, opts.excludeIds || null, opts.collectionsOnly || false, opts.excludeSelfDescribed || false]);
     return swrGet(countsCache, key, () => computeCounts(opts));
   };
   // A facet selection's answer, from the first collection filter that claims
@@ -1666,16 +1666,22 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
       const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 200));
       const offset = Math.max(0, Number(req.query.offset) || 0);
       const keys = req.query.counts === '0' ? [] : COLLECTION_CHIP_KEYS;
-      if (!keys.length) return res.json(collectionPage(db, { ...opts, keys: [], limit, offset }));
+      // native=1: comics and manga only, as the unpaged list gives the mobile
+      // apps. The reply says `native: true` so an app can tell this server
+      // honoured it (an older one would silently mix in books and audiobooks).
+      const native = req.query.native === '1';
+      if (native) opts.excludeSelfDescribed = true;
+      const mark = (body) => (native ? { ...body, native: true } : body);
+      if (!keys.length) return res.json(mark(collectionPage(db, { ...opts, keys: [], limit, offset })));
       try {
         // Rows synchronously (fast-path, ~10ms) while the heavy counts run on
         // the worker (or come from cache) — same fused response shape.
         const countsP = countsFor({ ...opts, keys });
         const page = collectionPage(db, { ...opts, keys: [], limit, offset });
         const { counts, total } = await countsP;
-        return res.json({ rows: page.rows, counts, total });
+        return res.json(mark({ rows: page.rows, counts, total }));
       } catch {
-        return res.json(collectionPage(db, { ...opts, keys, limit, offset })); // sync fallback
+        return res.json(mark(collectionPage(db, { ...opts, keys, limit, offset }))); // sync fallback
       }
     }
     // Legacy fused shape: the whole set + counts in one scan ({ rows, counts }),
