@@ -97,7 +97,7 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 - **Removing a comic with its files deletes only folders it leaves empty.** It used to delete each
   folder that held one of its files with everything still inside, including other series sharing it.
 - **An unreadable settings.json is kept, not silently replaced.** BackIssue starts on defaults, saves
-  the original beside it as settings.json.unreadable-<time>, and logs where; settings are now
+  the original beside it as `settings.json.unreadable-<time>`, and logs where; settings are now
   written in one step so a crash mid-save can no longer leave a broken file.
 - **Re-download keeps the current copy until the new one arrives.** The old file used to be deleted
   first, so a re-download that found nothing lost the copy you had. It is now replaced only once a
