@@ -189,6 +189,7 @@
   "srvThisToolNeedsAMetadata": "此工具需要元数据来源——请在 设置 → 元数据 中设置",
   "srvTooLargeToConvertSafely": "文件过大，无法安全转换（{detail}",
   "srvArchiveTooLargeToOpen": "压缩包过大，无法打开（{detail}",
+  "srvCantTagInPlace": "无法原地写入标签：{detail}",
   "srvTooManyAttemptsTryAgain": "尝试次数过多——请在 {detail} 后重试",
   "srvUnexpectedReleaseProviderResponseNot": "发布信息来源返回了意外的响应（不是列表）",
   "srvUnknownGrab": "未知的抓取",

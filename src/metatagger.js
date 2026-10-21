@@ -4,6 +4,7 @@ import JSZip from 'jszip';
 import { getCvIssue, getCvSeries, setCvIssueDetail, getLibraryFile } from './db.js';
 import { logWarn } from './logstore.js';
 import { convertCbrToCbz, sidecarPath } from './archive.js';
+import { writeComicInfoInPlace } from './cbzTag.js';
 import { normalizeNumber } from './matcher.js';
 import { isMintedId } from './metron.js';
 import { BUILTIN_CATALOG_RANGES } from './db.js';
@@ -182,9 +183,19 @@ export async function tagCbzBuffer(buffer, xml) {
   return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 }
 
-// Rewrite a CBZ on disk with the given ComicInfo.xml (atomic temp → rename).
+// Write ComicInfo.xml into a CBZ on disk. Normally only the zip's tail is
+// rewritten (cbzTag.js), so a multi-GB file never enters memory. An archive
+// that can't be tagged that way (zip64) is rebuilt in memory as before
+// (atomic temp → rename), but only when it is small enough to do safely.
+const REBUILD_MAX_BYTES = 512 * 1024 * 1024;
 export async function writeComicInfo(cbzPath, xml) {
   if (!/\.cbz$/i.test(cbzPath)) throw new Error('can only tag .cbz files');
+  try { return await writeComicInfoInPlace(cbzPath, xml); }
+  catch (e) {
+    if (e?.code !== 'NOT_SIMPLE_ZIP') throw e;
+    const { size } = await fs.stat(cbzPath);
+    if (size > REBUILD_MAX_BYTES) throw new Error(`${e.message}, and the file is too large to rebuild in memory (${Math.round(size / 1048576)}MB)`);
+  }
   const buffer = await fs.readFile(cbzPath);
   const out = await tagCbzBuffer(buffer, xml);
   const tmp = path.join(path.dirname(cbzPath), `.tag-${process.pid}-${path.basename(cbzPath)}`);

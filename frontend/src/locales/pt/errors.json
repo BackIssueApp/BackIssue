@@ -189,6 +189,7 @@
   "srvThisToolNeedsAMetadata": "esta ferramenta precisa de uma fonte de metadados — configure uma em Definições → Metadados",
   "srvTooLargeToConvertSafely": "demasiado grande para converter em segurança ({detail}",
   "srvArchiveTooLargeToOpen": "arquivo comprimido demasiado grande para abrir ({detail}",
+  "srvCantTagInPlace": "não é possível etiquetar no local: {detail}",
   "srvTooManyAttemptsTryAgain": "demasiadas tentativas — tente de novo dentro de {detail}",
   "srvUnexpectedReleaseProviderResponseNot": "resposta inesperada do fornecedor de lançamentos (não é uma lista)",
   "srvUnknownGrab": "obtenção desconhecida",

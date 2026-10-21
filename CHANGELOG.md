@@ -17,6 +17,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **Tagging large files no longer runs out of memory.** Writing metadata into a `.cbz` used to
+  load and rebuild the whole archive in memory, which failed with "not enough memory" on big
+  collected editions. Now only the end of the file is rewritten: the pages are never read or
+  re-compressed, so a 1 GB file tags in milliseconds.
+
 - **CBR files are never marked corrupt because the background reader couldn't start.** If its
   threads fail to start on a system, BackIssue now reads archives the old way instead.
 
