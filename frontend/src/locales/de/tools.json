@@ -19,6 +19,10 @@
     "label": "Verschachtelte Archive auspacken",
     "desc": "Manche Releases liefern eine .cbz, die statt Seiten eine .cbr enthält – sie lässt sich öffnen, taggen, sieht gesund aus und hat nichts zu lesen. Dieses Werkzeug hebt die Seiten des inneren Archivs an die oberste Ebene, an Ort und Stelle, und behält die ComicInfo. Alles, was es nicht belegen kann, bleibt unangetastet."
   },
+  "redownload-corrupt": {
+    "label": "Beschädigte Dateien neu herunterladen",
+    "desc": "Verschachtelte Archive werden an Ort und Stelle entpackt, dann wird jede andere beschädigte Comic-Datei neu zum Download eingereiht. Jede beschädigte Datei bleibt, bis eine gute Kopie sie ersetzt – ein Heft, das keine Quelle hat, geht also nicht verloren. Dateien ohne zugeordnete Ausgabe können nicht geladen werden und werden nur gezählt."
+  },
   "remove-duplicates": {
     "label": "Doppelte Dateien entfernen",
     "desc": "Löscht doppelte Kopien desselben Hefts über alle Comics hinweg. Beschädigte Kopien, die eine intakte bereits ersetzt hat, gehen sofort. Gibt es zwei INTAKTE Kopien, bleibt die beste – zuerst getaggt, dann die mit den meisten Seiten, dann die größte – und die andere wird entfernt; dieser Teil läuft als Vorschau (Liste unter Protokolle → Werkzeuge), sofern das Kästchen nicht angehakt ist."

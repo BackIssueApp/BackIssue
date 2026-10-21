@@ -19,6 +19,10 @@
     "label": "Desaninhar arquivos",
     "desc": "Alguns lançamentos trazem um .cbz que contém um .cbr em vez de páginas — abre, etiqueta e parece saudável, mas não tem nada para ler. Isto eleva as páginas do arquivo interior ao nível de topo, no mesmo lugar, mantendo o ComicInfo. O que não conseguir comprovar fica intocado."
   },
+  "redownload-corrupt": {
+    "label": "Baixar de novo arquivos corrompidos",
+    "desc": "Desaninha os arquivos compactados no lugar e depois coloca na fila um novo download de cada outro arquivo de quadrinho corrompido. Cada arquivo corrompido fica até que uma cópia boa o substitua, então uma edição que nenhuma fonte tem não perde nada. Arquivos sem edição correspondente não podem ser baixados e são apenas contados."
+  },
   "remove-duplicates": {
     "label": "Remover arquivos duplicados",
     "desc": "Apaga cópias duplicadas da mesma edição em todos os quadrinhos. Cópias corrompidas que uma boa já substituiu vão logo embora. Onde existem duas cópias BOAS, fica a melhor — primeiro a etiquetada, depois a com mais páginas, depois a maior — e a outra é removida; essa parte corre como pré-visualização (veja Registros → ferramentas para a lista) a não ser que marque a caixa."

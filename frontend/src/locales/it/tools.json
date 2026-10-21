@@ -19,6 +19,10 @@
     "label": "Estrai gli archivi annidati",
     "desc": "Alcune release contengono un .cbz che racchiude un .cbr invece delle pagine — si apre, si tagga e sembra sano, ma non ha nulla da leggere. Questo porta le pagine dell'archivio interno al livello superiore, sul posto, conservando il ComicInfo. Tutto ciò che non può essere verificato resta intatto."
   },
+  "redownload-corrupt": {
+    "label": "Riscarica i file danneggiati",
+    "desc": "Estrae sul posto gli archivi annidati, poi mette in coda un nuovo download di ogni altro file di fumetto danneggiato. Ogni file danneggiato resta finché una copia buona non lo sostituisce, quindi un numero che nessuna fonte ha non perde nulla. I file non abbinati a un numero non si possono scaricare e vengono solo contati."
+  },
   "remove-duplicates": {
     "label": "Rimuovi i file duplicati",
     "desc": "Elimina le copie duplicate dello stesso albo in ogni fumetto. Le copie corrotte già sostituite da una buona vengono eliminate subito. Dove esistono due copie BUONE, si conserva la migliore — prima quella taggata, poi quella con più pagine, poi la più grande — e l'altra viene rimossa; questa parte gira come anteprima (vedi Log → strumenti per l'elenco) a meno che non spunti la casella."

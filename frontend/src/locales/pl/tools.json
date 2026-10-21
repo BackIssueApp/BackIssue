@@ -19,6 +19,10 @@
     "label": "Rozpakuj zagnieżdżone archiwa",
     "desc": "Niektóre wydania zawierają plik .cbz, w którym zamiast stron jest plik .cbr — otwiera się, taguje i wygląda dobrze, ale nie ma czego czytać. To narzędzie przenosi strony wewnętrznego archiwum na najwyższy poziom, w miejscu, zachowując ComicInfo. Wszystko, czego nie da się potwierdzić, zostaje nietknięte."
   },
+  "redownload-corrupt": {
+    "label": "Pobierz ponownie uszkodzone pliki",
+    "desc": "Rozpakowuje na miejscu zagnieżdżone archiwa, a potem dodaje do kolejki ponowne pobranie każdego innego uszkodzonego pliku komiksu. Każdy uszkodzony plik zostaje, dopóki nie zastąpi go dobra kopia, więc numer, którego nie ma żadne źródło, niczego nie traci. Plików niedopasowanych do numeru nie da się pobrać — są tylko liczone."
+  },
   "remove-duplicates": {
     "label": "Usuń zduplikowane pliki",
     "desc": "Usuń zduplikowane kopie tego samego zeszytu we wszystkich komiksach. Uszkodzone kopie, które dobra już zastąpiła, są usuwane od razu. Gdy istnieją dwie DOBRE kopie, zostaje najlepsza — najpierw otagowana, potem z największą liczbą stron, potem największa — a druga jest usuwana; ta część działa jako podgląd (lista w Dzienniki → narzędzia), chyba że zaznaczysz pole."

@@ -19,6 +19,10 @@
     "label": "Desempaquetar archivos anidados",
     "desc": "Algunos lanzamientos traen un .cbz que contiene un .cbr en lugar de páginas: se abre, se etiqueta y parece sano, pero no hay nada que leer. Esta herramienta sube las páginas del archivo interno al nivel superior, en el mismo sitio, conservando el ComicInfo. Lo que no pueda demostrar se deja intacto."
   },
+  "redownload-corrupt": {
+    "label": "Volver a descargar archivos dañados",
+    "desc": "Desempaqueta en su sitio los archivos anidados y luego pone en cola una nueva descarga de cada otro archivo de cómic dañado. Cada archivo dañado se conserva hasta que lo sustituye una copia buena, así que no se pierde nada si ninguna fuente tiene el número. Los archivos sin número asociado no se pueden descargar y solo se cuentan."
+  },
   "remove-duplicates": {
     "label": "Eliminar archivos duplicados",
     "desc": "Borra las copias duplicadas del mismo número en todos los cómics. Las copias corruptas que ya reemplazó una buena se van directamente. Cuando existen dos copias BUENAS, se conserva la mejor (primero la etiquetada, luego la de más páginas, luego la más grande) y se elimina la otra; esa parte se ejecuta como vista previa (consulta la lista en Registros → herramientas) a menos que marques la casilla."

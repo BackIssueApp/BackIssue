@@ -8,7 +8,7 @@ import { poolWithResource } from './pool.js';
 import { convertCbrToCbz, verifyArchive, readArchiveInfo, sniffFormat, repackRarAsZip, sidecarPath, unwrapNestedArchive } from './archive.js';
 import { removeSupersededFiles, removeExtraCopies, indexLibrary } from './library.js';
 import { walkFiles } from './sources/usenet.js';
-import { pruneLibraryFiles, SELF_DESCRIBED_TYPES } from './db.js';
+import { pruneLibraryFiles, SELF_DESCRIBED_TYPES, ensureCvIssueRow } from './db.js';
 import { libraryStats } from './db.js';
 import { linkFilesToCv, refreshCvVolume, relinkMatchedSeries } from './cvmatch.js';
 import { tagFileFromCv } from './metatagger.js';
@@ -116,11 +116,35 @@ export async function unwrapNestedArchives(db, onProgress = () => {}) {
       } else skipped++;
     } catch (e) {
       failed++;
-      logWarn('tools', `unwrap failed: ${p} — ${e?.message || e}`);
+      logWarn(`unwrap failed: ${p} — ${e?.message || e}`, 'tools');
     }
     onProgress({ done: ++done, total: files.length, message: `${unwrapped} unwrapped` });
   });
   return { total: files.length, unwrapped, skipped, failed };
+}
+
+// Re-download every corrupt comic file. Nested archives are unwrapped first
+// (fixed in place, nothing to fetch); each remaining corrupt file linked to an
+// issue is queued through `queue`, the same reset-and-queue as the series
+// page's Re-download. The corrupt file stays until a valid copy is indexed,
+// so an issue no source has loses nothing. Files not linked to any issue
+// can't be fetched and are only counted. Book and audiobook series are left
+// out: their files come from their own plugins' downloads.
+export async function redownloadCorrupt(db, onProgress = () => {}, { queue = () => {} } = {}) {
+  const unwrap = await unwrapNestedArchives(db, (p) => onProgress({ ...p, message: `unwrapping: ${p.message || ''}` }));
+  const rows = db.prepare(`SELECT lf.series_id sid, lf.issue_id iid, lf.cv_issue_id cvid, s.type, ci.issue_number num, ci.name nm
+      FROM library_files lf JOIN series s ON s.id = lf.series_id
+      LEFT JOIN cv_issues ci ON ci.comicvine_id = lf.cv_issue_id
+     WHERE lf.valid = 0`).all().filter((r) => !SELF_DESCRIBED_TYPES.has(r.type || 'comic'));
+  const ids = new Set();
+  let notMatched = 0;
+  for (const r of rows) {
+    const id = r.cvid ? ensureCvIssueRow(db, { seriesId: r.sid, cvIssueId: r.cvid, number: r.num, title: r.nm }) : r.iid;
+    if (id) ids.add(Number(id)); else notMatched++;
+  }
+  if (ids.size) await queue([...ids]);
+  onProgress({ done: rows.length, total: rows.length, message: `${ids.size} queued` });
+  return { unwrapped: unwrap.unwrapped, queued: ids.size, notMatched };
 }
 
 // Duplicate copies across every comic. Invalid files a good copy already

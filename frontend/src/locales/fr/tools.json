@@ -19,6 +19,10 @@
     "label": "Extraire les archives imbriquées",
     "desc": "Certaines releases livrent un .cbz qui contient un .cbr au lieu de pages — il s'ouvre, s'étiquette, semble sain, et n'a rien à lire. Cet outil remonte les pages de l'archive interne au niveau supérieur, sur place, en conservant le ComicInfo. Tout ce qu'il ne peut pas prouver est laissé intact."
   },
+  "redownload-corrupt": {
+    "label": "Retélécharger les fichiers corrompus",
+    "desc": "Désimbrique sur place les archives imbriquées, puis met en file un nouveau téléchargement de chaque autre fichier de comic corrompu. Chaque fichier corrompu reste en place jusqu’à ce qu’une bonne copie le remplace : un numéro qu’aucune source n’a ne perd donc rien. Les fichiers non associés à un numéro ne peuvent pas être récupérés et sont seulement comptés."
+  },
   "remove-duplicates": {
     "label": "Supprimer les fichiers en double",
     "desc": "Supprime les copies en double d'un même numéro dans tous les comics. Les copies corrompues déjà remplacées par une bonne partent directement. Quand deux BONNES copies existent, la meilleure est conservée — étiquetée d'abord, puis la plus de pages, puis la plus volumineuse — et l'autre supprimée ; cette partie s'exécute en aperçu (voir Journaux → outils pour la liste) sauf si vous cochez la case."

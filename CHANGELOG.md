@@ -8,6 +8,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Added
+
+- **Re-download corrupt files** (Tools). One run fixes nested archives in place,
+  then queues a fresh download of every other corrupt comic, instead of
+  re-downloading series by series. A corrupt file stays until a good copy
+  replaces it, so an issue no source has loses nothing.
+
 ### Fixed
 
 - **CBR files are never marked corrupt because the background reader couldn't start.** If its

@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { openDb, upsertSeries, setSeriesCv, upsertCvSeries, upsertCvIssue, upsertLibraryFile, linkFileCvIssue, getLibraryFile } from '../src/db.js';
-import { convertAllCbr, removeAllDuplicates, relinkAllCv, verifyLibrary, scanEntireLibrary, tagAllUntagged } from '../src/tools.js';
+import { convertAllCbr, removeAllDuplicates, relinkAllCv, verifyLibrary, scanEntireLibrary, tagAllUntagged, redownloadCorrupt } from '../src/tools.js';
 import JSZip from 'jszip';
 
 async function realCbz(p) {
@@ -309,4 +309,27 @@ test('removeGhostSeries: previews then deletes legacy no-CV no-file rows; spares
   assert.equal(db.prepare('SELECT COUNT(*) c FROM issues WHERE series_id = ?').get(ghost).c, 0);
   assert.equal(db.prepare('SELECT COUNT(*) c FROM user_follows WHERE series_id = ?').get(ghost).c, 0);
   for (const id of [matched, withFile, book]) assert.ok(db.prepare('SELECT 1 FROM series WHERE id = ?').get(id), 'survivor ' + id);
+});
+
+test('redownloadCorrupt: queues each corrupt file linked to an issue once, counts the unlinked, leaves good files alone', async () => {
+  const db = openDb(':memory:');
+  const s = upsertSeries(db, { title: 'Invincible', url: 'cv:20' });
+  setSeriesCv(db, s, 20, { locked: 1 });
+  upsertCvSeries(db, { id: 20, name: 'Invincible', count_of_issues: 3 });
+  upsertCvIssue(db, { id: 201, cv_series_id: 20, number: '1', name: 'One' });
+  upsertCvIssue(db, { id: 202, cv_series_id: 20, number: '2', name: 'Two' });
+  const file = (p, valid, cv) => {
+    upsertLibraryFile(db, { path: p, dir: '/', name: p.slice(1), size: 1, mtime: 1, valid, page_count: valid ? 20 : null, series_id: s });
+    if (cv) linkFileCvIssue(db, p, cv);
+  };
+  file('/inv1.cbz', 0, 201);
+  file('/inv1b.cbz', 0, 201); // a second corrupt copy of the same issue
+  file('/inv2.cbz', 1, 202); // healthy: not touched
+  file('/mystery.cbz', 0, null); // corrupt, matched to nothing
+  const queued = [];
+  const r = await redownloadCorrupt(db, () => {}, { queue: (ids) => { queued.push(...ids); } });
+  assert.deepEqual([r.queued, r.notMatched], [1, 1]);
+  assert.equal(queued.length, 1);
+  assert.equal(db.prepare('SELECT url FROM issues WHERE id=?').get(queued[0]).url, 'cvissue:201');
+  assert.ok(getLibraryFile(db, '/inv1.cbz'), 'the corrupt file stays until a good copy replaces it');
 });

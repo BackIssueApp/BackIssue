@@ -19,6 +19,10 @@
     "label": "Unwrap nested archives",
     "desc": "Some releases ship a .cbz that holds a .cbr instead of pages — it opens, tags and looks healthy, and has nothing to read. This lifts the inner archive’s pages to the top level, in place, keeping the ComicInfo. Anything it cannot prove is left untouched."
   },
+  "redownload-corrupt": {
+    "label": "Re-download corrupt files",
+    "desc": "Unwrap nested archives in place, then queue a fresh download of every other corrupt comic file. Each corrupt file stays until a good copy replaces it, so an issue no source has loses nothing. Files not matched to an issue can't be fetched and are only counted."
+  },
   "remove-duplicates": {
     "label": "Remove duplicate files",
     "desc": "Delete duplicate copies of the same issue across every comic. Corrupt copies a good one already replaced go outright. Where two GOOD copies exist, the best is kept — tagged first, then the most pages, then the largest — and the other removed; that part runs as a preview (see Logs → tools for the list) unless you tick the box."

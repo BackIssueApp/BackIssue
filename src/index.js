@@ -31,7 +31,7 @@ import { startJob, listJobs, clearFinishedJobs, attachJobsDb } from './jobs.js';
 import { createScheduler } from './scheduler.js';
 import { createDownloadMonitor, CLIENT_SOURCES } from './downloadmonitor.js';
 import { activeMedia as activeMediaList, emitMedia } from './mediadownload.js';
-import { tagAllUntagged, convertAllCbr, unwrapNestedArchives, removeAllDuplicates, verifyLibrary, relinkAllCv, scanEntireLibrary, backupDatabase, renameAllFiles, removeGhostSeries } from './tools.js';
+import { tagAllUntagged, convertAllCbr, unwrapNestedArchives, redownloadCorrupt, removeAllDuplicates, verifyLibrary, relinkAllCv, scanEntireLibrary, backupDatabase, renameAllFiles, removeGhostSeries } from './tools.js';
 import { collectionStats } from './stats.js';
 import { installConsoleCapture, attachLogDb, listLogs, clearLogs, logInfo, logWarn, logError, logCounts, logCategories } from './logstore.js';
 import { startWatchdog } from './watchdog.js';
@@ -185,6 +185,7 @@ const TOOLS = {
   'tag-untagged': { label: "Tag all untagged files", desc: "Write metadata into every owned file that has none (converts .cbr as needed).", needsCv: true, run: (op) => tagAllUntagged(db, cvClient(), op) },
   'convert-cbr': { label: "Convert all CBR → CBZ", desc: "Repack every .cbr as a .cbz so it can be tagged and read consistently.", run: (op) => convertAllCbr(db, op) },
   'unwrap-nested': { label: "Unwrap nested archives", desc: "Some releases ship a .cbz that holds a .cbr instead of pages — it opens, tags and looks healthy, and has nothing to read. This lifts the inner archive’s pages to the top level, in place, keeping the ComicInfo. Anything it cannot prove is left untouched.", run: (op) => unwrapNestedArchives(db, op) },
+  'redownload-corrupt': { label: "Re-download corrupt files", desc: "Unwrap nested archives in place, then queue a fresh download of every other corrupt comic file. Each corrupt file stays until a good copy replaces it, so an issue no source has loses nothing. Files not matched to an issue can't be fetched and are only counted.", run: (op) => redownloadCorrupt(db, op, { queue: queueRedownload }) },
   'remove-duplicates': { label: "Remove duplicate files", desc: "Delete duplicate copies of the same issue across every comic. Corrupt copies a good one already replaced go outright. Where two GOOD copies exist, the best is kept — tagged first, then the most pages, then the largest — and the other removed; that part runs as a preview (see Logs → tools for the list) unless you tick the box.", run: (op, opts) => removeAllDuplicates(db, op, opts) },
   'verify': { label: "Verify archives", desc: "Deep-check every comic file for corruption and prune ones missing from disk.", run: (op, opts) => verifyLibrary(db, op, opts) },
   'relink-cv': { label: "Re-link files to metadata", desc: "Re-map owned files to the metadata source's issues for every matched comic (fixes owned/missing counts).", run: (op) => relinkAllCv(db, op) },
@@ -1279,6 +1280,12 @@ function recordProgressTagLog(p) {
 // the new file takes the clean name), so a grab that never lands loses nothing.
 async function prepareRedownload(issueIds) {
   clearIssuesForRedownload(db, issueIds);
+}
+// The Tools page's bulk re-download: reset, queue, and start the queue if idle.
+async function queueRedownload(issueIds) {
+  await prepareRedownload(issueIds);
+  queueIssues(db, issueIds);
+  if (!state.queue.running) Promise.resolve(runDownloads()).catch((e) => { state.queue.error = String(e); state.queue.running = false; });
 }
 
 // The support package (System → Tools): built the same way whether it is

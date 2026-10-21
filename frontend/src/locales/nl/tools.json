@@ -19,6 +19,10 @@
     "label": "Geneste archieven uitpakken",
     "desc": "Sommige releases bevatten een .cbz met daarin een .cbr in plaats van pagina's — die opent, tagt en lijkt gezond, maar heeft niets om te lezen. Dit tilt de pagina's van het binnenste archief naar het hoogste niveau, ter plekke, met behoud van de ComicInfo. Wat niet aantoonbaar is, blijft ongemoeid."
   },
+  "redownload-corrupt": {
+    "label": "Beschadigde bestanden opnieuw downloaden",
+    "desc": "Pakt geneste archieven ter plekke uit en zet daarna elk ander beschadigd stripbestand opnieuw in de downloadwachtrij. Elk beschadigd bestand blijft staan tot een goede kopie het vervangt, dus een nummer dat geen bron heeft gaat niet verloren. Bestanden die niet aan een nummer gekoppeld zijn, kunnen niet worden opgehaald en worden alleen geteld."
+  },
   "remove-duplicates": {
     "label": "Dubbele bestanden verwijderen",
     "desc": "Verwijdert dubbele kopieën van hetzelfde nummer in elke strip. Beschadigde kopieën die al door een goede zijn vervangen gaan meteen weg. Waar twee GOEDE kopieën bestaan, blijft de beste — eerst de getagde, dan die met de meeste pagina's, dan de grootste — en wordt de andere verwijderd; dat deel draait als voorbeeld (zie Logboek → hulpmiddelen voor de lijst), tenzij je het vakje aanvinkt."
