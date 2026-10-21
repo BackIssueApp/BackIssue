@@ -8,6 +8,15 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+## [0.9.4] — 2026-10-21
+
+### Security
+
+- **Built on Node.js 22.23.4, which fixes the October 21 Node.js security issues.** These include a
+  Brotli decompression flaw that could let a malicious server run code (BackIssue fetches from
+  indexers, download sites and the metadata service) and TLS hostname checks that could be
+  bypassed. Every 0.9.3 and older image runs an affected Node.js. Update promptly.
+
 ### Added
 
 - **Re-download corrupt files** (Tools). One run fixes nested archives in place,
@@ -21,10 +30,8 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   load and rebuild the whole archive in memory, which failed with "not enough memory" on big
   collected editions. Now only the end of the file is rewritten: the pages are never read or
   re-compressed, so a 1 GB file tags in milliseconds.
-
 - **CBR files are never marked corrupt because the background reader couldn't start.** If its
   threads fail to start on a system, BackIssue now reads archives the old way instead.
-
 - **A queue row no longer shows the last source's page count while the next source searches.**
   When one source failed partway through an issue, its "page 31 / 32" stayed on the row
   while the next source searched; the row now shows the search instead.
