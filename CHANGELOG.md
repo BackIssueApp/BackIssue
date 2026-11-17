@@ -30,6 +30,9 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   volumes 1 to 13. Chapter files are now left out of a manga series' pack import and listed as
   "chapter N, not a volume"; volume files (`v01`, `Vol. 1`) and bare numbers import as before.
   Comic series are unchanged. (#17)
+- **A refresh could erase a series cover.** When a metadata source answered without any art for a
+  series, the refresh overwrote the cover it already had with nothing, leaving the placeholder
+  with no way back. A missing cover from a source now keeps the existing one. (#15)
 - **KOReader reading time stopped syncing for heavy readers.** A device with more than about
   1,500 unsynced page turns on one book sent an upload larger than the server would accept, and
   the same upload was rejected on every sync after that. The server now accepts JSON bodies up

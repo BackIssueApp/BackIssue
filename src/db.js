@@ -2027,7 +2027,7 @@ export function upsertCvSeries(db, v) {
        name=excluded.name, publisher=excluded.publisher, start_year=excluded.start_year,
        count_of_issues=excluded.count_of_issues, description=excluded.description,
        deck=COALESCE(excluded.deck, cv_series.deck),
-       image_url=excluded.image_url, site_detail_url=COALESCE(excluded.site_detail_url, cv_series.site_detail_url),
+       image_url=COALESCE(excluded.image_url, cv_series.image_url), site_detail_url=COALESCE(excluded.site_detail_url, cv_series.site_detail_url),
        aliases=COALESCE(excluded.aliases, cv_series.aliases),
        meta_source=COALESCE(cv_series.meta_source, excluded.meta_source),
        meta_ref=COALESCE(cv_series.meta_ref, excluded.meta_ref),

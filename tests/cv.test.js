@@ -761,3 +761,16 @@ test('rankSearchResults: the current run from a familiar publisher outranks tran
   assert.equal(rankSearchResults(null, 'x'), null);
   assert.deepEqual(rankSearchResults([{ id: 1, name: 'A' }, { id: 2, name: 'A' }], 'A').map((v) => v.id), [1, 2]);
 });
+
+// A refresh through a provider that has no art for the series (a Metron-routed
+// volume whose issue stubs carry no image, or a stub listing) must not erase the
+// cover the series already had: that left a stable set of series on the
+// placeholder with nothing a user could do about it (#15).
+test('upsertCvSeries keeps an existing cover when the provider returns none', () => {
+  const db = openDb(':memory:');
+  upsertCvSeries(db, { id: 77, name: 'Kept', count_of_issues: 1, image_url: 'https://img.example/kept.jpg' });
+  upsertCvSeries(db, { id: 77, name: 'Kept', count_of_issues: 1, image_url: null });
+  assert.equal(getCvSeries(db, 77).image_url, 'https://img.example/kept.jpg');
+  upsertCvSeries(db, { id: 77, name: 'Kept', count_of_issues: 1, image_url: 'https://img.example/new.jpg' });
+  assert.equal(getCvSeries(db, 77).image_url, 'https://img.example/new.jpg', 'a real new cover still replaces it');
+});
