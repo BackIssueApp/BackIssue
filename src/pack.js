@@ -103,6 +103,10 @@ export async function processPack(db, { dir, cvClient, scope, dryRun = false, re
       if (!seriesId) { unmatched++; note('unmatched', file, scope.addNew ? `no confident ComicVine volume to add for "${parsed.series}"` : `series not in collection ("${parsed.series}")`); continue; }
       const series = getSeriesById(db, seriesId);
       if (!series?.cv_id) { unmatched++; note('unmatched', file, 'series not matched to a metadata record'); continue; }
+      // A manga series is collected by volume. A chapter file ("c001", "ch. 12")
+      // carries a number too, but it is not volume 1: leave it out rather than
+      // file chapters 1-13 as volumes 1-13.
+      if (series.type === 'manga' && parsed.marker === 'chapter') { unmatched++; note('unmatched', file, `chapter ${parsed.number}, not a volume`); continue; }
 
       // 2. Match the issue number within that CV volume. If it's missing and we can
       // refresh (0-day: the just-released issue isn't in the CV cache yet), re-pull

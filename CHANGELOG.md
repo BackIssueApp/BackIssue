@@ -25,6 +25,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   never tagged. The number now comes from the cached catalog issue. The torrent and usenet sources
   also accept either `downloadUrl` or `nzbUrl` on a result, and a result with neither is refused
   with a clear error instead of an empty add at the download client. (#20)
+- **A manga chapter pack filed chapters as volumes.** A pack of chapter files (`c001`, `ch. 12`,
+  `Chapter 5`) matched a manga series' volumes by number, so chapters 1 to 13 were imported as
+  volumes 1 to 13. Chapter files are now left out of a manga series' pack import and listed as
+  "chapter N, not a volume"; volume files (`v01`, `Vol. 1`) and bare numbers import as before.
+  Comic series are unchanged. (#17)
 - **KOReader reading time stopped syncing for heavy readers.** A device with more than about
   1,500 unsynced page turns on one book sent an upload larger than the server would accept, and
   the same upload was rejected on every sync after that. The server now accepts JSON bodies up

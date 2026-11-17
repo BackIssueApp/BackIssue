@@ -139,3 +139,26 @@ test('processPack (series scope): forces every file onto one series volume', asy
   assert.equal(r.imported, 1, JSON.stringify(r.details)); // matched Saga #2 by number despite the filename series
   await fs.rm(dir, { recursive: true, force: true });
 });
+
+test('processPack (manga series): chapter files are left out, volume files import', async () => {
+  const { db, saga } = await setup();
+  db.prepare("UPDATE series SET type='manga' WHERE id=?").run(saga);
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'pack-'));
+  await cbz(path.join(dir, '【SAGA】 c002 - THE SECOND ONE (2012) (Digital).cbz'));
+  await cbz(path.join(dir, 'Saga ch. 2 (2012).cbz'));
+  await cbz(path.join(dir, 'Saga v02 (2012) (Digital).cbz'));
+  const r = await processPack(db, { dir, scope: { type: 'series', seriesId: saga }, dryRun: true });
+  assert.equal(r.imported, 1, JSON.stringify(r.details));
+  assert.equal(r.unmatched, 2);
+  assert.ok(r.details.filter((d) => d.outcome === 'unmatched').every((d) => /chapter 2, not a volume/.test(d.reason)), JSON.stringify(r.details));
+  await fs.rm(dir, { recursive: true, force: true });
+});
+
+test('processPack (comic series): a chapter-looking name still imports by number', async () => {
+  const { db, saga } = await setup();
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'pack-'));
+  await cbz(path.join(dir, 'Saga ch. 2 (2012).cbz'));
+  const r = await processPack(db, { dir, scope: { type: 'series', seriesId: saga }, dryRun: true });
+  assert.equal(r.imported, 1, JSON.stringify(r.details));
+  await fs.rm(dir, { recursive: true, force: true });
+});

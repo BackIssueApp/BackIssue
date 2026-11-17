@@ -154,27 +154,27 @@ test('usenet normalizeSeries: leading "the" and & handled, distinct names differ
 });
 
 test('usenet parseReleaseName: series / number / year', () => {
-  assert.deepEqual(parseReleaseName('Spider-Man 001 (1990) (digital) (Group)'), { series: 'Spider-Man', number: '1', year: '1990' });
-  assert.deepEqual(parseReleaseName('Amazing Spider-Man 700 (2013)'), { series: 'Amazing Spider-Man', number: '700', year: '2013' });
-  assert.deepEqual(parseReleaseName('Batman 05 (of 12) (2016)'), { series: 'Batman', number: '5', year: '2016' });
-  assert.deepEqual(parseReleaseName('Spider-Man 2099 001 (1992)'), { series: 'Spider-Man 2099', number: '1', year: '1992' }); // volume number stays in series
+  assert.deepEqual(parseReleaseName('Spider-Man 001 (1990) (digital) (Group)'), { series: 'Spider-Man', number: '1', year: '1990', marker: null });
+  assert.deepEqual(parseReleaseName('Amazing Spider-Man 700 (2013)'), { series: 'Amazing Spider-Man', number: '700', year: '2013', marker: null });
+  assert.deepEqual(parseReleaseName('Batman 05 (of 12) (2016)'), { series: 'Batman', number: '5', year: '2016', marker: null });
+  assert.deepEqual(parseReleaseName('Spider-Man 2099 001 (1992)'), { series: 'Spider-Man 2099', number: '1', year: '1992', marker: null }); // volume number stays in series
   // decimal issue numbers survive (the ½ promo / point-ones): dot between digits kept
-  assert.deepEqual(parseReleaseName('Spider-Man 000.5 (1998) (Marvel-Wizard)'), { series: 'Spider-Man', number: '0.5', year: '1998' });
-  assert.deepEqual(parseReleaseName('Amazing Spider-Man 001.1 (2014)'), { series: 'Amazing Spider-Man', number: '1.1', year: '2014' });
+  assert.deepEqual(parseReleaseName('Spider-Man 000.5 (1998) (Marvel-Wizard)'), { series: 'Spider-Man', number: '0.5', year: '1998', marker: null });
+  assert.deepEqual(parseReleaseName('Amazing Spider-Man 001.1 (2014)'), { series: 'Amazing Spider-Man', number: '1.1', year: '2014', marker: null });
   // "-1" (Marvel Flashback) issues: the leading minus is the issue number...
-  assert.deepEqual(parseReleaseName('X-Men -1 (1997)'), { series: 'X-Men', number: '-1', year: '1997' });
+  assert.deepEqual(parseReleaseName('X-Men -1 (1997)'), { series: 'X-Men', number: '-1', year: '1997', marker: null });
   // ...but a hyphen inside a series name (X-23) is NOT mistaken for a negative.
-  assert.deepEqual(parseReleaseName('X-23 5 (2010)'), { series: 'X-23', number: '5', year: '2010' });
+  assert.deepEqual(parseReleaseName('X-23 5 (2010)'), { series: 'X-23', number: '5', year: '2010', marker: null });
   // An inline volume marker ("vN", "Vol N") identifies the volume, not the
   // series — strip it so the series matches its catalog name. (This is the
   // Stumptown-#6/#7 bug: the only release was "Stumptown v3 007", and the "v3"
   // left in the series made the strict auto-matcher reject a perfect match.)
-  assert.deepEqual(parseReleaseName('Stumptown v3 007 (2015) (Digital-Empire)'), { series: 'Stumptown', number: '7', year: '2015' });
-  assert.deepEqual(parseReleaseName('Batman v2 012 (2013)'), { series: 'Batman', number: '12', year: '2013' });
-  assert.deepEqual(parseReleaseName('Batman Vol 2 012 (2013)'), { series: 'Batman', number: '12', year: '2013' });
+  assert.deepEqual(parseReleaseName('Stumptown v3 007 (2015) (Digital-Empire)'), { series: 'Stumptown', number: '7', year: '2015', marker: null });
+  assert.deepEqual(parseReleaseName('Batman v2 012 (2013)'), { series: 'Batman', number: '12', year: '2013', marker: null });
+  assert.deepEqual(parseReleaseName('Batman Vol 2 012 (2013)'), { series: 'Batman', number: '12', year: '2013', marker: null });
   // The digits are required: a name that merely contains a volume number stays
   // intact ("Spider-Man 2099" above), and a hyphenated name isn't touched.
-  assert.deepEqual(parseReleaseName('X-23 v3 001 (2018)'), { series: 'X-23', number: '1', year: '2018' });
+  assert.deepEqual(parseReleaseName('X-23 v3 001 (2018)'), { series: 'X-23', number: '1', year: '2018', marker: null });
 });
 
 test('usenet: an inline volume marker no longer defeats the auto-matcher (Stumptown #7)', () => {
@@ -375,4 +375,16 @@ test('ensureCvIssueRow: a grab that names only the catalog issue takes its numbe
   // Unknown to the cache: the old placeholder, not a crash.
   const unknown = ensureCvIssueRow(db, { seriesId: sid, cvIssueId: 4242 });
   assert.equal(db.prepare('SELECT issue_number FROM issues WHERE id=?').get(unknown).issue_number, null);
+});
+
+// A manga chapter pack must not file chapter N as volume N (#17): the parser
+// says which notation the number came with.
+test('parseReleaseName: marker tells a chapter number from a volume number', () => {
+  assert.equal(parseReleaseName('【OSHI NO KO】 c001 - MOTHER AND CHILD (2022) (Digital) (Antrill)').marker, 'chapter');
+  assert.equal(parseReleaseName('Oshi no Ko ch. 12 (2022)').marker, 'chapter');
+  assert.equal(parseReleaseName('Frieren - Chapter 5 (2021)').marker, 'chapter');
+  assert.equal(parseReleaseName('Oshi no Ko v01 (2023) (Digital)').marker, 'volume');
+  assert.equal(parseReleaseName('Berserk Vol. 3 (2004)').marker, 'volume');
+  assert.equal(parseReleaseName('Saga 002 (2012)').marker, null, 'a bare number says nothing');
+  assert.equal(parseReleaseName('Stumptown v3 005 (2015)').marker, null, 'an inline volume marker is the volume, the number is the issue');
 });

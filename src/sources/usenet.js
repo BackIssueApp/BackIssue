@@ -46,7 +46,10 @@ export function parseReleaseName(title) {
   // A fraction ("Wizard 1/2") is one number, the half issue — not issue 2 of
   // a series called "Wizard 1/".
   const nums = cleaned.match(/(?<!\w)-?\d+(?:\/\d+(?![\d/])|\.\d+)?/g);
-  let number = null, series = cleaned;
+  // `marker` says what notation the number came with: 'chapter' (c001, ch. 12,
+  // Chapter 5), 'volume' (v03, Vol. 1) or null for a bare number. A manga pack
+  // of chapters must not file chapter 1 as volume 1.
+  let number = null, series = cleaned, marker = null;
   if (nums) {
     const last = nums[nums.length - 1];
     number = normalizeNumber(last);   // "001" -> "1", "000.5" -> "0.5"
@@ -60,10 +63,13 @@ export function parseReleaseName(title) {
     if (tok && !(/^v/i.test(tok[1]) && /^(?:19|20)\d{2}$/.test(tok[2]))) {
       number = normalizeNumber(tok[2]);
       series = cleaned.slice(0, tok.index);
+      marker = /^c/i.test(tok[1]) ? 'chapter' : 'volume';
     }
   }
   // A marker word left dangling at the series tail ("naruto ch", "vagabond vol",
   // "frieren … - chapter") is part of the number's notation, not the name.
+  const tail = number != null && series.match(/[\s._-]*(c|ch|chapter|v|vol|volume)[\s.]*$/i);
+  if (tail) marker = /^c/i.test(tail[1]) ? 'chapter' : 'volume';
   series = series.replace(/[\s._-]*(?:c|ch|chapter|v|vol|volume)[\s.]*$/i, '');
   // An INLINE volume marker with its number ("Stumptown v3", "Batman Vol 2") is
   // a release-naming convention where vN identifies the VOLUME, distinct from
@@ -73,7 +79,7 @@ export function parseReleaseName(title) {
   // trailing digits so it only fires on the vN form (the marker-word-only case
   // is handled just above).
   series = series.replace(/[\s._-]+v(?:ol(?:ume)?)?\.?\s*\d+\s*$/i, '');
-  return { series: series.trim(), number, year };
+  return { series: series.trim(), number, year, marker };
 }
 
 // Score a release against the wanted issue, or return null if it's the wrong
