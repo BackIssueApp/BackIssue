@@ -56,7 +56,10 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
   // decision correct. Off by default so a DIRECT deploy never trusts a
   // spoofed X-Forwarded-For. Set trustProxy to true / a hop count / a subnet.
   if (config.trustProxy) app.set('trust proxy', config.trustProxy);
-  app.use(express.json()); // 100kb default body cap — fine for this API
+  // JSON body cap. Express's 100kb default is too small for the KOReader
+  // plugin's reading-event uploads (2,000 page turns ≈ 127kb), which would
+  // then fail on every sync; 1mb bounds memory per request with room to spare.
+  app.use(express.json({ limit: '1mb' }));
 
   // gzip responses — a 2,000-issue volume detail is ~1MB of JSON raw, ~10x
   // smaller compressed, which matters on WiFi tablets. SSE must stay
@@ -2240,7 +2243,7 @@ export function createApp({ db, openApiBeforeSetup = false, runDownloads, prepar
     if (err?.type === 'entity.parse.failed' || err instanceof SyntaxError) {
       return res.status(400).json({ error: 'invalid JSON body' });
     }
-    // An oversized body (past express.json's 100kb cap) is also a 4xx.
+    // An oversized body (past express.json's 1mb cap) is also a 4xx.
     if (err?.type === 'entity.too.large' || err?.status === 413) {
       return res.status(413).json({ error: 'request body too large' });
     }

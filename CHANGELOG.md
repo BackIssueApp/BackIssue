@@ -8,6 +8,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **KOReader reading time stopped syncing for heavy readers.** A device with more than about
+  1,500 unsynced page turns on one book sent an upload larger than the server would accept, and
+  the same upload was rejected on every sync after that. The server now accepts JSON bodies up
+  to 1 MB (it was 100 KB).
+
 ### Added
 
 - **The paged library list can be limited to comics.** `GET /api/collection` with `limit`/`offset`
