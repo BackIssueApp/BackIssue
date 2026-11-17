@@ -20,7 +20,7 @@
     "one": "Rename {count} file?",
     "other": "Rename {count} files?"
   },
-  "renameMessage": "Files for \"{title}\" are moved/renamed to match your folder and file patterns{collisions}.",
+  "renameMessage": "Files for \"{title}\" are moved/renamed to match your folder and file patterns, under its library’s folder{collisions}.",
   "renameCollisions": " ({count} would collide and are skipped)",
   "renameFiles": "Rename files",
   "renamed": {

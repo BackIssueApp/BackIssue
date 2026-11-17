@@ -20,7 +20,7 @@
     "one": "Mudar o nome a {count} arquivo?",
     "other": "Mudar o nome a {count} arquivos?"
   },
-  "renameMessage": "Os arquivos de \"{title}\" são movidos/renomeados para corresponder aos seus padrões de pastas e arquivos{collisions}.",
+  "renameMessage": "Os arquivos de \"{title}\" são movidos/renomeados para corresponder aos seus padrões de pastas e arquivos, dentro da pasta da sua biblioteca{collisions}.",
   "renameCollisions": " ({count} entrariam em conflito e são ignorados)",
   "renameFiles": "Mudar o nome aos arquivos",
   "renamed": {

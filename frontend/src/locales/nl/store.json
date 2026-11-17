@@ -20,7 +20,7 @@
     "one": "{count} bestand hernoemen?",
     "other": "{count} bestanden hernoemen?"
   },
-  "renameMessage": "De bestanden van \"{title}\" worden verplaatst/hernoemd volgens je map- en bestandspatronen{collisions}.",
+  "renameMessage": "De bestanden van \"{title}\" worden verplaatst/hernoemd volgens je map- en bestandspatronen, in de map van hun bibliotheek{collisions}.",
   "renameCollisions": " ({count} zouden botsen en worden overgeslagen)",
   "renameFiles": "Bestanden hernoemen",
   "renamed": {

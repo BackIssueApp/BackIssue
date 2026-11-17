@@ -18,7 +18,7 @@
   "renameTitle": {
     "other": "{count} ファイルの名前を変更しますか？"
   },
-  "renameMessage": "「{title}」のファイルを、フォルダーとファイル名のパターンに合わせて移動・名前変更します{collisions}。",
+  "renameMessage": "「{title}」のファイルを、フォルダーとファイル名のパターンに合わせて、所属ライブラリのフォルダー内に移動・名前変更します{collisions}。",
   "renameCollisions": "（{count} 件は名前が衝突するためスキップします）",
   "renameFiles": "ファイル名を変更",
   "renamed": {

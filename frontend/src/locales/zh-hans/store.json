@@ -18,7 +18,7 @@
   "renameTitle": {
     "other": "重命名 {count} 个文件？"
   },
-  "renameMessage": "“{title}”的文件将被移动/重命名，以符合你的文件夹和文件命名规则{collisions}。",
+  "renameMessage": "“{title}”的文件将被移动/重命名，以符合你的文件夹和文件命名规则，并放入其所属库的文件夹{collisions}。",
   "renameCollisions": "（{count} 个会冲突，将被跳过）",
   "renameFiles": "重命名文件",
   "renamed": {

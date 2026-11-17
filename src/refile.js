@@ -14,11 +14,12 @@ import { sidecarPath } from './archive.js';
 
 // Series naming fields, preferring ComicVine's clean name/publisher/start-year.
 function seriesForNaming(db, series) {
+  const type = series.type || 'comic';
   if (series.cv_id) {
     const cv = db.prepare('SELECT name, publisher, start_year FROM cv_series WHERE comicvine_id = ?').get(series.cv_id);
-    if (cv) return { title: cv.name || series.title, publisher: cv.publisher || null, year: cv.start_year || null };
+    if (cv) return { title: cv.name || series.title, publisher: cv.publisher || null, year: cv.start_year || null, type };
   }
-  return { title: series.title, publisher: null, year: null };
+  return { title: series.title, publisher: null, year: null, type };
 }
 
 const norm = (p) => path.resolve(String(p || ''));
@@ -36,11 +37,13 @@ function libraryOf(db, series) {
 }
 const splitFolders = (s) => String(s || '').split(/[\n,]+/).map((x) => x.trim()).filter(Boolean);
 
-// Roots a series may file under: its library's folders first (the first is
-// the library's default filing target), then the global roots.
+// Roots a series may file under. `own` are its library's folders (the first
+// is the library's default filing target); `roots` adds every global root
+// after them, for a series whose library has no folder of its own.
 function rootsFor(db, series) {
   const lib = libraryOf(db, series);
-  return { lib, roots: [...new Set([...splitFolders(lib?.root_folder), ...parseRootFolders(config.rootFolders)])] };
+  const own = splitFolders(lib?.root_folder);
+  return { lib, own, roots: [...new Set([...own, ...parseRootFolders(config.rootFolders)])] };
 }
 function allRoots(db) {
   let libs = [];
@@ -69,7 +72,7 @@ export function canRefile(series) { return !!series.cv_id; }
  *  { from, to, status } where status is 'move' | 'unchanged' | 'skip:<why>'. */
 export async function planSeries(db, series, cache = new Map()) {
   if (!canRefile(series)) return [];
-  const { lib, roots } = rootsFor(db, series);
+  const { lib, own, roots } = rootsFor(db, series);
   const snm = seriesForNaming(db, series);
   // "Publisher/Title (Year)" (OS separators) — the library's own pattern when
   // it has one, as downloads use (manga trees often skip the publisher level).
@@ -87,7 +90,12 @@ export async function planSeries(db, series, cache = new Map()) {
     const ext = (path.extname(f.path).slice(1) || 'cbz').toLowerCase();
     const stem = fileStemFromPattern(snm, { issue_number: f.issue_number, title: f.issue_title, cover_date: f.cover_date }, config.filePattern);
     if (!stem) { plan.push({ from: f.path, to: null, status: 'skip:no-name' }); continue; }
-    const root = roots.find((r) => underRoot(f.path, r)) || roots[0];
+    // A library owns its folders, so a file of one of its series belongs under
+    // them: the folder it is already in when that is one of them, else the
+    // library's first folder (which is how a series moved to another library
+    // gets its files moved too). Only a series whose library has no folder of
+    // its own stays under whichever global root it is in.
+    const root = own.find((r) => underRoot(f.path, r)) || own[0] || roots.find((r) => underRoot(f.path, r)) || roots[0];
     if (!root) { plan.push({ from: f.path, to: null, status: 'skip:no-root' }); continue; }
     const to = path.join(root, folderRel, `${stem}.${ext}`);
     let status;

@@ -20,7 +20,7 @@
     "one": "{count} Datei umbenennen?",
     "other": "{count} Dateien umbenennen?"
   },
-  "renameMessage": "Die Dateien von \"{title}\" werden verschoben/umbenannt, damit sie den Ordner- und Dateimustern entsprechen{collisions}.",
+  "renameMessage": "Die Dateien von \"{title}\" werden verschoben/umbenannt, damit sie den Ordner- und Dateimustern entsprechen, in den Ordner ihrer Bibliothek{collisions}.",
   "renameCollisions": " ({count} würden kollidieren und werden übersprungen)",
   "renameFiles": "Dateien umbenennen",
   "renamed": {

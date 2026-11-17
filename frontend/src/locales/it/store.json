@@ -20,7 +20,7 @@
     "one": "Rinominare {count} file?",
     "other": "Rinominare {count} file?"
   },
-  "renameMessage": "I file di \"{title}\" vengono spostati/rinominati secondo gli schemi di cartelle e file{collisions}.",
+  "renameMessage": "I file di \"{title}\" vengono spostati/rinominati secondo gli schemi di cartelle e file, nella cartella della sua libreria{collisions}.",
   "renameCollisions": " ({count} andrebbero in conflitto e vengono saltati)",
   "renameFiles": "Rinomina file",
   "renamed": {

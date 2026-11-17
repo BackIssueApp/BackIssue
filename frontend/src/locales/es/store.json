@@ -20,7 +20,7 @@
     "one": "¿Renombrar {count} archivo?",
     "other": "¿Renombrar {count} archivos?"
   },
-  "renameMessage": "Los archivos de \"{title}\" se mueven o renombran según tus patrones de carpeta y archivo{collisions}.",
+  "renameMessage": "Los archivos de \"{title}\" se mueven o renombran según tus patrones de carpeta y archivo, dentro de la carpeta de su biblioteca{collisions}.",
   "renameCollisions": " ({count} entrarían en conflicto y se omiten)",
   "renameFiles": "Renombrar archivos",
   "renamed": {

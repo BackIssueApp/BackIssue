@@ -24,7 +24,7 @@
     "many": "Zmienić nazwy {count} plików?",
     "other": "Zmienić nazwy {count} pliku?"
   },
-  "renameMessage": "Pliki serii „{title}” zostaną przeniesione lub przemianowane zgodnie ze wzorcami folderów i plików{collisions}.",
+  "renameMessage": "Pliki serii „{title}” zostaną przeniesione lub przemianowane zgodnie ze wzorcami folderów i plików, do folderu jej biblioteki{collisions}.",
   "renameCollisions": " (kolizje: {count} — zostaną pominięte)",
   "renameFiles": "Zmień nazwy plików",
   "renamed": {

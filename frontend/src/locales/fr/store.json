@@ -20,7 +20,7 @@
     "one": "Renommer {count} fichier ?",
     "other": "Renommer {count} fichiers ?"
   },
-  "renameMessage": "Les fichiers de « {title} » sont déplacés/renommés selon vos modèles de dossier et de fichier{collisions}.",
+  "renameMessage": "Les fichiers de « {title} » sont déplacés/renommés selon vos modèles de dossier et de fichier, dans le dossier de sa bibliothèque{collisions}.",
   "renameCollisions": " ({count} entreraient en conflit et sont ignorés)",
   "renameFiles": "Renommer les fichiers",
   "renamed": {

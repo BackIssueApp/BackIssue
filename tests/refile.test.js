@@ -83,7 +83,7 @@ test('a move updates the issue\'s recorded file too', async () => {
   } finally { rm(); }
 });
 
-test('a series in a library files under that library\'s root and folder pattern', async () => {
+test('a series in a library files under that library\'s own folder and folder pattern', async () => {
   const { dir, db, rm } = setup();
   try {
     const manga = path.join(dir, 'Manga'); fs.mkdirSync(manga);
@@ -94,10 +94,22 @@ test('a series in a library files under that library\'s root and folder pattern'
     db.prepare('UPDATE library_files SET path=? WHERE cv_issue_id=11').run(outside);
     const plan = await planSeries(db, db.prepare('SELECT * FROM series WHERE id=1').get());
     const to = (from) => path.dirname(plan.find((p) => p.from === from).to);
-    // A file stays under the root it is in, laid out by the library's pattern;
-    // one outside every root goes to the library's own folder.
-    assert.equal(to(db.prepare('SELECT path FROM library_files WHERE cv_issue_id=10').get().path), path.join(dir, 'Comics', 'Batman'));
+    // The library owns its folder: a file still under another root (the series
+    // was moved to this library after download) goes to the library's folder,
+    // as does one outside every root. (#19)
+    assert.equal(to(db.prepare('SELECT path FROM library_files WHERE cv_issue_id=10').get().path), path.join(manga, 'Batman'));
     assert.equal(to(outside), path.join(manga, 'Batman'));
+  } finally { rm(); }
+});
+
+test('a series whose library has no folder of its own stays under the root it is in', async () => {
+  const { dir, db, rm } = setup();
+  try {
+    db.exec('ALTER TABLE series ADD COLUMN library_id INTEGER; CREATE TABLE libraries (id INTEGER PRIMARY KEY, root_folder TEXT, folder_pattern TEXT)');
+    db.prepare('INSERT INTO libraries VALUES (6, NULL, NULL)').run();
+    db.prepare('UPDATE series SET library_id=6 WHERE id=1').run();
+    const plan = await planSeries(db, db.prepare('SELECT * FROM series WHERE id=1').get());
+    assert.equal(path.dirname(plan[0].to), path.join(dir, 'Comics', 'DC Comics', 'Batman (2011)'));
   } finally { rm(); }
 });
 
