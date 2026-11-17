@@ -10,6 +10,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Fixed
 
+- **A series added to a library lost it after a restart.** A series added with monitoring off and
+  no files yet counted as a catalog row at start-up ("Removed 1 non-collection catalog rows"), so
+  its library was cleared and the next download filed under the default library. The start-up
+  check now counts the same things the collection does: a follow by any user and issue picks
+  keep a series in its library. (#18)
 - **KOReader reading time stopped syncing for heavy readers.** A device with more than about
   1,500 unsynced page turns on one book sent an upload larger than the server would accept, and
   the same upload was rejected on every sync after that. The server now accepts JSON bodies up

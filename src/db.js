@@ -653,6 +653,38 @@ export function reorderLibraries(db, ids) {
 // restricted library also flags the member restricted; moving OUT clears only
 // the library-inherited flag (a restricted library → default move unhides —
 // deliberate: the default library carries no restriction of its own).
+// Boot-time reconciliation of which series belong to a library. A collection
+// MEMBER is the same thing membershipWhere() counts at run time: monitored
+// (followed=1), owns a valid file, is personally followed by ANY user (a
+// series added with "monitor: none" and no files yet is exactly that — it
+// was added on purpose and must keep its library across restarts), has issue
+// picks, or is self-described with catalog issue rows. Everything else in the
+// series table is a catalog row the user never added, which must stay
+// unassigned. Returns { stripped, adopted } for the boot log.
+export function reconcileLibraryMembers(db) {
+  const selfTypes = [...SELF_DESCRIBED_TYPES];
+  const quoted = selfTypes.map((t) => `'${String(t).replace(/'/g, "''")}'`).join(',');
+  const selfMember = selfTypes.length
+    ? ` OR (series.type IN (${quoted}) AND EXISTS(SELECT 1 FROM issues i WHERE i.series_id=series.id))`
+    : '';
+  const MEMBER = `(followed=1
+    OR EXISTS(SELECT 1 FROM library_files lf WHERE lf.series_id=series.id AND lf.valid=1)
+    OR EXISTS(SELECT 1 FROM user_follows uf WHERE uf.series_id=series.id)
+    OR EXISTS(SELECT 1 FROM issue_picks ip WHERE ip.series_id=series.id AND ip.want=1)${selfMember})`;
+  // Corrective: an earlier migration adopted every row — strip non-members.
+  const stripped = db.prepare(`UPDATE series SET library_id=NULL WHERE library_id IS NOT NULL AND NOT ${MEMBER}`).run().changes;
+  // Unassigned members join the first comic library so the per-library sidebar
+  // entries cover the whole collection. Self-described series get their library
+  // from cataloging (their own type's library), never this comic-library sweep.
+  const home = listLibraries(db).find((l) => l.type === 'comic') || listLibraries(db)[0];
+  let adopted = 0;
+  if (home) {
+    const notSelf = selfTypes.length ? ` AND series.type NOT IN (${quoted})` : '';
+    adopted = db.prepare(`UPDATE series SET library_id=? WHERE library_id IS NULL AND ${MEMBER}${notSelf}`).run(home.id).changes;
+  }
+  return { stripped, adopted, home };
+}
+
 export function assignSeriesLibrary(db, seriesId, libraryId) {
   const prev = db.prepare('SELECT library_id FROM series WHERE id=?').get(seriesId);
   if (libraryId == null) {

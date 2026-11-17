@@ -1,4 +1,4 @@
-import { openDb, dbVersion, backfillPeopleIndex, clearIssuesForRedownload, SELF_DESCRIBED_TYPES, recordedCatalog, backfillCatalogs, libraryOfRecord, librarySources, failInterruptedPackGrabs } from './db.js';
+import { openDb, dbVersion, backfillPeopleIndex, clearIssuesForRedownload, reconcileLibraryMembers, recordedCatalog, backfillCatalogs, libraryOfRecord, librarySources, failInterruptedPackGrabs } from './db.js';
 import { runQueue, reconcileDownloading } from './downloader.js';
 import { processPack } from './pack.js';
 import { createApp } from './server.js';
@@ -89,31 +89,10 @@ attachLogDb(db); // persist logs (and flush anything captured before the db open
   }
   // Only COLLECTION members join a library — the series table also carries
   // catalog rows (looked-up/crawled, never added) that must stay unassigned.
-  // Self-described types (e.g. ebooks) own their content by having issue rows,
-  // NOT by owning a file — a file-less on-demand book IS a member and must
-  // keep its library, or every boot would strip it (loadPlugins ran at line 45,
-  // so SELF_DESCRIBED_TYPES is populated here).
-  const selfTypes = [...SELF_DESCRIBED_TYPES];
-  const selfMember = selfTypes.length
-    ? ` OR (series.type IN (${selfTypes.map((t) => `'${String(t).replace(/'/g, "''")}'`).join(',')})
-        AND EXISTS(SELECT 1 FROM issues i WHERE i.series_id=series.id))`
-    : '';
-  const MEMBER = `(followed=1 OR EXISTS(SELECT 1 FROM library_files lf WHERE lf.series_id=series.id AND lf.valid=1)${selfMember})`;
-  // Corrective: an earlier migration adopted every row — strip non-members.
-  const stripped = db.prepare(`UPDATE series SET library_id=NULL WHERE library_id IS NOT NULL AND NOT ${MEMBER}`).run().changes;
+  // (loadPlugins ran at line 45, so SELF_DESCRIBED_TYPES is populated here.)
+  const { stripped, adopted, home } = reconcileLibraryMembers(db);
   if (stripped) logInfo(`Removed ${stripped} non-collection catalog rows from libraries (members only)`, 'library');
-  // Unassigned members join the first comic library so the per-library sidebar
-  // entries cover the whole collection.
-  const home = listLibraries(db).find((l) => l.type === 'comic') || listLibraries(db)[0];
-  if (home) {
-    // Self-described series get their library from cataloging (their own type's
-    // library), never this comic-library sweep — exclude them.
-    const notSelf = selfTypes.length
-      ? ` AND series.type NOT IN (${selfTypes.map((t) => `'${String(t).replace(/'/g, "''")}'`).join(',')})`
-      : '';
-    const adopted = db.prepare(`UPDATE series SET library_id=? WHERE library_id IS NULL AND ${MEMBER}${notSelf}`).run(home.id).changes;
-    if (adopted) logInfo(`Migrated ${adopted} series into the "${home.name}" library`, 'library');
-  }
+  if (adopted) logInfo(`Migrated ${adopted} series into the "${home.name}" library`, 'library');
 }
 attachJobsDb(db); // persist job runs (and fail any left 'running' by a crashed session)
 // Capture HARD crashes (OOM, native/WASM aborts) that bypass the JS handlers —
