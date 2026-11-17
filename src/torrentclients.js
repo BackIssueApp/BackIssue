@@ -339,13 +339,27 @@ export function makeDelugeClient(config, { fetchImpl = fetch } = {}) {
   }
 
   return {
+    // Fetch the link ourselves and hand Deluge the bytes (core.add_torrent_file,
+    // base64), as the qBittorrent path does. Deluge is very often behind a VPN
+    // that cannot reach the indexer on the LAN, in which case core.add_torrent_url
+    // hangs until our timeout and nothing is added; and a hit-counted private-
+    // tracker link is then fetched exactly once. Magnets have no bytes and go
+    // through core.add_torrent_magnet as before.
     async add(link, { name, category } = {}) {
-      const u = String(link);
-      const id = u.startsWith('magnet:')
-        ? await rpc('core.add_torrent_magnet', [u, {}])
-        : await rpc('core.add_torrent_url', [u, {}]);
-      // Adding a duplicate returns null — derive the hash from the link instead.
-      const hash = id ? String(id).toLowerCase() : await infohashFromLink(u, fetchImpl);
+      const t = await fetchTorrentLink(String(link), fetchImpl);
+      let hash, id;
+      if (t.magnet) {
+        hash = magnetInfohash(t.magnet);
+        if (!hash) throw new Error('could not read infohash from magnet');
+        id = await rpc('core.add_torrent_magnet', [t.magnet, {}]);
+      } else {
+        hash = torrentInfohash(t.buf);
+        if (!hash) throw new Error('could not compute infohash from .torrent');
+        id = await rpc('core.add_torrent_file', [(name || hash) + '.torrent', t.buf.toString('base64'), {}]);
+      }
+      // Adding a duplicate returns null; the hash we computed is the one Deluge
+      // already has, so the monitor can still match it.
+      hash = String(id || hash).toLowerCase();
       // Category = a Label-plugin label (lowercase — Deluge requires it). All
       // best-effort: the plugin may not be enabled (RPC error → skip), and
       // "already exists" from label.add is the normal steady state.

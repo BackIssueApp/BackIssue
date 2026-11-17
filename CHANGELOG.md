@@ -15,6 +15,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   its library was cleared and the next download filed under the default library. The start-up
   check now counts the same things the collection does: a follow by any user and issue picks
   keep a series in its library. (#18)
+- **Deluge behind a VPN could not add torrents.** BackIssue asked Deluge to fetch the .torrent from
+  the indexer link itself, which a VPN-isolated Deluge often cannot reach, so the add hung until
+  the timeout ("The operation was aborted due to timeout"). BackIssue now fetches the file and
+  hands Deluge the bytes, as it already did for qBittorrent, so a private tracker's download link
+  is also hit only once. Magnets are unchanged. (#21)
 - **KOReader reading time stopped syncing for heavy readers.** A device with more than about
   1,500 unsynced page turns on one book sent an upload larger than the server would accept, and
   the same upload was rejected on every sync after that. The server now accepts JSON bodies up

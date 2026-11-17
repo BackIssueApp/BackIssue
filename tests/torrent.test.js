@@ -478,10 +478,19 @@ test('testTorrentClient: transmission 401 → credentials hint; missing host rep
 // Web-UI JSON-RPC: auth.login issues a session cookie, later calls without a
 // valid one get a "Not authenticated" error. `expireAfter` kills the session
 // after N authed calls; web.connect flips a disconnected UI to connected.
+// A minimal valid .torrent (bencoded dict with an info dict) for the file add.
+const FAKE_TORRENT = Buffer.concat([
+  Buffer.from('d4:infod6:lengthi3e4:name5:a.jpg12:piece lengthi16384e6:pieces20:'), Buffer.alloc(20, 7), Buffer.from('ee'),
+]);
 function fakeDeluge({ torrents = {}, addResult, password = 'pw', connected = true, hosts = [['h1', '127.0.0.1', 58846, 'Online']], labelError = false, version = '2.1.1', expireAfter = Infinity } = {}) {
   const calls = [];
   let sessions = 0, valid = null, authed = 0;
   const fetchImpl = async (url, opts = {}) => {
+    // Not the RPC endpoint: the indexer link BackIssue fetches itself.
+    if (!opts.body) {
+      calls.push({ method: 'GET', url: String(url) });
+      return { ok: true, status: 200, headers: { get: () => null }, arrayBuffer: async () => FAKE_TORRENT };
+    }
     const body = JSON.parse(opts.body);
     const cookie = (opts.headers || {}).Cookie || null;
     const reply = (result, error = null, setCookie = null) => ({
@@ -500,7 +509,7 @@ function fakeDeluge({ torrents = {}, addResult, password = 'pw', connected = tru
     if (body.method === 'web.connected') return reply(connected);
     if (body.method === 'web.get_hosts') return reply(hosts);
     if (body.method === 'web.connect') { connected = true; return reply(null); }
-    if (body.method === 'core.add_torrent_magnet' || body.method === 'core.add_torrent_url') return reply(addResult !== undefined ? addResult : 'abcdef0123456789abcdef0123456789abcdef01');
+    if (body.method === 'core.add_torrent_magnet' || body.method === 'core.add_torrent_file') return reply(addResult !== undefined ? addResult : 'abcdef0123456789abcdef0123456789abcdef01');
     if (body.method === 'label.add' || body.method === 'label.set_torrent') return reply(null, labelError ? { message: 'Unknown method' } : null);
     if (body.method === 'core.get_torrents_status') return reply(torrents);
     if (body.method === 'core.remove_torrent') return reply(true);
@@ -522,11 +531,22 @@ test('deluge add: cookie login, magnet add, category applied as a lowercase labe
   assert.deepEqual(calls.find((c) => c.method === 'label.set_torrent').params, [hash, 'backissue']);
 });
 
-test('deluge add: http links go through core.add_torrent_url', async () => {
+test('deluge add: http links are fetched here and handed over as a .torrent file, never as a URL', async () => {
   const { fetchImpl, calls } = fakeDeluge();
   const client = makeDelugeClient({ delugeHost: 'h', delugePass: 'pw' }, { fetchImpl });
-  assert.equal(await client.add('http://prowlarr/download?id=1', {}), 'abcdef0123456789abcdef0123456789abcdef01');
-  assert.equal(calls.find((c) => c.method === 'core.add_torrent_url').params[0], 'http://prowlarr/download?id=1');
+  assert.equal(await client.add('http://prowlarr/download?id=1', { name: 'Saga 1' }), 'abcdef0123456789abcdef0123456789abcdef01');
+  // Deluge behind a VPN cannot reach the indexer, so the link is fetched once
+  // by BackIssue and the bytes go in base64.
+  assert.equal(calls.filter((c) => c.method === 'GET').length, 1);
+  assert.equal(calls.find((c) => c.method === 'core.add_torrent_url'), undefined);
+  const add = calls.find((c) => c.method === 'core.add_torrent_file');
+  assert.deepEqual(add.params, ['Saga 1.torrent', FAKE_TORRENT.toString('base64'), {}]);
+});
+
+test('deluge add: a duplicate .torrent (null result) answers with the hash of the bytes', async () => {
+  const { fetchImpl } = fakeDeluge({ addResult: null });
+  const client = makeDelugeClient({ delugeHost: 'h', delugePass: 'pw' }, { fetchImpl });
+  assert.equal(await client.add('http://prowlarr/download?id=1', {}), torrentInfohash(FAKE_TORRENT));
 });
 
 test('deluge add: a duplicate (null result) falls back to the magnet infohash', async () => {
