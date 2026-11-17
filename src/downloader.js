@@ -52,13 +52,13 @@ export function comicFileName(seriesTitle, number, issueDate, issueTitle, year) 
   return name;
 }
 
-export function targetPath(seriesTitle, issue, format = 'cbz', year, baseDir) {
+export function targetPath(seriesTitle, issue, format = 'cbz', year, baseDir, type = 'comic') {
   const folder = safeName(seriesTitle);
   const ext = format === 'pdf' ? 'pdf' : format === 'cbr' ? 'cbr' : 'cbz';
   const hasNum = issue.issue_number != null && /[\d½¼¾⅓⅔⅛]/.test(String(issue.issue_number));
   const ed = detectEdition(issue.title);
   const stem = (hasNum || ed)
-    ? fileStemFromPattern({ title: seriesTitle, publisher: issue.publisher || '', year }, issue, config.filePattern)
+    ? fileStemFromPattern({ title: seriesTitle, publisher: issue.publisher || '', year, type }, issue, config.filePattern)
     : `${folder} - ${safeName(issue.title)}`;
   // Save into the comic's own folder when we have one; else legacy downloads/<Series>.
   const dir = baseDir || path.join(config.downloadsDir, folder);
@@ -130,7 +130,7 @@ function uniquePath(p) {
 // Shared import step for every download source: take a finished comic (buffer or
 // a file on disk), bake in the ComicVine ComicInfo.xml (if provided), and place
 // it in the comic's folder. Returns { path, tagged }.
-export async function finalizeComic({ buffer, srcPath, format = 'cbz', issue, seriesTitle, seriesYear, seriesPath, comicInfoXml = null, tagPlacement = 'embed' }) {
+export async function finalizeComic({ buffer, srcPath, format = 'cbz', issue, seriesTitle, seriesYear, seriesPath, seriesType = 'comic', comicInfoXml = null, tagPlacement = 'embed' }) {
   let buf = buffer || (srcPath ? await fsp.readFile(srcPath) : null);
   if (!buf) throw new Error('no comic data to finalize');
   const sidecar = tagPlacement === 'sidecar';
@@ -184,7 +184,7 @@ export async function finalizeComic({ buffer, srcPath, format = 'cbz', issue, se
     const dir = seriesPath || path.join(config.downloadsDir, safeName(seriesTitle));
     dest = path.join(dir, `${stem}.${format === 'pdf' ? 'pdf' : format === 'cbr' ? 'cbr' : 'cbz'}`);
   } else {
-    dest = targetPath(seriesTitle, issue, format, seriesYear, seriesPath);
+    dest = targetPath(seriesTitle, issue, format, seriesYear, seriesPath, seriesType);
   }
   // The pattern name may still hold the copy this download replaces (a
   // re-download keeps the old file until the new one proves good), so file
@@ -219,7 +219,7 @@ export async function reconcileDownloading(db) {
       const f = issueFiling(db, issue);
       let existing = null;
       for (const fmt of ['cbz', 'cbr', 'pdf']) {
-        const p = targetPath(f.seriesTitle, issue, fmt, f.seriesYear, f.seriesPath);
+        const p = targetPath(f.seriesTitle, issue, fmt, f.seriesYear, f.seriesPath, f.seriesType);
         if (existsSync(p) && (await readArchiveInfo(p)).ok) { existing = p; break; }
       }
       if (existing) setIssueStatus(db, issue.id, 'done', { filePath: existing });
@@ -237,7 +237,8 @@ function issueFiling(db, issue) {
   const publisher = cv?.publisher || series?.publisher;
   const seriesYear = cv?.start_year || series?.year;
   const seriesPath = series ? resolveSeriesDir(db, series) : undefined;
-  return { series, cv, seriesTitle, publisher, seriesYear, seriesPath };
+  const seriesType = series?.type || 'comic';
+  return { series, cv, seriesTitle, publisher, seriesYear, seriesPath, seriesType };
 }
 
 // Build the ComicVine-derived context an issue needs for filing + tagging:
@@ -245,7 +246,7 @@ function issueFiling(db, issue) {
 // Shared by the download worker and the background monitor. `cvClient` is a
 // lazy getter so a keyless/tagging-off run never constructs a client.
 export async function buildIssueContext(db, issue, cvClient) {
-  const { series, cv, seriesTitle, publisher, seriesYear, seriesPath } = issueFiling(db, issue);
+  const { series, cv, seriesTitle, publisher, seriesYear, seriesPath, seriesType } = issueFiling(db, issue);
   // Every name a source may find this volume under (title + CV/user aliases) —
   // used to search and match indexers that name it differently.
   const seriesNames = series ? seriesSearchNames(db, series.id) : [seriesTitle];
@@ -255,7 +256,7 @@ export async function buildIssueContext(db, issue, cvClient) {
     catch (e) { console.warn('comicinfo build failed', issue.title, e?.message || e); }
   }
   const tagPlacement = tagPlacementFor(db, series?.id);
-  return { series, cv, seriesTitle, seriesNames, publisher, seriesYear, seriesPath, comicInfoXml, tagPlacement };
+  return { series, cv, seriesTitle, seriesNames, publisher, seriesYear, seriesPath, seriesType, comicInfoXml, tagPlacement };
 }
 
 // A download that had to file beside an existing copy (a re-download) takes
@@ -279,7 +280,7 @@ async function takeCleanName(db, result) {
 // owned, and emit tag-log/done progress. Used by both the immediate download path
 // and the deferred (usenet) monitor.
 export async function finishImport(db, { issue, ic, fetched, source, onProgress = () => {} }) {
-  const result = await finalizeComic({ ...fetched, issue, seriesTitle: ic.seriesTitle, seriesYear: ic.seriesYear, seriesPath: ic.seriesPath, comicInfoXml: ic.comicInfoXml, tagPlacement: ic.tagPlacement });
+  const result = await finalizeComic({ ...fetched, issue, seriesTitle: ic.seriesTitle, seriesYear: ic.seriesYear, seriesPath: ic.seriesPath, seriesType: ic.seriesType, comicInfoXml: ic.comicInfoXml, tagPlacement: ic.tagPlacement });
   // A cvissue:<id> row IS a specific ComicVine issue — pass that identity through
   // so the index links this file authoritatively (a release's embedded ComicInfo
   // can carry a wrong number, which would mislead the number-based relink).

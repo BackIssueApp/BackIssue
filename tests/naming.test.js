@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   renderPattern, seriesFolderFromPattern, fileStemFromPattern,
-  DEFAULT_FOLDER_PATTERN, DEFAULT_FILE_PATTERN,
+  DEFAULT_FOLDER_PATTERN, DEFAULT_FILE_PATTERN, DEFAULT_MANGA_FILE_PATTERN,
 } from '../src/naming.js';
 
 const batman = { title: 'Batman', publisher: 'DC Comics', year: '2011' };
@@ -88,4 +88,15 @@ test('token values are sanitized — illegal chars stripped, no path escape', ()
 test('custom patterns work end to end', () => {
   assert.equal(seriesFolderFromPattern(batman, '{series}'), 'Batman');
   assert.equal(fileStemFromPattern(batman, { issue_number: '5' }, '{series} {year} {issue}'), 'Batman 2011 005');
+});
+
+// A manga series is collected by volume, and "V2023" reads as volume 2023 to
+// manga readers, so a blank pattern takes the volume form for it (#16).
+test('default file pattern for a manga series: Series Vol. NN', () => {
+  const oshi = { title: '[Oshi No Ko]', publisher: 'Yen Press', year: '2023', type: 'manga' };
+  assert.equal(DEFAULT_MANGA_FILE_PATTERN, '{series} Vol. {issue:2}');
+  assert.equal(fileStemFromPattern(oshi, { issue_number: '1' }, ''), '[Oshi No Ko] Vol. 01');
+  assert.equal(fileStemFromPattern({ ...oshi, type: 'comic' }, { issue_number: '1' }, ''), '[Oshi No Ko] V2023 #001');
+  // An explicit pattern is honoured whatever the type.
+  assert.equal(fileStemFromPattern(oshi, { issue_number: '1' }, '{series} #{issue}'), '[Oshi No Ko] #001');
 });

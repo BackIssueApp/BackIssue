@@ -38,6 +38,19 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   the same upload was rejected on every sync after that. The server now accepts JSON bodies up
   to 1 MB (it was 100 KB).
 
+### Changed
+
+- **Rename files moves a series into its library's folder.** A series moved to another library
+  kept its files under the root they were in, laid out by the new library's folder pattern, so
+  the files never reached the new library's folder. Rename files and Reorganize library now file
+  a series under its own library's folder; a series whose library has no folder of its own stays
+  under the root it is in, as before. The preview and the confirm say so. (#19)
+- **Manga libraries name and tag files as volumes.** A manga series' default file pattern is now
+  `{series} Vol. {issue:2}` (`[Oshi No Ko] Vol. 01.cbz`) instead of the comic form, and its
+  ComicInfo carries the volume number in `Volume`, no `Number`, and `Manga` set to
+  `YesAndRightToLeft`, which is what Kavita and Komga expect. A file pattern you typed still
+  applies to every library; comics are unchanged. (#16)
+
 ### Added
 
 - **The paged library list can be limited to comics.** `GET /api/collection` with `limit`/`offset`

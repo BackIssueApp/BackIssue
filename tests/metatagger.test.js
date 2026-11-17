@@ -307,3 +307,17 @@ test('taggingEnabled follows the switch alone: no ComicVine key needed', () => {
     assert.equal(taggingEnabled(), false);
   } finally { config.tagOnDownload = saved.on; config.comicvineKeys = saved.keys; }
 });
+
+test('buildComicInfoXml for a manga series: Volume is the number, no Number, Manga right-to-left', () => {
+  const xml = buildComicInfoXml({ series: { name: '[Oshi No Ko]', start_year: '2023', count_of_issues: 13 }, issue: { comicvine_id: 1, issue_number: '4', name: null }, type: 'manga' });
+  assert.match(xml, /<Volume>4<\/Volume>/);
+  assert.ok(!/<Number>/.test(xml), 'no Number: the file is the volume');
+  assert.match(xml, /<Manga>YesAndRightToLeft<\/Manga>/);
+  assert.match(xml, /<Count>13<\/Count>/);
+  assert.match(xml, /<Year>2023<\/Year>/);
+  // A comic is tagged as before.
+  const comic = buildComicInfoXml({ series: { name: 'S', start_year: '1999' }, issue: { comicvine_id: 1, issue_number: '4', name: null } });
+  assert.match(comic, /<Number>4<\/Number>/);
+  assert.match(comic, /<Volume>1999<\/Volume>/);
+  assert.ok(!/<Manga>/.test(comic));
+});

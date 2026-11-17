@@ -27,6 +27,10 @@ export const DEFAULT_FOLDER_PATTERN = '{publisher}/{series} ({year})';
 // downloads (no cover date at filing time) consistent with re-filing (which
 // does have it) so the reorganizer doesn't churn freshly-downloaded files.
 export const DEFAULT_FILE_PATTERN = '{series} V{year} {edition} #{issue}';
+// A manga series is collected by volume, and manga readers (Kavita, Komga)
+// read "V2023" as volume 2023, so its default names the volume instead.
+export const DEFAULT_MANGA_FILE_PATTERN = '{series} Vol. {issue:2}';
+export const defaultFilePattern = (type) => (type === 'manga' ? DEFAULT_MANGA_FILE_PATTERN : DEFAULT_FILE_PATTERN);
 
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -128,7 +132,8 @@ export function seriesFolderFromPattern(series, pattern) {
   return renderPattern(pattern || DEFAULT_FOLDER_PATTERN, seriesTokens(series)) || cleanSegment(cleanSeriesTitle(series.title));
 }
 
-/** The issue filename stem (no extension) from a file pattern. */
+/** The issue filename stem (no extension) from a file pattern. A blank
+ *  pattern takes the default for the series' type (`series.type`). */
 export function fileStemFromPattern(series, issue, pattern) {
-  return renderPattern(pattern || DEFAULT_FILE_PATTERN, issueTokens(series, issue));
+  return renderPattern(pattern || defaultFilePattern(series && series.type), issueTokens(series, issue));
 }

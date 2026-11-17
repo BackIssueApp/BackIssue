@@ -72,16 +72,21 @@ export function mapCredits(credits) {
   return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, [...v].join(', ')]));
 }
 
-// Build ComicInfo.xml from a cv_series row + cv_issues row.
-export function buildComicInfoXml({ series, issue }) {
+// Build ComicInfo.xml from a cv_series row + cv_issues row. `type` is the
+// catalog series' type: for 'manga' the file IS a volume, so Volume carries
+// the number (the comic convention of Volume = start year reads as "volume
+// 2023" in Kavita and Komga), Number is left out, and Manga says right-to-left.
+export function buildComicInfoXml({ series, issue, type = 'comic' }) {
   const tags = [];
   const add = (el, v) => { if (v != null && String(v).trim() !== '') tags.push(`  <${el}>${esc(String(v).trim())}</${el}>`); };
+  const manga = type === 'manga';
 
   add('Title', issue.name);
   add('Series', series.name);
-  add('Number', issue.issue_number);
+  if (!manga) add('Number', issue.issue_number);
   add('Count', series.count_of_issues);
-  add('Volume', series.start_year);
+  add('Volume', manga ? issue.issue_number : series.start_year);
+  if (manga) add('Manga', 'YesAndRightToLeft');
   add('Summary', stripHtml(issue.description));
   const date = issue.cover_date || issue.store_date;
   const m = date ? String(date).match(/^(\d{4})-(\d{2})-(\d{2})/) : null;
@@ -237,7 +242,7 @@ export async function xmlForIssue(db, client, series, issueNumber) {
   catch { /* tag with the cached stub (series/number/name) rather than fail */ }
   const cvSeries = getCvSeries(db, series.cv_id);
   if (!cvSeries) return null;
-  return buildComicInfoXml({ series: cvSeries, issue });
+  return buildComicInfoXml({ series: cvSeries, issue, type: series.type || 'comic' });
 }
 
 // Tag one existing library file from its CV linkage. Records a tag_log entry.
@@ -283,7 +288,8 @@ export async function tagFileFromCv(db, client, filePath) {
     if (e?.rateLimited) throw e;
     /* any other detail error: proceed with the cached stub */
   }
-  const xml = buildComicInfoXml({ series: cvSeries, issue });
+  const owner = row.series_id ? db.prepare('SELECT type FROM series WHERE id=?').get(row.series_id) : null;
+  const xml = buildComicInfoXml({ series: cvSeries, issue, type: owner?.type || 'comic' });
   try {
     if (sidecar) await writeSidecar(filePath, xml);
     else await writeComicInfo(filePath, xml);
