@@ -23,8 +23,8 @@ test('a qBittorrent torrent still moving or re-checking is not done yet', async 
 });
 
 test('a half issue in a release name is one number', () => {
-  assert.deepEqual(parseReleaseName('Wizard 1/2 (1999) (digital)'), { series: 'Wizard', number: '0.5', year: '1999' });
-  assert.deepEqual(parseReleaseName('Wizard 001 (1999)'), { series: 'Wizard', number: '1', year: '1999' });
+  assert.deepEqual(parseReleaseName('Wizard 1/2 (1999) (digital)'), { series: 'Wizard', number: '0.5', year: '1999', marker: null });
+  assert.deepEqual(parseReleaseName('Wizard 001 (1999)'), { series: 'Wizard', number: '1', year: '1999', marker: null });
 });
 
 test('the temp sweep only matches the app\'s own temp names', () => {
