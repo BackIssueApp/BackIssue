@@ -210,5 +210,6 @@
   "srvZipError": "zip error",
   "srvMetadataServiceRateLimitReachedHttp": "Metadata service rate limit reached (HTTP {detail}",
   "srvSeriesNotInThatMetadataSource": "This series is not in that metadata source, so it cannot be refreshed from there",
-  "srvIssueNotInThatMetadataSource": "This issue is not in that metadata source"
+  "srvIssueNotInThatMetadataSource": "This issue is not in that metadata source",
+  "srvResultHasNoDownloadLink": "the result has no download link (downloadUrl or nzbUrl)"
 }

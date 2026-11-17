@@ -210,5 +210,6 @@
   "srvZipError": "błąd ZIP",
   "srvMetadataServiceRateLimitReachedHttp": "Osiągnięto limit zapytań usługi metadanych (HTTP {detail}",
   "srvSeriesNotInThatMetadataSource": "Tej serii nie ma w tym źródle metadanych, więc nie można jej stamtąd odświeżyć",
-  "srvIssueNotInThatMetadataSource": "Tego zeszytu nie ma w tym źródle metadanych"
+  "srvIssueNotInThatMetadataSource": "Tego zeszytu nie ma w tym źródle metadanych",
+  "srvResultHasNoDownloadLink": "wynik nie ma linku do pobrania (downloadUrl lub nzbUrl)"
 }

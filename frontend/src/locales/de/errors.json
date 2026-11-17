@@ -210,5 +210,6 @@
   "srvZipError": "ZIP-Fehler",
   "srvMetadataServiceRateLimitReachedHttp": "Abfragelimit des Metadatendienstes erreicht (HTTP {detail}",
   "srvSeriesNotInThatMetadataSource": "Diese Reihe ist nicht in dieser Metadatenquelle und kann daher nicht von dort aktualisiert werden",
-  "srvIssueNotInThatMetadataSource": "Dieses Heft ist nicht in dieser Metadatenquelle"
+  "srvIssueNotInThatMetadataSource": "Dieses Heft ist nicht in dieser Metadatenquelle",
+  "srvResultHasNoDownloadLink": "das Ergebnis hat keinen Download-Link (downloadUrl oder nzbUrl)"
 }

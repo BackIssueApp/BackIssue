@@ -6,7 +6,7 @@
 import { parseIndexers, searchTorznab } from '../torznab.js';
 import { resolveIndexers, indexersManaged } from '../indexerproviders.js';
 import { makeTorrentClient, torrentClientHost } from '../torrentclients.js';
-import { scoreRelease, issueToken, suspiciouslySmall, manualQueries, manualTarget, autoQueries, autoTarget } from './usenet.js';
+import { scoreRelease, issueToken, suspiciouslySmall, manualQueries, manualTarget, autoQueries, autoTarget, releaseLink } from './usenet.js';
 import { isBookContext, findBookRelease } from './books.js';
 
 export const torrent = {
@@ -59,8 +59,9 @@ export const torrent = {
   // Add the magnet/.torrent to the client under our category; return the infohash
   // so the monitor can match it later. Does not wait for the download.
   async grab(candidate, ctx) {
+    const link = releaseLink(candidate);
     const client = makeTorrentClient(ctx.config, {});
-    const downloadId = await client.add(candidate.downloadUrl, { name: candidate.title, category: ctx.config.torrentCategory });
+    const downloadId = await client.add(link, { name: candidate.title, category: ctx.config.torrentCategory });
     return { downloadId, client: ctx.config.torrentClient || 'qbittorrent', category: ctx.config.torrentCategory, title: candidate.title };
   },
 

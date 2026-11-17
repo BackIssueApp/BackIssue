@@ -210,5 +210,6 @@
   "srvZipError": "zip のエラー",
   "srvMetadataServiceRateLimitReachedHttp": "メタデータサービスのリクエスト上限に達しました (HTTP {detail}",
   "srvSeriesNotInThatMetadataSource": "このシリーズはそのメタデータソースにないため、そこから更新できません",
-  "srvIssueNotInThatMetadataSource": "この号はそのメタデータソースにありません"
+  "srvIssueNotInThatMetadataSource": "この号はそのメタデータソースにありません",
+  "srvResultHasNoDownloadLink": "結果にダウンロードリンクがありません（downloadUrl または nzbUrl）"
 }

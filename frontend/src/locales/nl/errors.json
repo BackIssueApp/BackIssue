@@ -210,5 +210,6 @@
   "srvZipError": "zip-fout",
   "srvMetadataServiceRateLimitReachedHttp": "Aanvraaglimiet van de metadatadienst bereikt (HTTP {detail}",
   "srvSeriesNotInThatMetadataSource": "Deze reeks staat niet in die metadatabron en kan daar dus niet uit worden vernieuwd",
-  "srvIssueNotInThatMetadataSource": "Dit nummer staat niet in die metadatabron"
+  "srvIssueNotInThatMetadataSource": "Dit nummer staat niet in die metadatabron",
+  "srvResultHasNoDownloadLink": "het resultaat heeft geen downloadlink (downloadUrl of nzbUrl)"
 }

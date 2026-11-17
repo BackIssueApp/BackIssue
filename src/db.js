@@ -2291,6 +2291,9 @@ export function ensureCvIssueRow(db, { seriesId, cvIssueId, number = null, title
   const url = 'cvissue:' + cvIssueId;
   const existing = db.prepare('SELECT id FROM issues WHERE url=?').get(url);
   if (existing) return existing.id;
+  // An API caller may give only the catalog issue id; the cached issue knows
+  // its number, and without one the file would be named "- #" and never tagged.
+  if (number == null) number = getCvIssue(db, cvIssueId)?.issue_number ?? null;
   return db.prepare('INSERT INTO issues (series_id, title, issue_number, url) VALUES (?,?,?,?)')
     .run(seriesId, title || ('#' + (number ?? '?')), number != null ? String(number) : null, url).lastInsertRowid;
 }

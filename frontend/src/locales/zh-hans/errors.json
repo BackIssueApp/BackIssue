@@ -210,5 +210,6 @@
   "srvZipError": "zip 错误",
   "srvMetadataServiceRateLimitReachedHttp": "已达到元数据服务的请求上限 (HTTP {detail}",
   "srvSeriesNotInThatMetadataSource": "该系列不在那个元数据来源中，因此无法从那里刷新",
-  "srvIssueNotInThatMetadataSource": "该期刊不在那个元数据来源中"
+  "srvIssueNotInThatMetadataSource": "该期刊不在那个元数据来源中",
+  "srvResultHasNoDownloadLink": "该结果没有下载链接（downloadUrl 或 nzbUrl）"
 }

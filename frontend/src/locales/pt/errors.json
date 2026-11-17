@@ -210,5 +210,6 @@
   "srvZipError": "erro de zip",
   "srvMetadataServiceRateLimitReachedHttp": "Limite de pedidos do serviço de metadados atingido (HTTP {detail}",
   "srvSeriesNotInThatMetadataSource": "Esta série não está nessa fonte de metadados, por isso não pode ser atualizada a partir dela",
-  "srvIssueNotInThatMetadataSource": "Esta edição não está nessa fonte de metadados"
+  "srvIssueNotInThatMetadataSource": "Esta edição não está nessa fonte de metadados",
+  "srvResultHasNoDownloadLink": "o resultado não tem ligação de transferência (downloadUrl ou nzbUrl)"
 }

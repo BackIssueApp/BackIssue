@@ -20,6 +20,11 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
   the timeout ("The operation was aborted due to timeout"). BackIssue now fetches the file and
   hands Deluge the bytes, as it already did for qBittorrent, so a private tracker's download link
   is also hit only once. Magnets are unchanged. (#21)
+- **Grabbing through the API with only the catalog issue id.** `POST /api/search/grab` without
+  `number` and `name` made an issue with no number, so the file was saved as `Series - #.cbz` and
+  never tagged. The number now comes from the cached catalog issue. The torrent and usenet sources
+  also accept either `downloadUrl` or `nzbUrl` on a result, and a result with neither is refused
+  with a clear error instead of an empty add at the download client. (#20)
 - **KOReader reading time stopped syncing for heavy readers.** A device with more than about
   1,500 unsynced page turns on one book sent an upload larger than the server would accept, and
   the same upload was rejected on every sync after that. The server now accepts JSON bodies up

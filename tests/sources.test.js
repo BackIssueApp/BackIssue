@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { orderedSources, allSources } from '../src/sources/index.js';
 import { pluginApi } from '../src/plugins.js';
-import { matchesIssue, buildQuery, parseReleaseName, normalizeSeries, scoreRelease, importCompleted, suspiciouslySmall, autoQueries, autoTarget, manualQueries, manualTarget } from '../src/sources/usenet.js';
+import { matchesIssue, buildQuery, parseReleaseName, normalizeSeries, scoreRelease, importCompleted, suspiciouslySmall, autoQueries, autoTarget, manualQueries, manualTarget, releaseLink } from '../src/sources/usenet.js';
 import { isCollectedSeries, stripEditionSuffix, collectedQueries } from '../src/editions.js';
-import { openDb, upsertSeries, ensureCvIssueRow } from '../src/db.js';
+import { openDb, upsertSeries, ensureCvIssueRow, upsertCvSeries, upsertCvIssue } from '../src/db.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -353,4 +353,26 @@ test('collectedRelease is about the release, judged against the series names', a
   assert.equal(collectedRelease('Saga Vol. 12 (2013)', ['Saga']), false, 'a bare volume word is not enough');
   assert.equal(collectedRelease('Batman Omnibus 003', ['Batman Omnibus']), false, 'explained by the series name');
   assert.equal(collectedRelease('Batman Omnibus 003', ['Batman']), true, 'not explained by the series name');
+});
+
+// API callers drive /api/search/grab with less than the web UI sends (#20).
+test('releaseLink: a result is grabbed by whichever link field it carries, and a missing one is a clear error', () => {
+  assert.equal(releaseLink({ downloadUrl: 'http://t/1.torrent' }), 'http://t/1.torrent');
+  assert.equal(releaseLink({ nzbUrl: 'http://n/1.nzb' }), 'http://n/1.nzb');
+  assert.equal(releaseLink({ link: 'http://i/x' }), 'http://i/x');
+  assert.throws(() => releaseLink({ title: 'no link' }), /no download link/);
+});
+
+test('ensureCvIssueRow: a grab that names only the catalog issue takes its number from the cache', () => {
+  const db = openDb(':memory:');
+  const sid = upsertSeries(db, { title: '[Oshi No Ko]', url: 'cv:147500' });
+  upsertCvSeries(db, { id: 147500, name: '[Oshi No Ko]', count_of_issues: 13 });
+  upsertCvIssue(db, { id: 1001, cv_series_id: 147500, number: '4', name: 'Volume 4' });
+  const id = ensureCvIssueRow(db, { seriesId: sid, cvIssueId: 1001 });
+  const row = db.prepare('SELECT title, issue_number FROM issues WHERE id=?').get(id);
+  assert.equal(row.issue_number, '4', 'the number the file name and tagger need');
+  assert.equal(row.title, '#4');
+  // Unknown to the cache: the old placeholder, not a crash.
+  const unknown = ensureCvIssueRow(db, { seriesId: sid, cvIssueId: 4242 });
+  assert.equal(db.prepare('SELECT issue_number FROM issues WHERE id=?').get(unknown).issue_number, null);
 });

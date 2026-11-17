@@ -124,6 +124,16 @@ export function matchesIssue(title, series, number) {
 // megabyte, so auto-grab refuses anything smaller. Unknown size (0/absent) is NOT
 // rejected — many indexers omit it, and unknown ≠ fake.
 export const MIN_RELEASE_BYTES = 1024 * 1024;
+// The release link of a search result, whichever field it came in. Torrent
+// results carry downloadUrl and usenet results nzbUrl; an API caller sending
+// one shape to both sources otherwise reached the client with no URL at all
+// (SABnzbd answers {"status":false,"nzo_ids":[]}, which says nothing).
+export function releaseLink(candidate) {
+  const link = candidate?.downloadUrl || candidate?.nzbUrl || candidate?.link;
+  if (!link) throw new Error('the result has no download link (downloadUrl or nzbUrl)');
+  return String(link);
+}
+
 export function suspiciouslySmall(size) {
   return Number(size) > 0 && Number(size) < MIN_RELEASE_BYTES;
 }
@@ -328,8 +338,9 @@ export const usenet = {
   // Send the NZB to the client under our category and return the client's id so
   // the monitor can match it later. Does not wait for the download.
   async grab(candidate, ctx) {
+    const link = releaseLink(candidate);
     const client = makeNzbClient(ctx.config, {});
-    const downloadId = await client.add(candidate.nzbUrl, { name: candidate.title, category: ctx.config.nzbCategory });
+    const downloadId = await client.add(link, { name: candidate.title, category: ctx.config.nzbCategory });
     return { downloadId, client: ctx.config.nzbClient, category: ctx.config.nzbCategory, title: candidate.title, releaseGuid: candidate.guid || null };
   },
 
