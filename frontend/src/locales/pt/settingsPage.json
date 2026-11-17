@@ -128,6 +128,8 @@
   "orgSub": "Como as bandas desenhadas descarregadas são nomeadas e arquivadas.",
   "filePattern": "Padrão de ficheiros",
   "renameDownloads": "Mudar o nome aos ficheiros descarregados segundo o padrão de ficheiros (desligado = manter o nome original da fonte)",
+  "convertToCbz": "Converter transferências PDF e EPUB para CBZ (uma imagem por página, copiada tal como está)",
+  "convertToCbzNote": "Os volumes digitais oficiais costumam chegar como PDF ou como EPUB de layout fixo com uma imagem por página. Essas páginas são copiadas sem perdas para um CBZ, que pode depois incluir ComicInfo.xml. Um ficheiro que não esteja construído assim é mantido tal como foi transferido, e o registo indica o motivo.",
   "tokensNote": "Tokens: <code>{publisher}</code> <code>{series}</code> <code>{year}</code> <code>{issue}</code> (<code>{issue:2}</code> define o preenchimento com zeros) <code>{issueTitle}</code> <code>{date}</code> <code>{edition}</code>.",
   "dateNote": "<code>{date}</code> é a data de capa — <i>novembro de 2011</i>. Para as partes em separado: <code>{date:m}</code> <i>11</i>, <code>{date:y}</code> <i>2011</i>, <code>{date:mon}</code> <i>nov</i>. Assim, <code>({date:m}-{date:y})</code> dá <i>(11-2011)</i>.",
   "patternsNote": "Alterar isto afeta os <b>novos</b> downloads — para os ficheiros existentes use <b>Reorganizar biblioteca</b> na página Ferramentas.",

@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
 import JSZip from 'jszip';
 import { PDFDocument } from 'pdf-lib';
+import { pdfToCbz, epubToCbz, isEpub } from './cbzconvert.js';
 import config from './config.js';
 import fsp from 'node:fs/promises';
 import { claimNextQueued, setIssueStatus, getSeriesById, getCvSeries, listIssues, recordGrab, recordImport, seriesSearchNames } from './db.js';
@@ -141,6 +142,14 @@ export async function finalizeComic({ buffer, srcPath, format = 'cbz', issue, se
   // the download-import conversion path cbrBufferToCbz is meant to own.
   if (buf[0] === 0x50 && buf[1] === 0x4b) {                                   // "PK" → ZIP
     format = 'cbz';
+    // A fixed-layout EPUB (official digital manga, mostly) is a zip of one
+    // image per page: with the option on, copy the pages out as a CBZ so the
+    // file can be tagged and read like any other comic.
+    if (config.convertToCbz && await isEpub(buf)) {
+      const c = await epubToCbz(buf);
+      if (c.buffer) buf = c.buffer;
+      else console.warn(`${seriesTitle}: EPUB kept as it is — ${c.reason}`);
+    }
     // A zip is not automatically a comic. Some releases are a .cbz wrapped
     // around a .cbr: the magic bytes say zip, it tags cleanly, and there is
     // nothing inside to read. Straighten it out HERE, before it is written,
@@ -166,7 +175,16 @@ export async function finalizeComic({ buffer, srcPath, format = 'cbz', issue, se
       }
     }
   }
-  else if (buf.toString('latin1', 0, 4) === '%PDF') format = 'pdf';          // "%PDF"
+  else if (buf.toString('latin1', 0, 4) === '%PDF') {                         // "%PDF"
+    format = 'pdf';
+    // Same for a PDF of one image per page: the images are copied out as they
+    // are (never rendered). Anything else stays a PDF, with the reason logged.
+    if (config.convertToCbz) {
+      const c = await pdfToCbz(buf);
+      if (c.buffer) { buf = c.buffer; format = 'cbz'; }
+      else console.warn(`${seriesTitle}: PDF kept as PDF — ${c.reason}`);
+    }
+  }
   else {
     // Unrecognizable container = a corrupt/bogus download (truncated file, an
     // error page, junk a peer shares). Fail CLEARLY here rather than letting

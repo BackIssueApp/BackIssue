@@ -128,6 +128,8 @@
   "orgSub": "Hoe gedownloade comics worden benoemd en opgeborgen.",
   "filePattern": "Bestandspatroon",
   "renameDownloads": "Gedownloade bestanden hernoemen volgens het bestandspatroon (uit = de oorspronkelijke bestandsnaam van de bron behouden)",
+  "convertToCbz": "PDF- en EPUB-downloads omzetten naar CBZ (één afbeelding per pagina, ongewijzigd gekopieerd)",
+  "convertToCbzNote": "Officiële digitale delen komen meestal als PDF of als EPUB met vaste opmaak en één afbeelding per pagina. Die pagina’s worden zonder verlies naar een CBZ gekopieerd, dat daarna ComicInfo.xml kan bevatten. Een bestand dat niet zo is opgebouwd blijft zoals gedownload, en het logboek vermeldt waarom.",
   "tokensNote": "Tokens: <code>{publisher}</code> <code>{series}</code> <code>{year}</code> <code>{issue}</code> (<code>{issue:2}</code> bepaalt het aantal voorloopnullen) <code>{issueTitle}</code> <code>{date}</code> <code>{edition}</code>.",
   "dateNote": "<code>{date}</code> is de coverdatum — <i>november 2011</i>. Voor losse onderdelen: <code>{date:m}</code> <i>11</i>, <code>{date:y}</code> <i>2011</i>, <code>{date:mon}</code> <i>nov</i>. Dus <code>({date:m}-{date:y})</code> geeft <i>(11-2011)</i>.",
   "patternsNote": "Wijzigingen hier gelden voor <b>nieuwe</b> downloads — gebruik voor bestaande bestanden <b>Bibliotheek herordenen</b> op de pagina Hulpmiddelen.",

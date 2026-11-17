@@ -126,6 +126,8 @@
   "orgSub": "ダウンロードしたコミックの名前の付け方と整理の仕方です。",
   "filePattern": "ファイル名パターン",
   "renameDownloads": "ダウンロードしたファイルの名前をパターンに合わせる（オフ = ソースの元のファイル名のまま）",
+  "convertToCbz": "PDF と EPUB のダウンロードを CBZ に変換する（1 ページ 1 画像をそのままコピー）",
+  "convertToCbzNote": "公式のデジタル単行本は、多くの場合 1 ページ 1 画像の PDF または固定レイアウト EPUB で配布されます。それらのページを劣化なしに CBZ へコピーし、ComicInfo.xml を持てるようにします。この形式でないファイルはダウンロードしたまま保存され、理由はログに記録されます。",
   "tokensNote": "トークン：<code>{publisher}</code> <code>{series}</code> <code>{year}</code> <code>{issue}</code>（<code>{issue:2}</code> で桁数を指定）<code>{issueTitle}</code> <code>{date}</code> <code>{edition}</code>。",
   "dateNote": "<code>{date}</code> は表紙日付です（<i>November 2011</i>）。部分ごとに使う場合：<code>{date:m}</code> <i>11</i>、<code>{date:y}</code> <i>2011</i>、<code>{date:mon}</code> <i>Nov</i>。たとえば <code>({date:m}-{date:y})</code> は <i>(11-2011)</i> になります。",
   "patternsNote": "これを変更すると<b>新しい</b>ダウンロードに適用されます。既存のファイルにはツールページの<b>ライブラリを再整理</b>を使ってください。",

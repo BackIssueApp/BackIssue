@@ -128,6 +128,8 @@
   "orgSub": "Wie heruntergeladene Comics benannt und abgelegt werden.",
   "filePattern": "Dateimuster",
   "renameDownloads": "Heruntergeladene Dateien nach dem Dateimuster umbenennen (aus = Originalnamen der Quelle behalten)",
+  "convertToCbz": "PDF- und EPUB-Downloads in CBZ umwandeln (ein Bild pro Seite, unverändert übernommen)",
+  "convertToCbzNote": "Offizielle digitale Bände kommen meist als PDF oder als EPUB mit festem Layout und einem Bild pro Seite. Diese Seiten werden verlustfrei in ein CBZ kopiert, das dann ComicInfo.xml tragen kann. Eine Datei, die nicht so aufgebaut ist, bleibt wie heruntergeladen, und das Protokoll nennt den Grund.",
   "tokensNote": "Platzhalter: <code>{publisher}</code> <code>{series}</code> <code>{year}</code> <code>{issue}</code> (<code>{issue:2}</code> legt die Stellenzahl fest) <code>{issueTitle}</code> <code>{date}</code> <code>{edition}</code>.",
   "dateNote": "<code>{date}</code> ist das Coverdatum — <i>November 2011</i>. Für die Teile einzeln: <code>{date:m}</code> <i>11</i>, <code>{date:y}</code> <i>2011</i>, <code>{date:mon}</code> <i>Nov</i>. <code>({date:m}-{date:y})</code> ergibt also <i>(11-2011)</i>.",
   "patternsNote": "Änderungen hier betreffen <b>neue</b> Downloads — für bestehende Dateien <b>Bibliothek neu organisieren</b> auf der Werkzeugseite verwenden.",

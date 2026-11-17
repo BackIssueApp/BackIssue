@@ -172,6 +172,10 @@ const config = {
   // Rename downloaded files to the file pattern (off = keep the source's
   // original filename; files still land in the comic's folder).
   renameDownloads: true,
+  // Convert a PDF or fixed-layout EPUB download that holds one image per page
+  // into a CBZ (images copied as they are, never rendered) so it can carry
+  // ComicInfo.xml. Off: such files are filed as downloaded.
+  convertToCbz: false,
 
   // First-run onboarding wizard: set true once completed or skipped.
   onboardingDone: false,

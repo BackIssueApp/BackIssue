@@ -128,6 +128,8 @@
   "orgSub": "Come vengono nominati e archiviati i fumetti scaricati.",
   "filePattern": "Schema dei file",
   "renameDownloads": "Rinomina i file scaricati secondo lo schema dei file (disattivato = mantieni il nome originale della fonte)",
+  "convertToCbz": "Converti i download PDF ed EPUB in CBZ (un’immagine per pagina, copiata così com’è)",
+  "convertToCbzNote": "I volumi digitali ufficiali arrivano di solito come PDF o come EPUB a layout fisso con un’immagine per pagina. Quelle pagine vengono copiate senza perdita in un CBZ, che può poi contenere ComicInfo.xml. Un file non costruito in questo modo resta com’è stato scaricato, e il registro ne indica il motivo.",
   "tokensNote": "Token: <code>{publisher}</code> <code>{series}</code> <code>{year}</code> <code>{issue}</code> (<code>{issue:2}</code> imposta la larghezza di riempimento) <code>{issueTitle}</code> <code>{date}</code> <code>{edition}</code>.",
   "dateNote": "<code>{date}</code> è la data di copertina — <i>November 2011</i>. Per le singole parti: <code>{date:m}</code> <i>11</i>, <code>{date:y}</code> <i>2011</i>, <code>{date:mon}</code> <i>Nov</i>. Quindi <code>({date:m}-{date:y})</code> dà <i>(11-2011)</i>.",
   "patternsNote": "Modificarli riguarda i <b>nuovi</b> download — per i file esistenti usa <b>Riorganizza biblioteca</b> nella pagina Strumenti.",

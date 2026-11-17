@@ -53,6 +53,13 @@ by the maintainers when changes merge, so concurrent PRs don't conflict here.
 
 ### Added
 
+- **Convert PDF and EPUB downloads to CBZ.** A new option under Settings → Library → File
+  organization (off by default). A PDF or fixed-layout EPUB that holds one image per page, which
+  is how official digital volumes are usually published, has its pages copied out as they are
+  into a CBZ: a JPEG keeps its exact bytes, a raw image becomes a PNG, and the result is tagged
+  and named like any other download. Nothing is rendered; a file that is not built that way
+  (text over the pages, several images on a page, JPEG 2000) is kept as downloaded, and the log
+  names the page and the reason. (#22)
 - **The paged library list can be limited to comics.** `GET /api/collection` with `limit`/`offset`
   accepts `native=1` to leave out books and audiobooks, and says so in its reply (`native: true`).
   The mobile apps use it to page through large comic libraries instead of loading every series

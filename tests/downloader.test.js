@@ -161,3 +161,33 @@ test('reconcileDownloading requeues a stuck tagging issue with no dest file', ()
   // dest doesn't exist -> back in the queue, resumed by the boot kick-off
   assert.equal(listIssues(db, { seriesId: sid })[0].status, 'queued');
 });
+
+test('finalizeComic converts a one-image-per-page PDF to CBZ when the option is on, and tags it', async () => {
+  const { PDFDocument } = await import('pdf-lib');
+  const { default: config } = await import('../src/config.js');
+  const JPG = Buffer.from([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0x02, 0x00, 0x03, 0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00, 0xff, 0xd9]);
+  const doc = await PDFDocument.create();
+  const j = await doc.embedJpg(Uint8Array.from(JPG));
+  doc.addPage([300, 200]).drawImage(j, { x: 0, y: 0, width: 300, height: 200 });
+  const pdf = Buffer.from(await doc.save());
+  const dir = await fsp.mkdtemp(nodePath.join(os.tmpdir(), 'finalize-'));
+  const was = config.convertToCbz;
+  try {
+    const issue = { issue_number: '2', title: 'Vol. 2', url: 'cvissue:2' };
+    const xml = '<?xml version="1.0"?><ComicInfo><Series>Frieren</Series></ComicInfo>';
+    config.convertToCbz = false;
+    const kept = await finalizeComic({ buffer: pdf, format: 'pdf', issue, seriesTitle: 'Frieren', seriesYear: '2020', seriesPath: dir, comicInfoXml: xml });
+    assert.match(kept.path, /\.pdf$/, 'off: filed as the PDF it was');
+    assert.equal(kept.tagged, false);
+    config.convertToCbz = true;
+    const res = await finalizeComic({ buffer: pdf, format: 'pdf', issue, seriesTitle: 'Frieren', seriesYear: '2020', seriesPath: nodePath.join(dir, 'on'), comicInfoXml: xml });
+    assert.match(res.path, /\.cbz$/, 'on: filed as .cbz');
+    assert.equal(res.tagged, true, 'and tagged, which a PDF cannot be');
+    const z = await JSZip.loadAsync(await fsp.readFile(res.path));
+    assert.ok(z.file('001.jpg') && z.file('ComicInfo.xml'));
+    assert.ok((await z.file('001.jpg').async('nodebuffer')).equals(JPG), 'the page is the PDF\'s own JPEG');
+  } finally {
+    config.convertToCbz = was;
+    await fsp.rm(dir, { recursive: true, force: true });
+  }
+});

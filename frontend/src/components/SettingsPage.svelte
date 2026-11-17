@@ -815,6 +815,11 @@
                 <span class="switch"><input id="set-renameDownloads" type="checkbox" /><span class="switch__track"></span></span>
                 <span>{t('settingsPage.renameDownloads')}</span>
               </label>
+              <label class="field field--check">
+                <span class="switch"><input id="set-convertToCbz" type="checkbox" /><span class="switch__track"></span></span>
+                <span>{t('settingsPage.convertToCbz')}</span>
+              </label>
+              <p class="modal__note">{t('settingsPage.convertToCbzNote')}</p>
               <p class="modal__note">{@html th('settingsPage.tokensNote')}</p>
               <p class="modal__note">{@html th('settingsPage.dateNote')}</p>
               <p class="modal__note">{@html th('settingsPage.patternsNote')}</p>

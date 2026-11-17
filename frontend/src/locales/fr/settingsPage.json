@@ -128,6 +128,8 @@
   "orgSub": "Comment les comics téléchargés sont nommés et classés.",
   "filePattern": "Modèle de fichier",
   "renameDownloads": "Renommer les fichiers téléchargés selon le modèle de fichier (désactivé = conserver le nom d'origine de la source)",
+  "convertToCbz": "Convertir les téléchargements PDF et EPUB en CBZ (une image par page, copiée telle quelle)",
+  "convertToCbzNote": "Les volumes numériques officiels arrivent le plus souvent en PDF ou en EPUB à mise en page fixe, avec une image par page. Ces pages sont copiées sans perte dans un CBZ, qui peut ensuite porter un ComicInfo.xml. Un fichier qui n’est pas construit ainsi est conservé tel que téléchargé, et le journal en donne la raison.",
   "tokensNote": "Jetons : <code>{publisher}</code> <code>{series}</code> <code>{year}</code> <code>{issue}</code> (<code>{issue:2}</code> fixe le nombre de chiffres) <code>{issueTitle}</code> <code>{date}</code> <code>{edition}</code>.",
   "dateNote": "<code>{date}</code> est la date de couverture — <i>novembre 2011</i>. Pour ses parties séparément : <code>{date:m}</code> <i>11</i>, <code>{date:y}</code> <i>2011</i>, <code>{date:mon}</code> <i>nov.</i>. Ainsi <code>({date:m}-{date:y})</code> donne <i>(11-2011)</i>.",
   "patternsNote": "Ces changements s'appliquent aux <b>nouveaux</b> téléchargements — pour les fichiers existants, utilisez <b>Réorganiser la bibliothèque</b> sur la page Outils.",

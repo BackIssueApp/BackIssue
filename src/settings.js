@@ -109,6 +109,7 @@ export const SETTING_FIELDS = {
   folderPattern:       { type: 'string', allowEmpty: true }, // library org (blank = default)
   filePattern:         { type: 'string', allowEmpty: true },
   renameDownloads:     { type: 'bool' }, // off = downloads keep the source's filename
+  convertToCbz:        { type: 'bool' }, // one-image-per-page PDF/EPUB downloads become CBZ
   onboardingDone:      { type: 'bool' },
   // Download sources
   sourcePriority:          { type: 'string' },

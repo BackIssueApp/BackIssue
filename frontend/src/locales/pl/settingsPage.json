@@ -132,6 +132,8 @@
   "orgSub": "Jak pobrane komiksy są nazywane i układane.",
   "filePattern": "Wzorzec nazwy pliku",
   "renameDownloads": "Zmieniaj nazwy pobranych plików według wzorca (wył. = zachowaj oryginalną nazwę ze źródła)",
+  "convertToCbz": "Konwertuj pobrane pliki PDF i EPUB do CBZ (jeden obraz na stronę, kopiowany bez zmian)",
+  "convertToCbzNote": "Oficjalne tomy cyfrowe zwykle są rozpowszechniane jako PDF lub EPUB o stałym układzie z jednym obrazem na stronę. Te strony są kopiowane bezstratnie do pliku CBZ, który może następnie zawierać ComicInfo.xml. Plik zbudowany inaczej zostaje taki, jaki został pobrany, a dziennik podaje powód.",
   "tokensNote": "Znaczniki: <code>{publisher}</code> <code>{series}</code> <code>{year}</code> <code>{issue}</code> (<code>{issue:2}</code> ustala szerokość dopełnienia) <code>{issueTitle}</code> <code>{date}</code> <code>{edition}</code>.",
   "dateNote": "<code>{date}</code> to data na okładce — <i>November 2011</i>. Poszczególne części: <code>{date:m}</code> <i>11</i>, <code>{date:y}</code> <i>2011</i>, <code>{date:mon}</code> <i>Nov</i>. Zatem <code>({date:m}-{date:y})</code> daje <i>(11-2011)</i>.",
   "patternsNote": "Zmiana tych ustawień dotyczy <b>nowych</b> pobrań — dla istniejących plików użyj <b>Reorganizuj bibliotekę</b> na stronie Narzędzia.",
